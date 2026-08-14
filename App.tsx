@@ -1,20 +1,512 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react'
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native'
+import { StatusBar } from 'expo-status-bar'
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context'
+import type { Session } from '@supabase/supabase-js'
+import { BarraAbas, ORDEM_ABAS, type Aba } from './src/components/BarraAbas'
+import { supabase } from './src/lib/supabase'
+import { AguaScreen } from './src/screens/AguaScreen'
+import { CadastroScreen } from './src/screens/CadastroScreen'
+import { CodigoScreen } from './src/screens/CodigoScreen'
+import { ContadorCaloriasScreen } from './src/screens/ContadorCaloriasScreen'
+import { EmBreveScreen } from './src/screens/EmBreveScreen'
+import { HomeScreen } from './src/screens/HomeScreen'
+import { LoginScreen } from './src/screens/LoginScreen'
+import { EditarPlanoScreen } from './src/screens/EditarPlanoScreen'
+import { ExcluirContaScreen } from './src/screens/ExcluirContaScreen'
+import { MaisScreen } from './src/screens/MaisScreen'
+import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
+import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
+import { NutricionistasScreen } from './src/screens/NutricionistasScreen'
+import { PerfilScreen } from './src/screens/PerfilScreen'
+import { PesoScreen } from './src/screens/PesoScreen'
+import { RefeicaoScreen } from './src/screens/RefeicaoScreen'
+import { RegistrarScreen } from './src/screens/RegistrarScreen'
+import { RelatoriosScreen } from './src/screens/RelatoriosScreen'
+import { SonoScreen } from './src/screens/SonoScreen'
+import type { PlanoCompleto, RefeicaoSalva } from './src/lib/plano'
+import { cores } from './src/theme'
 
+/* UM provider só, na raiz, e que nunca desmonta.
+ *
+ * O SafeAreaProvider renderiza null enquanto não mediu os insets do aparelho.
+ * Com um provider por ramo de tela, trocar de ramo desmontava um e montava
+ * outro no meio da medição — e a árvore podia ficar vazia para sempre, sem
+ * erro nenhum no console, porque tecnicamente nada quebrou.
+ *
+ * initialMetrics entrega os insets já no primeiro quadro, em vez de esperar
+ * uma ida e volta de medição. */
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      {/* Cor de fundo na raiz: se algum dia sobrar um quadro sem conteúdo, ele
+          aparece branco em vez de preto. */}
+      <View style={styles.raiz}>
+        <Raiz />
+      </View>
+    </SafeAreaProvider>
+  )
+}
+
+function Raiz() {
+  const [sessao, setSessao] = useState<Session | null>(null)
+  /* Só duas telas antes de entrar, então um estado resolve. Vale trocar por uma
+     biblioteca de navegação quando surgir a terceira (recuperar senha). */
+  const [telaAberta, setTelaAberta] = useState<'login' | 'cadastro'>('login')
+  /* A sessão fica no AsyncStorage, cuja leitura é assíncrona. Sem este estado
+     o app pisca a tela de login por um instante para quem já estava logado. */
+  const [verificando, setVerificando] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSessao(data.session)
+      setVerificando(false)
+    })
+
+    /* Fonte única da verdade daqui para a frente: cobre login, logout e a
+       renovação do token, sem cada tela ter de avisar as outras. */
+    const { data: sub } = supabase.auth.onAuthStateChange((_evento, s) => {
+      setSessao(s)
+      /* Sair devolve ao login, nunca ao cadastro meio preenchido. */
+      if (!s) setTelaAberta('login')
+    })
+
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  if (verificando) {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <View style={styles.centro}>
+          <ActivityIndicator color={cores.verde} />
+        </View>
+      </>
+    )
+  }
+
+  if (sessao) return <AreaLogada sessao={sessao} />
+
+  return (
+    <>
+      <StatusBar style="dark" />
+      <SafeAreaView style={styles.telaAuth}>
+        {telaAberta === 'cadastro' ? (
+          <CadastroScreen onVoltar={() => setTelaAberta('login')} />
+        ) : (
+          <LoginScreen onIrParaCadastro={() => setTelaAberta('cadastro')} />
+        )}
+      </SafeAreaView>
+    </>
+  )
+}
+
+/* Componente à parte porque tem estado e refs próprios: montá-lo só depois do
+   login evita criar o carrossel e disparar a busca do nome antes da hora.
+   Sem SafeAreaView em volta, de propósito — a faixa do topo precisa sangrar até
+   a borda, e quem cuida do respiro do notch é a própria Home. */
+function AreaLogada({ sessao }: { sessao: Session }) {
+  const { width } = useWindowDimensions()
+  const [aba, setAba] = useState<Aba>('inicio')
+  /* As telas do menu vivem aqui, e não dentro da Home, para poder cobrir também
+     a barra de abas. Dentro da Home elas seriam recortadas pelo carrossel. */
+  const [perfilAberto, setPerfilAberto] = useState(false)
+  const [codigoAberto, setCodigoAberto] = useState(false)
+  const [nutricionistasAbertas, setNutricionistasAbertas] = useState(false)
+  const [excluirContaAberta, setExcluirContaAberta] = useState(false)
+  const [cadastrosAberto, setCadastrosAberto] = useState(false)
+  const [aguaAberta, setAguaAberta] = useState(false)
+  /* null = fechada. Aberta, guarda O QUE editar: um conjunto escolhido na lista,
+     'nova' para começar em branco, ou 'ativa' quando veio do menu e a pessoa só
+     quer mexer no que está valendo. */
+  const [metasAbertas, setMetasAbertas] = useState<AlvoMetas | null>(null)
+  const [pesoAberto, setPesoAberto] = useState(false)
+  const [contadorAberto, setContadorAberto] = useState(false)
+  const [sonoAberto, setSonoAberto] = useState(false)
+  /* null = fechada. Aberta, guarda em que opção ela deve nascer: 'plano' quando
+     veio do botão da Home, 'energetico' quando veio de Meus cadastros, undefined
+     quando veio do + e a grade é o começo. */
+  const [registrar, setRegistrar] = useState<{ inicial?: 'plano' | 'energetico' } | null>(null)
+  /* A refeição aberta a partir do cartão "Próxima refeição". Carrega junto o
+     "Hoje"/"Amanhã" de onde ela foi aberta: quem calculou isso foi a Home, e
+     recalcular aqui poderia dar outra resposta se a hora virasse no meio. */
+  const [refeicaoAberta, setRefeicaoAberta] = useState<{
+    refeicao: RefeicaoSalva
+    quando: string
+  } | null>(null)
+  const [planoEmEdicao, setPlanoEmEdicao] = useState<PlanoCompleto | null>(null)
+  /* Contador, e não um booleano de "recarregar": a Home fica montada dentro do
+     carrossel o tempo todo e nunca remonta sozinha. Salvar um plano precisa
+     empurrar uma busca nova, e um número que só cresce faz isso sem ninguém ter
+     de lembrar de baixar a bandeira depois. */
+  const [versaoPlano, setVersaoPlano] = useState(0)
+  /* O mesmo contador, para a água. Separado do plano de propósito: o cartão de
+     água muda várias vezes por dia e o plano quase nunca, e um contador só faria
+     cada copo mandar a Home reler as quatro tabelas do plano. */
+  const [versaoAgua, setVersaoAgua] = useState(0)
+  /* Salvar metas mexe na Home (calorias e macros) E na tela de Água (a meta de
+     água mora na mesma linha de app_metas), então este contador empurra as duas.
+     Por isso ele também sobe o de água, em vez de a Água ter de saber de metas. */
+  const [versaoMetas, setVersaoMetas] = useState(0)
+  const [versaoPeso, setVersaoPeso] = useState(0)
+  const [versaoConsumo, setVersaoConsumo] = useState(0)
+  const [versaoSono, setVersaoSono] = useState(0)
+  const carrossel = useRef<ScrollView>(null)
+  /* O Início não é a primeira aba, então o carrossel precisa nascer deslocado.
+     A prop contentOffset só funciona no iOS; posicionar no primeiro layout
+     funciona nos dois. */
+  const jaPosicionou = useRef(false)
+
+  /* Um caminho só para os dois contadores: a meta de água mora na mesma linha
+     que as de caloria e passos, então gravar metas invalida as duas telas. */
+  function aoSalvarMetas() {
+    setVersaoMetas(v => v + 1)
+    setVersaoAgua(v => v + 1)
+  }
+
+  function irPara(destino: Aba) {
+    const i = ORDEM_ABAS.indexOf(destino)
+    if (i < 0) return
+    carrossel.current?.scrollTo({ x: i * width, animated: true })
+    /* Atualiza já, sem esperar o fim da animação: o realce na barra tem que
+       responder ao toque na hora. */
+    setAba(destino)
+  }
+
+  function aoTerminarDeslizar(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const i = Math.round(e.nativeEvent.contentOffset.x / width)
+    const destino = ORDEM_ABAS[i]
+    if (destino && destino !== aba) setAba(destino)
+  }
+
+  return (
+    <>
+      {/* Topo da Home é branco, então os ícones do sistema precisam ser escuros. */}
+      <StatusBar style="dark" />
+      <View style={styles.telaApp}>
+        <ScrollView
+          ref={carrossel}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          /* Sem elástico nas pontas: puxar além da primeira ou da última aba
+             mostraria um vão vazio ao lado do conteúdo. */
+          bounces={false}
+          overScrollMode="never"
+          onMomentumScrollEnd={aoTerminarDeslizar}
+          onLayout={() => {
+            if (jaPosicionou.current) return
+            jaPosicionou.current = true
+            carrossel.current?.scrollTo({ x: ORDEM_ABAS.indexOf('inicio') * width, animated: false })
+          }}
+          style={styles.carrossel}
+        >
+          {ORDEM_ABAS.map(chave => (
+            <View key={chave} style={{ width }}>
+              <TelaDaAba
+                chave={chave}
+                sessao={sessao}
+                versaoPlano={versaoPlano}
+                versaoAgua={versaoAgua}
+                versaoMetas={versaoMetas}
+                versaoPeso={versaoPeso}
+                versaoConsumo={versaoConsumo}
+                versaoSono={versaoSono}
+                onAbrirPerfil={() => setPerfilAberto(true)}
+                onAbrirCodigo={() => setCodigoAberto(true)}
+                onAbrirNutricionistas={() => setNutricionistasAbertas(true)}
+                onAbrirExcluirConta={() => setExcluirContaAberta(true)}
+                onAbrirCadastros={() => setCadastrosAberto(true)}
+                onMontarPlano={() => setRegistrar({ inicial: 'plano' })}
+                onAbrirRefeicao={(refeicao, quando) => setRefeicaoAberta({ refeicao, quando })}
+                onEditarPlano={setPlanoEmEdicao}
+                onAbrirAgua={() => setAguaAberta(true)}
+                /* Da tela inicial vai-se para o conjunto que está valendo: o
+                   convite ali é "defina sua meta", não "crie mais uma". */
+                onAbrirMetas={() => setMetasAbertas('ativa')}
+                onAbrirPeso={() => setPesoAberto(true)}
+                onAbrirContador={() => setContadorAberto(true)}
+                onAbrirSono={() => setSonoAberto(true)}
+              />
+            </View>
+          ))}
+        </ScrollView>
+
+        <BarraAbas ativa={aba} onTrocar={irPara} onRegistrar={() => setRegistrar({})} />
+
+        {/* Sobreposto por cima de tudo, inclusive da barra de abas. É uma View
+            e não um Modal de propósito: no iOS, abrir a câmera de dentro de um
+            Modal deixa a promise do picker pendurada para sempre. */}
+        {perfilAberto && (
+          <View style={StyleSheet.absoluteFill}>
+            <PerfilScreen
+              sessao={sessao}
+              onFechar={() => setPerfilAberto(false)}
+              /* O foco do peso mora em app_metas: mudá-lo invalida as mesmas
+                 telas que salvar uma meta invalida. */
+              onObjetivoMudou={aoSalvarMetas}
+            />
+          </View>
+        )}
+
+        {codigoAberto && (
+          <View style={StyleSheet.absoluteFill}>
+            <CodigoScreen sessao={sessao} onFechar={() => setCodigoAberto(false)} />
+          </View>
+        )}
+
+        {nutricionistasAbertas && (
+          <View style={StyleSheet.absoluteFill}>
+            <NutricionistasScreen onFechar={() => setNutricionistasAbertas(false)} />
+          </View>
+        )}
+
+        {/* Não precisa de nada para fechar quando dá certo: apagar a conta
+            termina em signOut, o listener de sessão lá em cima zera tudo e o
+            App inteiro volta para o login. */}
+        {excluirContaAberta && (
+          <View style={StyleSheet.absoluteFill}>
+            <ExcluirContaScreen
+              email={sessao.user.email ?? ''}
+              onFechar={() => setExcluirContaAberta(false)}
+            />
+          </View>
+        )}
+
+        {/* Antes da edição no JSX de propósito: abrir um plano daqui empilha a
+            tela de edição POR CIMA desta, e é para ela que o voltar devolve. */}
+        {cadastrosAberto && (
+          <View style={StyleSheet.absoluteFill}>
+            <MeusCadastrosScreen
+              contaId={sessao.user.id}
+              versao={versaoPlano}
+              versaoMetas={versaoMetas}
+              onFechar={() => setCadastrosAberto(false)}
+              onAbrirPlano={setPlanoEmEdicao}
+              onNovoPlano={() => setRegistrar({ inicial: 'plano' })}
+              onAbrirMetas={setMetasAbertas}
+              onNovasMetas={() => setMetasAbertas('nova')}
+              onNovoCalculo={() => setRegistrar({ inicial: 'energetico' })}
+              /* Ativar plano e ativar cálculo passam pelo mesmo aviso: os dois
+                 mudam o que a tela inicial mostra. Bater nos dois contadores é
+                 mais barato que um caminho por assunto. */
+              onAtivou={() => {
+                setVersaoPlano(v => v + 1)
+                setVersaoMetas(v => v + 1)
+              }}
+            />
+          </View>
+        )}
+
+        {planoEmEdicao && (
+          <View style={StyleSheet.absoluteFill}>
+            <EditarPlanoScreen
+              plano={planoEmEdicao}
+              onFechar={() => setPlanoEmEdicao(null)}
+              onSalvo={() => {
+                setPlanoEmEdicao(null)
+                setVersaoPlano(v => v + 1)
+              }}
+            />
+          </View>
+        )}
+
+        {aguaAberta && (
+          <View style={StyleSheet.absoluteFill}>
+            <AguaScreen
+              contaId={sessao.user.id}
+              onFechar={() => setAguaAberta(false)}
+              onMudou={() => setVersaoAgua(v => v + 1)}
+            />
+          </View>
+        )}
+
+        {metasAbertas !== null && (
+          <View style={StyleSheet.absoluteFill}>
+            <MetasScreen
+              contaId={sessao.user.id}
+              alvo={metasAbertas}
+              onFechar={() => setMetasAbertas(null)}
+              onSalvo={aoSalvarMetas}
+            />
+          </View>
+        )}
+
+        {sonoAberto && (
+          <View style={StyleSheet.absoluteFill}>
+            <SonoScreen
+              contaId={sessao.user.id}
+              onFechar={() => setSonoAberto(false)}
+              onMudou={() => setVersaoSono(v => v + 1)}
+            />
+          </View>
+        )}
+
+        {contadorAberto && (
+          <View style={StyleSheet.absoluteFill}>
+            <ContadorCaloriasScreen
+              contaId={sessao.user.id}
+              onFechar={() => setContadorAberto(false)}
+              onMudou={() => setVersaoConsumo(v => v + 1)}
+            />
+          </View>
+        )}
+
+        {pesoAberto && (
+          <View style={StyleSheet.absoluteFill}>
+            <PesoScreen
+              contaId={sessao.user.id}
+              onFechar={() => setPesoAberto(false)}
+              onMudou={() => setVersaoPeso(v => v + 1)}
+            />
+          </View>
+        )}
+
+        {refeicaoAberta && (
+          <View style={StyleSheet.absoluteFill}>
+            <RefeicaoScreen
+              refeicao={refeicaoAberta.refeicao}
+              quando={refeicaoAberta.quando}
+              onFechar={() => setRefeicaoAberta(null)}
+            />
+          </View>
+        )}
+
+        {registrar && (
+          <View style={StyleSheet.absoluteFill}>
+            <RegistrarScreen
+              contaId={sessao.user.id}
+              inicial={registrar.inicial}
+              onFechar={() => setRegistrar(null)}
+              onPlanoSalvo={() => {
+                setRegistrar(null)
+                setVersaoPlano(v => v + 1)
+              }}
+              onAguaMudou={() => setVersaoAgua(v => v + 1)}
+              onMetasSalvas={aoSalvarMetas}
+              onPesoMudou={() => setVersaoPeso(v => v + 1)}
+              onConsumoMudou={() => setVersaoConsumo(v => v + 1)}
+              onSonoMudou={() => setVersaoSono(v => v + 1)}
+            />
+          </View>
+        )}
+      </View>
+    </>
+  )
+}
+
+function TelaDaAba({
+  chave,
+  sessao,
+  versaoPlano,
+  versaoAgua,
+  versaoMetas,
+  versaoPeso,
+  versaoConsumo,
+  versaoSono,
+  onAbrirPerfil,
+  onAbrirCodigo,
+  onAbrirNutricionistas,
+  onAbrirExcluirConta,
+  onAbrirCadastros,
+  onMontarPlano,
+  onAbrirRefeicao,
+  onEditarPlano,
+  onAbrirAgua,
+  onAbrirMetas,
+  onAbrirPeso,
+  onAbrirContador,
+  onAbrirSono,
+}: {
+  chave: Aba
+  sessao: Session
+  versaoPlano: number
+  versaoAgua: number
+  versaoMetas: number
+  versaoPeso: number
+  versaoConsumo: number
+  versaoSono: number
+  onAbrirPerfil: () => void
+  onAbrirCodigo: () => void
+  onAbrirNutricionistas: () => void
+  onAbrirExcluirConta: () => void
+  onAbrirCadastros: () => void
+  onMontarPlano: () => void
+  onAbrirRefeicao: (refeicao: RefeicaoSalva, quando: string) => void
+  onEditarPlano: (plano: PlanoCompleto) => void
+  onAbrirAgua: () => void
+  onAbrirMetas: () => void
+  onAbrirPeso: () => void
+  onAbrirContador: () => void
+  onAbrirSono: () => void
+}) {
+  switch (chave) {
+    case 'inicio':
+      return (
+        <HomeScreen
+          sessao={sessao}
+          versaoPlano={versaoPlano}
+          versaoAgua={versaoAgua}
+          versaoMetas={versaoMetas}
+          versaoPeso={versaoPeso}
+          versaoConsumo={versaoConsumo}
+          versaoSono={versaoSono}
+          onAbrirPerfil={onAbrirPerfil}
+          onAbrirCodigo={onAbrirCodigo}
+          onAbrirCadastros={onAbrirCadastros}
+          onMontarPlano={onMontarPlano}
+          onAbrirRefeicao={onAbrirRefeicao}
+          onEditarPlano={onEditarPlano}
+          onAbrirAgua={onAbrirAgua}
+          onAbrirMetas={onAbrirMetas}
+          onAbrirPeso={onAbrirPeso}
+          onAbrirContador={onAbrirContador}
+          onAbrirSono={onAbrirSono}
+        />
+      )
+    case 'relatorios':
+      return (
+        <RelatoriosScreen
+          contaId={sessao.user.id}
+          /* A soma dos seis contadores, e não um sétimo: os relatórios leem TODOS
+             os assuntos, então qualquer registro os invalida. Como cada contador
+             só cresce, a soma também só cresce — que é a única coisa de que o
+             efeito da tela precisa. */
+          versao={versaoPlano + versaoAgua + versaoMetas + versaoPeso + versaoConsumo + versaoSono}
+          onAbrirMetas={onAbrirMetas}
+        />
+      )
+    case 'mensagens':
+      return <EmBreveScreen titulo="Mensagens" icone="chatbubble-ellipses-outline" />
+    case 'mais':
+      return (
+        <MaisScreen
+          email={sessao.user.email ?? ''}
+          onAbrirNutricionistas={onAbrirNutricionistas}
+          onAbrirCodigo={onAbrirCodigo}
+          onAbrirExcluirConta={onAbrirExcluirConta}
+        />
+      )
+  }
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+  raiz: { flex: 1, backgroundColor: cores.fundo },
+  /* Login e cadastro seguem no creme da marca; a área logada usa a paleta nova. */
+  telaAuth: { flex: 1, backgroundColor: cores.mist },
+  telaApp: { flex: 1, backgroundColor: cores.fundo },
+  carrossel: { flex: 1 },
+  centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.fundo },
+})

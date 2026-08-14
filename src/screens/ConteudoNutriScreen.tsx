@@ -1,0 +1,543 @@
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import {
+  carregarAnamneses,
+  carregarAvaliacoes,
+  carregarEnergetico,
+  carregarPlano,
+  dataLegivel,
+  diaDeHojeNoPlano,
+  DIAS_DO_PLANO,
+  DIAS_DO_PLANO_CURTOS,
+  type Anamnese,
+  type Avaliacao,
+  type CampoAnamnese,
+  type Energetico,
+  type PlanoDaNutri,
+} from '../lib/conteudoNutri'
+import { carregarSessoes, type SessaoDeFotos } from '../lib/fotos'
+import { ComparativoFotos } from '../components/ComparativoFotos'
+import { decimal, milhar } from '../lib/formatar'
+import { cores, inkFraco, inkSuave } from '../theme'
+
+/* O conteúdo de um item do painel "Meu nutricionista".
+ *
+ * Quatro assuntos numa tela só porque o que muda entre eles é o miolo: o
+ * cabeçalho, o carregamento, o erro e o vazio são idênticos, e quatro arquivos
+ * repetiriam essas quatro coisas quatro vezes. Cada leitura é uma função lá
+ * embaixo, sem estado próprio.
+ *
+ * A evolução fotográfica é a única que não sai de RPC: o bucket é privado e cada
+ * foto precisa de URL assinada, então ela vem da edge function `app-fotos`. O
+ * resto da tela não sabe disso — é uma leitura como as outras.
+ *
+ * Tudo é SÓ LEITURA. Nada nesta tela escreve no sistema da nutricionista — o
+ * app mostra o que ela registrou, e quem edita isso é ela, de lá. */
+
+export type ChaveConteudo = 'anamnese' | 'antropometria' | 'fotos' | 'plano' | 'energetico'
+
+const TITULOS: Record<ChaveConteudo, string> = {
+  anamnese: 'Anamnese',
+  antropometria: 'Antropometria',
+  fotos: 'Evolução fotográfica',
+  plano: 'Planejamento alimentar',
+  energetico: 'Cálculo energético',
+}
+
+type Dados =
+  | { chave: 'anamnese'; anamneses: Anamnese[] }
+  | { chave: 'antropometria'; avaliacoes: Avaliacao[] }
+  | { chave: 'fotos'; sessoes: SessaoDeFotos[] }
+  | { chave: 'plano'; plano: PlanoDaNutri | null }
+  | { chave: 'energetico'; energetico: Energetico | null }
+
+export function ConteudoNutriScreen({
+  chave,
+  onFechar,
+}: {
+  chave: ChaveConteudo
+  onFechar: () => void
+}) {
+  const { top } = useSafeAreaInsets()
+  const [dados, setDados] = useState<Dados | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  useEffect(() => {
+    let vivo = true
+    setDados(null)
+    setErro(null)
+
+    carregar(chave)
+      .then(d => vivo && setDados(d))
+      .catch((e: Error) => vivo && setErro(e.message))
+
+    return () => {
+      vivo = false
+    }
+  }, [chave])
+
+  return (
+    <View style={[styles.tela, { paddingTop: top + 8 }]}>
+      <View style={styles.cabecalho}>
+        <Pressable
+          onPress={onFechar}
+          style={styles.botaoVoltar}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+        </Pressable>
+        <Text style={styles.tituloTela}>{TITULOS[chave]}</Text>
+        <View style={styles.botaoVoltar} />
+      </View>
+
+      {erro ? (
+        <View style={styles.conteudo}>
+          <Aviso texto="Não foi possível carregar agora. Tente de novo daqui a pouco." />
+        </View>
+      ) : !dados ? (
+        <View style={styles.centro}>
+          <ActivityIndicator color={cores.verde} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.conteudo} showsVerticalScrollIndicator={false}>
+          <Miolo dados={dados} />
+        </ScrollView>
+      )}
+    </View>
+  )
+}
+
+async function carregar(chave: ChaveConteudo): Promise<Dados> {
+  if (chave === 'anamnese') return { chave, anamneses: await carregarAnamneses() }
+  if (chave === 'antropometria') return { chave, avaliacoes: await carregarAvaliacoes() }
+  if (chave === 'fotos') return { chave, sessoes: await carregarSessoes() }
+  if (chave === 'plano') return { chave, plano: await carregarPlano() }
+  return { chave, energetico: await carregarEnergetico() }
+}
+
+function Miolo({ dados }: { dados: Dados }) {
+  if (dados.chave === 'anamnese') {
+    if (dados.anamneses.length === 0) {
+      return <Aviso texto="A sua nutricionista ainda não preencheu uma anamnese." />
+    }
+    return (
+      <>
+        {dados.anamneses.map(a => (
+          <CartaoAnamnese key={a.id} anamnese={a} />
+        ))}
+      </>
+    )
+  }
+
+  if (dados.chave === 'antropometria') {
+    if (dados.avaliacoes.length === 0) {
+      return <Aviso texto="Nenhuma avaliação registrada até agora." />
+    }
+    return (
+      <>
+        {dados.avaliacoes.map(av => (
+          <CartaoAvaliacao key={av.id} avaliacao={av} />
+        ))}
+      </>
+    )
+  }
+
+  if (dados.chave === 'fotos') {
+    if (dados.sessoes.length === 0) {
+      return <Aviso texto="A sua nutricionista ainda não registrou fotos de evolução." />
+    }
+    return <ComparativoFotos sessoes={dados.sessoes} />
+  }
+
+  if (dados.chave === 'plano') {
+    if (!dados.plano) {
+      return <Aviso texto="Você não tem um plano ativo no momento." />
+    }
+    return <CorpoPlano plano={dados.plano} />
+  }
+
+  if (!dados.energetico) {
+    return <Aviso texto="A sua nutricionista ainda não fez esse cálculo." />
+  }
+  return <CartaoEnergetico energetico={dados.energetico} />
+}
+
+/* ── Anamnese ──────────────────────────────────────────────────────────────*/
+
+function CartaoAnamnese({ anamnese }: { anamnese: Anamnese }) {
+  const quando = dataLegivel(anamnese.data)
+
+  return (
+    <View style={styles.cartao}>
+      <Text style={styles.tituloCartao}>
+        {anamnese.titulo?.trim() || anamnese.templateNome?.trim() || 'Anamnese'}
+      </Text>
+      {!!quando && <Text style={styles.subtituloCartao}>{quando}</Text>}
+
+      {anamnese.secoes.length === 0 ? (
+        <Text style={styles.vazioInterno}>Sem respostas registradas.</Text>
+      ) : (
+        anamnese.secoes.map((secao, i) => (
+          <View key={`${secao.titulo}-${i}`} style={styles.secao}>
+            {!!secao.titulo && <Text style={styles.tituloSecao}>{secao.titulo}</Text>}
+            {secao.campos.map((campo, j) => (
+              <CampoLido key={`${campo.label}-${j}`} campo={campo} />
+            ))}
+          </View>
+        ))
+      )}
+    </View>
+  )
+}
+
+function CampoLido({ campo }: { campo: CampoAnamnese }) {
+  /* O valor vem de jsonb preenchido por outro sistema: pode ser texto, booleano
+     ou uma lista de linhas (o "grupo repetível" do web, como a tabela de
+     exercícios praticados). Qualquer outra coisa vira texto — melhor mostrar o
+     bruto do que esconder que existe resposta ali. */
+  if (Array.isArray(campo.valor)) {
+    return (
+      <View style={styles.campo}>
+        <Text style={styles.rotuloCampo}>{campo.label}</Text>
+        {campo.valor.length === 0 ? (
+          <Text style={styles.valorCampo}>—</Text>
+        ) : (
+          campo.valor.map((linha, i) => (
+            <View key={i} style={styles.linhaGrupo}>
+              {Object.entries(linha ?? {}).map(([chave, valor]) => (
+                <Text key={chave} style={styles.valorCampo}>
+                  {chave}: {textoDe(valor)}
+                </Text>
+              ))}
+            </View>
+          ))
+        )}
+      </View>
+    )
+  }
+
+  return (
+    <View style={styles.campo}>
+      <Text style={styles.rotuloCampo}>{campo.label}</Text>
+      <Text style={styles.valorCampo}>{textoDe(campo.valor)}</Text>
+    </View>
+  )
+}
+
+const textoDe = (v: unknown): string => {
+  if (v === true) return 'Sim'
+  if (v === false) return 'Não'
+  if (v == null || v === '') return '—'
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
+/* ── Antropometria ─────────────────────────────────────────────────────────*/
+
+function CartaoAvaliacao({ avaliacao: a }: { avaliacao: Avaliacao }) {
+  /* Só o que foi medido. Uma grade com doze "—" faria a avaliação parecer
+     malfeita, quando na verdade ninguém mede tudo em toda consulta. */
+  const medidas: { rotulo: string; valor: string }[] = []
+  const juntar = (rotulo: string, valor: number | null, unidade: string, casas = 1) => {
+    if (valor != null) medidas.push({ rotulo, valor: `${decimal(valor, casas)}${unidade}` })
+  }
+
+  juntar('Peso', a.peso, ' kg')
+  juntar('Altura', a.altura != null && a.altura > 3 ? a.altura / 100 : a.altura, ' m', 2)
+  juntar('IMC', a.imc, '')
+  juntar('Gordura', a.gorduraPct, '%')
+  juntar('Massa magra', a.massaMagra, ' kg')
+  juntar('Massa gorda', a.massaGorda, ' kg')
+  juntar('Cintura', a.cintura, ' cm')
+  juntar('Quadril', a.quadril, ' cm')
+  juntar('RCQ', a.rcq, '', 2)
+  juntar('Braço', a.braco, ' cm')
+  juntar('Coxa', a.coxa, ' cm')
+  juntar('Panturrilha', a.panturrilha, ' cm')
+
+  return (
+    <View style={styles.cartao}>
+      <Text style={styles.tituloCartao}>{dataLegivel(a.data) ?? 'Avaliação'}</Text>
+
+      {medidas.length === 0 ? (
+        <Text style={styles.vazioInterno}>Sem medidas registradas nesta avaliação.</Text>
+      ) : (
+        <View style={styles.grade}>
+          {medidas.map(m => (
+            <View key={m.rotulo} style={styles.celula}>
+              <Text style={styles.rotuloCelula}>{m.rotulo}</Text>
+              <Text style={styles.valorCelula}>{m.valor}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {!!a.observacoes?.trim() && <Text style={styles.observacao}>{a.observacoes}</Text>}
+    </View>
+  )
+}
+
+/* ── Plano alimentar ───────────────────────────────────────────────────────*/
+
+/* O plano é um cardápio POR DIA, e a tela mostra um dia de cada vez.
+ *
+ * A primeira versão despejava todas as refeições numa lista só. Num plano de
+ * rotina — o formato que o web cria por padrão — isso são as mesmas quatro ou
+ * cinco refeições repetidas em seis dias, trinta cartões em sequência, sem nada
+ * dizendo onde um dia acaba e o outro começa. Ninguém acha o próprio almoço ali.
+ *
+ * Mesma leitura que o portal e o painel do web fazem do mesmo dado: fita de dias
+ * em cima, cardápio do dia escolhido embaixo. E, quando o plano tem um dia só,
+ * fita nenhuma — um seletor com um botão não seleciona coisa alguma. */
+function CorpoPlano({ plano }: { plano: PlanoDaNutri }) {
+  /* Abre no dia de hoje, que é a pergunta que traz a pessoa aqui ("o que eu como
+     hoje?"). Se o plano não cobre hoje — rotina de segunda a sábado aberta num
+     domingo —, abre no primeiro dia que existe, em vez de numa tela vazia. */
+  const [diaAberto, setDiaAberto] = useState(() => {
+    const hoje = diaDeHojeNoPlano()
+    return plano.dias.some(d => d.dia === hoje) ? hoje : plano.dias[0]?.dia ?? null
+  })
+
+  const umDiaSo = plano.dias.length <= 1
+  const dia = umDiaSo ? plano.dias[0] : plano.dias.find(d => d.dia === diaAberto)
+
+  return (
+    <>
+      <Text style={styles.chamada}>{plano.titulo?.trim() || 'Plano alimentar'}</Text>
+      {!!plano.descricao && <Text style={styles.explicacao}>{plano.descricao}</Text>}
+
+      {plano.dias.length === 0 ? (
+        <Aviso texto="Este plano ainda não tem refeições montadas." />
+      ) : (
+        <>
+          {!umDiaSo && (
+            <>
+              <View style={styles.fitas}>
+                {plano.dias.map(d => {
+                  const aberto = d.dia === diaAberto
+                  return (
+                    <Pressable
+                      key={String(d.dia)}
+                      onPress={() => setDiaAberto(d.dia)}
+                      style={[styles.fita, aberto && styles.fitaAberta]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: aberto }}
+                      accessibilityLabel={nomeDoDia(d.dia)}
+                    >
+                      <Text style={[styles.textoFita, aberto && styles.textoFitaAberto]}>
+                        {nomeCurtoDoDia(d.dia)}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+              <Text style={styles.tituloDia}>{nomeDoDia(dia?.dia ?? null)}</Text>
+            </>
+          )}
+
+          {!dia || dia.refeicoes.length === 0 ? (
+            <Aviso texto="Nenhuma refeição montada neste dia." />
+          ) : (
+            dia.refeicoes.map(r => (
+              <View key={r.id} style={styles.cartao}>
+                <View style={styles.linhaRefeicao}>
+                  <Text style={styles.tituloCartao}>{r.nome}</Text>
+                  {!!r.horario && <Text style={styles.horario}>{r.horario}</Text>}
+                </View>
+
+                {r.itens.length === 0 ? (
+                  <Text style={styles.vazioInterno}>Sem itens nesta refeição.</Text>
+                ) : (
+                  r.itens.map(i => (
+                    <View key={i.id} style={styles.item}>
+                      <Text style={styles.rotuloItem}>{i.rotulo}</Text>
+                      <Text style={styles.apoioItem}>{apoioDoItem(i.quantidadeG, i.medidaCaseira, i.energiaKcal)}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            ))
+          )}
+        </>
+      )}
+    </>
+  )
+}
+
+/* Refeição sem dia não deveria existir, mas a coluna aceita nulo — e um dia
+   chamado "undefined" na fita seria pior do que um rótulo honesto. */
+const nomeDoDia = (dia: number | null) =>
+  dia == null ? 'Sem dia definido' : DIAS_DO_PLANO[dia] ?? `Dia ${dia}`
+
+const nomeCurtoDoDia = (dia: number | null) =>
+  dia == null ? '—' : DIAS_DO_PLANO_CURTOS[dia] ?? String(dia)
+
+/* "120 g · 3 unidades pequenas · 78 kcal", pulando o que não existe. Um item de
+   texto livre ("Ovo mexido") não tem nada disso e fica só com o nome. */
+function apoioDoItem(
+  quantidadeG: number | null,
+  medida: string | null,
+  kcal: number | null,
+): string {
+  const partes: string[] = []
+  if (quantidadeG != null) partes.push(`${decimal(quantidadeG, 0)} g`)
+  if (medida?.trim()) partes.push(medida.trim())
+  if (kcal != null) partes.push(`${milhar(kcal)} kcal`)
+  return partes.join(' · ')
+}
+
+/* ── Cálculo energético ────────────────────────────────────────────────────*/
+
+function CartaoEnergetico({ energetico: e }: { energetico: Energetico }) {
+  const linhas: { rotulo: string; valor: string }[] = []
+  if (e.tmb != null) linhas.push({ rotulo: 'Metabolismo basal', valor: `${milhar(e.tmb)} kcal` })
+  if (e.fatorAtividade != null) linhas.push({ rotulo: 'Fator de atividade', valor: decimal(e.fatorAtividade, 2) })
+  if (e.formula?.trim()) linhas.push({ rotulo: 'Fórmula', valor: e.formula })
+  if (e.peso != null) linhas.push({ rotulo: 'Peso usado', valor: `${decimal(e.peso)} kg` })
+  if (e.altura != null) linhas.push({ rotulo: 'Altura usada', valor: `${decimal(e.altura, 0)} cm` })
+  if (e.idade != null) linhas.push({ rotulo: 'Idade', valor: `${e.idade} anos` })
+  if (e.proteinaGkg != null) linhas.push({ rotulo: 'Proteína', valor: `${decimal(e.proteinaGkg, 1)} g por kg` })
+  if (e.carboPct != null) linhas.push({ rotulo: 'Carboidrato', valor: `${decimal(e.carboPct, 0)}% do total` })
+
+  return (
+    <>
+      <View style={styles.cartaoDestaque}>
+        <Text style={styles.rotuloDestaque}>Gasto energético total</Text>
+        <Text style={styles.numeroDestaque}>
+          {e.getTotal != null ? milhar(e.getTotal) : '—'}
+          <Text style={styles.unidadeDestaque}> kcal/dia</Text>
+        </Text>
+        {!!dataLegivel(e.data) && (
+          <Text style={styles.dataDestaque}>Calculado em {dataLegivel(e.data)}</Text>
+        )}
+      </View>
+
+      {linhas.length > 0 && (
+        <View style={styles.cartao}>
+          <Text style={styles.tituloCartao}>Como foi calculado</Text>
+          {linhas.map(l => (
+            <View key={l.rotulo} style={styles.campo}>
+              <Text style={styles.rotuloCampo}>{l.rotulo}</Text>
+              <Text style={styles.valorCampo}>{l.valor}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {!!e.observacoes?.trim() && (
+        <View style={styles.cartao}>
+          <Text style={styles.tituloCartao}>Observações</Text>
+          <Text style={styles.observacao}>{e.observacoes}</Text>
+        </View>
+      )}
+    </>
+  )
+}
+
+/* ── Peças ─────────────────────────────────────────────────────────────────*/
+
+function Aviso({ texto }: { texto: string }) {
+  return (
+    <View style={styles.aviso}>
+      <Text style={styles.textoAviso}>{texto}</Text>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  tela: { flex: 1, backgroundColor: cores.fundo },
+  centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  cabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+
+  conteudo: { paddingHorizontal: 20, paddingBottom: 32 },
+
+  chamada: { marginTop: 6, fontSize: 18, fontWeight: '800', color: cores.ink },
+  explicacao: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+
+  cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: 16, marginTop: 12 },
+  tituloCartao: { fontSize: 15, fontWeight: '800', color: cores.ink },
+  subtituloCartao: { marginTop: 2, fontSize: 12.5, color: inkSuave },
+  vazioInterno: { marginTop: 10, fontSize: 13, color: inkFraco },
+
+  secao: { marginTop: 16 },
+  tituloSecao: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: cores.verde,
+    marginBottom: 6,
+  },
+
+  campo: { marginTop: 8 },
+  rotuloCampo: { fontSize: 12, color: inkSuave },
+  valorCampo: { marginTop: 1, fontSize: 14, lineHeight: 20, color: cores.ink },
+  linhaGrupo: {
+    marginTop: 6,
+    paddingLeft: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: cores.trilho,
+  },
+
+  grade: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 },
+  celula: { width: '33.33%', paddingVertical: 7, paddingRight: 8 },
+  rotuloCelula: { fontSize: 11.5, color: inkSuave },
+  valorCelula: { marginTop: 2, fontSize: 15, fontWeight: '700', color: cores.ink },
+
+  observacao: { marginTop: 12, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+
+  /* Sete fitas numa linha só, com wrap: em tela estreita a última desce em vez
+     de espremer as sete até o texto sumir. Mesma medida do SeletorDias, que é a
+     fita que a pessoa já conhece dos planos dela. */
+  fitas: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 16 },
+  fita: {
+    flexGrow: 1,
+    minWidth: 42,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    backgroundColor: cores.cartao,
+  },
+  fitaAberta: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
+  textoFita: { fontSize: 12.5, fontWeight: '600', color: inkSuave },
+  textoFitaAberto: { fontWeight: '800', color: cores.verdeEscuro },
+  /* O nome por extenso embaixo da fita: "Seg" sozinho é abreviação de fita, e
+     quem abre o plano quer ler o dia inteiro em algum lugar. */
+  tituloDia: { marginTop: 16, fontSize: 15, fontWeight: '800', color: cores.ink },
+
+  linhaRefeicao: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  horario: { fontSize: 13, fontWeight: '700', color: cores.verde },
+  item: { marginTop: 10 },
+  rotuloItem: { fontSize: 14.5, color: cores.ink },
+  apoioItem: { marginTop: 1, fontSize: 12.5, color: inkSuave },
+
+  cartaoDestaque: {
+    borderRadius: 20,
+    backgroundColor: cores.verdeMenta,
+    padding: 20,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  rotuloDestaque: { fontSize: 12.5, fontWeight: '700', color: cores.verde },
+  numeroDestaque: { marginTop: 6, fontSize: 34, fontWeight: '800', color: cores.ink },
+  unidadeDestaque: { fontSize: 15, fontWeight: '600', color: inkSuave },
+  dataDestaque: { marginTop: 4, fontSize: 12, color: inkSuave },
+
+  aviso: { marginTop: 16, borderRadius: 16, backgroundColor: cores.cartao, padding: 18 },
+  textoAviso: { fontSize: 13.5, lineHeight: 20, color: inkSuave, textAlign: 'center' },
+})

@@ -1,25 +1,50 @@
 {
   "expo": {
-    "name": "app-cygnos",
-    "slug": "app-cygnos",
+    "name": "Cygnos",
+    "slug": "gruporhx",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/cygnos-icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E6F4FE"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cygnosnutri.app"
     },
     "android": {
+      "package": "com.cygnosnutri.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Cygnos acessa suas fotos para você escolher a imagem do seu perfil.",
+          "cameraPermission": "O Cygnos acessa a câmera para você tirar a foto do seu perfil."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "18848ee4-c435-4c84-952c-7be6a0bc79d1"
+      }
+    },
+    "owner": "gruporhx"
   }
 }

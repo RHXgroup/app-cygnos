@@ -1,0 +1,142 @@
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+
+/* Depois de definir as refeições do dia, como preenchê-las.
+ *
+ * O caminho da Aurora está desenhado e desligado de propósito: esconder até
+ * ficar pronto obrigaria a redesenhar a tela inteira depois, e quem usa não
+ * saberia que a opção vai existir. */
+export function ModoPlanoScreen({
+  quantasRefeicoes,
+  onManual,
+  onVoltar,
+}: {
+  quantasRefeicoes: number
+  onManual: () => void
+  onVoltar: () => void
+}) {
+  const { top } = useSafeAreaInsets()
+
+  return (
+    <>
+      <View style={[styles.cabecalho, { paddingTop: top + 8 }]}>
+        <Pressable
+          onPress={onVoltar}
+          style={styles.botaoVoltar}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+        </Pressable>
+        <Text style={styles.tituloTela}>Planejamento alimentar</Text>
+        <View style={styles.botaoVoltar} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.conteudo}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
+      >
+        <Text style={styles.pergunta}>Como você quer montar o plano?</Text>
+        <Text style={styles.apoio}>
+          Seu dia tem {quantasRefeicoes}{' '}
+          {quantasRefeicoes === 1 ? 'refeição' : 'refeições'}. Agora é hora de dizer o que vai em
+          cada uma.
+        </Text>
+
+        <Pressable
+          onPress={onManual}
+          style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
+          accessibilityRole="button"
+        >
+          <View style={styles.icone}>
+            <Ionicons name="create-outline" size={22} color={cores.verde} />
+          </View>
+          <View style={styles.textoCartao}>
+            <Text style={styles.tituloCartao}>Manual</Text>
+            <Text style={styles.descricaoCartao}>
+              Você escolhe os alimentos de cada refeição e informa a quantidade.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={inkFraco} />
+        </Pressable>
+
+        <View style={[styles.cartao, styles.cartaoDesligado]}>
+          <View style={[styles.icone, styles.iconeDesligado]}>
+            <Ionicons name="sparkles-outline" size={22} color={inkFraco} />
+          </View>
+          <View style={styles.textoCartao}>
+            <View style={styles.linhaTitulo}>
+              <Text style={[styles.tituloCartao, styles.tituloDesligado]}>Ajuda da Aurora</Text>
+              <View style={styles.selo}>
+                <Text style={styles.textoSelo}>Em breve</Text>
+              </View>
+            </View>
+            <Text style={styles.descricaoCartao}>
+              A Aurora monta uma sugestão a partir da sua rotina, e você ajusta o que quiser.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </>
+  )
+}
+
+const styles = StyleSheet.create({
+  cabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+
+  conteudo: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24, gap: 12 },
+  pergunta: { fontSize: 20, fontWeight: '800', color: cores.ink, letterSpacing: -0.4 },
+  apoio: { marginTop: -4, marginBottom: 10, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+
+  cartao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: cores.cartao,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  cartaoPressionado: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
+  /* Sem Pressable em volta: um botão que responde ao toque e não faz nada é
+     pior que um botão visivelmente desligado. */
+  cartaoDesligado: { opacity: 0.7 },
+
+  icone: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: cores.verdeClaro,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconeDesligado: { backgroundColor: cores.trilho },
+
+  textoCartao: { flex: 1 },
+  linhaTitulo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tituloCartao: { fontSize: 16, fontWeight: '800', color: cores.ink },
+  tituloDesligado: { color: inkMedio },
+  descricaoCartao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: inkSuave },
+
+  selo: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: cores.trilho,
+  },
+  textoSelo: { fontSize: 10.5, fontWeight: '800', color: inkMedio, letterSpacing: 0.2 },
+})
