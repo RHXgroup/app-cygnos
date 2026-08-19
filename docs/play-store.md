@@ -169,9 +169,13 @@ disponível na faixa e o opt-in acontecer.
 
 ## Imagens da ficha, em `docs/loja`
 
-Geradas por script a partir de `assets/cygnos-icon.png`, sobre o `#0C0F0B` do
-tema escuro. Nenhuma das duas tem canal alfa, porque a Play recusa o ícone com
-transparência.
+Geradas por script a partir de `assets/cygnos-icon.png`. Nenhuma das duas tem
+canal alfa, porque a Play recusa o ícone com transparência.
+
+O ícone da ficha usa o creme da marca, `#FDFBF6` (o `sano.cream`). O gráfico de
+destaque continua no escuro `#0C0F0B`. Se um dia o creme parecer lavado demais
+na grade da loja, o `sano.mist`, `#F4EFE4`, é o mesmo creme um tom mais quente
+e dá mais separação para a pena branca.
 
 | Arquivo | Onde entra |
 | --- | --- |
