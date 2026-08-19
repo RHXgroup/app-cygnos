@@ -210,3 +210,24 @@ obrigatórios a partir das permissões: pedir `CAMERA` sem declarar
 exigindo câmera. Não muda o alcance na prática e não justifica um build só para
 isso. Se algum dia for arrumar, precisa de um config plugin próprio, porque o
 plugin do `expo-image-picker` não declara o `uses-feature`.
+
+## Classificação de conteúdo: respostas
+
+Respondido em 19/08/2026. O questionário é refeito a qualquer momento e a
+classificação é recalculada, então ele descreve a versão que está sendo
+enviada, nunca o roteiro futuro.
+
+| Pergunta | Resposta | Por quê |
+| --- | --- | --- |
+| Aplicação transferida | Não | Nada de sexo, violência ou linguagem dentro do pacote |
+| Partilha de conteúdos dos utilizadores | Não | Não há chat nem troca de conteúdo no app; a conversa acontece no WhatsApp, fora dele |
+| Conteúdo online | Não | O catálogo de nutricionistas só tem campos estruturados (nome, foto, especialidades, telefone, CRN, cidade). Sem biografia livre, sem feed, sem mídia |
+| Produtos com restrição de idade | Não | Não promove cigarro, álcool, arma nem aposta |
+
+### Quando a troca de fotos com a nutricionista existir
+
+Aí a partilha de conteúdos dos utilizadores passa a ser **sim**, e isso não é
+só trocar um radio button. Conteúdo de usuário obriga, pela política do Google,
+a existir dentro do app um jeito de denunciar conteúdo impróprio e de bloquear
+o outro lado, mais uma política de conteúdo publicada. Vale desenhar a
+funcionalidade já com isso, em vez de descobrir na hora do envio.
