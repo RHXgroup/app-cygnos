@@ -188,3 +188,12 @@ avisar:
 unzip -o -q app.aab base/manifest/AndroidManifest.xml -d man
 grep -a -o "android\.permission\.[A-Z_]*" man/base/manifest/AndroidManifest.xml | sort -u
 ```
+
+### Capricho pendente: recursos obrigatórios
+
+O manifesto não declara `uses-feature` nenhum, mas a Play deduz três recursos
+obrigatórios a partir das permissões: pedir `CAMERA` sem declarar
+`android.hardware.camera` como `required="false"` faz o app ser marcado como
+exigindo câmera. Não muda o alcance na prática e não justifica um build só para
+isso. Se algum dia for arrumar, precisa de um config plugin próprio, porque o
+plugin do `expo-image-picker` não declara o `uses-feature`.
