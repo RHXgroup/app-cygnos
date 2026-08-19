@@ -220,6 +220,7 @@ export function PesoScreen({
                 keyboardType="decimal-pad"
                 placeholder="72,4"
                 placeholderTextColor={inkFraco}
+                keyboardAppearance="dark"
                 maxLength={6}
                 style={[styles.campo, texto.trim() !== '' && !valido && styles.campoComErro]}
                 accessibilityLabel="Peso em quilos"
@@ -545,7 +546,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 16,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 19,

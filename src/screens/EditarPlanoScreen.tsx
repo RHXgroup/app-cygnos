@@ -397,6 +397,7 @@ function BlocoRefeicao({
           onChangeText={onRotulo}
           placeholder="Nome da refeição"
           placeholderTextColor={inkFraco}
+          keyboardAppearance="dark"
           maxLength={40}
           editable={!desativado}
           style={styles.campoRotulo}
@@ -407,6 +408,7 @@ function BlocoRefeicao({
           onChangeText={onHora}
           placeholder="00:00"
           placeholderTextColor={inkFraco}
+          keyboardAppearance="dark"
           keyboardType="number-pad"
           maxLength={5}
           editable={!desativado}
@@ -547,7 +549,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
     fontWeight: '700',
@@ -559,7 +561,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
@@ -576,7 +578,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     borderWidth: 1,
     borderColor: cores.borda,
   },
@@ -626,7 +628,7 @@ const styles = StyleSheet.create({
   botaoDesativado: { opacity: 0.45 },
   textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
 
-  fundoMenu: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(16,20,19,0.35)' },
+  fundoMenu: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   menu: {
     position: 'absolute',
     left: 0,

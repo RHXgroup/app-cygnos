@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   textoAvatar: { fontSize: 32, fontWeight: '800', color: cores.verdeEscuro },
   veuAvatar: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(16,20,19,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.70)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     borderWidth: 1,
     borderColor: cores.borda,
   },
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
   botaoSairPressionado: { opacity: 0.75 },
   textoBotaoSair: { fontSize: 15, fontWeight: '700', color: cores.erroTexto },
 
-  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(16,20,19,0.35)' },
+  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
     position: 'absolute',
     left: 0,

@@ -756,7 +756,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     borderWidth: 1,
     borderColor: cores.borda,
   },
@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
   /* ── Véu de análise ── */
   veu: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(16,20,19,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.62)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -832,7 +832,7 @@ const styles = StyleSheet.create({
   textoAnalise: { fontSize: 14, fontWeight: '700', color: cores.ink },
 
   /* ── Folhas ── */
-  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(16,20,19,0.35)' },
+  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
     position: 'absolute',
     left: 0,

@@ -139,6 +139,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
             autoCorrect={false}
             placeholder={PALAVRA_CONFIRMACAO}
             placeholderTextColor={inkFraco}
+            keyboardAppearance="dark"
             style={[styles.campo, confirmada && styles.campoConfirmado]}
             accessibilityLabel={`Digite ${PALAVRA_CONFIRMACAO} para confirmar`}
           />
@@ -253,7 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: cores.line,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 16,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,

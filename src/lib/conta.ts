@@ -1,5 +1,35 @@
 import { supabase } from './supabase'
 
+/* Esta conta é de paciente do app?
+ *
+ * O Auth do Supabase é um só para os dois sistemas: a mesma tabela de usuários
+ * atende o painel da nutricionista e o aplicativo do paciente. Autenticar,
+ * portanto, não quer dizer nada sobre QUEM entrou. Quem separa os dois mundos é
+ * a existência da linha em `app_contas`.
+ *
+ * Sem esta verificação, uma nutricionista entra no app com a conta do sistema
+ * web e vê a casca vazia: sem nome, sem vínculo, sem registro. E a conclusão
+ * natural de quem vê isso é que os dados sumiram.
+ *
+ * Devolve `null` quando não deu para perguntar. Erro de rede não pode barrar
+ * ninguém: paciente legítimo no elevador sem sinal seria expulso do próprio
+ * app. Na dúvida, deixa entrar, e as telas lidam com a ausência de dados como
+ * já lidam hoje. */
+/* Mora aqui, e não no App, para a tela de recuperação poder usar a mesma frase
+   sem importar do App e fechar um ciclo de importação. */
+export const AVISO_NAO_E_PACIENTE =
+  'Esta conta é do sistema Cygnos para nutricionistas, e o aplicativo é para pacientes. Entre pelo site com ela, ou crie sua conta de paciente aqui.'
+
+export async function ehContaDePaciente(): Promise<boolean | null> {
+  const { data, error } = await supabase
+    .from('app_contas')
+    .select('id')
+    .maybeSingle()
+
+  if (error) return null
+  return data !== null
+}
+
 /* Exclusão da própria conta.
  *
  * Quem apaga de verdade é a edge function `app-excluir-conta`, no repo do

@@ -65,22 +65,28 @@ export function MenuTopo({
 }
 
 const styles = StyleSheet.create({
-  fundo: { flex: 1, backgroundColor: 'rgba(16,20,19,0.22)' },
+  fundo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)' },
   cartao: {
     position: 'absolute',
     left: 20,
     minWidth: 200,
     borderRadius: 16,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingVertical: 4,
-    shadowColor: '#101413',
-    shadowOpacity: 0.18,
+    /* Borda, e não só sombra: sombra preta sobre fundo preto não recorta nada,
+       e o menu ficaria colado na tela atrás dele. */
+    borderWidth: 1,
+    borderColor: cores.borda,
+    shadowColor: '#000000',
+    shadowOpacity: 0.5,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
   itemComDivisor: { borderTopWidth: 1, borderTopColor: cores.borda },
-  itemPressionado: { backgroundColor: cores.cartao },
+  /* Pressionado CLAREIA, e não escurece: no tema escuro o realce vem de somar
+     luz, e escurecer faria o item parecer desabilitado. */
+  itemPressionado: { backgroundColor: cores.trilho },
   rotulo: { fontSize: 14.5, fontWeight: '600', color: inkMedio },
 })

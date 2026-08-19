@@ -464,6 +464,7 @@ function Linha({
             onChangeText={onNome}
             placeholder="Nome da refeição"
             placeholderTextColor={inkFraco}
+            keyboardAppearance="dark"
             maxLength={40}
             autoCapitalize="sentences"
             style={styles.campoNome}
@@ -478,6 +479,7 @@ function Linha({
           onChangeText={onHora}
           placeholder="00:00"
           placeholderTextColor={inkFraco}
+          keyboardAppearance="dark"
           keyboardType="number-pad"
           maxLength={5}
           style={styles.campoHora}
@@ -536,7 +538,7 @@ const styles = StyleSheet.create({
        por baixo da vizinha no meio do arraste. */
     zIndex: 10,
     elevation: 6,
-    shadowColor: '#101413',
+    shadowColor: '#000000',
     shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -549,7 +551,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     borderWidth: 1.5,
     borderColor: cores.trilho,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -564,7 +566,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 10,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
@@ -576,7 +578,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',

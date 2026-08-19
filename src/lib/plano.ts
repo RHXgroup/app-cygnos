@@ -469,6 +469,35 @@ export const quandoDaProxima = (p: ProximaRefeicao): string =>
  *
  * Mora aqui, e não na tela: a mesma linha aparece enquanto o plano é montado e
  * depois de ele estar salvo, e as duas precisam dizer a mesma coisa. */
+/* As duas metades de `detalheDoItem`, separadas.
+ *
+ * Existem para quem apresenta o item em duas colunas, com a caloria alinhada à
+ * direita. Numa lista de vinte alimentos, "6 colheres de sopa · 54 g · 213
+ * kcal" repetido vinte vezes vira parede de texto, e o olho não acha o número
+ * que procura. Em coluna, os números ficam um embaixo do outro e a leitura é
+ * vertical.
+ *
+ * `detalheDoItem` continua existindo e continua sendo o certo onde a linha é
+ * estreita demais para duas colunas. */
+export function medidaDoItem(item: Nutrientes & { descricao: string }): string {
+  const partes = [item.descricao]
+
+  if (item.gramasTotais === null) {
+    partes.push('sem peso informado')
+  } else if (!item.descricao.endsWith(' g')) {
+    /* O peso em gramas só aparece quando não é ele próprio a descrição. */
+    partes.push(`${Math.round(item.gramasTotais)} g`)
+  }
+
+  return partes.join(' · ')
+}
+
+export function caloriasDoItem(item: Nutrientes): number | null {
+  /* Sem peso não há como converter a tabela por 100 g em caloria do prato. */
+  if (item.gramasTotais === null) return null
+  return porcao(item.caloriasPor100g, item.gramasTotais)
+}
+
 export function detalheDoItem(item: Nutrientes & { descricao: string }): string {
   const partes = [item.descricao]
 

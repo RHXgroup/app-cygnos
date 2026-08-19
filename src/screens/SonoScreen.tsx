@@ -438,6 +438,7 @@ export function SonoScreen({
                 onChangeText={setObservacao}
                 placeholder="Alguma outra coisa? (opcional)"
                 placeholderTextColor={inkFraco}
+                keyboardAppearance="dark"
                 multiline
                 maxLength={300}
                 style={styles.campoObservacao}
@@ -685,7 +686,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.28)',
     overflow: 'hidden',
   },
-  preenchimentoEficiencia: { height: '100%', borderRadius: 3, backgroundColor: cores.branco },
+  preenchimentoEficiencia: { height: '100%', borderRadius: 3, backgroundColor: cores.superficie },
   textoEficiencia: { marginTop: 6, fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.9)' },
 
   /* ── Blocos ── */
@@ -711,7 +712,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 16,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 19,
@@ -736,7 +737,7 @@ const styles = StyleSheet.create({
     borderColor: cores.verdeClaro,
   },
   botaoPassoPressionado: { backgroundColor: cores.verdeClaro },
-  botaoPassoDesligado: { backgroundColor: cores.branco, borderColor: cores.borda },
+  botaoPassoDesligado: { backgroundColor: cores.superficie, borderColor: cores.borda },
 
   notas: { flexDirection: 'row', gap: 8 },
   nota: {
@@ -745,7 +746,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     borderWidth: 1,
     borderColor: cores.borda,
   },
@@ -758,7 +759,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     borderWidth: 1,
     borderColor: cores.borda,
   },
@@ -772,7 +773,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 12,
@@ -798,7 +799,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     borderWidth: 1,
     borderColor: cores.borda,
   },

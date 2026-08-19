@@ -22,6 +22,7 @@ export const CampoTexto = forwardRef<TextInput, Props>(function CampoTexto(
       <TextInput
         ref={ref}
         placeholderTextColor={inkFraco}
+        keyboardAppearance="dark"
         style={[styles.campo, !!erro && styles.campoComErro, style]}
         {...props}
       />
@@ -46,7 +47,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: cores.line,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 16,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
