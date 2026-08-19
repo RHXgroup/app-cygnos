@@ -161,3 +161,30 @@ logo dentro do círculo seguro de 66%, sobre `#0C0F0B`. A camada monocromática
 foi removida de propósito: a silhueta da pena vira um borrão branco, e sem o
 arquivo o Android usa o ícone normal em vez de aplicar o tema do papel de
 parede.
+
+## Permissões do Android
+
+O que o pacote pede depois da limpeza de 19/08/2026: `INTERNET`, `CAMERA`,
+`READ_EXTERNAL_STORAGE` e `VIBRATE`. A `DUMP` que aparece no manifesto não é
+pedido do app, é o receptor do `androidx.profileinstaller` se protegendo.
+
+Três foram removidas, e nenhuma delas vinha do `app.json`:
+
+- `RECORD_AUDIO`: o plugin do `expo-image-picker` adiciona sozinho, a menos
+  que receba `microphonePermission: false`. Passar `false` também bloqueia a
+  permissão no merge, então nenhum outro pacote consegue trazer de volta
+- `SYSTEM_ALERT_WINDOW` e `WRITE_EXTERNAL_STORAGE`: vêm do modelo base de
+  manifesto do Expo, num bloco marcado como opcional. Sem pasta `android`
+  própria não dá para editar o arquivo, então saem por `blockedPermissions`
+
+`READ_EXTERNAL_STORAGE` ficou de propósito: em Android 12 e anteriores é ela
+que deixa escolher foto da galeria. `VIBRATE` ficou porque é inofensiva e a
+notificação de horário das refeições vai precisar.
+
+Conferir depois de cada build novo, porque plugin adiciona permissão sem
+avisar:
+
+```
+unzip -o -q app.aab base/manifest/AndroidManifest.xml -d man
+grep -a -o "android\.permission\.[A-Z_]*" man/base/manifest/AndroidManifest.xml | sort -u
+```
