@@ -98,8 +98,10 @@ histórico de navegação. O app não toca em nada disso.
 - Público-alvo: apenas 18 anos ou mais. Incluir faixas menores aciona as
   regras de Famílias
 - App de saúde: não é app médico regulado nem faz medição clínica
-- Imagens que faltam produzir: ícone 512x512, gráfico de destaque 1024x500 e
-  no mínimo 2 capturas de tela de celular
+- Imagens: o ícone 512x512 e o gráfico de destaque 1024x500 estão prontos em
+  `docs/loja`, gerados a partir da logo sobre o fundo #0C0F0B do tema escuro.
+  Faltam no mínimo 2 capturas de tela de celular, que só saem com o app
+  instalado num aparelho
 
 ## Regra dos 14 dias
 
@@ -140,3 +142,22 @@ São 14 para uma exigência de 12, ou seja, dois de folga. Cada pessoa precisa
 abrir o link de opt-in com a conta Google da lista e aceitar; quem não aceita
 não conta. A contagem dos 14 dias só começa depois que a versão estiver
 disponível na faixa e o opt-in acontecer.
+
+## Imagens da ficha, em `docs/loja`
+
+Geradas por script a partir de `assets/cygnos-icon.png`, sobre o `#0C0F0B` do
+tema escuro. Nenhuma das duas tem canal alfa, porque a Play recusa o ícone com
+transparência.
+
+| Arquivo | Onde entra |
+| --- | --- |
+| `icone-512.png` | Ícone do app na ficha da loja |
+| `destaque-1024x500.png` | Gráfico de destaque |
+
+O ícone do launcher também foi refeito: até 19/08/2026 o `adaptiveIcon` ainda
+apontava para o "A" azul do template do Expo sobre fundo `#E6F4FE`, que é o
+que apareceria na tela inicial dos testadores. Agora a camada de frente é a
+logo dentro do círculo seguro de 66%, sobre `#0C0F0B`. A camada monocromática
+foi removida de propósito: a silhueta da pena vira um borrão branco, e sem o
+arquivo o Android usa o ícone normal em vez de aplicar o tema do papel de
+parede.

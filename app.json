@@ -4,7 +4,7 @@
     "slug": "gruporhx",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/cygnos-icon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/cygnos-icon.png",
@@ -18,10 +18,8 @@
     "android": {
       "package": "com.cygnosnutri.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#0C0F0B",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
