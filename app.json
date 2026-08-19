@@ -21,7 +21,11 @@
         "backgroundColor": "#0C0F0B",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,7 +35,8 @@
         "expo-image-picker",
         {
           "photosPermission": "O Cygnos acessa suas fotos para você escolher a imagem do seu perfil.",
-          "cameraPermission": "O Cygnos acessa a câmera para você tirar a foto do seu perfil."
+          "cameraPermission": "O Cygnos acessa a câmera para você tirar a foto do seu perfil.",
+          "microphonePermission": false
         }
       ]
     ],
