@@ -60,15 +60,29 @@ Qualquer erro ou sugestão, envie para o contato do teste.
 | Termos | `https://www.cygnos-nutri.com/app/termos` |
 | Exclusão de conta e dados | `https://www.cygnos-nutri.com/app/excluir-conta` |
 
-## Acesso ao app
+## Detalhes do login (o antigo "Acesso ao app")
 
-O app é todo atrás de login, então o revisor precisa de credenciais. Criar uma
-conta de demonstração já vinculada a um paciente fictício com plano, registros
-e peso lançados. Conta vazia gera rejeição por funcionalidade incompleta.
+O app é todo atrás de login, então o revisor precisa de credenciais. A conta de
+demonstração tem que estar **já vinculada** a um paciente com plano e registros
+lançados, e a senha tem que funcionar direto, sem confirmação de e-mail
+pendente. Conta vazia, ou que caia na tela do código de vínculo, gera rejeição
+por funcionalidade incompleta.
 
-Instrução a informar: "Faça login com as credenciais acima. A conta já está
-vinculada a um paciente de demonstração e vai direto para a tela inicial com
-dados preenchidos."
+O formulário exige os textos **em inglês**.
+
+**Nome** (máx. 60):
+
+```
+Demo patient account
+```
+
+**Qualquer outra informação necessária** (máx. 500):
+
+```
+The entire app is behind a login. Use the email and password above. There is no two-step verification, no biometric login and no location restriction. The account is already linked to a demo patient, so the linking-code step is skipped: the app opens on the home screen with a meal plan and with food, water, weight and sleep entries already filled in. Every screen is reachable from the bottom tab bar and the "Mais" (More) menu. The app is free and has no paid or premium content.
+```
+
+O e-mail e a senha da conta ficam só no Play Console. Não guardar aqui.
 
 ## Segurança de dados
 
