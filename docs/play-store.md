@@ -28,7 +28,7 @@ O que você faz no app:
 • Marca as horas de sono
 • Define metas e acompanha o progresso
 • Vê relatórios do seu período de acompanhamento
-• Agenda consultas com a sua nutricionista
+• Pede horário de consulta e acompanha a resposta da sua nutricionista
 • Mantém seu perfil atualizado, com foto e dados pessoais
 
 Como começar:
