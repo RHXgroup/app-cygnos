@@ -93,13 +93,23 @@ O e-mail e a senha da conta ficam só no Play Console. Não guardar aqui.
 | Usuário pode pedir exclusão? | Sim, com a URL de exclusão acima |
 
 Tipos de dados, todos **coletados**, **não compartilhados**, finalidade
-**funcionalidade do app** e **gerenciamento de conta**:
+**funcionalidade do app** e **gerenciamento de conta**. A lista saiu da tela de
+cadastro e das colunas de `app_contas`, não de memória:
 
-- Informações pessoais: nome e e-mail. Obrigatórios
-- Fotos e vídeos: fotos. Opcional (foto de perfil)
-- Saúde e fitness: informações de saúde e de atividade física. Opcional.
-  Cobre peso, medidas, registros alimentares, água e sono
-- Identificadores: ID do usuário. Obrigatório
+| Categoria | Item | Obrigatório | De onde vem |
+| --- | --- | --- | --- |
+| Informações pessoais | Nome | Sim | `nome_completo`, no cadastro |
+| Informações pessoais | Endereço de e-mail | Sim | login |
+| Informações pessoais | Número de telefone | Sim | `telefone`, no cadastro |
+| Informações pessoais | IDs de usuário | Sim | `username` e o id do Auth |
+| Informações pessoais | Outras informações | Sim | CPF, data de nascimento e gênero |
+| Fotos e vídeos | Fotos | Não | foto de perfil, opcional |
+| Saúde e fitness | Informações de saúde | Não | peso, medidas, registros alimentares, água |
+| Saúde e fitness | Informações de atividade física | Não | sono e metas |
+
+O CPF, a data de nascimento e o gênero entram em "Outras informações" porque a
+lista do Google não tem categoria própria para documento nacional, data de
+nascimento nem gênero.
 
 Não marcar localização, contatos, mensagens, arquivos, dados financeiros nem
 histórico de navegação. O app não toca em nada disso.
