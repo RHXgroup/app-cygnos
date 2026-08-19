@@ -10,10 +10,12 @@ import {
   View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
+import { AnelCalorias } from '../components/AnelCalorias'
 import { AnelProgresso } from '../components/AnelProgresso'
-import { ArcoCalorias } from '../components/ArcoCalorias'
+import { FaixaDeDias } from '../components/FaixaDeDias'
 import { MenuTopo } from '../components/MenuTopo'
 import { MiniGrafico } from '../components/MiniGrafico'
 import { TotaisPlano } from '../components/TotaisPlano'
@@ -28,9 +30,10 @@ import {
   type Agua,
 } from '../lib/agua'
 import {
+  caloriasDoItem,
   carregarPlanoAtivo,
-  detalheDoItem,
   itensDoPlano,
+  medidaDoItem,
   proximaRefeicaoDe,
   quandoDaProxima,
   resumoDosDias,
@@ -71,9 +74,11 @@ import {
   type Noite,
 } from '../lib/sono'
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { cores, coresMacro, degrades, inkFraco, inkMedio, inkSuave } from '../theme'
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
+
+const ehHoje = (d: Date) => dataISO(d) === dataISO(new Date())
 
 /* Margem lateral da tela e respiro interno dos cartões. Ficam nomeados porque
    a largura do gráfico é calculada a partir deles. */
@@ -146,6 +151,10 @@ export function HomeScreen({
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
   const [pesos, setPesos] = useState<RegistroPeso[]>([])
   const [consumo, setConsumo] = useState<ItemConsumo[]>([])
+  /* O dia que a faixa está mostrando. Nasce em hoje e só o bloco de calorias
+     obedece a ele: água, peso e sono seguem sendo o dia corrente, porque são
+     cartões de acompanhamento contínuo e não do prato de uma data. */
+  const [diaSelecionado, setDiaSelecionado] = useState(() => new Date())
   const [noites, setNoites] = useState<Noite[]>([])
   const [detalheDoDia, setDetalheDoDia] = useState(false)
 
@@ -254,14 +263,14 @@ export function HomeScreen({
   useEffect(() => {
     let ativo = true
 
-    carregarConsumo(sessao.user.id).then(r => {
+    carregarConsumo(sessao.user.id, diaSelecionado).then(r => {
       if (ativo && r.tipo === 'ok') setConsumo(r.itens)
     })
 
     return () => {
       ativo = false
     }
-  }, [sessao.user.id, versaoConsumo])
+  }, [sessao.user.id, versaoConsumo, diaSelecionado])
 
   /* Sete noites, não trinta: é o que o cartão desenha, e trazer o mês inteiro
      para mostrar uma semana seria carregar quatro vezes mais a cada abertura. */
@@ -390,11 +399,15 @@ export function HomeScreen({
         </Pressable>
       </View>
 
+      {/* ── Dias da semana ── */}
+      <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
+
       {/* ── Calorias ── */}
       <CartaoCalorias
         consumo={consumo}
         plano={planoNaTela}
         metas={metas}
+        dia={diaSelecionado}
         onAbrirMetas={onAbrirMetas}
         onAbrirContador={onAbrirContador}
       />
@@ -618,18 +631,23 @@ function CartaoCalorias({
   consumo,
   plano,
   metas,
+  dia,
   onAbrirMetas,
   onAbrirContador,
 }: {
   consumo: ItemConsumo[]
   plano: PlanoCompleto | null
   metas: Metas
+  /* O dia escolhido na faixa. Só rotula: quem já trouxe os itens certos foi o
+     efeito que carregou o consumo. */
+  dia: Date
   onAbrirMetas: () => void
   onAbrirContador: () => void
 }) {
   const comido: TotaisConsumo = totaisConsumidos(consumo)
   const meta = metas.calorias
   const doPlano = plano ? totaisDe(itensDoPlano(plano.refeicoes)).calorias : null
+  const rotuloDoDia = ehHoje(dia) ? 'Hoje' : dataNumerica(dia)
 
   const cabecalho = (
     <View style={styles.linhaTituloPlano}>
@@ -675,49 +693,64 @@ function CartaoCalorias({
       onPress={onAbrirContador}
       style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
       accessibilityRole="button"
-      accessibilityLabel={`${milhar(kcal)} de ${milhar(meta)} calorias hoje. Abrir o contador.`}
+      accessibilityLabel={`${milhar(kcal)} de ${milhar(meta)} calorias em ${rotuloDoDia}. Abrir o contador.`}
     >
-      <View style={styles.linhaCalorias}>
-        <View style={styles.colunaRestantes}>
-          {cabecalho}
-          <Text style={styles.rotuloRestantes}>
-            {restantes >= 0 ? 'Restantes' : 'Acima da meta'}
-          </Text>
-          <View style={styles.linhaValorGrande}>
-            <Text style={styles.valorGrande}>{milhar(Math.abs(restantes))}</Text>
-            <Text style={styles.unidadeGrande}>kcal</Text>
-          </View>
-          <Text style={styles.metaCalorias}>de {milhar(meta)} kcal de meta</Text>
-        </View>
+      {cabecalho}
 
-        <ArcoCalorias fracao={kcal / meta}>
-          <View style={styles.chama}>
-            <Ionicons name="restaurant-outline" size={17} color={cores.verde} />
+      {/* Anel à esquerda, macros em coluna à direita. O número grande fica no
+          meio do anel, e não numa coluna própria: é ele que o anel está
+          medindo, e separá-los faria a pessoa ler duas vezes. */}
+      <View style={styles.linhaCalorias}>
+        <AnelCalorias
+          fatias={{
+            proteinas: comido.proteinas,
+            carboidratos: comido.carboidratos,
+            gorduras: comido.gorduras,
+          }}
+          meta={meta}
+        >
+          <Text style={styles.rotuloAnelDia}>{rotuloDoDia}</Text>
+          <View style={styles.linhaValorAnel}>
+            <Ionicons name="flame" size={17} color={cores.limao} />
+            <Text style={styles.valorAnel}>{milhar(kcal)}</Text>
           </View>
-          <Text style={styles.rotuloConsumidas}>Comidas</Text>
-          <View style={styles.linhaConsumidas}>
-            <Text style={styles.valorConsumidas}>{milhar(kcal)}</Text>
-            <Text style={styles.unidadeConsumidas}>kcal</Text>
-          </View>
-        </ArcoCalorias>
+          <Text style={styles.metaAnel}>{milhar(meta)} kcal</Text>
+          <Text style={styles.restantesAnel}>
+            {restantes >= 0 ? `faltam ${milhar(restantes)}` : `${milhar(-restantes)} acima`}
+          </Text>
+        </AnelCalorias>
+
+        <View style={styles.colunaMacros}>
+          <LinhaMacro
+            rotulo="Carboidratos"
+            comido={comido.carboidratos}
+            meta={metas.carboidratos}
+            cor={coresMacro.carboidratos}
+          />
+          <LinhaMacro
+            rotulo="Proteínas"
+            comido={comido.proteinas}
+            meta={metas.proteinas}
+            cor={coresMacro.proteinas}
+          />
+          <LinhaMacro
+            rotulo="Gorduras"
+            comido={comido.gorduras}
+            meta={metas.gorduras}
+            cor={coresMacro.gorduras}
+          />
+        </View>
       </View>
 
-      {/* Macros: o mesmo comido × meta, e só os que têm meta definida. */}
-      {(metas.proteinas !== null || metas.carboidratos !== null || metas.gorduras !== null) && (
-        <>
-          <View style={styles.divisor} />
-          <View style={styles.linhaMacros}>
-            <ColunaMacro rotulo="Proteínas" comido={comido.proteinas} meta={metas.proteinas} />
-            <ColunaMacro
-              rotulo="Carboidratos"
-              comido={comido.carboidratos}
-              meta={metas.carboidratos}
-              comDivisor
-            />
-            <ColunaMacro rotulo="Gorduras" comido={comido.gorduras} meta={metas.gorduras} comDivisor />
-          </View>
-        </>
-      )}
+      {/* A mesma ação do cartão inteiro, dita com todas as letras. O cartão ser
+          tocável não se anuncia sozinho, e a câmera é o caminho que a maioria
+          usa para lançar. */}
+      <View style={styles.barraConferir}>
+        <Text style={styles.textoConferir}>Conferir calorias</Text>
+        <View style={styles.botaoCamera}>
+          <Ionicons name="camera-outline" size={17} color={cores.sobreLimao} />
+        </View>
+      </View>
 
       {/* A referência do dia. Uma linha só: o plano tem cartão próprio logo
           abaixo, e o que interessa aqui é o número, para comparar de relance. */}
@@ -785,6 +818,17 @@ function CartaoAgua({
       accessibilityRole="button"
       accessibilityLabel={`Água: ${copos} de ${coposMeta} copos. Abrir.`}
     >
+      {/* O degradê fica atrás do conteúdo como camada absoluta, e não como
+          contêiner em volta: assim o Pressable continua sendo quem mede o
+          cartão, e o estado pressionado não precisa recalcular o degradê. */}
+      <LinearGradient
+        colors={degrades.destaque}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
       <View style={styles.linhaTituloAgua}>
         <Ionicons name="water-outline" size={15} color={cores.branco} />
         <Text style={styles.tituloAgua}>Água</Text>
@@ -1230,14 +1274,37 @@ function RefeicaoDoPlano({ refeicao }: { refeicao: RefeicaoSalva }) {
       {refeicao.itens.length === 0 ? (
         <Text style={styles.refeicaoVazia}>Nenhum alimento nesta refeição</Text>
       ) : (
-        refeicao.itens.map(i => (
-          <View key={i.id} style={styles.itemPlano}>
-            <Text style={styles.nomeItemPlano} numberOfLines={2}>
-              {i.nome}
-            </Text>
-            <Text style={styles.detalheItemPlano}>{detalheDoItem(i)}</Text>
-          </View>
-        ))
+        <View style={styles.listaItensPlano}>
+          {refeicao.itens.map((i, indice) => {
+            const kcal = caloriasDoItem(i)
+            return (
+              /* Fio separando um item do outro, e não espaço maior: com nome em
+                 duas linhas o espaço sozinho não diz onde um item acaba e o
+                 próximo começa. */
+              <View
+                key={i.id}
+                style={[styles.itemPlano, indice > 0 && styles.itemPlanoComLinha]}
+              >
+                <View style={styles.textoItemPlano}>
+                  <Text style={styles.nomeItemPlano} numberOfLines={2}>
+                    {i.nome}
+                  </Text>
+                  <Text style={styles.medidaItemPlano}>{medidaDoItem(i)}</Text>
+                </View>
+
+                {/* Largura mínima fixa: é ela que alinha as calorias numa
+                    coluna, em vez de cada uma parar onde o texto da esquerda
+                    terminou. */}
+                {kcal !== null && (
+                  <Text style={styles.kcalItemPlano}>
+                    {Math.round(kcal)}
+                    <Text style={styles.unidadeKcalItem}> kcal</Text>
+                  </Text>
+                )}
+              </View>
+            )
+          })}
+        </View>
       )}
     </View>
   )
@@ -1248,33 +1315,59 @@ function RefeicaoDoPlano({ refeicao }: { refeicao: RefeicaoSalva }) {
  * Os dois lados podem faltar, e cada ausência tem uma cara diferente: sem meta,
  * o número do plano aparece sozinho, sem barra — barra sem meta não teria contra
  * o que encher. Sem plano, um traço, que é como se escreve "não se sabe". */
-function ColunaMacro({
+/* Um bloco por macro, cada um com a sua cor.
+ *
+ * A cor não é enfeite: os três ficam lado a lado e a barrinha de cada um é
+ * curta. Fossem os três no mesmo verde, saber qual barra é de qual macro
+ * dependeria de ler o rótulo toda vez. */
+/* Um macro na coluna ao lado do anel: glifo de barras, o comido sobre a meta e
+   o nome na cor do arco correspondente.
+ *
+ * O nome é que carrega a cor, e não um quadradinho de legenda: são três linhas
+ * curtas, e ligar arco a nome pela cor da própria palavra dispensa a legenda
+ * inteira. */
+function LinhaMacro({
   rotulo,
   comido,
   meta,
-  comDivisor,
+  cor,
 }: {
   rotulo: string
   comido: number | null
   meta: number | null
-  comDivisor?: boolean
+  cor: string
 }) {
   const fracao = meta !== null && meta > 0 && comido !== null ? Math.min(comido / meta, 1) : 0
+  /* Quatro barras de altura crescente, preenchidas conforme a fração. Um
+      progresso que cabe em 14 pontos de largura, onde uma barra deitada não
+      caberia. */
+  const barras = [0.45, 0.62, 0.8, 1]
 
   return (
-    <View style={[styles.macro, comDivisor && styles.macroComDivisor]}>
-      <Text style={styles.rotuloMacro}>{rotulo}</Text>
-      <View style={styles.linhaValorMacro}>
-        {/* Traço, e não zero, quando nada informou o macro: nenhum item trouxe
-            proteína é diferente de comeu zero de proteína. */}
-        <Text style={styles.valorMacro}>{comido === null ? '—' : Math.round(comido)}</Text>
-        {meta !== null && <Text style={styles.metaMacro}> / {meta}g</Text>}
+    <View style={styles.linhaMacro}>
+      <View style={styles.glifoMacro}>
+        {barras.map((altura, i) => (
+          <View
+            key={i}
+            style={[
+              styles.barrinha,
+              { height: 18 * altura, backgroundColor: i / barras.length < fracao ? cor : cores.trilho },
+            ]}
+          />
+        ))}
       </View>
-      {meta !== null && (
-        <View style={styles.trilhoMacro}>
-          <View style={[styles.preenchimentoMacro, { width: `${fracao * 100}%` }]} />
-        </View>
-      )}
+
+      <View style={styles.textoMacro}>
+        <Text style={styles.valorMacro} numberOfLines={1}>
+          {/* Traço, e não zero, quando nada informou o macro: nenhum item trouxe
+              proteína é diferente de comeu zero de proteína. */}
+          {comido === null ? '—' : Math.round(comido)}
+          {meta !== null && <Text style={styles.metaMacro}>/{meta}g</Text>}
+        </Text>
+        <Text style={[styles.rotuloMacro, { color: cor }]} numberOfLines={1}>
+          {rotulo}
+        </Text>
+      </View>
     </View>
   )
 }
@@ -1323,47 +1416,58 @@ const styles = StyleSheet.create({
      uma coluna, e ali flex faria o texto esticar na vertical. */
   tituloPlano: { flex: 1 },
 
-  linhaCalorias: { flexDirection: 'row', alignItems: 'center' },
-  colunaRestantes: { flex: 1 },
-  rotuloRestantes: { marginTop: 2, fontSize: 12.5, color: inkSuave },
+  linhaCalorias: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14 },
   linhaValorGrande: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  valorGrande: { fontSize: 34, fontWeight: '800', color: cores.verde, letterSpacing: -1 },
-  unidadeGrande: { fontSize: 13, fontWeight: '600', color: inkMedio },
-  metaCalorias: { marginTop: 2, fontSize: 12, color: inkFraco },
   avisoSemPeso: { marginTop: 10, fontSize: 11.5, lineHeight: 16, color: inkFraco },
   linhaPlanoRef: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
   textoPlanoRef: { flexShrink: 1, fontSize: 11.5, color: inkFraco },
 
-  chama: {
-    width: 32,
-    height: 32,
+
+
+  /* Coluna à direita do anel. `justifyContent: space-around` para as três
+     linhas se distribuírem na altura do anel em vez de ficarem grudadas no
+     topo. */
+  colunaMacros: { flex: 1, justifyContent: 'space-around', paddingVertical: 4 },
+  linhaMacro: { flexDirection: 'row', alignItems: 'flex-end', gap: 9 },
+  glifoMacro: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 18 },
+  barrinha: { width: 3, borderRadius: 2 },
+  textoMacro: { flex: 1 },
+  rotuloMacro: { fontSize: 12, fontWeight: '700' },
+  valorMacro: { fontSize: 15, fontWeight: '800', color: cores.ink },
+  metaMacro: { fontSize: 12, fontWeight: '600', color: inkSuave },
+
+  /* Miolo do anel. Quatro linhas curtas, centralizadas, com o número comendo
+     quase toda a largura interna. */
+  rotuloAnelDia: { fontSize: 11.5, fontWeight: '700', color: inkSuave },
+  linhaValorAnel: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  valorAnel: { fontSize: 34, fontWeight: '800', color: cores.ink, letterSpacing: -1.2 },
+  metaAnel: { fontSize: 12.5, fontWeight: '600', color: inkSuave },
+  restantesAnel: { marginTop: 3, fontSize: 11.5, fontWeight: '700', color: cores.limao },
+
+  /* Faixa de ação no rodapé do cartão, no formato de campo: é o convite para
+     lançar o que comeu, e o botão da câmera é o atalho de dentro dele. */
+  barraConferir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: cores.superficie,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  textoConferir: { flex: 1, fontSize: 14, fontWeight: '600', color: inkMedio },
+  botaoCamera: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: cores.limao,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rotuloConsumidas: { marginTop: 6, fontSize: 12.5, color: inkSuave },
-  linhaConsumidas: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
-  valorConsumidas: { fontSize: 19, fontWeight: '800', color: cores.ink, letterSpacing: -0.4 },
-  unidadeConsumidas: { fontSize: 11.5, fontWeight: '600', color: inkMedio },
-
-  divisor: { height: 1, backgroundColor: cores.borda, marginVertical: 14 },
-
-  linhaMacros: { flexDirection: 'row' },
-  macro: { flex: 1, paddingHorizontal: 10, gap: 4 },
-  macroComDivisor: { borderLeftWidth: 1, borderLeftColor: cores.borda },
-  rotuloMacro: { fontSize: 12.5, fontWeight: '700', color: cores.ink },
-  linhaValorMacro: { flexDirection: 'row', alignItems: 'baseline' },
-  valorMacro: { fontSize: 14, fontWeight: '800', color: cores.verde },
-  metaMacro: { fontSize: 12, color: inkSuave },
-  trilhoMacro: {
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: cores.trilho,
-    overflow: 'hidden',
-    marginTop: 2,
-  },
-  preenchimentoMacro: { height: '100%', borderRadius: 3, backgroundColor: cores.verde },
 
   cartaoPlanoCarregando: { alignItems: 'center', justifyContent: 'center', height: 120 },
 
@@ -1408,24 +1512,47 @@ const styles = StyleSheet.create({
   /* O totalizador vem com cartão próprio: aqui ele só ganha o respiro em volta. */
   totaisPlano: { marginTop: 14 },
 
-  refeicaoPlano: { marginTop: 16, gap: 6 },
+  /* Cada refeição num painel próprio, um degrau mais claro que o cartão. Sem
+     isto as refeições do dia viram uma coluna de texto contínua, e o cabeçalho
+     de uma parece rodapé da anterior. */
+  refeicaoPlano: {
+    marginTop: 12,
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: cores.superficie,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
   cabecalhoRefeicaoPlano: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   horaPlano: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 9,
     backgroundColor: cores.verdeClaro,
   },
-  textoHoraPlano: { fontSize: 12, fontWeight: '800', color: cores.verdeEscuro },
-  nomeRefeicaoPlano: { flex: 1, fontSize: 14.5, fontWeight: '800', color: cores.ink },
+  textoHoraPlano: { fontSize: 12, fontWeight: '800', color: cores.limao },
+  nomeRefeicaoPlano: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
   kcalRefeicaoPlano: { fontSize: 12.5, fontWeight: '700', color: inkMedio },
-  /* Linha do alimento sem cartão em volta, ao contrário da tela de montagem:
-     aqui não há o que tocar, e uma borda por item deixaria o cartão da Home
-     parecendo um formulário. */
-  itemPlano: { paddingLeft: 4 },
-  nomeItemPlano: { fontSize: 13.5, fontWeight: '600', color: cores.ink, lineHeight: 18 },
-  detalheItemPlano: { marginTop: 1, fontSize: 11.5, color: inkSuave },
-  refeicaoVazia: { paddingLeft: 4, fontSize: 12, color: inkFraco },
+
+  listaItensPlano: { marginTop: 2 },
+  /* Duas colunas: texto à esquerda, caloria à direita. O respiro vertical vem
+     do padding de cada linha, e não de um gap na lista, para o fio separador
+     nascer no meio do vão e não colado no texto de cima. */
+  itemPlano: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 9 },
+  itemPlanoComLinha: { borderTopWidth: 1, borderTopColor: cores.borda },
+  textoItemPlano: { flex: 1 },
+  nomeItemPlano: { fontSize: 14, fontWeight: '600', color: cores.ink, lineHeight: 19 },
+  medidaItemPlano: { marginTop: 3, fontSize: 12, lineHeight: 16, color: inkSuave },
+  kcalItemPlano: {
+    minWidth: 66,
+    textAlign: 'right',
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: cores.ink,
+  },
+  unidadeKcalItem: { fontSize: 11.5, fontWeight: '600', color: inkSuave },
+  refeicaoVazia: { fontSize: 12, color: inkFraco },
 
   linhaDupla: { flexDirection: 'row', gap: 12 },
   cartaoAgua: {
@@ -1433,6 +1560,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: cores.verde,
     padding: PADDING_CARTAO,
+    /* Sem isto o degradê de dentro vaza pelos cantos arredondados. */
+    overflow: 'hidden',
   },
   cartaoAguaCarregando: { alignItems: 'center', justifyContent: 'center', minHeight: 150 },
   cartaoAguaPressionado: { backgroundColor: cores.verdeEscuro },
@@ -1521,7 +1650,7 @@ const styles = StyleSheet.create({
 
   /* ── Folha da meta do dia ── */
   centroFolha: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: MARGEM },
-  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(16,20,19,0.35)' },
+  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
     width: '100%',
     backgroundColor: cores.fundo,

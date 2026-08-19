@@ -42,8 +42,9 @@ export function AvatarNutri({
 }
 
 const styles = StyleSheet.create({
-  /* Fundo branco atrás da logo: muitas são PNG com transparência e desenhadas
-     para papel — em cima do cinza do cartão elas somem. */
+  /* Fundo branco atrás da logo, e este é o único lugar do app escuro em que o
+     branco continua: as logos são PNG com transparência, desenhadas em traço
+     escuro para papel. Sobre o fundo do app elas sumiriam por completo. */
   imagem: { backgroundColor: cores.branco },
   vazio: { backgroundColor: cores.verdeClaro, alignItems: 'center', justifyContent: 'center' },
   iniciais: { fontWeight: '800', color: cores.verde },

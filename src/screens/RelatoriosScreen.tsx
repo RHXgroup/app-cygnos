@@ -106,7 +106,7 @@ export function RelatoriosScreen({
       contentContainerStyle={[styles.conteudo, { paddingTop: top + 8 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={atualizando} onRefresh={puxarParaAtualizar} tintColor={cores.verde} />
+        <RefreshControl refreshing={atualizando} onRefresh={puxarParaAtualizar} tintColor={cores.limao} />
       }
     >
       <View>
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   opcaoPeriodo: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11 },
-  opcaoEscolhida: { backgroundColor: cores.branco },
+  opcaoEscolhida: { backgroundColor: cores.superficie },
   textoPeriodo: { fontSize: 13, fontWeight: '600', color: inkSuave },
   textoPeriodoEscolhido: { color: cores.verde, fontWeight: '800' },
 
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 9,
     borderRadius: 12,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
   },
   valorMetrica: { fontSize: 15, fontWeight: '800', color: cores.ink },
   valorMetricaBom: { color: cores.verde },
@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
   },
   textoChip: { fontSize: 11.5, color: inkMedio },
 
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: cores.cartao,
   },
-  padraoAtencao: { backgroundColor: cores.mist },
+  padraoAtencao: { backgroundColor: cores.atencaoFundo },
   padraoBom: { backgroundColor: cores.verdeMenta },
   iconePadrao: {
     width: 32,
@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconePadraoAtencao: { backgroundColor: cores.branco },
+  iconePadraoAtencao: { backgroundColor: cores.superficie },
   textoPadrao: { flex: 1 },
   tituloPadrao: { fontSize: 14, fontWeight: '700', color: cores.ink, lineHeight: 19 },
   corpoPadrao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: inkMedio },

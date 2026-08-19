@@ -273,6 +273,7 @@ export function BuscarAlimentoScreen({
             onChangeText={setTermo}
             placeholder="Buscar alimento"
             placeholderTextColor={inkFraco}
+            keyboardAppearance="dark"
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
@@ -444,6 +445,7 @@ export function BuscarAlimentoScreen({
                         onChangeText={setMedida}
                         placeholder="unidade"
                         placeholderTextColor={inkFraco}
+                        keyboardAppearance="dark"
                         maxLength={24}
                         autoCapitalize="none"
                         style={styles.entradaTexto}
@@ -488,6 +490,7 @@ export function BuscarAlimentoScreen({
                         onChangeText={t => setPesoUnidade(soDigitos(t).slice(0, 4))}
                         placeholder="—"
                         placeholderTextColor={inkFraco}
+                        keyboardAppearance="dark"
                         keyboardType="number-pad"
                         selectTextOnFocus
                         style={styles.entradaNumero}
@@ -619,7 +622,7 @@ const styles = StyleSheet.create({
   },
   textoContagem: { fontSize: 13, fontWeight: '600', color: inkMedio },
 
-  fundoPainel: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(16,20,19,0.35)' },
+  fundoPainel: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   painel: {
     position: 'absolute',
     left: 0,
@@ -651,7 +654,7 @@ const styles = StyleSheet.create({
     backgroundColor: cores.cartao,
   },
   opcaoSeletor: { flex: 1, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  opcaoSeletorAtiva: { backgroundColor: cores.branco },
+  opcaoSeletorAtiva: { backgroundColor: cores.superficie },
   textoSeletor: { fontSize: 13.5, fontWeight: '600', color: inkSuave },
   textoSeletorAtivo: { fontWeight: '800', color: cores.ink },
 

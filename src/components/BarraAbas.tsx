@@ -58,7 +58,9 @@ export function BarraAbas({
         accessibilityRole="button"
         accessibilityLabel="Registrar"
       >
-        <Ionicons name="add" size={28} color={cores.branco} />
+        {/* Ícone escuro, e não branco: o limão é claro demais para carregar
+            branco por cima. */}
+        <Ionicons name="add" size={28} color={cores.sobreLimao} />
       </Pressable>
     </View>
   )
@@ -82,7 +84,7 @@ function ItemAba({
       accessibilityState={{ selected: selecionada }}
       accessibilityLabel={aba.rotulo}
     >
-      <Ionicons name={aba.icone} size={21} color={selecionada ? cores.verde : inkFraco} />
+      <Ionicons name={aba.icone} size={21} color={selecionada ? cores.limao : inkFraco} />
       <Text style={[styles.rotulo, selecionada && styles.rotuloAtivo]} numberOfLines={1}>
         {aba.rotulo}
       </Text>
@@ -96,8 +98,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 12,
-    borderRadius: 22,
-    backgroundColor: cores.cartao,
+    borderRadius: 26,
+    backgroundColor: cores.superficie,
+    /* Fio de borda claro: sobre fundo quase preto, cartão sem contorno some.
+       É o que separa a barra da tela em vez da sombra, que no escuro não
+       aparece. */
+    borderWidth: 1,
+    borderColor: cores.borda,
     paddingVertical: 10,
   },
   item: { flex: 1, alignItems: 'center', gap: 4 },
@@ -105,7 +112,7 @@ const styles = StyleSheet.create({
      botão do meio. */
   vao: { flex: 1 },
   rotulo: { fontSize: 10.5, color: inkFraco },
-  rotuloAtivo: { color: cores.verde, fontWeight: '700' },
+  rotuloAtivo: { color: cores.limao, fontWeight: '700' },
 
   botaoMais: {
     position: 'absolute',
@@ -117,14 +124,17 @@ const styles = StyleSheet.create({
     width: DIAMETRO,
     height: DIAMETRO,
     borderRadius: DIAMETRO / 2,
-    backgroundColor: cores.verde,
+    backgroundColor: cores.limao,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: cores.verdeEscuro,
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 7,
+    /* Sombra na cor do próprio botão: sobre fundo escuro, sombra preta não
+       existe. Colorida, ela vira o brilho que o desenho tem em volta do
+       círculo. */
+    shadowColor: cores.limao,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
   },
-  botaoMaisPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoMaisPressionado: { backgroundColor: cores.limaoEscuro },
 })

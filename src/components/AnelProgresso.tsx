@@ -26,7 +26,7 @@ export function AnelProgresso({ percentual }: { percentual: number }) {
           cx={DIAMETRO / 2}
           cy={DIAMETRO / 2}
           r={RAIO}
-          stroke={cores.verde}
+          stroke={cores.limao}
           strokeWidth={ESPESSURA}
           strokeLinecap="round"
           fill="none"
@@ -47,5 +47,5 @@ export function AnelProgresso({ percentual }: { percentual: number }) {
 const styles = StyleSheet.create({
   bloco: { width: DIAMETRO, height: DIAMETRO, alignItems: 'center', justifyContent: 'center' },
   centro: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  texto: { fontSize: 15, fontWeight: '800', color: cores.verde },
+  texto: { fontSize: 15, fontWeight: '800', color: cores.limao },
 })

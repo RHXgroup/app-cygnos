@@ -16,6 +16,7 @@ import {
 } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
 import { BarraAbas, ORDEM_ABAS, type Aba } from './src/components/BarraAbas'
+import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from './src/lib/conta'
 import { supabase } from './src/lib/supabase'
 import { AguaScreen } from './src/screens/AguaScreen'
 import { CadastroScreen } from './src/screens/CadastroScreen'
@@ -31,6 +32,7 @@ import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
 import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
 import { NutricionistasScreen } from './src/screens/NutricionistasScreen'
 import { PerfilScreen } from './src/screens/PerfilScreen'
+import { RecuperarSenhaScreen } from './src/screens/RecuperarSenhaScreen'
 import { PesoScreen } from './src/screens/PesoScreen'
 import { RefeicaoScreen } from './src/screens/RefeicaoScreen'
 import { RegistrarScreen } from './src/screens/RegistrarScreen'
@@ -52,7 +54,7 @@ export default function App() {
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       {/* Cor de fundo na raiz: se algum dia sobrar um quadro sem conteúdo, ele
-          aparece branco em vez de preto. */}
+          aparece no fundo do app em vez de um branco estourado. */}
       <View style={styles.raiz}>
         <Raiz />
       </View>
@@ -62,12 +64,19 @@ export default function App() {
 
 function Raiz() {
   const [sessao, setSessao] = useState<Session | null>(null)
-  /* Só duas telas antes de entrar, então um estado resolve. Vale trocar por uma
-     biblioteca de navegação quando surgir a terceira (recuperar senha). */
-  const [telaAberta, setTelaAberta] = useState<'login' | 'cadastro'>('login')
+  /* Três telas antes de entrar, e um estado ainda resolve: elas não empilham,
+     não têm parâmetro de rota e sempre voltam para o login. Uma biblioteca de
+     navegação aqui seria mais peça do que problema. */
+  const [telaAberta, setTelaAberta] = useState<'login' | 'cadastro' | 'recuperar'>('login')
   /* A sessão fica no AsyncStorage, cuja leitura é assíncrona. Sem este estado
      o app pisca a tela de login por um instante para quem já estava logado. */
   const [verificando, setVerificando] = useState(true)
+  /* Autenticado não é o mesmo que ser paciente: o Auth é compartilhado com o
+     sistema web. Ver `ehContaDePaciente`. */
+  const [acesso, setAcesso] = useState<'checando' | 'liberado'>('checando')
+  /* Recado que sobrevive ao logout e aparece na tela de login. Sem ele, quem é
+     barrado volta para o login sem entender por quê. */
+  const [aviso, setAviso] = useState('')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -86,10 +95,36 @@ function Raiz() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  /* O portão fica aqui, e não dentro do login, porque são três as portas de
+     entrada: entrar com senha, terminar a recuperação e voltar com a sessão
+     guardada no aparelho. Cobrindo no App, nenhuma delas escapa.
+     A recuperação fica de fora enquanto está aberta: ali a sessão nasce no meio
+     do caminho e quem confere é a própria tela. */
+  useEffect(() => {
+    if (!sessao || telaAberta === 'recuperar') return
+
+    let vivo = true
+    setAcesso('checando')
+
+    ehContaDePaciente().then(paciente => {
+      if (!vivo) return
+      if (paciente === false) {
+        setAviso(AVISO_NAO_E_PACIENTE)
+        supabase.auth.signOut()
+        return
+      }
+      setAcesso('liberado')
+    })
+
+    return () => {
+      vivo = false
+    }
+  }, [sessao?.user.id, telaAberta])
+
   if (verificando) {
     return (
       <>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
         <View style={styles.centro}>
           <ActivityIndicator color={cores.verde} />
         </View>
@@ -97,16 +132,47 @@ function Raiz() {
     )
   }
 
-  if (sessao) return <AreaLogada sessao={sessao} />
+  /* A recuperação de senha CRIA sessão no meio do caminho: conferir o código já
+     autentica a pessoa, antes de ela ter escolhido a senha nova. Sem esta
+     exceção, o App a jogaria para dentro do app naquele instante e a tela de
+     senha nova nunca apareceria. */
+  if (sessao && telaAberta !== 'recuperar') {
+    /* Meio segundo de espera do portão. Renderizar a área logada antes da
+       resposta faria a nutricionista ver o app inteiro e ser expulsa em
+       seguida, que é pior do que esperar. */
+    if (acesso === 'checando') {
+      return (
+        <>
+          <StatusBar style="light" />
+          <View style={styles.centro}>
+            <ActivityIndicator color={cores.verde} />
+          </View>
+        </>
+      )
+    }
+    return <AreaLogada sessao={sessao} />
+  }
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <SafeAreaView style={styles.telaAuth}>
         {telaAberta === 'cadastro' ? (
           <CadastroScreen onVoltar={() => setTelaAberta('login')} />
+        ) : telaAberta === 'recuperar' ? (
+          <RecuperarSenhaScreen
+            onVoltar={() => setTelaAberta('login')}
+            /* Só volta para 'login' como estado. Como a sessão já existe, o
+               próximo render cai direto na área logada. */
+            onConcluido={() => setTelaAberta('login')}
+          />
         ) : (
-          <LoginScreen onIrParaCadastro={() => setTelaAberta('cadastro')} />
+          <LoginScreen
+            aviso={aviso}
+            onLimparAviso={() => setAviso('')}
+            onIrParaCadastro={() => setTelaAberta('cadastro')}
+            onIrParaRecuperar={() => setTelaAberta('recuperar')}
+          />
         )}
       </SafeAreaView>
     </>
@@ -193,8 +259,8 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
   return (
     <>
-      {/* Topo da Home é branco, então os ícones do sistema precisam ser escuros. */}
-      <StatusBar style="dark" />
+      {/* Fundo escuro em todas as telas, então os ícones do sistema são claros. */}
+      <StatusBar style="light" />
       <View style={styles.telaApp}>
         <ScrollView
           ref={carrossel}
@@ -504,7 +570,8 @@ function TelaDaAba({
 
 const styles = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: cores.fundo },
-  /* Login e cadastro seguem no creme da marca; a área logada usa a paleta nova. */
+  /* Login e cadastro ficam um degrau acima do fundo da área logada, para o
+     cartão de formulário não sumir dentro da tela. */
   telaAuth: { flex: 1, backgroundColor: cores.mist },
   telaApp: { flex: 1, backgroundColor: cores.fundo },
   carrossel: { flex: 1 },

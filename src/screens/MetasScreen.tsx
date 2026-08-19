@@ -268,6 +268,7 @@ export function MetasScreen({
                 onChangeText={setNome}
                 placeholder={nomeAutomatico()}
                 placeholderTextColor={inkFraco}
+                keyboardAppearance="dark"
                 maxLength={80}
                 style={styles.campoNome}
                 accessibilityLabel="Nome do conjunto de metas"
@@ -469,6 +470,7 @@ function LinhaCampo({
           keyboardType="decimal-pad"
           placeholder={campo.exemplo}
           placeholderTextColor={inkFraco}
+          keyboardAppearance="dark"
           maxLength={6}
           style={[styles.campo, invalido && styles.campoComErro]}
           accessibilityLabel={`${campo.rotulo} ${campo.periodo}, em ${campo.unidade}`}
@@ -527,7 +529,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 14,
     fontSize: 16,
     color: cores.ink,
@@ -556,7 +558,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 10,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,

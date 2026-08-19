@@ -377,6 +377,7 @@ function CampoOutro({ onRegistrar }: { onRegistrar: (ml: number) => void }) {
         keyboardType="number-pad"
         placeholder="Quantos ml?"
         placeholderTextColor={inkFraco}
+        keyboardAppearance="dark"
         autoFocus
         maxLength={4}
         style={styles.campoOutro}
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: cores.borda,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 14,
     fontSize: 16,
     color: cores.ink,
@@ -819,7 +820,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     borderWidth: 1,
     borderColor: cores.borda,
   },

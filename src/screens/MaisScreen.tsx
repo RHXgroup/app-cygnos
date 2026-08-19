@@ -79,7 +79,7 @@ export function MaisScreen({
         <RefreshControl
           refreshing={atualizando}
           onRefresh={puxarParaAtualizar}
-          tintColor={cores.verde}
+          tintColor={cores.limao}
         />
       }
     >
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
   },
   convitePressionado: { backgroundColor: cores.verdeMenta },
   pilha: { flexDirection: 'row' },
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
     borderRadius: 14,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
   },
   linhaLinkPressionada: { backgroundColor: cores.verdeMenta },
   textoLink: { flex: 1, fontSize: 14, fontWeight: '600', color: cores.ink },

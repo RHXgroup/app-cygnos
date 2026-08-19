@@ -40,7 +40,19 @@ function mensagemDeErro(msg: string): string {
   return 'Não foi possível entrar agora. Tente de novo em instantes.'
 }
 
-export function LoginScreen({ onIrParaCadastro }: { onIrParaCadastro: () => void }) {
+export function LoginScreen({
+  aviso,
+  onLimparAviso,
+  onIrParaCadastro,
+  onIrParaRecuperar,
+}: {
+  /* Recado vindo do portão do App, tipicamente "esta conta não é de paciente".
+     Chega já com a tela montada, depois de um logout forçado. */
+  aviso: string
+  onLimparAviso: () => void
+  onIrParaCadastro: () => void
+  onIrParaRecuperar: () => void
+}) {
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
   const [mostrarSenha, setMostrarSenha] = useState(false)
@@ -131,9 +143,11 @@ export function LoginScreen({ onIrParaCadastro }: { onIrParaCadastro: () => void
               onChangeText={v => {
                 setIdentificador(v)
                 if (erro) setErro('')
+                if (aviso) onLimparAviso()
               }}
               placeholder="voce@email.com ou maria.silva"
               placeholderTextColor={inkFraco}
+              keyboardAppearance="dark"
               /* Teclado de e-mail mesmo aceitando usuário: deixa o "@" à mão
                  para a maioria e não atrapalha quem digita o apelido. */
               keyboardType="email-address"
@@ -157,6 +171,7 @@ export function LoginScreen({ onIrParaCadastro }: { onIrParaCadastro: () => void
                 onChangeText={setSenha}
                 placeholder="••••••••"
                 placeholderTextColor={inkFraco}
+                keyboardAppearance="dark"
                 secureTextEntry={!mostrarSenha}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -177,6 +192,25 @@ export function LoginScreen({ onIrParaCadastro }: { onIrParaCadastro: () => void
               </Pressable>
             </View>
           </View>
+
+          {/* Logo abaixo da senha, que é onde a pessoa está olhando quando
+              descobre que não lembra dela. */}
+          <Pressable
+            onPress={onIrParaRecuperar}
+            hitSlop={8}
+            style={styles.linkEsqueci}
+            accessibilityRole="button"
+          >
+            <Text style={styles.textoEsqueci}>Esqueci minha senha</Text>
+          </Pressable>
+
+          {/* O aviso do portão tem caixa própria, em tom de recado e não de
+              erro: quem foi barrado não digitou nada errado. */}
+          {aviso.length > 0 && erro.length === 0 && (
+            <View style={styles.caixaAviso}>
+              <Text style={styles.textoAviso}>{aviso}</Text>
+            </View>
+          )}
 
           {erro.length > 0 && (
             <View style={styles.caixaErro}>
@@ -227,7 +261,7 @@ export function LoginScreen({ onIrParaCadastro }: { onIrParaCadastro: () => void
           <Text style={styles.textoBotaoSecundario}>Sou nutricionista</Text>
         </Pressable>
 
-        <Text style={styles.rodape}>Cygnos — sistemas de saúde, com clareza</Text>
+        <Text style={styles.rodape}>Cygnos, sistemas de saúde com clareza</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   )
@@ -278,7 +312,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: cores.line,
-    backgroundColor: cores.branco,
+    backgroundColor: cores.superficie,
     paddingHorizontal: 16,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
@@ -300,14 +334,26 @@ const styles = StyleSheet.create({
   botaoPrimario: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: cores.deep,
+    backgroundColor: cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
-  botaoPrimarioPressionado: { backgroundColor: cores.forest },
+  botaoPrimarioPressionado: { backgroundColor: cores.verdeEscuro },
   botaoDesabilitado: { opacity: 0.45 },
   textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: cores.branco },
+  caixaAviso: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: cores.verdeClaro,
+    backgroundColor: cores.verdeMenta,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  textoAviso: { fontSize: 13.5, lineHeight: 20, color: cores.ink },
+
+  linkEsqueci: { alignSelf: 'flex-end', marginTop: -6 },
+  textoEsqueci: { fontSize: 13.5, fontWeight: '600', color: cores.deep },
   linkCriarConta: { alignItems: 'center', paddingVertical: 6 },
   textoLinkSuave: { fontSize: 14, color: inkSuave },
   textoLinkForte: { fontWeight: '700', color: cores.deep },
