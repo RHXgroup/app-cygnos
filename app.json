@@ -12,7 +12,7 @@
       "backgroundColor": "#0C0F0B"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.cygnosnutri.app"
     },
     "android": {
@@ -21,10 +21,7 @@
         "backgroundColor": "#0C0F0B",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
