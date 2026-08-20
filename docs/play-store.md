@@ -184,6 +184,17 @@ para a pena branca.
 | `icone-512.png` | Ícone do app na ficha da loja |
 | `destaque-1024x500.png` | Gráfico de destaque |
 
+**Escala do ícone adaptativo, corrigida em 20/08/2026.** O Android mostra só as
+72 unidades centrais de um ícone de 108, ou seja, o recorte central de 66,7%.
+Numa tela de 1024 px, o que aparece são 683 px, e tudo é ampliado 1,5 vez. A
+logo estava em 620 px achando que tinha folga; depois da ampliação ela ocupava
+91% do ícone visível e a máscara redonda cortava a borda do círculo dourado.
+Agora está em 440 px, que dá 64% do visível.
+
+Para conferir isso corretamente: recortar o centro de 683 px ANTES de aplicar a
+máscara. Mascarar a imagem de 1024 inteira mostra um ícone que ninguém vê, e foi
+esse o erro que deixou o problema passar para a loja.
+
 O ícone do launcher também foi refeito: até 19/08/2026 o `adaptiveIcon` ainda
 apontava para o "A" azul do template do Expo sobre fundo `#E6F4FE`, que é o
 que apareceria na tela inicial dos testadores. Agora a camada de frente é a
