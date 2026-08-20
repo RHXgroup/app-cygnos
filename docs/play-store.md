@@ -247,3 +247,32 @@ só trocar um radio button. Conteúdo de usuário obriga, pela política do Goog
 a existir dentro do app um jeito de denunciar conteúdo impróprio e de bloquear
 o outro lado, mais uma política de conteúdo publicada. Vale desenhar a
 funcionalidade já com isso, em vez de descobrir na hora do envio.
+
+## Rejeição de 20/08/2026: categoria médica exige conta de organização
+
+O primeiro envio foi **reprovado por sistema automatizado**, sem revisão
+humana. Motivo, na área "Developer Account": desde 31/08/2024 contas novas
+precisam ser de organização para publicar **health apps, como apps médicos**.
+
+A causa foi a declaração de Apps de saúde, onde havia sido marcado
+**"Serviços e gerenciamento de saúde"**, do bloco **Medicina**, por causa do
+catálogo de nutricionistas e do pedido de consulta.
+
+**A regra, que não estava anotada aqui antes:**
+
+- O bloco de **bem-estar** da declaração (nutrição, peso, sono, hidratação)
+  NÃO exige conta de organização
+- O bloco **Medicina** exige, e conta de organização exige CNPJ e D-U-N-S,
+  que é exatamente o que esta conta não tem (ver [[playstore-conta-pessoal]])
+
+O Cygnos não é app médico: não diagnostica, não trata, não faz medição
+clínica, não guarda prontuário médico e não marca consulta com médico. A
+declaração correta é só bem-estar.
+
+**Nenhuma caixa do bloco Medicina pode ser marcada enquanto a conta for
+pessoal.** O mesmo vale para a categoria da ficha da loja, que precisa ser
+"Saúde e fitness" e nunca "Medicina".
+
+Corrigir a declaração e reenviar pela Visão geral da publicação. Recurso só
+faz sentido se a reprovação se repetir depois da correção, porque recorrer
+mantendo a declaração que causou o problema dá negativa quase certa.
