@@ -38,7 +38,8 @@
           "cameraPermission": "O Cygnos acessa a câmera para você tirar a foto do seu perfil.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
