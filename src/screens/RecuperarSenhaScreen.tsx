@@ -89,18 +89,6 @@ export function RecuperarSenhaScreen({
     return () => clearTimeout(t)
   }, [esperaReenvio])
 
-  /* Traduz nome de usuário para e-mail pelo mesmo caminho do login. Devolve
-     `undefined` quando não deu para falar com o servidor, que é diferente de
-     não existir conta: um é problema de rede e merece ser dito, o outro é
-     informação que a tela não entrega. */
-  async function resolverEmail(login: string): Promise<string | null | undefined> {
-    if (login.includes('@')) return login
-
-    const { data, error } = await supabase.rpc('app_email_do_login', { p_login: login })
-    if (error) return undefined
-    return (data as string | null) ?? null
-  }
-
   async function pedirCodigo() {
     const login = identificador.trim().toLowerCase()
     if (login.length === 0 || carregando) return
@@ -108,18 +96,25 @@ export function RecuperarSenhaScreen({
     setErro('')
     setCarregando(true)
 
-    const email = await resolverEmail(login)
-    if (email === undefined) {
+    /* Quem resolve o e-mail e dispara o envio é a `app-recuperar-senha`, do lado
+       do servidor. Antes era esta tela: ela pedia o e-mail a uma RPC que
+       respondia sem cobrar nada, e a chave anônima que a autorizava vai dentro
+       do APK. O e-mail não volta mais para cá — e não precisa: a tela só o
+       exibe (mascarado) quando foi a própria pessoa que o digitou, e nesse caso
+       ela já o tem em mãos. */
+    const { error: erroFn } = await supabase.functions.invoke('app-recuperar-senha', {
+      body: { login },
+    })
+    if (erroFn) {
       setErro('Não consegui falar com o servidor. Verifique sua conexão e tente de novo.')
       setCarregando(false)
       return
     }
 
-    /* O disparo só acontece havendo conta, mas a tela avança nos dois casos e
-       com a mesma mensagem. */
-    if (email) await supabase.auth.resetPasswordForEmail(email)
-
-    setEmailDestino(email)
+    /* A tela avança exista conta ou não, com a mesma mensagem — como já fazia.
+       `emailDestino` agora guarda o LOGIN, que é o que as chamadas seguintes
+       precisam; o texto de apoio só o mascara quando é um e-mail de verdade. */
+    setEmailDestino(login)
     setDigitouEmail(login.includes('@'))
     setCodigo('')
     setTentativas(0)
@@ -132,7 +127,9 @@ export function RecuperarSenhaScreen({
     if (esperaReenvio > 0 || carregando) return
     setErro('')
     setCodigo('')
-    if (emailDestino) await supabase.auth.resetPasswordForEmail(emailDestino)
+    if (emailDestino) {
+      await supabase.functions.invoke('app-recuperar-senha', { body: { login: emailDestino } })
+    }
     setEsperaReenvio(SEGUNDOS_PARA_REENVIAR)
   }
 
@@ -150,10 +147,22 @@ export function RecuperarSenhaScreen({
       return
     }
 
-    const { error } = await supabase.auth.verifyOtp({
-      email: emailDestino,
-      token: codigo,
-      type: 'recovery',
+    /* `verifyOtp` exige e-mail junto do código, e era só por isso que esta tela
+       precisava do endereço. A `app-conferir-codigo` resolve do lado de lá e
+       devolve os tokens apenas quando o código confere. */
+    const { data: conferido } = await supabase.functions.invoke('app-conferir-codigo', {
+      body: { login: emailDestino, codigo },
+    })
+
+    if (!conferido?.access_token || !conferido?.refresh_token) {
+      registrarTentativaFalha()
+      setCarregando(false)
+      return
+    }
+
+    const { error } = await supabase.auth.setSession({
+      access_token: conferido.access_token,
+      refresh_token: conferido.refresh_token,
     })
 
     if (error) {
