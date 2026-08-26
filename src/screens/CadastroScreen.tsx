@@ -89,7 +89,16 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
 
     /* 2. Checagem prévia só para poder dizer QUAL campo repetiu. Quem garante a
        unicidade são os constraints do banco — o erro que volta de lá não diz o
-       campo, então a mensagem boa tem que vir daqui. */
+       campo, então a mensagem boa tem que vir daqui.
+
+       CPF e telefone saíram desta checagem, e é de propósito. A função é
+       chamável por qualquer um com a chave pública do app, sem login e sem
+       limite: perguntar "esse CPF já está em uso?" respondia, de graça, se uma
+       pessoa determinada é paciente de um serviço de nutrição. E-mail e usuário
+       ficam porque a pessoa está ESCOLHENDO os dois e precisa saber se estão
+       livres — ninguém escolhe o próprio CPF.
+       Repetição de CPF ou telefone continua barrada pelo índice único do banco
+       e aparece ao enviar, no bloco de erro mais abaixo. */
     const { data: disp, error: erroDisp } = await supabase.rpc('app_cadastro_disponibilidade', {
       p_email: email.trim().toLowerCase(),
       p_username: username.trim().toLowerCase(),
@@ -106,8 +115,6 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
     const emUso: Erros = {
       email: disp?.email_em_uso ? 'Já existe uma conta com esse e-mail.' : undefined,
       username: disp?.username_em_uso ? 'Esse nome de usuário já está em uso.' : undefined,
-      cpf: disp?.cpf_em_uso ? 'Já existe uma conta com esse CPF.' : undefined,
-      telefone: disp?.telefone_em_uso ? 'Já existe uma conta com esse telefone.' : undefined,
     }
     if (Object.values(emUso).some(Boolean)) {
       setErros(emUso)
@@ -138,9 +145,10 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
       if (m.includes('already registered') || m.includes('already been registered')) {
         setErros({ email: 'Já existe uma conta com esse e-mail.' })
       } else if (m.includes('database error')) {
-        /* Corrida: alguém cadastrou o mesmo CPF/telefone/usuário entre a
-           checagem e o envio. Raro, e o banco fez o certo ao recusar. */
-        setErroGeral('Alguns dados já foram cadastrados por outra pessoa agora há pouco. Confira CPF, telefone e usuário.')
+        /* CPF ou telefone repetido — o caminho NORMAL desde que a checagem
+           prévia parou de perguntar por eles. Cobre também a corrida de alguém
+           ter cadastrado o mesmo usuário entre a checagem e o envio. */
+        setErroGeral('Já existe uma conta com esse CPF ou telefone. Se a conta é sua, entre em vez de criar outra.')
       } else {
         setErroGeral('Não foi possível criar sua conta agora. Tente de novo em instantes.')
       }
