@@ -23,22 +23,16 @@ function saudacaoDoDia() {
 
 /* Mesma frase para usuário inexistente e para senha errada. Diferenciar as duas
    transformaria a tela num verificador de quem tem conta no sistema. */
-const CREDENCIAL_INVALIDA = 'E-mail, usuário ou senha incorretos.'
+const CREDENCIAL_INVALIDA =
+  'E-mail, usuário ou senha incorretos. Se você acabou de criar a conta, confirme seu e-mail antes de entrar.'
 
-/* O supabase-js devolve a mensagem em inglês e crua. Traduzir só os casos que
-   o paciente consegue resolver sozinho; o resto cai no genérico, porque expor
-   detalhe interno de auth não ajuda quem está na tela e ajuda quem não devia. */
-function mensagemDeErro(msg: string): string {
-  const m = msg.toLowerCase()
-  if (m.includes('invalid login credentials')) return CREDENCIAL_INVALIDA
-  if (m.includes('email not confirmed')) {
-    return 'Falta confirmar seu e-mail. Procure a mensagem que enviamos na sua caixa de entrada.'
-  }
-  if (m.includes('network') || m.includes('fetch')) {
-    return 'Não consegui falar com o servidor. Verifique sua conexão e tente de novo.'
-  }
-  return 'Não foi possível entrar agora. Tente de novo em instantes.'
-}
+/* A tradutora de mensagem do supabase-js saiu daqui junto com o
+   `signInWithPassword`: quem responde agora é a `app-login`, e ela responde
+   IGUAL para usuário inexistente, senha errada e e-mail não confirmado —
+   separar os três devolveria o verificador de contas que a mudança fechou.
+   O caso que valia a pena dizer, "confirme seu e-mail", virou parte da
+   mensagem única: serve para quem precisa e não afirma nada sobre a conta de
+   ninguém. */
 
 export function LoginScreen({
   aviso,
@@ -67,43 +61,43 @@ export function LoginScreen({
     setCarregando(true)
 
     const login = identificador.trim().toLowerCase()
-    let email = login
 
-    /* O Auth só entra por e-mail. Quando vem um nome de usuário, o banco
-       traduz — o username é único em app_contas. Sem "@" não há o que
-       confundir, então dá para decidir aqui e poupar uma ida ao servidor em
-       quem entra com e-mail, que é a maioria. */
-    if (!login.includes('@')) {
-      const { data, error: erroRpc } = await supabase.rpc('app_email_do_login', {
-        p_login: login,
-      })
-
-      if (erroRpc) {
-        setErro('Não consegui falar com o servidor. Verifique sua conexão e tente de novo.')
-        setCarregando(false)
-        return
-      }
-      if (!data) {
-        /* Usuário não existe. Mesma mensagem de senha errada, de propósito. */
-        setErro(CREDENCIAL_INVALIDA)
-        setCarregando(false)
-        return
-      }
-      email = data
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
+    /* Identificador e senha na MESMA chamada, e é esse o ponto.
+       Antes o app perguntava primeiro "qual o e-mail do fulano?" — uma RPC que
+       respondia sem cobrar senha nenhuma. A chave anônima vai dentro do APK e
+       sai de lá em minutos, então qualquer pessoa mandava uma lista de nomes
+       prováveis e recebia e-mails de verdade; nome inexistente voltava vazio e
+       entregava, de quebra, quem tem conta. Numa base de app de nutrição, isso
+       é insumo de phishing dirigido e dado pessoal servido de graça.
+       A `app-login` resolve o e-mail do lado do servidor e devolve só os tokens
+       da sessão: quem não souber a senha não leva nada. E-mail continua
+       aceito no lugar do usuário — ela decide lá. */
+    const { data, error: erroFn } = await supabase.functions.invoke('app-login', {
+      body: { login, senha },
     })
 
-    /* Em caso de sucesso não mexemos no estado: o onAuthStateChange lá no App
-       troca de tela e este componente é desmontado. Mexer aqui daria um
-       "setState em componente desmontado". */
-    if (error) {
-      setErro(mensagemDeErro(error.message))
+    if (erroFn && !data?.error) {
+      setErro('Não consegui falar com o servidor. Verifique sua conexão e tente de novo.')
       setCarregando(false)
+      return
     }
+
+    if (data?.access_token && data?.refresh_token) {
+      /* Em caso de sucesso não mexemos no estado: o onAuthStateChange lá no App
+         troca de tela e este componente é desmontado. Mexer aqui daria um
+         "setState em componente desmontado". */
+      const { error: erroSessao } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      })
+      if (!erroSessao) return
+    }
+
+    /* Usuário inexistente e senha errada caem na MESMA mensagem, de propósito —
+       e agora é a função que responde igual para os dois, então a tela não teria
+       como ser mais específica nem se quisesse. */
+    setErro(CREDENCIAL_INVALIDA)
+    setCarregando(false)
   }
 
   return (
