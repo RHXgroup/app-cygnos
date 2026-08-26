@@ -106,7 +106,11 @@ export function RecuperarSenhaScreen({
       body: { login },
     })
     if (erroFn) {
-      setErro('Não consegui falar com o servidor. Verifique sua conexão e tente de novo.')
+      /* Não dá para afirmar que é a internet da pessoa: o pedido pode ter
+         falhado do nosso lado. A mensagem antiga mandava conferir a conexão e,
+         quando o problema era nosso, fazia a pessoa procurar defeito no
+         aparelho dela. */
+      setErro('Não consegui enviar o código agora. Tente de novo em instantes — se continuar, fale com sua nutricionista.')
       setCarregando(false)
       return
     }
@@ -455,7 +459,12 @@ function textoDeApoio(etapa: Etapa, email: string | null, digitouEmail: boolean)
   }
   if (etapa === 'codigo') {
     const destino = email && digitouEmail ? mascarar(email) : 'o e-mail cadastrado nessa conta'
-    return `Se existir uma conta, o código foi enviado para ${destino}. Ele vale por 15 minutos.`
+    /* O aviso do spam fica aqui, e não no passo anterior, porque é aqui que a
+       pessoa está parada esperando uma mensagem que pode não ter chegado à
+       caixa de entrada — é o momento em que a dica serve para alguma coisa. */
+    return `Se existir uma conta, o código foi enviado para ${destino}. Ele vale por 15 minutos.
+
+Não achou? Confira a caixa de spam ou lixo eletrônico.`
   }
   return 'Escolha uma senha que você não use em outro lugar. As outras sessões desta conta serão desconectadas.'
 }

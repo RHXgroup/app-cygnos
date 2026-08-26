@@ -77,7 +77,10 @@ export function LoginScreen({
     })
 
     if (erroFn && !data?.error) {
-      setErro('Não consegui falar com o servidor. Verifique sua conexão e tente de novo.')
+      /* Sem afirmar que é a internet da pessoa: o pedido pode ter falhado do
+         nosso lado, e aí a mensagem antiga a mandava procurar defeito no
+         aparelho dela. */
+      setErro('Não consegui entrar agora. Tente de novo em instantes.')
       setCarregando(false)
       return
     }
