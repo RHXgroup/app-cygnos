@@ -196,12 +196,17 @@ const styles = StyleSheet.create({
 
   grade: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   cartao: {
-    /* Duas colunas com o vão de 12 no meio. 47% e não 48% porque a porcentagem
-       é calculada antes do gap: em tela de 320pt, 48% + 48% + 12 estoura a
-       largura e a grade desaba para uma coluna só. */
-    width: '47%',
+    /* Duas colunas com o vão de 12 no meio. A base é 47%, e não 48%, porque a
+       porcentagem é calculada antes do gap: em tela de 320pt, 48% + 48% + 12
+       estoura a largura e a grade desaba para uma coluna só.
+     *
+     * O flexGrow reparte entre os dois cartões da linha o que sobra dessa
+     * conta. Sem ele a folga inteira vira margem extra na direita, e a grade
+     * fica visivelmente deslocada para a esquerda dentro do padding da tela. */
+    flexBasis: '47%',
+    flexGrow: 1,
     /* Altura fixa para os cartões de rótulo curto ficarem do tamanho dos de
-       duas linhas — sem isso a grade fica com degraus. */
+       duas linhas. Sem isso a grade fica com degraus. */
     height: 122,
     justifyContent: 'center',
     gap: 10,

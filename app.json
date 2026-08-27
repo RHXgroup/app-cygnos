@@ -18,7 +18,7 @@
     "android": {
       "package": "com.cygnosnutri.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0C0F0B",
+        "backgroundColor": "#FDFBF6",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -38,7 +38,8 @@
           "cameraPermission": "O Cygnos acessa a câmera para você tirar a foto do seu perfil.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
