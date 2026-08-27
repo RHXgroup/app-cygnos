@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  BackHandler,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -94,6 +95,19 @@ function Raiz() {
 
     return () => sub.subscription.unsubscribe()
   }, [])
+
+  /* O voltar do Android nas portas de entrada. Sem isto ele encerra o app de
+     dentro do cadastro ou da recuperação, e o que a pessoa digitou some sem nem
+     uma pergunta. Do login não intercepta: ali sair é o que se espera. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (telaAberta === 'login') return false
+      setTelaAberta('login')
+      return true
+    })
+
+    return () => sub.remove()
+  }, [telaAberta])
 
   /* O portão fica aqui, e não dentro do login, porque são três as portas de
      entrada: entrar com senha, terminar a recuperação e voltar com a sessão
@@ -256,6 +270,71 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     const destino = ORDEM_ABAS[i]
     if (destino && destino !== aba) setAba(destino)
   }
+
+  /* O botão voltar do Android.
+   *
+   * A navegação daqui é feita com estado, e não com uma biblioteca de rotas, então
+   * o Android não encontra pilha nenhuma para desempilhar e faz a única coisa que
+   * sabe: encerra o app — de qualquer tela, inclusive do meio de um plano pela
+   * metade.
+   *
+   * A ordem abaixo é a inversa da que as sobreposições são desenhadas no JSX: a
+   * última a ser pintada é a que está por cima, e é ela que o voltar fecha
+   * primeiro. Duas abertas ao mesmo tempo é o caso comum — Cadastros abre a
+   * Edição por cima de si. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const deCimaParaBaixo: [boolean, () => void][] = [
+        [registrar !== null, () => setRegistrar(null)],
+        [refeicaoAberta !== null, () => setRefeicaoAberta(null)],
+        [pesoAberto, () => setPesoAberto(false)],
+        [contadorAberto, () => setContadorAberto(false)],
+        [sonoAberto, () => setSonoAberto(false)],
+        [metasAbertas !== null, () => setMetasAbertas(null)],
+        [aguaAberta, () => setAguaAberta(false)],
+        [planoEmEdicao !== null, () => setPlanoEmEdicao(null)],
+        [cadastrosAberto, () => setCadastrosAberto(false)],
+        [excluirContaAberta, () => setExcluirContaAberta(false)],
+        [nutricionistasAbertas, () => setNutricionistasAbertas(false)],
+        [codigoAberto, () => setCodigoAberto(false)],
+        [perfilAberto, () => setPerfilAberto(false)],
+      ]
+
+      const deCima = deCimaParaBaixo.find(([aberta]) => aberta)
+      if (deCima) {
+        deCima[1]()
+        return true
+      }
+
+      /* Sem nada aberto, o voltar leva ao Início, como em qualquer app de abas.
+         Já no Início, devolve o evento ao Android: sair dali é o esperado, e
+         segurar o voltar para sempre prenderia a pessoa dentro do app. */
+      if (aba !== 'inicio') {
+        irPara('inicio')
+        return true
+      }
+
+      return false
+    })
+
+    return () => sub.remove()
+  }, [
+    aba,
+    width,
+    registrar,
+    refeicaoAberta,
+    pesoAberto,
+    contadorAberto,
+    sonoAberto,
+    metasAbertas,
+    aguaAberta,
+    planoEmEdicao,
+    cadastrosAberto,
+    excluirContaAberta,
+    nutricionistasAbertas,
+    codigoAberto,
+    perfilAberto,
+  ])
 
   return (
     <>
