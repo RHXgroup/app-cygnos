@@ -96,9 +96,26 @@ const textosDe = (m: Metas): Textos => ({
   sonoHoras: textoDe(m.sonoHoras),
 })
 
-/* Vazio é null — "não acompanho isso" —, e não zero. */
-const numeroDe = (texto: string): number | null => {
-  const limpo = texto.trim().replace(',', '.')
+/* O sono é o único campo com casa decimal — sete horas e meia é uma meta que
+   existe. Todo o resto é contagem inteira: mililitro, passo, grama, caloria. */
+const ehDecimal = (chave: CampoMeta) => chave === 'sonoHoras'
+
+/* Vazio é null — "não acompanho isso" —, e não zero.
+ *
+ * Nos campos inteiros, ponto e vírgula são DESCARTADOS em vez de interpretados.
+ * Quem digita "10.000" passos quer dez mil, e `Number("10.000")` é 10 — que cai
+ * abaixo do mínimo de 500 e trava o salvar sem explicar por quê. A ironia é que
+ * a própria mensagem de erro escreve a faixa com ponto ("de 500 a 100.000"),
+ * ensinando o formato que o campo recusava. Mesma regra da tela de Água, que já
+ * filtrava só dígitos.
+ *
+ * No sono, ponto e vírgula valem como separador decimal: o teclado brasileiro
+ * oferece vírgula, e obrigar a traduzir para ponto seria pedir demais. */
+const numeroDe = (texto: string, chave: CampoMeta): number | null => {
+  const limpo = ehDecimal(chave)
+    ? texto.trim().replace(',', '.')
+    : texto.replace(/[^0-9]/g, '')
+
   if (limpo === '') return null
   const n = Number(limpo)
   return Number.isFinite(n) ? n : null
@@ -107,7 +124,7 @@ const numeroDe = (texto: string): number | null => {
 /* Fora dos limites do banco? Vazio nunca é inválido: é a ausência da meta —
    exceto água e copo, que precisam de valor para a tela de Água desenhar. */
 function invalido(chave: CampoMeta, texto: string): boolean {
-  const n = numeroDe(texto)
+  const n = numeroDe(texto, chave)
   if (n === null) return chave === 'aguaMl' || chave === 'copoMl'
   const { min, max } = LIMITES[chave]
   return n < min || n > max
@@ -166,23 +183,26 @@ export function MetasScreen({
     }
   }, [contaId, alvo])
 
+  /* O campo só aceita separador onde ele significa alguma coisa: no sono. Nos
+     inteiros o ponto nem chega a ser digitado, então a pessoa vê "10000" na
+     hora e não descobre o problema só na hora de salvar. */
   const escrever = (chave: CampoMeta) => (t: string) =>
-    /* Vírgula passa porque o teclado brasileiro oferece vírgula, e sono é o
-       único campo decimal — digitar "7.5" num teclado que mostra vírgula é
-       pedir para a pessoa traduzir. A conversão trata as duas. */
-    setTextos(prev => ({ ...prev, [chave]: t.replace(/[^0-9.,]/g, '') }))
+    setTextos(prev => ({
+      ...prev,
+      [chave]: ehDecimal(chave) ? t.replace(/[^0-9.,]/g, '') : t.replace(/[^0-9]/g, ''),
+    }))
 
   const metas: Metas = {
-    calorias: numeroDe(textos.calorias),
-    proteinas: numeroDe(textos.proteinas),
-    carboidratos: numeroDe(textos.carboidratos),
-    gorduras: numeroDe(textos.gorduras),
-    fibras: numeroDe(textos.fibras),
-    aguaMl: numeroDe(textos.aguaMl) ?? METAS_VAZIAS.aguaMl,
-    copoMl: numeroDe(textos.copoMl) ?? METAS_VAZIAS.copoMl,
-    passos: numeroDe(textos.passos),
-    treinosSemana: numeroDe(textos.treinosSemana),
-    sonoHoras: numeroDe(textos.sonoHoras),
+    calorias: numeroDe(textos.calorias, 'calorias'),
+    proteinas: numeroDe(textos.proteinas, 'proteinas'),
+    carboidratos: numeroDe(textos.carboidratos, 'carboidratos'),
+    gorduras: numeroDe(textos.gorduras, 'gorduras'),
+    fibras: numeroDe(textos.fibras, 'fibras'),
+    aguaMl: numeroDe(textos.aguaMl, 'aguaMl') ?? METAS_VAZIAS.aguaMl,
+    copoMl: numeroDe(textos.copoMl, 'copoMl') ?? METAS_VAZIAS.copoMl,
+    passos: numeroDe(textos.passos, 'passos'),
+    treinosSemana: numeroDe(textos.treinosSemana, 'treinosSemana'),
+    sonoHoras: numeroDe(textos.sonoHoras, 'sonoHoras'),
   }
 
   const camposInvalidos = (Object.keys(LIMITES) as CampoMeta[]).filter(c => invalido(c, textos[c]))
@@ -465,9 +485,11 @@ function LinhaCampo({
         <TextInput
           value={valor}
           onChangeText={onChange}
-          /* decimal-pad e não number-pad por causa do sono: sete horas e meia é
-             uma meta que existe, e number-pad não oferece o separador. */
-          keyboardType="decimal-pad"
+          /* decimal-pad só no sono, que é o único campo com casa decimal — sete
+             horas e meia é uma meta que existe. Nos inteiros, number-pad: um
+             teclado que mostra separador para um campo que o descarta é um
+             convite a digitar "10.000" e não entender por que sumiu. */
+          keyboardType={ehDecimal(campo.chave) ? 'decimal-pad' : 'number-pad'}
           placeholder={campo.exemplo}
           placeholderTextColor={inkFraco}
           keyboardAppearance="dark"
