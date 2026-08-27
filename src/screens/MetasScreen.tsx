@@ -155,13 +155,14 @@ export function MetasScreen({
   const [nome, setNome] = useState(typeof alvo === 'string' ? '' : alvo.nome)
   /* O id do conjunto sendo editado. null grava um conjunto novo. */
   const [id, setId] = useState<string | null>(typeof alvo === 'string' ? null : alvo.id)
-  /* Só o caminho 'ativa' precisa buscar; os outros dois já nascem prontos. */
-  const [carregando, setCarregando] = useState(alvo === 'ativa')
+  /* 'ativa' e 'nova' buscam o conjunto que está valendo; só o caminho que abre
+     um conjunto escolhido da lista já nasce pronto. */
+  const [carregando, setCarregando] = useState(alvo === 'ativa' || alvo === 'nova')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
   useEffect(() => {
-    if (alvo !== 'ativa') return
+    if (alvo !== 'ativa' && alvo !== 'nova') return
     let ativo = true
 
     carregarMetasAtivas(contaId).then(r => {
@@ -169,11 +170,25 @@ export function MetasScreen({
 
       if (r.tipo === 'erro') setErro(r.mensagem)
       else if (r.metas) {
-        /* Existe conjunto ativo: é ele que se está editando. Sem isto, salvar
-           criaria um segundo conjunto idêntico a cada visita ao "+". */
+        /* Os dois caminhos partem do que já vale, e diferem no que fazem com
+           ele: 'ativa' edita a mesma linha; 'nova' cria outra a partir dela.
+         *
+         * Nascer em branco era o comportamento anterior, e ele perdia meta sem
+         * avisar: o conjunto novo vira o ativo por gatilho da tabela, então
+         * quem entrava aqui para anotar só a meta de treino saía com calorias,
+         * macros e água zerados na tela inicial. Mesmo cuidado que a tela de
+         * Cálculo Energético já toma ao gravar metas — lá o comentário diz que
+         * "partir de um objeto vazio apagaria passos, sono e o foco de peso de
+         * quem já os tinha".
+         *
+         * O nome fica de fora na cópia: repetir "Metas de 20/08" em dois
+         * conjuntos deixaria a lista impossível de ler. Vazio, o salvar gera um
+         * nome com a data de hoje. */
         setTextos(textosDe(r.metas))
-        setNome(r.metas.nome)
-        setId(r.metas.id)
+        if (alvo === 'ativa') {
+          setNome(r.metas.nome)
+          setId(r.metas.id)
+        }
       }
       setCarregando(false)
     })
