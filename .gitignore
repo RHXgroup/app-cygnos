@@ -41,3 +41,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Dado pessoal de terceiros: a lista de testadores do Alpha vive fora do git.
+docs/testadores-alpha.csv
+testadores-alpha.csv

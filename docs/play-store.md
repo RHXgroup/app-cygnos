@@ -155,10 +155,17 @@ a conta Expo significa perder a capacidade de atualizar o app.
 
 ## Lista de testadores da faixa Alpha
 
-Os 14 e-mails entregues em 19/08/2026 estão em `docs/testadores-alpha.csv`,
-um por linha, tudo em minúsculo. No Play Console: Teste fechado > Alpha >
-aba Testadores > Criar lista de e-mails, nome `Alpha Cygnos`, e colar os
-e-mails separados por vírgula ou enviar o CSV.
+Os 14 e-mails entregues em 19/08/2026 ficam em `testadores-alpha.csv`, na
+pasta `Dev` do computador, FORA deste repositório e fora do git.
+
+Eles moram lá de propósito. São endereços de outras pessoas, ou seja, dado
+pessoal de terceiros, e este repositório é público: já estiveram indexados por
+buscador uma vez. Se algum dia precisar versionar essa lista, o lugar dela é um
+repositório privado, nunca este.
+
+No Play Console: Teste fechado > Alpha > aba Testadores > Criar lista de
+e-mails, nome `Alpha Cygnos`, e colar os e-mails separados por vírgula ou
+enviar o CSV.
 
 
 São 14 para uma exigência de 12, ou seja, dois de folga. Cada pessoa precisa
