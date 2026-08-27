@@ -191,20 +191,3 @@ export async function apagarRegistro(id: string): Promise<{ erro: string } | nul
   return error ? { erro: error.message } : null
 }
 
-/* A meta e o copo, juntos: são editados na mesma tela, ao mesmo tempo, e uma
-   escrita só evita a tela ficar com meta nova e copo velho se a segunda falhar.
- *
- * Upsert com só estas duas colunas no corpo: quem já tem metas de caloria e
- * passos gravadas não as perde por ajustar a água aqui — o ON CONFLICT do
- * PostgREST atualiza apenas as colunas enviadas. */
-export async function salvarMetaAgua(
-  contaId: string,
-  { metaMl, copoMl }: { metaMl: number; copoMl: number },
-): Promise<{ erro: string } | null> {
-  const { error } = await supabase.from('app_metas').upsert(
-    { conta_id: contaId, agua_ml: Math.round(metaMl), copo_ml: Math.round(copoMl) },
-    { onConflict: 'conta_id' },
-  )
-
-  return error ? { erro: error.message } : null
-}

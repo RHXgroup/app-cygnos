@@ -19,7 +19,6 @@ import {
   coposDaMeta,
   coposDe,
   registrarAgua,
-  salvarMetaAgua,
   totalDe,
   volume,
   COPO_MAX_ML,
@@ -30,6 +29,10 @@ import {
   type DiaAgua,
   type RegistroAgua,
 } from '../lib/agua'
+/* De metas, e não de agua: a versão que vivia ali usava ON CONFLICT em
+   conta_id, que deixou de ser chave única quando as metas viraram lista — o
+   Postgres recusava toda gravação com 42P10 e a meta nunca salvava. */
+import { salvarMetaAgua } from '../lib/metas'
 import { DIAS_CURTOS, horaCurta, milhar } from '../lib/formatar'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
