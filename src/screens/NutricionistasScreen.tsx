@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  BackHandler,
   Linking,
   Pressable,
   RefreshControl,
@@ -65,6 +66,38 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
   /* Recarrega ao voltar da tela de agendamento: quem acabou de pedir horário
      precisa ver o pedido aparecer aqui, e não uma ficha igual à de antes. */
   const [versao, setVersao] = useState(0)
+
+  /* O voltar do Android, descascando uma camada por vez.
+   *
+   * Esta tela abre outras duas POR CIMA de si — o conteúdo do acompanhamento e o
+   * agendamento —, e nenhuma das duas existia para o App: lá em cima só há
+   * `nutricionistasAbertas`. Sem isto, quem estivesse escolhendo horário e
+   * apertasse voltar era jogado direto em "Mais", com as três telas fechadas de
+   * uma vez.
+   *
+   * Registrado aqui, e não no App, porque o React Native chama os tratadores na
+   * ordem inversa do registro: o mais interno decide primeiro, e é isso que faz
+   * o voltar descascar em vez de fechar tudo. E `false` no fim devolve o evento
+   * para o App, que sabe fechar esta tela. Ver a armadilha 1 do AGENTS.md. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (aberto) {
+        setAberto(null)
+        return true
+      }
+      if (agendando) {
+        /* Mesmo caminho do botão de voltar da tela de agendamento, versão por
+           versão: quem pediu horário e saiu pelo botão do aparelho precisa ver o
+           pedido na ficha igual a quem saiu pela seta. */
+        setAgendando(false)
+        setVersao(v => v + 1)
+        return true
+      }
+      return false
+    })
+
+    return () => sub.remove()
+  }, [aberto, agendando])
 
   /* E recarrega também ao voltar do segundo plano.
    *

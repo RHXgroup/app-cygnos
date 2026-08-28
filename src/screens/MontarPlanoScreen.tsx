@@ -3,6 +3,7 @@ import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'reac
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
+import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
 import { ResumoPlanoScreen } from './ResumoPlanoScreen'
 import { milhar } from '../lib/formatar'
 import { detalheDoItem, totaisDe, type ItemAlimento, type RefeicaoMontada } from '../lib/plano'
@@ -24,6 +25,9 @@ export function MontarPlanoScreen({
   const { top, bottom } = useSafeAreaInsets()
   const [itens, setItens] = useState<Record<string, ItemAlimento[]>>({})
   const [buscandoPara, setBuscandoPara] = useState<RefeicaoEscolhida | null>(null)
+  /* A mesma refeição, pela outra porta: escrever tudo de uma vez em vez de
+     buscar alimento por alimento. */
+  const [escrevendoPara, setEscrevendoPara] = useState<RefeicaoEscolhida | null>(null)
   const [resumindo, setResumindo] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -37,7 +41,7 @@ export function MontarPlanoScreen({
    * registrado depois e decide primeiro. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (buscandoPara) return false
+      if (buscandoPara || escrevendoPara) return false
       if (resumindo) {
         setResumindo(false)
         return true
@@ -47,7 +51,7 @@ export function MontarPlanoScreen({
     })
 
     return () => sub.remove()
-  }, [buscandoPara, resumindo, onVoltar])
+  }, [buscandoPara, escrevendoPara, resumindo, onVoltar])
 
   /* O que segue para o resumo e para o banco: a refeição sem o id da tela, que
      não interessa a mais ninguém, e com os alimentos já dentro. A ordem é a
@@ -65,6 +69,25 @@ export function MontarPlanoScreen({
         refeicoes={montadas}
         onVoltar={() => setResumindo(false)}
         onSalvo={onSalvo}
+      />
+    )
+  }
+
+  if (escrevendoPara) {
+    return (
+      <EscreverRefeicaoScreen
+        refeicao={escrevendoPara.rotulo}
+        onFechar={() => setEscrevendoPara(null)}
+        onAdicionar={novos => {
+          setItens(atual => ({
+            ...atual,
+            [escrevendoPara.id]: [
+              ...(atual[escrevendoPara.id] ?? []),
+              ...novos.map(a => ({ ...a, variacoes: [] })),
+            ],
+          }))
+          setErro('')
+        }}
       />
     )
   }
@@ -180,6 +203,20 @@ export function MontarPlanoScreen({
                 <Ionicons name="add" size={17} color={cores.verde} />
                 <Text style={styles.textoBotaoAdicionar}>Adicionar alimentos</Text>
               </Pressable>
+
+              {/* A segunda porta para a mesma refeição. Buscar um a um é preciso
+                  e lento; escrever é rápido e às vezes erra o alimento. Cada uma
+                  serve a um momento, e nenhuma substitui a outra — por isso as
+                  duas ficam lado a lado, com a busca em primeiro. */}
+              <Pressable
+                onPress={() => setEscrevendoPara(r)}
+                style={({ pressed }) => [styles.botaoEscrever, pressed && styles.botaoPressionado]}
+                accessibilityRole="button"
+                accessibilityLabel={`Escrever ${r.rotulo} de uma vez`}
+              >
+                <Ionicons name="create-outline" size={16} color={inkMedio} />
+                <Text style={styles.textoBotaoEscrever}>Escrever tudo de uma vez</Text>
+              </Pressable>
             </View>
           )
         })}
@@ -257,6 +294,18 @@ const styles = StyleSheet.create({
 
   semPeso: { marginTop: 2, fontSize: 11.5, color: inkFraco },
 
+  botaoEscrever: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 8,
+    paddingVertical: 10,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  textoBotaoEscrever: { fontSize: 13, fontWeight: '700', color: inkMedio },
   botaoAdicionar: {
     flexDirection: 'row',
     alignItems: 'center',

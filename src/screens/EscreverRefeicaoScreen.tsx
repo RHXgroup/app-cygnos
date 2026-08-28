@@ -1,0 +1,390 @@
+import { useEffect, useState } from 'react'
+import {
+  ActivityIndicator,
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
+import { descricaoDe, gramasDe, lerRefeicao, type ItemLido } from '../lib/interpretador'
+import { novaChave, type AlimentoEscolhido } from '../lib/plano'
+import { milhar } from '../lib/formatar'
+import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+
+/* Escrever a refeição inteira de uma vez.
+ *
+ * A alternativa é a busca: digitar "pão", escolher, informar a quantidade,
+ * voltar, digitar "café", escolher, informar, voltar. São seis toques por
+ * alimento, e é aí que um leigo desiste de montar o próprio plano.
+ *
+ * Aqui ela escreve como fala — "2 fatias de pão integral, 1 xícara de café e
+ * 200g de mamão" — e a tela mostra o que entendeu ANTES de gravar qualquer
+ * coisa. Mostrar antes é o que separa isto de um chute: a pessoa confere linha
+ * por linha, tira o que não era e adiciona o resto.
+ *
+ * O que não é encontrado na base fica visível como não encontrado, em vez de
+ * sumir em silêncio. Sumir seria pior do que falhar: ela contaria com um
+ * alimento que nunca entrou. */
+
+type Linha = {
+  lido: ItemLido
+  /* undefined enquanto procura; null quando a base não tem. */
+  alimento?: Alimento | null
+}
+
+export function EscreverRefeicaoScreen({
+  refeicao,
+  onAdicionar,
+  onFechar,
+}: {
+  /* Só para o título dizer onde isto vai cair. */
+  refeicao: string
+  onAdicionar: (itens: AlimentoEscolhido[]) => void
+  onFechar: () => void
+}) {
+  const { top, bottom } = useSafeAreaInsets()
+  const [texto, setTexto] = useState('')
+  const [linhas, setLinhas] = useState<Linha[]>([])
+  const [procurando, setProcurando] = useState(false)
+  const [conferido, setConferido] = useState(false)
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onFechar()
+      return true
+    })
+    return () => sub.remove()
+  }, [onFechar])
+
+  /* Procura cada item na base. Uma consulta por linha, e não uma só com tudo:
+     a busca do banco recebe um termo, e "pão café mamão" não é um alimento. */
+  async function conferir() {
+    const itens = lerRefeicao(texto)
+    if (itens.length === 0) return
+
+    setProcurando(true)
+    setConferido(true)
+    setLinhas(itens.map(lido => ({ lido })))
+
+    const achados = await Promise.all(
+      itens.map(async i => {
+        const r = await buscarAlimentos(i.nome)
+        /* O primeiro resultado. A busca do banco já ordena por relevância, e
+           oferecer cinco opções por linha devolveria à pessoa exatamente o
+           trabalho de escolher que esta tela existe para tirar. Quem quiser
+           outro alimento remove a linha e usa a busca. */
+        return r.tipo === 'ok' && r.alimentos.length > 0 ? r.alimentos[0] : null
+      }),
+    )
+
+    setLinhas(itens.map((lido, i) => ({ lido, alimento: achados[i] })))
+    setProcurando(false)
+  }
+
+  /* Quantos gramas este item representa.
+   *
+   * Três fontes, nesta ordem: o peso que a pessoa escreveu ("200 g"), o peso da
+   * medida caseira que a base conhece ("1 fatia = 25 g") e, faltando os dois,
+   * nada — que é honesto. Inventar o peso de uma fatia colocaria na soma do dia
+   * um número que ninguém mediu. */
+  function gramasDaLinha(l: Linha): number | null {
+    const escrito = gramasDe(l.lido)
+    if (escrito !== null) return escrito
+
+    const a = l.alimento
+    if (a?.porcaoG && a.medidaCaseira && ehMesmaMedida(a.medidaCaseira, l.lido.medida)) {
+      return l.lido.quantidade * a.porcaoG
+    }
+    return null
+  }
+
+  function remover(indice: number) {
+    setLinhas(atuais => atuais.filter((_, i) => i !== indice))
+  }
+
+  function adicionar() {
+    const escolhidos: AlimentoEscolhido[] = []
+
+    for (const l of linhas) {
+      if (!l.alimento) continue
+      escolhidos.push({
+        chave: novaChave(),
+        alimentoId: l.alimento.id,
+        nome: l.alimento.nome,
+        marca: l.alimento.marca,
+        descricao: descricaoDe(l.lido),
+        gramasTotais: gramasDaLinha(l),
+        caloriasPor100g: l.alimento.calorias,
+        proteinasPor100g: l.alimento.proteinas,
+        carboidratosPor100g: l.alimento.carboidratos,
+        gordurasPor100g: l.alimento.gorduras,
+        fibrasPor100g: l.alimento.fibras,
+      })
+    }
+
+    if (escolhidos.length > 0) onAdicionar(escolhidos)
+    onFechar()
+  }
+
+  const encontrados = linhas.filter(l => l.alimento).length
+  const perdidos = linhas.filter(l => l.alimento === null).length
+
+  return (
+    <KeyboardAvoidingView
+      style={[styles.tela, { paddingTop: top + 8 }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.cabecalho}>
+        <Pressable
+          onPress={onFechar}
+          style={styles.botaoVoltar}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+        </Pressable>
+        <Text style={styles.tituloTela} numberOfLines={1}>
+          Escrever {refeicao.toLowerCase()}
+        </Text>
+        <View style={styles.botaoVoltar} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 24 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.explicacao}>
+          Escreva como você falaria. Separe por vírgula ou uma por linha.
+        </Text>
+
+        <TextInput
+          value={texto}
+          onChangeText={t => {
+            setTexto(t)
+            setConferido(false)
+          }}
+          placeholder={'2 fatias de pão integral\n1 xícara de café\n200g de mamão'}
+          placeholderTextColor={inkFraco}
+          multiline
+          keyboardAppearance="dark"
+          style={styles.campo}
+          accessibilityLabel="O que você comeu"
+        />
+
+        <Pressable
+          onPress={conferir}
+          disabled={!texto.trim() || procurando}
+          style={({ pressed }) => [
+            styles.botaoConferir,
+            (!texto.trim() || procurando) && styles.botaoDesligado,
+            pressed && styles.pressionado,
+          ]}
+          accessibilityRole="button"
+        >
+          {procurando ? (
+            <ActivityIndicator size="small" color={cores.branco} />
+          ) : (
+            <>
+              <Ionicons name="sparkles-outline" size={17} color={cores.branco} />
+              <Text style={styles.textoBotaoConferir}>Ver o que eu entendi</Text>
+            </>
+          )}
+        </Pressable>
+
+        {conferido && !procurando && linhas.length === 0 && (
+          <Text style={styles.vazio}>
+            Não consegui separar nenhum alimento nesse texto. Tente uma linha por alimento, como
+            "2 fatias de pão".
+          </Text>
+        )}
+
+        {linhas.length > 0 && (
+          <>
+            <Text style={styles.tituloSecao}>O que eu entendi</Text>
+
+            {linhas.map((l, i) => {
+              const gramas = gramasDaLinha(l)
+              const kcal =
+                l.alimento && gramas !== null ? porcao(l.alimento.calorias, gramas) : null
+
+              return (
+                <View key={`${l.lido.original}-${i}`} style={styles.linha}>
+                  <View style={styles.textoLinha}>
+                    <Text style={styles.nomeLinha} numberOfLines={1}>
+                      {l.alimento ? l.alimento.nome : l.lido.nome}
+                    </Text>
+
+                    <Text style={styles.detalheLinha} numberOfLines={1}>
+                      {descricaoDe(l.lido)}
+                      {gramas !== null && ` · ${milhar(gramas)} g`}
+                      {kcal !== null && ` · ${milhar(kcal)} kcal`}
+                    </Text>
+
+                    {l.alimento === null && (
+                      <Text style={styles.naoAchei}>
+                        Não achei "{l.lido.nome}" na base. Ele fica de fora.
+                      </Text>
+                    )}
+                    {l.alimento && gramas === null && (
+                      <Text style={styles.semPeso}>
+                        Sem peso: entra no plano, mas fora da soma.
+                      </Text>
+                    )}
+                  </View>
+
+                  <Pressable
+                    onPress={() => remover(i)}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.remover, pressed && styles.pressionado]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remover ${l.lido.nome}`}
+                  >
+                    <Ionicons name="close" size={16} color={inkFraco} />
+                  </Pressable>
+                </View>
+              )
+            })}
+
+            <Pressable
+              onPress={adicionar}
+              disabled={encontrados === 0}
+              style={({ pressed }) => [
+                styles.botaoAdicionar,
+                encontrados === 0 && styles.botaoDesligado,
+                pressed && styles.pressionado,
+              ]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="add" size={18} color={cores.branco} />
+              <Text style={styles.textoBotaoConferir}>
+                {encontrados === 0
+                  ? 'Nenhum alimento encontrado'
+                  : `Adicionar ${encontrados} ${encontrados === 1 ? 'alimento' : 'alimentos'}`}
+              </Text>
+            </Pressable>
+
+            {perdidos > 0 && (
+              <Text style={styles.rodape}>
+                {perdidos === 1
+                  ? '1 item não foi encontrado e ficará de fora.'
+                  : `${perdidos} itens não foram encontrados e ficarão de fora.`}{' '}
+                Você pode adicioná-los depois pela busca.
+              </Text>
+            )}
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}
+
+/* "fatia" da base e "fatia" do texto são a mesma medida; "colher de sopa" e
+   "colher" também. Comparação frouxa de propósito: exigir igualdade exata
+   descartaria o peso conhecido por uma diferença de plural. */
+function ehMesmaMedida(daBase: string, doTexto: string): boolean {
+  const n = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+  const a = n(daBase)
+  const b = n(doTexto)
+  return a === b || a.startsWith(b) || b.startsWith(a)
+}
+
+const styles = StyleSheet.create({
+  tela: { flex: 1, backgroundColor: cores.fundo },
+
+  cabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+
+  conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 12 },
+  explicacao: { fontSize: 13.5, color: inkSuave, lineHeight: 20 },
+
+  campo: {
+    minHeight: 120,
+    maxHeight: 200,
+    backgroundColor: cores.superficie,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    color: cores.ink,
+    textAlignVertical: 'top',
+  },
+
+  botaoConferir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 13,
+    backgroundColor: cores.verde,
+  },
+  botaoAdicionar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 13,
+    backgroundColor: cores.verde,
+    marginTop: 6,
+  },
+  botaoDesligado: { opacity: 0.4 },
+  pressionado: { opacity: 0.75 },
+  textoBotaoConferir: { fontSize: 15, fontWeight: '800', color: cores.branco },
+
+  tituloSecao: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: inkFraco,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginTop: 6,
+  },
+
+  linha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: cores.cartao,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+  },
+  textoLinha: { flex: 1, gap: 2 },
+  nomeLinha: { fontSize: 15, fontWeight: '700', color: cores.ink },
+  detalheLinha: { fontSize: 12.5, color: inkMedio },
+  naoAchei: { fontSize: 12, color: cores.gold },
+  semPeso: { fontSize: 12, color: inkSuave },
+  remover: { padding: 4 },
+
+  vazio: { fontSize: 13.5, color: inkSuave, lineHeight: 20 },
+  rodape: { fontSize: 12.5, color: inkFraco, lineHeight: 18 },
+})
