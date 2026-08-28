@@ -92,6 +92,17 @@ Quem digita dez mil escreve `10.000`, e `Number("10.000")` é **10**.
 
 Nunca ofereça um teclado com separador para um campo que descarta separador.
 
+**E o filtro do `onChangeText` só vale para quem digita.** Todo `setCampo()`
+chamado de fora — preencher a partir do banco, de uma sugestão, de outra tela —
+entra sem passar por ele. Foi assim que a medida caseira entrou: `porcao_g` é
+`numeric(10,2)`, `String(22.5)` virou `"22.5"` num campo que só aceita dígitos,
+e o primeiro toque para corrigir fez `soDigitos` transformar isso em `"225"` —
+dez vezes o peso, sem erro nenhum na tela.
+
+Ao preencher um campo inteiro por código, **arredonde na hora de preencher**. E
+decida o que fazer quando o arredondamento zera: `Math.round(0.4)` é `0`, e um
+peso zero é pior do que não preencher.
+
 ## 4. Nada nasce vazio e vira o que vale
 
 Conjuntos com um registro ativo — metas, planos, cálculos — têm gatilho no banco

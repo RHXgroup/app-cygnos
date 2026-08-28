@@ -354,10 +354,29 @@ export function BuscarAlimentoScreen({
                      preenchido. É a diferença entre escolher "2 colheres" e
                      escolher "2 colheres" e depois adivinhar quanto pesa cada
                      uma, que era o que a tela pedia. */
-                  if (a.medidaCaseira && a.porcaoG) {
+                  /* Arredondado, e não o número cru. `porcao_g` vem de uma
+                     coluna numeric(10,2), então "22.50" é valor possível — e
+                     este campo só aceita dígitos (`soDigitos` no onChangeText).
+                     Preencher "22.5" por fora do onChangeText passava o ponto
+                     pela porta dos fundos: a pessoa via um separador num
+                     teclado que não tem separador, e o primeiro toque para
+                     corrigir transformava 22,5 em 225 — dez vezes o peso, sem
+                     aviso nenhum.
+
+                     Medida caseira em grama inteira é a granularidade certa de
+                     qualquer jeito: ninguém serve 22,5 g de arroz com colher.
+
+                     Abaixo de meio grama não dá para arredondar sem virar
+                     zero, e zero seria pior que perguntar — aí cai em gramas,
+                     como se a base não soubesse. */
+                  const peso = a.porcaoG === null || a.porcaoG === undefined
+                    ? null
+                    : Math.round(a.porcaoG)
+
+                  if (a.medidaCaseira && peso !== null && peso >= 1) {
                     setModo('medida')
                     setMedida(a.medidaCaseira)
-                    setPesoUnidade(String(a.porcaoG))
+                    setPesoUnidade(String(peso))
                     setQuantidade(QUANTIDADE_PADRAO)
                   } else {
                     setModo('gramas')
