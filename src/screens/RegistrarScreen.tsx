@@ -9,6 +9,7 @@ import { EmBreveScreen } from './EmBreveScreen'
 import { MetasScreen } from './MetasScreen'
 import { PesoScreen } from './PesoScreen'
 import { SonoScreen } from './SonoScreen'
+import { TreinoScreen } from './TreinoScreen'
 import { RefeicoesDoDiaScreen } from './RefeicoesDoDiaScreen'
 import { cores, inkSuave } from '../theme'
 
@@ -50,6 +51,7 @@ export function RegistrarScreen({
   onPesoMudou,
   onConsumoMudou,
   onSonoMudou,
+  onTreinoMudou,
 }: {
   contaId: string
   /* Opção já aberta na entrada, quando esta tela foi chamada por um atalho — o
@@ -62,6 +64,8 @@ export function RegistrarScreen({
   onPesoMudou: () => void
   onConsumoMudou: () => void
   onSonoMudou: () => void
+  /* Treino mexe na constância que a tela inicial mostra. */
+  onTreinoMudou: () => void
 }) {
   const { top } = useSafeAreaInsets()
   const [escolhida, setEscolhida] = useState<Opcao | null>(
@@ -105,6 +109,12 @@ export function RegistrarScreen({
 
   if (escolhida?.chave === 'peso') {
     return <PesoScreen contaId={contaId} onFechar={voltarDaOpcao} onMudou={onPesoMudou} />
+  }
+
+  if (escolhida?.chave === 'treino') {
+    /* A última opção do "+" que ainda caía em "Em breve". As tabelas existiam
+       desde agosto, desenhadas e sem uso — ver a migração 20260803000002. */
+    return <TreinoScreen contaId={contaId} onFechar={voltarDaOpcao} onMudou={onTreinoMudou} />
   }
 
   if (escolhida?.chave === 'sono') {

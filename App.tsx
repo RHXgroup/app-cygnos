@@ -250,6 +250,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [versaoPeso, setVersaoPeso] = useState(0)
   const [versaoConsumo, setVersaoConsumo] = useState(0)
   const [versaoSono, setVersaoSono] = useState(0)
+  const [versaoTreino, setVersaoTreino] = useState(0)
   const carrossel = useRef<ScrollView>(null)
   /* O Início não é a primeira aba, então o carrossel precisa nascer deslocado.
      A prop contentOffset só funciona no iOS; posicionar no primeiro layout
@@ -587,6 +588,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
               onPesoMudou={() => setVersaoPeso(v => v + 1)}
               onConsumoMudou={() => setVersaoConsumo(v => v + 1)}
               onSonoMudou={() => setVersaoSono(v => v + 1)}
+              onTreinoMudou={() => setVersaoTreino(v => v + 1)}
             />
           </View>
         )}
