@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
@@ -26,6 +27,18 @@ import { cores, inkFraco, inkMedio, inkSuave, veu } from '../theme'
  * O produto, de onde veio o dado e a quantidade. Nunca grava direto: um código
  * lido errado — e acontece, com etiqueta amassada — colocaria comida que a
  * pessoa não comeu no diário dela. */
+/* Os quatro que o rótulo brasileiro sempre traz, na ordem em que ele os
+   imprime. Fibra e sódio ficam de fora: aparecem em menos rótulos e alongariam
+   um formulário que a pessoa preenche de pé, no supermercado. */
+const CAMPOS_ROTULO = [
+  { chave: 'calorias', rotulo: 'Calorias', unidade: 'kcal' },
+  { chave: 'proteinas', rotulo: 'Proteínas', unidade: 'g' },
+  { chave: 'carboidratos', rotulo: 'Carboidratos', unidade: 'g' },
+  { chave: 'gorduras', rotulo: 'Gorduras', unidade: 'g' },
+] as const
+
+type CampoRotulo = (typeof CAMPOS_ROTULO)[number]['chave']
+
 export function LerCodigoScreen({
   onAdicionar,
   onFechar,
@@ -39,6 +52,11 @@ export function LerCodigoScreen({
   const [produto, setProduto] = useState<ProdutoLido | null>(null)
   const [erro, setErro] = useState('')
   const [gramas, setGramas] = useState(100)
+  /* O que a pessoa corrigiu do rótulo. Guardado à parte do produto para o
+     original continuar visível: quem digita 250 kcal precisa poder ver que a
+     base dizia outra coisa, ou não saberá que corrigiu. */
+  const [doRotulo, setDoRotulo] = useState<Record<string, string>>({})
+  const [editando, setEditando] = useState(false)
 
   /* O leitor dispara várias vezes por segundo enquanto o código está no
      enquadramento. Sem esta trava, uma leitura vira dez consultas. */
@@ -88,6 +106,15 @@ export function LerCodigoScreen({
     lendo.current = false
   }
 
+  /* O número do rótulo vence o da base. Quem tem o pacote na mão está lendo a
+     fonte primária; o Open Food Facts é cópia colaborativa dela. */
+  function valorFinal(campo: CampoRotulo, original: number | null): number | null {
+    const digitado = doRotulo[campo]
+    if (digitado === undefined || digitado.trim() === '') return original
+    const n = Number(digitado.replace(',', '.'))
+    return Number.isFinite(n) ? n : original
+  }
+
   function adicionar() {
     if (!produto) return
 
@@ -101,10 +128,10 @@ export function LerCodigoScreen({
       marca: produto.marca,
       descricao: `${milhar(gramas)} g`,
       gramasTotais: gramas,
-      caloriasPor100g: produto.calorias,
-      proteinasPor100g: produto.proteinas,
-      carboidratosPor100g: produto.carboidratos,
-      gordurasPor100g: produto.gorduras,
+      caloriasPor100g: valorFinal('calorias', produto.calorias),
+      proteinasPor100g: valorFinal('proteinas', produto.proteinas),
+      carboidratosPor100g: valorFinal('carboidratos', produto.carboidratos),
+      gordurasPor100g: valorFinal('gorduras', produto.gorduras),
       fibrasPor100g: produto.fibras,
     })
     onFechar()
@@ -144,7 +171,7 @@ export function LerCodigoScreen({
 
   /* ── O produto lido ─────────────────────────────────────────────────────*/
   if (produto) {
-    const kcal = porcao(produto.calorias, gramas)
+    const kcal = porcao(valorFinal('calorias', produto.calorias), gramas)
 
     return (
       <View style={[styles.tela, { paddingTop: top + 8 }]}>
@@ -159,13 +186,16 @@ export function LerCodigoScreen({
               <Numero rotulo="Calorias" valor={kcal === null ? '—' : `${milhar(kcal)} kcal`} />
               <Numero
                 rotulo="Proteínas"
-                valor={naPorcao(produto.proteinas, gramas)}
+                valor={naPorcao(valorFinal('proteinas', produto.proteinas), gramas)}
               />
               <Numero
                 rotulo="Carboidratos"
-                valor={naPorcao(produto.carboidratos, gramas)}
+                valor={naPorcao(valorFinal('carboidratos', produto.carboidratos), gramas)}
               />
-              <Numero rotulo="Gorduras" valor={naPorcao(produto.gorduras, gramas)} />
+              <Numero
+                rotulo="Gorduras"
+                valor={naPorcao(valorFinal('gorduras', produto.gorduras), gramas)}
+              />
             </View>
 
             {/* De onde veio o número. Um dado da nossa base foi conferido por
@@ -177,6 +207,57 @@ export function LerCodigoScreen({
                 : 'Do Open Food Facts · dado colaborativo, confira o rótulo'}
             </Text>
           </View>
+
+          {/* Produto brasileiro entra no Open Food Facts com metade dos campos
+              vazios, e um traço na tela lê-se como app quebrado. Dizer o que
+              falta, e por quê, é mais honesto — e o pacote está na mão da
+              pessoa, que é a fonte primária do número. */}
+          {produto.faltando.length > 0 && !editando && (
+            <Pressable
+              onPress={() => setEditando(true)}
+              style={({ pressed }) => [styles.blocoFalta, pressed && styles.pressionado]}
+              accessibilityRole="button"
+              accessibilityLabel="Preencher os dados do rótulo"
+            >
+              <Ionicons name="alert-circle-outline" size={17} color={cores.gold} />
+              <Text style={styles.textoFalta}>
+                Esta base não tem {listar(produto.faltando)} deste produto. Toque para digitar do
+                rótulo.
+              </Text>
+            </Pressable>
+          )}
+
+          {editando && (
+            <View style={styles.formulario}>
+              <Text style={styles.tituloFormulario}>O que diz o rótulo, por 100 g</Text>
+
+              {CAMPOS_ROTULO.map(c => (
+                <View key={c.chave} style={styles.linhaFormulario}>
+                  <Text style={styles.rotuloCampo}>{c.rotulo}</Text>
+                  <TextInput
+                    value={doRotulo[c.chave] ?? ''}
+                    onChangeText={v =>
+                      setDoRotulo(atual => ({ ...atual, [c.chave]: v.replace(/[^0-9.,]/g, '') }))
+                    }
+                    placeholder={
+                      produto[c.chave] === null ? '—' : String(produto[c.chave])
+                    }
+                    placeholderTextColor={inkFraco}
+                    keyboardType="decimal-pad"
+                    keyboardAppearance="dark"
+                    maxLength={7}
+                    style={styles.campoFormulario}
+                    accessibilityLabel={`${c.rotulo} por 100 gramas`}
+                  />
+                  <Text style={styles.unidadeCampo}>{c.unidade}</Text>
+                </View>
+              ))}
+
+              <Text style={styles.ajudaFormulario}>
+                Em branco, vale o que a base trouxe. O que você digitar substitui.
+              </Text>
+            </View>
+          )}
 
           <Text style={styles.rotuloQuantidade}>Quanto você comeu</Text>
           <View style={styles.atalhos}>
@@ -297,6 +378,13 @@ function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
   )
 }
 
+/* "calorias e proteínas", "calorias, gorduras e proteínas". A vírgula antes do
+   "e" seria erro em português, e a frase aparece numa tela que pede confiança. */
+function listar(itens: string[]): string {
+  if (itens.length === 1) return itens[0]
+  return `${itens.slice(0, -1).join(', ')} e ${itens[itens.length - 1]}`
+}
+
 const naPorcao = (por100g: number | null, gramas: number): string => {
   const v = porcao(por100g, gramas)
   return v === null ? '—' : `${milhar(v)} g`
@@ -400,6 +488,44 @@ const styles = StyleSheet.create({
   atalhoAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
   textoAtalho: { fontSize: 14, fontWeight: '700', color: cores.ink },
   textoAtalhoAtivo: { color: cores.sobreLimao },
+
+  blocoFalta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: cores.atencaoFundo,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  textoFalta: { flex: 1, fontSize: 12.5, color: cores.ink, lineHeight: 18 },
+
+  formulario: {
+    backgroundColor: cores.cartao,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    padding: 14,
+    gap: 8,
+  },
+  tituloFormulario: { fontSize: 13, fontWeight: '700', color: cores.ink, marginBottom: 2 },
+  linhaFormulario: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rotuloCampo: { flex: 1, fontSize: 13.5, color: inkMedio },
+  campoFormulario: {
+    width: 88,
+    backgroundColor: cores.superficie,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: cores.ink,
+    textAlign: 'right',
+  },
+  unidadeCampo: { width: 34, fontSize: 12.5, color: inkSuave },
+  ajudaFormulario: { fontSize: 11.5, color: inkFraco, lineHeight: 17, marginTop: 2 },
 
   aviso: { paddingHorizontal: 28, paddingTop: 40, alignItems: 'center', gap: 10 },
   tituloAviso: { fontSize: 18, fontWeight: '800', color: cores.ink, textAlign: 'center' },

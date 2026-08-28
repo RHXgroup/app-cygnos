@@ -35,10 +35,20 @@ export type ProdutoLido = {
   /* O peso da embalagem, quando o produto informa: "395 g". Vira a sugestão de
      quantidade, porque quem escaneia costuma comer o pacote ou uma fração dele. */
   porcaoEmbalagem: number | null
+  /* Classificação NOVA, quando a base tem: 1 in natura … 4 ultraprocessado. */
+  nova: number | null
+  /* Quais nutrientes a base NÃO informou. A tela precisa dizer isso em vez de
+     mostrar traços: produto brasileiro entra no Open Food Facts com metade dos
+     campos vazios, e quem vê "—" acha que o app falhou. */
+  faltando: string[]
   /* De onde veio, para a tela dizer. Um número da nossa base e um do Open Food
      Facts não merecem a mesma confiança, e esconder isso seria omitir. */
   origem: 'base' | 'openfoodfacts'
 }
+
+/* Quilojoule para quilocaloria. O fator é o oficial, não arredondado para 4,2:
+   num produto de 2.000 kJ a diferença passa de 10 kcal. */
+const deKj = (kj: number | null) => (kj === null ? null : Math.round(kj / 4.184))
 
 export type ResultadoCodigo =
   | { tipo: 'ok'; produto: ProdutoLido }
@@ -127,13 +137,15 @@ export async function consultarCodigo(codigo: string): Promise<ResultadoCodigo> 
        em branco. Melhor tratar como não encontrado e deixar a pessoa buscar. */
     if (!nome) return { tipo: 'nao_encontrado' }
 
-    return {
-      tipo: 'ok',
-      produto: {
+    const produto: ProdutoLido = {
         codigo,
         nome,
         marca: typeof p.brands === 'string' && p.brands.trim() ? p.brands.split(',')[0].trim() : null,
-        calorias: numero(n['energy-kcal_100g']),
+        /* A caloria tem duas grafias na base, e produto brasileiro às vezes só
+           traz a segunda: quando falta `energy-kcal_100g`, `energy_100g` vem em
+           quilojoules. Sem esta conversão, produto com energia declarada
+           aparecia sem caloria nenhuma. */
+        calorias: numero(n['energy-kcal_100g']) ?? deKj(numero(n.energy_100g)),
         proteinas: numero(n.proteins_100g),
         carboidratos: numero(n.carbohydrates_100g),
         gorduras: numero(n.fat_100g),
@@ -145,9 +157,15 @@ export async function consultarCodigo(codigo: string): Promise<ResultadoCodigo> 
           return g === null ? null : Math.round(g * 1000)
         })(),
         porcaoEmbalagem: pesoDaEmbalagem(p.quantity),
+        nova: numero(n['nova-group_100g']) ?? numero(n['nova-group']),
+        /* Preenchido logo abaixo, depois de o produto existir: a lista depende
+           dos próprios valores. */
+        faltando: [],
         origem: 'openfoodfacts',
-      },
     }
+
+    produto.faltando = oQueFalta(produto)
+    return { tipo: 'ok', produto }
   } catch (e) {
     const erro = e as Error
     if (erro.name === 'AbortError') {
@@ -155,6 +173,22 @@ export async function consultarCodigo(codigo: string): Promise<ResultadoCodigo> 
     }
     return { tipo: 'erro', mensagem: 'Não consegui consultar o produto agora.' }
   }
+}
+
+/* O que a base deixou em branco. Só os quatro que a pessoa procura no rótulo:
+   listar dez faria a tela virar um relatório de ausências. */
+function oQueFalta(p: {
+  calorias: number | null
+  proteinas: number | null
+  carboidratos: number | null
+  gorduras: number | null
+}): string[] {
+  const faltas: string[] = []
+  if (p.calorias === null) faltas.push('calorias')
+  if (p.proteinas === null) faltas.push('proteínas')
+  if (p.carboidratos === null) faltas.push('carboidratos')
+  if (p.gorduras === null) faltas.push('gorduras')
+  return faltas
 }
 
 const daBase = (a: Alimento, codigo: string): ProdutoLido => ({
@@ -168,5 +202,7 @@ const daBase = (a: Alimento, codigo: string): ProdutoLido => ({
   fibras: a.fibras,
   sodio: a.sodio,
   porcaoEmbalagem: null,
+  nova: a.nova,
+  faltando: oQueFalta(a),
   origem: 'base',
 })
