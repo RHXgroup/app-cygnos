@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { falha } from '../lib/erros'
 import {
   AJUSTE_MAX,
   AJUSTE_MIN,
@@ -110,7 +111,10 @@ export function CalculoEnergeticoScreen({
     ]).then(([conta, pesoR, metasR]) => {
       if (!ativo) return
 
-      if (conta.error) setErro(conta.error.message)
+      /* Frase nossa: o texto do Postgres não diz nada a quem está calculando as
+         próprias calorias. O motivo cru vai para o console. */
+      if (conta.error)
+        setErro(falha('Não consegui carregar os seus dados agora. Verifique a conexão.', conta.error))
 
       const c = conta.data as
         | {

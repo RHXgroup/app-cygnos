@@ -1,4 +1,5 @@
 import { dataISO } from './formatar'
+import { falha } from './erros'
 import { LIMITES, carregarMetas } from './metas'
 import { supabase } from './supabase'
 
@@ -99,7 +100,11 @@ export async function carregarAgua(contaId: string, hoje = new Date()): Promise<
   ])
 
   if (metas.tipo === 'erro') return { tipo: 'erro', mensagem: metas.mensagem }
-  if (registros.error) return { tipo: 'erro', mensagem: registros.error.message }
+  if (registros.error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar a sua água agora. Verifique a conexão.', registros.error),
+    }
 
   const linhas = (registros.data ?? []) as LinhaRegistro[]
   const deHoje = dias[dias.length - 1]
@@ -145,7 +150,11 @@ export async function carregarAguaPeriodo(
     .lte('data', ate)
     .order('bebido_em', { ascending: true })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar o histórico de água agora. Verifique a conexão.', error),
+    }
 
   const linhas = (data ?? []) as LinhaRegistro[]
   return {
@@ -176,7 +185,11 @@ export async function registrarAgua(
     .select('id, ml, bebido_em')
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui registrar o copo agora. Verifique a conexão.', error),
+    }
   return {
     tipo: 'ok',
     registro: { id: data.id as string, ml: data.ml as number, bebidoEm: data.bebido_em as string },
@@ -188,6 +201,6 @@ export async function registrarAgua(
    guardá-lo só sujaria a soma de quem for ler isso depois. */
 export async function apagarRegistro(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_agua_registros').delete().eq('id', id)
-  return error ? { erro: error.message } : null
+  return error ? { erro: falha('Não consegui remover o copo agora. Verifique a conexão.', error) } : null
 }
 

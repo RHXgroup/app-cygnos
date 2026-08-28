@@ -214,7 +214,32 @@ nenhuma por causa de uma imagem.
 Função que existe para alimentar a tela devolve `null` e engole a falha. Quem
 decide o que fazer com a ausência é a tela, que já sabe desenhar as iniciais.
 
-## 12. Antes de dar por pronto
+## 12. Erro de banco não é texto para o paciente
+
+O Supabase devolve o texto do Postgres, e ele vinha parar na tela: "duplicate key
+value violates unique constraint", "Network request failed", "permission denied
+for function". Inglês, de programador, e sem dizer o que fazer — para alguém que
+só queria anotar um copo de água ou marcar uma consulta.
+
+Use `falha()` de `lib/erros.ts`: a frase que a pessoa lê fica no lugar da
+chamada, e o texto cru vai para o console.
+
+```ts
+if (error) return { tipo: 'erro', mensagem: falha('Não consegui registrar o copo agora.', error) }
+```
+
+Os dois lados importam. Engolir o erro em silêncio já custou uma sessão inteira
+de investigação aqui — ver o comentário do carregamento em `NutricionistasScreen`.
+
+**A exceção**, e é uma só: quando o BANCO escreve a mensagem para alguém ler (um
+`RAISE` em português, como "Esse horário não está mais disponível."), repassar é
+melhor do que traduzir. Está em `lib/agenda.ts`, na hora de pedir consulta, e é o
+único lugar.
+
+Nem toda lib já foi convertida. Ao mexer numa que ainda devolve `error.message`
+cru, converta-a de passagem.
+
+## 13. Antes de dar por pronto
 
 - `npx tsc --noEmit` — a suíte de testes deste projeto é esta.
 - Se mexeu em campo numérico, teste a conversão com valores reais (`10.000`,
@@ -224,6 +249,7 @@ decide o que fazer com a ausência é a tela, que já sabe desenhar as iniciais.
 - Se a tela mostra imagem remota, veja o que aparece quando ela **não** carrega.
 - Se a tela mostra dado do sistema, mande o app para o segundo plano, mude o
   dado do outro lado, e volte.
+- Se a tela mostra erro, veja se o que aparece é frase de gente ou do Postgres.
 
 ## Como rodar
 
