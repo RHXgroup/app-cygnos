@@ -470,12 +470,15 @@ export function ContadorCaloriasScreen({
               detalhe="O de sempre"
               onPress={abrirRepetir}
             />
-            {/* Escrever a refeição inteira: a porta que dispensa buscar
-                alimento por alimento. Fica por último porque erra mais que as
-                outras — e quem escolhe assumir isso o faz de propósito. */}
+            {/* A refeição inteira de uma vez, falada ou escrita. É a porta que
+                dispensa buscar alimento por alimento, e o microfone lidera
+                porque falar é o gesto de quem está com o prato na frente.
+
+                Erra mais que as outras — por isso a tela mostra o que entendeu
+                antes de gravar, e por isso ela não vem primeiro aqui. */}
             <Porta
-              icone="create-outline"
-              titulo="Escrever"
+              icone="mic-outline"
+              titulo="Falar ou escrever"
               detalhe="Tudo de uma vez"
               onPress={() => setPorta('escrever')}
             />

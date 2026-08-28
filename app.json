@@ -39,7 +39,13 @@
           "microphonePermission": false
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O Cygnos usa o microfone para você falar o que comeu em vez de digitar."
+        }
+      ]
     ],
     "extra": {
       "eas": {

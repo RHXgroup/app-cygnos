@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
 import { descricaoDe, gramasDe, lerRefeicao, type ItemLido } from '../lib/interpretador'
+import { Ditado } from '../components/Ditado'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { milhar } from '../lib/formatar'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
@@ -63,6 +64,9 @@ export function EscreverRefeicaoScreen({
   const [conferido, setConferido] = useState(false)
   /* Qual linha está com a lista de alternativas aberta. */
   const [trocando, setTrocando] = useState<number | null>(null)
+  /* O que deu errado no ditado. Vive aqui e não no componente porque a faixa
+     aparece acima do campo, fora dele. */
+  const [erroVoz, setErroVoz] = useState<string | null>(null)
 
   /* Fecha o teclado ANTES de sair.
    *
@@ -201,7 +205,7 @@ export function EscreverRefeicaoScreen({
           <Ionicons name="chevron-back" size={22} color={cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela} numberOfLines={1}>
-          Escrever {refeicao.toLowerCase()}
+          Falar ou escrever
         </Text>
         <View style={styles.botaoVoltar} />
       </View>
@@ -212,8 +216,27 @@ export function EscreverRefeicaoScreen({
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.explicacao}>
-          Escreva como você falaria. Separe por vírgula ou uma por linha.
+          Fale ou escreva o seu {refeicao.toLowerCase()} como você contaria para alguém.
+          Separe por vírgula ou uma por linha.
         </Text>
+
+        <Ditado
+          onTexto={t => {
+            setErroVoz(null)
+            /* Junta ao que já estava escrito, em linha nova. Substituir
+               apagaria o que a pessoa digitou antes de lembrar que podia
+               falar o resto. */
+            setTexto(atual => (atual.trim() ? atual.trim() + "\n" + t : t))
+            setConferido(false)
+          }}
+          onErro={setErroVoz}
+        />
+
+        {erroVoz && (
+          <View style={styles.blocoErro}>
+            <Text style={styles.textoErro}>{erroVoz}</Text>
+          </View>
+        )}
 
         <TextInput
           value={texto}
@@ -424,6 +447,15 @@ const styles = StyleSheet.create({
     color: cores.ink,
     textAlignVertical: 'top',
   },
+
+  blocoErro: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: cores.erroBorda,
+    backgroundColor: cores.erroFundo,
+  },
+  textoErro: { fontSize: 13, lineHeight: 18, color: cores.erroTexto },
 
   botaoConferir: {
     flexDirection: 'row',
