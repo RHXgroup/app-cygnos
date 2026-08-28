@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { assinados } from './arquivos'
 
 /* O catálogo de nutricionistas do app.
  *
@@ -69,87 +70,21 @@ const daLinha = (l: Linha): Nutricionista => ({
 
 /* ── As fotos ──────────────────────────────────────────────────────────────
  *
- * O sistema entrega URL PÚBLICA para um bucket PRIVADO. `getPublicUrl` não
- * pergunta nada a ninguém: concatena uma string e devolve um endereço com cara
- * de válido, que o servidor recusa com "Bucket not found". Era por isso que
- * nenhuma foto do catálogo carregava — e sem erro nenhum, porque do ponto de
- * vista do app estava tudo certo até a imagem simplesmente não aparecer.
- *
- * Aqui o endereço é desmontado, o caminho é extraído e assinado com a sessão de
- * quem está usando o app. É remendo, e o conserto de verdade é o sistema assinar
- * na origem — mas o remendo é honesto: se um dia o bucket virar público, ou o
- * sistema passar a assinar, este código continua funcionando sem mudar. */
-
-const VALIDADE_SEGUNDOS = 60 * 60
-
-/* .../storage/v1/object/public/<bucket>/<caminho>[?query] */
-const ENDERECO_PUBLICO = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/
-
-function partesDoEndereco(url: string): { bucket: string; caminho: string } | null {
-  const achado = ENDERECO_PUBLICO.exec(url)
-  if (!achado) return null
-
-  /* O `?t=` que o sistema pendura no fim é quebra-cache dele, não faz parte do
-     nome do arquivo — assinar com ele junto procuraria um arquivo que não
-     existe. */
-  const caminho = decodeURIComponent(achado[2].split('?')[0])
-  return caminho ? { bucket: achado[1], caminho } : null
-}
+ * O endereço vem do sistema como URL pública de um bucket privado, e por isso
+ * precisa ser assinado aqui. A conta mora em lib/arquivos.ts, junto com a dos
+ * arquivos de exame, que sofrem do mesmo mal. */
 
 async function comFotosAssinadas(lista: Nutricionista[]): Promise<Nutricionista[]> {
-  const doIndice = new Map<number, { bucket: string; caminho: string }>()
-  const porBucket = new Map<string, string[]>()
+  const comFoto = lista.filter(n => n.imagemUrl)
+  if (comFoto.length === 0) return lista
 
-  lista.forEach((n, i) => {
-    if (!n.imagemUrl) return
-    const partes = partesDoEndereco(n.imagemUrl)
-    /* Endereço fora do formato conhecido fica como veio: pode ser de outro lugar
-       que já funciona, e reescrever o que não se entende é pior que não mexer. */
-    if (!partes) return
+  const novos = await assinados(comFoto.map(n => n.imagemUrl as string))
+  const porOriginal = new Map<string, string>()
+  comFoto.forEach((n, i) => porOriginal.set(n.imagemUrl as string, novos[i]))
 
-    doIndice.set(i, partes)
-    porBucket.set(partes.bucket, [...(porBucket.get(partes.bucket) ?? []), partes.caminho])
-  })
-
-  if (doIndice.size === 0) return lista
-
-  /* Uma chamada por bucket, e não uma por foto: o catálogo é a vitrine e vai
-     crescer, e uma ida à rede por linha cresceria junto com ele. */
-  const assinados = new Map<string, string>()
-
-  await Promise.all(
-    [...porBucket].map(async ([bucket, caminhos]) => {
-      /* O try é o que impede uma foto de derrubar o catálogo. Assinar é ida à
-         rede: sem sinal, a promessa REJEITA em vez de devolver `error`, e essa
-         rejeição subiria por `carregarCatalogo` até a tela — que ficaria sem
-         nutricionista nenhuma por causa de uma imagem.
-         Sem assinatura, cada uma fica com o endereço que veio, e o AvatarNutri
-         desenha as iniciais para as que não carregarem. */
-      try {
-        const { data } = await supabase.storage
-          .from(bucket)
-          .createSignedUrls(caminhos, VALIDADE_SEGUNDOS)
-
-        for (const item of data ?? []) {
-          if (item.path && item.signedUrl) assinados.set(`${bucket}/${item.path}`, item.signedUrl)
-        }
-      } catch {
-        /* Silêncio de propósito: a lista continua, só sem foto. */
-      }
-    }),
+  return lista.map(n =>
+    n.imagemUrl ? { ...n, imagemUrl: porOriginal.get(n.imagemUrl) ?? n.imagemUrl } : n,
   )
-
-  return lista.map((n, i) => {
-    const partes = doIndice.get(i)
-    if (!partes) return n
-
-    const assinado = assinados.get(`${partes.bucket}/${partes.caminho}`)
-    /* Não deu para assinar — arquivo que não está lá, ou permissão que não
-       alcança aquela pasta. Fica o endereço original: se ele funcionar, ótimo; e
-       se não funcionar, o AvatarNutri desenha as iniciais quando a imagem falha,
-       que é melhor do que o buraco que ficava antes. */
-    return assinado ? { ...n, imagemUrl: assinado } : n
-  })
 }
 
 export async function carregarCatalogo(): Promise<ResultadoCatalogo> {

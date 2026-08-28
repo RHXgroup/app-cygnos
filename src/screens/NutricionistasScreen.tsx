@@ -423,6 +423,16 @@ function Acompanhamento({
       chave: 'fotos',
     },
     {
+      icone: 'flask-outline',
+      rotulo: 'Exames',
+      /* Sem contagem, ao contrário dos vizinhos: `app_conteudo_da_nutricionista`
+         não conta exames, e inventar "0 exames" para quem tem três seria pior do
+         que não dizer número nenhum. A frase convida a abrir, e a tela de dentro
+         responde a pergunta. */
+      apoio: 'Os exames que ela importou',
+      chave: 'exames',
+    },
+    {
       icone: 'restaurant-outline',
       rotulo: 'Planejamento alimentar',
       apoio: descricaoDoPlano(conteudo.plano),

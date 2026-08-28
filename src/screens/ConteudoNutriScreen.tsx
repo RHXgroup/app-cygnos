@@ -27,8 +27,10 @@ import {
   type PlanoDaNutri,
 } from '../lib/conteudoNutri'
 import { carregarSessoes, type SessaoDeFotos } from '../lib/fotos'
+import { carregarExames, ehImagem, tamanhoLegivel, type Exame } from '../lib/exames'
 import { ComparativoFotos } from '../components/ComparativoFotos'
 import { decimal, milhar } from '../lib/formatar'
+import { abrirLink } from '../lib/links'
 import { cores, inkFraco, inkSuave } from '../theme'
 
 /* O conteúdo de um item do painel "Meu nutricionista".
@@ -45,7 +47,13 @@ import { cores, inkFraco, inkSuave } from '../theme'
  * Tudo é SÓ LEITURA. Nada nesta tela escreve no sistema da nutricionista — o
  * app mostra o que ela registrou, e quem edita isso é ela, de lá. */
 
-export type ChaveConteudo = 'anamnese' | 'antropometria' | 'fotos' | 'plano' | 'energetico'
+export type ChaveConteudo =
+  | 'anamnese'
+  | 'antropometria'
+  | 'fotos'
+  | 'plano'
+  | 'energetico'
+  | 'exames'
 
 const TITULOS: Record<ChaveConteudo, string> = {
   anamnese: 'Anamnese',
@@ -53,6 +61,7 @@ const TITULOS: Record<ChaveConteudo, string> = {
   fotos: 'Evolução fotográfica',
   plano: 'Planejamento alimentar',
   energetico: 'Cálculo energético',
+  exames: 'Exames',
 }
 
 type Dados =
@@ -61,6 +70,7 @@ type Dados =
   | { chave: 'fotos'; sessoes: SessaoDeFotos[] }
   | { chave: 'plano'; plano: PlanoDaNutri | null }
   | { chave: 'energetico'; energetico: Energetico | null }
+  | { chave: 'exames'; exames: Exame[] }
 
 export function ConteudoNutriScreen({
   chave,
@@ -184,10 +194,87 @@ async function carregar(chave: ChaveConteudo): Promise<Dados> {
   if (chave === 'antropometria') return { chave, avaliacoes: await carregarAvaliacoes() }
   if (chave === 'fotos') return { chave, sessoes: await carregarSessoes() }
   if (chave === 'plano') return { chave, plano: await carregarPlano() }
+  if (chave === 'exames') {
+    const r = await carregarExames()
+    /* As outras funções deste arquivo estouram no erro e a tela trata; esta
+       devolve resultado, então a conversão acontece aqui para o comportamento
+       ser o mesmo dos vizinhos. */
+    if (r.tipo === 'erro') throw new Error(r.mensagem)
+    return { chave, exames: r.exames }
+  }
   return { chave, energetico: await carregarEnergetico() }
 }
 
+/* Um exame.
+ *
+ * O toque abre o arquivo FORA do app, no visualizador do aparelho. Não é
+ * preguiça: exame é PDF de laboratório, com tabela, cabeçalho e coluna de
+ * referência — desenhar isso dentro de uma tela de celular daria uma versão
+ * pior da que o sistema já sabe abrir, e o paciente costuma querer justamente
+ * salvar ou encaminhar o arquivo.
+ *
+ * A análise da nutricionista aparece como selo e não como texto: o conteúdo dela
+ * é jsonb de formato desconhecido daqui, e dizer que existe é informação —
+ * fingir que se sabe o que é seria invenção. Ver lib/exames.ts. */
+function CartaoExame({ exame }: { exame: Exame }) {
+  const quando = exame.dataExame
+    ? dataLegivel(exame.dataExame)
+    : dataLegivel(exame.criadoEm.slice(0, 10))
+
+  const apoio = [quando, tamanhoLegivel(exame.tamanho)].filter(Boolean).join(' · ')
+
+  return (
+    <Pressable
+      onPress={() => abrirLink(exame.arquivoUrl)}
+      style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir o exame ${exame.nome}, de ${quando}`}
+    >
+      <View style={styles.linhaExame}>
+        <View style={styles.iconeExame}>
+          <Ionicons
+            name={ehImagem(exame.tipoArquivo) ? 'image-outline' : 'document-text-outline'}
+            size={20}
+            color={cores.verde}
+          />
+        </View>
+
+        <View style={styles.textoExame}>
+          <Text style={styles.nomeExame} numberOfLines={2}>
+            {exame.nome}
+          </Text>
+          {!!apoio && <Text style={styles.apoioExame}>{apoio}</Text>}
+        </View>
+
+        <Ionicons name="open-outline" size={16} color={inkFraco} />
+      </View>
+
+      {!!exame.observacoes && <Text style={styles.observacaoExame}>{exame.observacoes}</Text>}
+
+      {exame.temAnalise && (
+        <View style={styles.seloAnalise}>
+          <Ionicons name="sparkles-outline" size={13} color={cores.verde} />
+          <Text style={styles.textoSeloAnalise}>Analisado pela sua nutricionista</Text>
+        </View>
+      )}
+    </Pressable>
+  )
+}
+
 function Miolo({ dados }: { dados: Dados }) {
+  if (dados.chave === 'exames') {
+    if (dados.exames.length === 0) {
+      return <Aviso texto="A sua nutricionista ainda não importou nenhum exame." />
+    }
+    return (
+      <>
+        {dados.exames.map(e => (
+          <CartaoExame key={e.id} exame={e} />
+        ))}
+      </>
+    )
+  }
+
   if (dados.chave === 'anamnese') {
     if (dados.anamneses.length === 0) {
       return <Aviso texto="A sua nutricionista ainda não preencheu uma anamnese." />
@@ -534,7 +621,33 @@ const styles = StyleSheet.create({
   chamada: { marginTop: 6, fontSize: 18, fontWeight: '800', color: cores.ink },
   explicacao: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: inkSuave },
 
-  cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: 16, marginTop: 12 },
+cartaoPressionado: { backgroundColor: cores.superficie },
+  linhaExame: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconeExame: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: cores.verdeMenta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textoExame: { flex: 1, gap: 2 },
+  nomeExame: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
+  apoioExame: { fontSize: 12, color: inkFraco },
+  observacaoExame: { marginTop: 10, fontSize: 13, lineHeight: 19, color: inkSuave },
+  seloAnalise: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: cores.verdeClaro,
+  },
+  textoSeloAnalise: { fontSize: 11.5, fontWeight: '700', color: cores.verde },
+    cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: 16, marginTop: 12 },
   tituloCartao: { fontSize: 15, fontWeight: '800', color: cores.ink },
   subtituloCartao: { marginTop: 2, fontSize: 12.5, color: inkSuave },
   vazioInterno: { marginTop: 10, fontSize: 13, color: inkFraco },
