@@ -78,24 +78,27 @@ export type Avisos = {
   marca: Marca
 }
 
-export async function carregarAvisos(): Promise<Avisos> {
-  /* Cada uma falha para o seu lado. Um aviso a menos é melhor do que uma tela
-     de erro no lugar de todos. */
-  const [consultas, catalogo, plano, marca] = await Promise.all([
-    carregarMinhasConsultas().catch(() => [] as MinhaConsulta[]),
-    carregarCatalogo().catch(() => null),
-    carregarPlanoDaNutri().catch(() => null),
-    lerMarca(),
-  ])
+/* O retrato do que existe AGORA, já com as datas escritas.
+ *
+ * A data chega formatada, e não como instante: é o que deixa a decisão abaixo
+ * sem nenhuma dependência — nem de rede, nem de fuso, nem de relógio. E é o que
+ * permite exercitá-la com casos de mesa, que é como o erro de anunciar recusa
+ * como aceite foi encontrado. */
+export type Retrato = {
+  consultas: { id: number; status: string; quando: string }[]
+  nutricionista: { id: string; nome: string } | null
+  planoId: string | null
+}
 
-  const nutricionista = catalogo?.tipo === 'ok' ? catalogo.catalogo.vinculada : null
+export const marcaDe = (r: Retrato): Marca => ({
+  consultas: Object.fromEntries(r.consultas.map(c => [String(c.id), c.status])),
+  nutricionistaId: r.nutricionista?.id ?? null,
+  planoId: r.planoId,
+})
 
-  const agora: Marca = {
-    consultas: Object.fromEntries(consultas.map(c => [String(c.id), c.status])),
-    nutricionistaId: nutricionista?.id ?? null,
-    planoId: plano?.id ?? null,
-  }
-
+/* A decisão, e só ela. Sem I/O, sem Date, sem AsyncStorage: entra o que existe
+   agora mais o que a pessoa viu da última vez, sai a lista. */
+export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
   /* Primeira visita: nada é novidade.
    *
    * Sem isto, quem instala o app hoje abre o sino e recebe "plano novo!" por um
@@ -106,19 +109,19 @@ export async function carregarAvisos(): Promise<Avisos> {
   const lista: Aviso[] = []
 
   if (!primeiraVez) {
-    if (nutricionista && marca.nutricionistaId !== nutricionista.id) {
+    if (agora.nutricionista && marca.nutricionistaId !== agora.nutricionista.id) {
       lista.push({
-        id: `vinculo:${nutricionista.id}`,
+        id: `vinculo:${agora.nutricionista.id}`,
         titulo: 'Você tem uma nutricionista',
-        texto: `${nutricionista.nome} passou a acompanhar você. O que ela registrar aparece aqui no app.`,
+        texto: `${agora.nutricionista.nome} passou a acompanhar você. O que ela registrar aparece aqui no app.`,
         icone: 'person-add',
         novo: true,
       })
     }
 
-    if (plano && marca.planoId !== plano.id) {
+    if (agora.planoId && marca.planoId !== agora.planoId) {
       lista.push({
-        id: `plano:${plano.id}`,
+        id: `plano:${agora.planoId}`,
         titulo: 'Plano alimentar novo',
         texto: 'A sua nutricionista publicou um plano novo. Ele já está valendo na tela inicial.',
         icone: 'restaurant',
@@ -127,10 +130,9 @@ export async function carregarAvisos(): Promise<Avisos> {
     }
   }
 
-  for (const c of consultas) {
+  for (const c of agora.consultas) {
     const antes = marca?.consultas[String(c.id)]
     const mudou = !primeiraVez && antes !== c.status
-    const quando = consultaLegivel(c.dataHora)
 
     if (c.status === 'solicitada') {
       /* Estado, não notícia: continua na lista todo dia até ela responder,
@@ -139,7 +141,7 @@ export async function carregarAvisos(): Promise<Avisos> {
       lista.push({
         id: `consulta:${c.id}:solicitada`,
         titulo: 'Pedido aguardando resposta',
-        texto: `Você pediu ${quando}. A consulta ainda não está marcada.`,
+        texto: `Você pediu ${c.quando}. A consulta ainda não está marcada.`,
         icone: 'hourglass-outline',
         novo: mudou && antes === undefined,
       })
@@ -159,7 +161,7 @@ export async function carregarAvisos(): Promise<Avisos> {
       lista.push({
         id: `consulta:${c.id}:${c.status}`,
         titulo: 'A sua consulta mudou',
-        texto: `Houve uma mudança na consulta de ${quando}. Confirme com a sua nutricionista antes de se programar para o dia.`,
+        texto: `Houve uma mudança na consulta de ${c.quando}. Confirme com a sua nutricionista antes de se programar para o dia.`,
         icone: 'calendar',
         novo: true,
       })
@@ -174,14 +176,40 @@ export async function carregarAvisos(): Promise<Avisos> {
       id: `consulta:${c.id}:${c.status}`,
       titulo: dela ? 'Consulta marcada para você' : 'Pedido aceito',
       texto: dela
-        ? `A sua nutricionista agendou ${quando}.`
-        : `A sua consulta ficou marcada para ${quando}.`,
+        ? `A sua nutricionista agendou ${c.quando}.`
+        : `A sua consulta ficou marcada para ${c.quando}.`,
       icone: 'checkmark-circle',
       novo: true,
     })
   }
 
-  return { lista, marca: agora }
+  return lista
+}
+
+/* A busca. Junta o que está no servidor, escreve as datas e entrega à decisão. */
+export async function carregarAvisos(): Promise<Avisos> {
+  /* Cada uma falha para o seu lado. Um aviso a menos é melhor do que uma tela
+     de erro no lugar de todos. */
+  const [consultas, catalogo, plano, marca] = await Promise.all([
+    carregarMinhasConsultas().catch(() => [] as MinhaConsulta[]),
+    carregarCatalogo().catch(() => null),
+    carregarPlanoDaNutri().catch(() => null),
+    lerMarca(),
+  ])
+
+  const vinculada = catalogo?.tipo === 'ok' ? catalogo.catalogo.vinculada : null
+
+  const agora: Retrato = {
+    consultas: consultas.map(c => ({
+      id: c.id,
+      status: c.status,
+      quando: consultaLegivel(c.dataHora),
+    })),
+    nutricionista: vinculada ? { id: vinculada.id, nome: vinculada.nome } : null,
+    planoId: plano?.id ?? null,
+  }
+
+  return { lista: montarAvisos(agora, marca), marca: marcaDe(agora) }
 }
 
 /* Quantos pedem atenção de verdade — o número do ponto vermelho. */
