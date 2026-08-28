@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NOME_NOVA, buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
 import { mascaraQuantidade, numeroDigitado, soDigitos } from '../lib/formulario'
-import { decimal } from '../lib/formatar'
+import { decimal, milhar } from '../lib/formatar'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
@@ -589,6 +589,9 @@ function resumoMacros(a: Alimento, gramas: number): string {
  * propósito: aqui a pessoa ainda está escolhendo o alimento, e comparar dois
  * rótulos exige a mesma base — que é como o rótulo do mundo real também fala. */
 function DetalheDoAlimento({ alimento }: { alimento: Alimento }) {
+  /* Fechado por padrão: quem está registrando o almoço quer o peso e o botão,
+     não a tabela de minerais. Quem procura ferro sabe que procura. */
+  const [abertos, setAbertos] = useState(false)
   const linhas: { rotulo: string; valor: string; alerta?: boolean }[] = []
 
   if (alimento.nova !== null && NOME_NOVA[alimento.nova]) {
@@ -613,6 +616,19 @@ function DetalheDoAlimento({ alimento }: { alimento: Alimento }) {
     linhas.push({ rotulo: 'Açúcares', valor: g(alimento.acucaresTotais) })
   }
 
+  /* O sódio vem antes das gorduras: é o número que hipertenso precisa vigiar, e
+     o único desta lista que costuma decidir se o alimento entra ou não. */
+  if (alimento.sodio !== null && alimento.sodio > 0) {
+    linhas.push({
+      rotulo: 'Sódio',
+      valor: `${milhar(alimento.sodio)} mg`,
+      /* Acima de 600 mg por 100 g é muito para qualquer coisa que não seja
+         tempero. A referência é grosseira de propósito: serve para acender a
+         cor, não para diagnosticar. */
+      alerta: alimento.sodio >= 600,
+    })
+  }
+
   if (alimento.gorduraTrans !== null && alimento.gorduraTrans > 0) {
     linhas.push({ rotulo: 'Gordura trans', valor: g(alimento.gorduraTrans), alerta: true })
   }
@@ -620,7 +636,22 @@ function DetalheDoAlimento({ alimento }: { alimento: Alimento }) {
     linhas.push({ rotulo: 'Gordura saturada', valor: g(alimento.gorduraSaturada) })
   }
 
-  if (linhas.length === 0) return null
+  const micros: { rotulo: string; valor: string }[] = []
+  const mg = (rotulo: string, v: number | null) => {
+    if (v !== null && v > 0) micros.push({ rotulo, valor: `${decimal(v, 1)} mg` })
+  }
+  mg('Ferro', alimento.ferro)
+  mg('Cálcio', alimento.calcio)
+  mg('Potássio', alimento.potassio)
+  mg('Magnésio', alimento.magnesio)
+  mg('Zinco', alimento.zinco)
+  mg('Vitamina C', alimento.vitaminaC)
+  mg('Colesterol', alimento.colesterol)
+  if (alimento.indiceGlicemico !== null && alimento.indiceGlicemico > 0) {
+    micros.push({ rotulo: 'Índice glicêmico', valor: String(alimento.indiceGlicemico) })
+  }
+
+  if (linhas.length === 0 && micros.length === 0) return null
 
   return (
     <View style={styles.detalhe}>
@@ -630,7 +661,29 @@ function DetalheDoAlimento({ alimento }: { alimento: Alimento }) {
           <Text style={[styles.valorDetalhe, l.alerta && styles.valorAlerta]}>{l.valor}</Text>
         </View>
       ))}
-      <Text style={styles.baseDetalhe}>por 100 g</Text>
+      {abertos &&
+        micros.map(m => (
+          <View key={m.rotulo} style={styles.linhaDetalhe}>
+            <Text style={styles.rotuloDetalhe}>{m.rotulo}</Text>
+            <Text style={styles.valorDetalhe}>{m.valor}</Text>
+          </View>
+        ))}
+
+      <View style={styles.rodapeDetalhe}>
+        <Text style={styles.baseDetalhe}>por 100 g</Text>
+        {micros.length > 0 && (
+          <Pressable
+            onPress={() => setAbertos(a => !a)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={abertos ? 'Esconder micronutrientes' : 'Ver micronutrientes'}
+          >
+            <Text style={styles.verMais}>
+              {abertos ? 'Menos' : `Mais ${micros.length}`}
+            </Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   )
 }
@@ -650,7 +703,14 @@ const styles = StyleSheet.create({
   rotuloDetalhe: { fontSize: 12.5, color: inkSuave },
   valorDetalhe: { fontSize: 12.5, fontWeight: '700', color: cores.ink },
   valorAlerta: { color: cores.gold },
-  baseDetalhe: { fontSize: 11, color: inkFraco, marginTop: 2 },
+  baseDetalhe: { fontSize: 11, color: inkFraco },
+  rodapeDetalhe: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  verMais: { fontSize: 11.5, fontWeight: '700', color: cores.verde },
 
   tela: { flex: 1, backgroundColor: cores.fundo },
   corpo: { flex: 1 },

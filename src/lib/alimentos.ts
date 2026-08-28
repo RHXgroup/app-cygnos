@@ -32,6 +32,25 @@ export type Alimento = {
      que se está comendo, e ela já estava gravada. */
   nova: number | null
   grupo: string | null
+
+  /* ── Sódio e micronutrientes ─────────────────────────────────────────────
+   *
+   * Também já estavam na tabela, vindos da TACO pela função de semeadura, e
+   * também eram descartados por não estarem declarados.
+   *
+   * O sódio é o mais importante dos dois grupos: é o número que hipertenso
+   * precisa vigiar, e o app não sabia dizer. Os minerais e as vitaminas ficam
+   * atrás de um toque — interessam a quem procura, e poluiriam a tela de quem
+   * só quer registrar o almoço. */
+  sodio: number | null
+  colesterol: number | null
+  ferro: number | null
+  calcio: number | null
+  potassio: number | null
+  magnesio: number | null
+  zinco: number | null
+  vitaminaC: number | null
+  indiceGlicemico: number | null
 }
 
 export type ResultadoBusca =
@@ -58,6 +77,15 @@ export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
     gordura_trans_g: number | null
     acucares_totais_g: number | null
     acucares_adicionados_g: number | null
+    sodio_mg: number | null
+    colesterol_mg: number | null
+    ferro_mg: number | null
+    calcio_mg: number | null
+    potassio_mg: number | null
+    magnesio_mg: number | null
+    zinco_mg: number | null
+    vitamina_c_mg: number | null
+    indice_glicemico: number | null
   }
 
   const alimentos = ((data ?? []) as Linha[]).map(l => ({
@@ -68,6 +96,15 @@ export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
     gorduraTrans: numero(l.gordura_trans_g),
     acucaresTotais: numero(l.acucares_totais_g),
     acucaresAdicionados: numero(l.acucares_adicionados_g),
+    sodio: numero(l.sodio_mg),
+    colesterol: numero(l.colesterol_mg),
+    ferro: numero(l.ferro_mg),
+    calcio: numero(l.calcio_mg),
+    potassio: numero(l.potassio_mg),
+    magnesio: numero(l.magnesio_mg),
+    zinco: numero(l.zinco_mg),
+    vitaminaC: numero(l.vitamina_c_mg),
+    indiceGlicemico: numero(l.indice_glicemico),
   }))
 
   return { tipo: 'ok', alimentos }
