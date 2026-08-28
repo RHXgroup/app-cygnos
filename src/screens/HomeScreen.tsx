@@ -166,6 +166,17 @@ export function HomeScreen({
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
   const [pesos, setPesos] = useState<RegistroPeso[]>([])
   const [consumo, setConsumo] = useState<ItemConsumo[]>([])
+  /* O consumo de HOJE, separado do que a faixa está mostrando.
+   *
+   * O anel da saudação mede o DIA CORRENTE — água e sono já eram de hoje, e
+   * alimentação e refeições vinham do dia escolhido na faixa. Escolher ontem
+   * trocava dois dos quatro pilares e deixava os outros dois onde estavam: um
+   * número que misturava dois dias e que ninguém conseguiria justificar, que é
+   * exatamente o que o cabeçalho de lib/metaDoDia.ts diz que o anel não pode
+   * ser.
+   *
+   * Olhando hoje, os dois estados são o mesmo e nada é buscado duas vezes. */
+  const [consumoDeHoje, setConsumoDeHoje] = useState<ItemConsumo[]>([])
   /* O dia que a faixa está mostrando. Nasce em hoje e só o bloco de calorias
      obedece a ele: água, peso e sono seguem sendo o dia corrente, porque são
      cartões de acompanhamento contínuo e não do prato de uma data. */
@@ -323,7 +334,24 @@ export function HomeScreen({
     let ativo = true
 
     carregarConsumo(sessao.user.id, diaSelecionado).then(r => {
-      if (ativo && r.tipo === 'ok') setConsumo(r.itens)
+      if (!ativo || r.tipo !== 'ok') return
+      setConsumo(r.itens)
+      /* Mesma busca serve aos dois quando o dia escolhido é hoje. */
+      if (ehHoje(diaSelecionado)) setConsumoDeHoje(r.itens)
+    })
+
+    return () => {
+      ativo = false
+    }
+  }, [sessao.user.id, versaoConsumo, diaSelecionado])
+
+  /* E o de hoje à parte, só enquanto a faixa estiver noutro dia. */
+  useEffect(() => {
+    if (ehHoje(diaSelecionado)) return
+    let ativo = true
+
+    carregarConsumo(sessao.user.id, new Date()).then(r => {
+      if (ativo && r.tipo === 'ok') setConsumoDeHoje(r.itens)
     })
 
     return () => {
@@ -410,7 +438,14 @@ export function HomeScreen({
   /* O anel da saudação: a média dos pilares que o app realmente mede hoje.
      Ver lib/metaDoDia.ts — as regras de o que entra e o que fica de fora estão
      todas lá, e não espalhadas por esta tela. */
-  const doDia = calcularMetaDoDia({ metas, agua, consumo, noites, plano: planoNaTela })
+  const doDia = calcularMetaDoDia({
+    metas,
+    agua,
+    /* De HOJE, e não do dia que a faixa mostra: ver o comentário do estado. */
+    consumo: consumoDeHoje,
+    noites,
+    plano: planoNaTela,
+  })
 
   /* O que sobra para o gráfico depois das duas colunas de texto do cartão de
      progresso. Calculado, e não fixo, para não estourar num aparelho estreito. */
