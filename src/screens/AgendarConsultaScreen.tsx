@@ -66,7 +66,23 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
       setConsultas(minhas)
       setDias(vagas)
     } catch (e) {
-      setErro((e as Error).message)
+      /* Frase nossa, e não a do banco.
+       *
+       * Aqui a distinção é de quem escreveu o texto. As recusas de PEDIDO vêm
+       * como frase pronta para ler ("Esse horário não está mais disponível.") e
+       * são repassadas inteiras logo abaixo, em `pedir` — quem sabe por que
+       * recusou é quem recusou.
+       *
+       * Falha de CARGA não tem nada disso. O que chega é "Network request
+       * failed" ou "permission denied for function app_horarios_livres": texto
+       * de programador, em inglês, numa caixa vermelha, para alguém que só
+       * queria marcar uma consulta. E não há o que ela faça a respeito além de
+       * tentar de novo — que é o que a frase manda fazer.
+       *
+       * O motivo cru fica no console: a tela não pode assustar o paciente, mas
+       * quem for depurar não pode ficar sem a pista. */
+      console.warn('[agenda] falha ao carregar a agenda:', e)
+      setErro('Não consegui carregar a agenda agora. Puxe para baixo para tentar de novo.')
       setDias([])
     }
   }

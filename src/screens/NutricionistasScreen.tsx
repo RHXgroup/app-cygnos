@@ -135,8 +135,14 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
       /* O erro é limpo no sucesso, e não só escrito na falha: agora que a tela
          relê sozinha, um erro que não sai da tela quando a próxima leitura dá
          certo faria a ficha ficar escondida atrás de uma mensagem vencida. */
-      if (cat.tipo === 'erro') setErro(cat.mensagem)
-      else {
+      if (cat.tipo === 'erro') {
+        /* Frase nossa. O que vinha do banco era "Network request failed" ou
+           coisa parecida: texto de programador, em inglês, ocupando a tela
+           inteira no lugar da ficha de quem acompanha a pessoa. O motivo cru
+           fica no console, para quem for depurar. */
+        console.warn('[nutricionistas] falha ao carregar o catálogo:', cat.mensagem)
+        setErro('Não consegui carregar agora. Puxe para baixo para tentar de novo.')
+      } else {
         setErro(null)
         setCatalogo(cat.catalogo)
       }

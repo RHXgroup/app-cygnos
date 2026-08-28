@@ -38,6 +38,11 @@ type Linha = {
   lido: ItemLido
   /* undefined enquanto procura; null quando a base não tem. */
   alimento?: Alimento | null
+  /* Os outros resultados da mesma busca. "Pão" traz pão francês, de forma, de
+     leite — e o primeiro nem sempre é o que a pessoa quis. Sem eles, errar o
+     alimento custava remover a linha e ir para a busca; com eles, custa dois
+     toques. */
+  alternativas?: Alimento[]
 }
 
 export function EscreverRefeicaoScreen({
@@ -55,6 +60,8 @@ export function EscreverRefeicaoScreen({
   const [linhas, setLinhas] = useState<Linha[]>([])
   const [procurando, setProcurando] = useState(false)
   const [conferido, setConferido] = useState(false)
+  /* Qual linha está com a lista de alternativas aberta. */
+  const [trocando, setTrocando] = useState<number | null>(null)
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -77,15 +84,20 @@ export function EscreverRefeicaoScreen({
     const achados = await Promise.all(
       itens.map(async i => {
         const r = await buscarAlimentos(i.nome)
-        /* O primeiro resultado. A busca do banco já ordena por relevância, e
-           oferecer cinco opções por linha devolveria à pessoa exatamente o
-           trabalho de escolher que esta tela existe para tirar. Quem quiser
-           outro alimento remove a linha e usa a busca. */
-        return r.tipo === 'ok' && r.alimentos.length > 0 ? r.alimentos[0] : null
+        /* O primeiro entra escolhido; os próximos ficam à mão. A busca do banco
+           já ordena por relevância, então acertar de primeira é o caso comum —
+           mas quando erra, trocar tem de ser barato. */
+        return r.tipo === 'ok' ? r.alimentos.slice(0, 6) : []
       }),
     )
 
-    setLinhas(itens.map((lido, i) => ({ lido, alimento: achados[i] })))
+    setLinhas(
+      itens.map((lido, i) => ({
+        lido,
+        alimento: achados[i][0] ?? null,
+        alternativas: achados[i].slice(1),
+      })),
+    )
     setProcurando(false)
   }
 
@@ -104,6 +116,23 @@ export function EscreverRefeicaoScreen({
       return l.lido.quantidade * a.porcaoG
     }
     return null
+  }
+
+  /* Troca o alimento escolhido por uma das alternativas, e devolve o antigo
+     para a lista: quem trocou por engano desfaz pelo mesmo caminho. */
+  function trocar(indice: number, novo: Alimento) {
+    setLinhas(atuais =>
+      atuais.map((l, i) => {
+        if (i !== indice) return l
+        const outras = (l.alternativas ?? []).filter(a => a.id !== novo.id)
+        return {
+          ...l,
+          alimento: novo,
+          alternativas: l.alimento ? [l.alimento, ...outras] : outras,
+        }
+      }),
+    )
+    setTrocando(null)
   }
 
   function remover(indice: number) {
@@ -219,10 +248,32 @@ export function EscreverRefeicaoScreen({
 
               return (
                 <View key={`${l.lido.original}-${i}`} style={styles.linha}>
-                  <View style={styles.textoLinha}>
-                    <Text style={styles.nomeLinha} numberOfLines={1}>
-                      {l.alimento ? l.alimento.nome : l.lido.nome}
-                    </Text>
+                  <Pressable
+                    style={styles.textoLinha}
+                    onPress={() =>
+                      (l.alternativas?.length ?? 0) > 0 &&
+                      setTrocando(trocando === i ? null : i)
+                    }
+                    disabled={(l.alternativas?.length ?? 0) === 0}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      (l.alternativas?.length ?? 0) > 0
+                        ? `Trocar ${l.alimento?.nome ?? l.lido.nome} por outro alimento`
+                        : undefined
+                    }
+                  >
+                    <View style={styles.linhaNome}>
+                      <Text style={styles.nomeLinha} numberOfLines={1}>
+                        {l.alimento ? l.alimento.nome : l.lido.nome}
+                      </Text>
+                      {(l.alternativas?.length ?? 0) > 0 && (
+                        <Ionicons
+                          name={trocando === i ? 'chevron-up' : 'swap-horizontal'}
+                          size={14}
+                          color={inkFraco}
+                        />
+                      )}
+                    </View>
 
                     <Text style={styles.detalheLinha} numberOfLines={1}>
                       {descricaoDe(l.lido)}
@@ -240,7 +291,27 @@ export function EscreverRefeicaoScreen({
                         Sem peso: entra no plano, mas fora da soma.
                       </Text>
                     )}
-                  </View>
+
+                    {/* As outras opções da mesma busca, abertas sob a linha em
+                        vez de numa folha por cima: o que se compara é o nome
+                        contra o nome, e uma folha esconderia o que está sendo
+                        trocado. */}
+                    {trocando === i &&
+                      (l.alternativas ?? []).map(a => (
+                        <Pressable
+                          key={a.id}
+                          onPress={() => trocar(i, a)}
+                          style={({ pressed }) => [styles.alternativa, pressed && styles.pressionado]}
+                          accessibilityRole="button"
+                        >
+                          <Ionicons name="return-down-forward" size={13} color={inkFraco} />
+                          <Text style={styles.textoAlternativa} numberOfLines={1}>
+                            {a.nome}
+                            {a.marca ? ` · ${a.marca}` : ''}
+                          </Text>
+                        </Pressable>
+                      ))}
+                  </Pressable>
 
                   <Pressable
                     onPress={() => remover(i)}
@@ -379,6 +450,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
   },
   textoLinha: { flex: 1, gap: 2 },
+  linhaNome: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  alternativa: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingLeft: 2,
+  },
+  textoAlternativa: { flex: 1, fontSize: 13, color: inkMedio },
   nomeLinha: { fontSize: 15, fontWeight: '700', color: cores.ink },
   detalheLinha: { fontSize: 12.5, color: inkMedio },
   naoAchei: { fontSize: 12, color: cores.gold },
