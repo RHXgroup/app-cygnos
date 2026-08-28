@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
 import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
 import { LerCodigoScreen } from './LerCodigoScreen'
+import { ReceitasScreen } from './ReceitasScreen'
 import {
   REFEICOES,
   ajustarQuantidade,
@@ -72,7 +73,7 @@ export function ContadorCaloriasScreen({
   const [refeicao, setRefeicao] = useState(() => refeicaoPelaHora())
 
   /* null = a tela principal. As quatro portas abrem por cima dela. */
-  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | 'escrever' | 'codigo' | null>(null)
+  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | 'escrever' | 'codigo' | 'receitas' | null>(null)
   /* O que a pessoa já come nesta refeição. Carregado só quando a porta abre —
      são duas consultas que a maioria das visitas não usa, e pagá-las na abertura
      da tela atrasaria o caso comum por causa do caso eventual. */
@@ -310,6 +311,16 @@ export function ContadorCaloriasScreen({
     gravar(r.itens.map(i => doPlano(i, r.rotulo)))
   }
 
+  if (porta === 'receitas') {
+    return (
+      <ReceitasScreen
+        contaId={contaId}
+        onFechar={() => setPorta(null)}
+        onUsar={itens => gravar(itens.map(a => doAlimento(a, refeicao)))}
+      />
+    )
+  }
+
   if (porta === 'codigo') {
     return (
       <LerCodigoScreen
@@ -444,6 +455,15 @@ export function ContadorCaloriasScreen({
               titulo="Código de barras"
               detalhe="Produto embalado"
               onPress={() => setPorta('codigo')}
+            />
+            {/* O que a pessoa come junto e repete. Última porque só serve
+                depois de existir uma receita — e a primeira precisa ser
+                montada pelas outras portas. */}
+            <Porta
+              icone="book-outline"
+              titulo="Minhas receitas"
+              detalhe="O de sempre, junto"
+              onPress={() => setPorta('receitas')}
             />
           </View>
 
