@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   Pressable,
   ScrollView,
@@ -114,6 +115,25 @@ export function PerfilScreen({
       ativo = false
     }
   }, [sessao.user.id])
+
+  /* O voltar do Android fecha a folha de opções, não a tela.
+   *
+   * A folha é overlay sobreposto e não `Modal`, então não existe
+   * `onRequestClose` para o sistema chamar — o evento passava direto para o App,
+   * que fechava o Perfil inteiro com a folha aberta por cima. Ver a armadilha 1
+   * do AGENTS.md: registrar no filho, e devolver `false` quando não houver
+   * camada nenhuma para descascar. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (opcoesAbertas) {
+        setOpcoesAbertas(false)
+        return true
+      }
+      return false
+    })
+
+    return () => sub.remove()
+  }, [opcoesAbertas])
 
   /* O endereço da foto agora é assinado, e assinar é ida ao servidor — então ele
      vira estado em vez de ser calculado no meio do render. Refaz sempre que o
