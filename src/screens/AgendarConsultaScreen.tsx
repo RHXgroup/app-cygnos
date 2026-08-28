@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  AppState,
   Pressable,
+  RefreshControl,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -48,6 +50,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
 
   const [enviando, setEnviando] = useState<string | null>(null)
   const [cancelando, setCancelando] = useState(false)
+  const [atualizando, setAtualizando] = useState(false)
 
   async function carregar() {
     setErro(null)
@@ -65,6 +68,38 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
   }
 
   useEffect(() => { carregar() }, [])
+
+  /* Esta é a tela que mais envelhece parada.
+   *
+   * Duas coisas mudam aqui sem o paciente encostar no aparelho: a nutricionista
+   * responde ao pedido dele, e as vagas saem da lista porque OUTRO paciente
+   * pediu antes. A segunda é a que dói — ele toca num horário que já não existe
+   * e leva um erro no lugar de uma consulta.
+   *
+   * Voltar do segundo plano relê, e o gesto de puxar existe para quem ficou
+   * olhando a lista sem sair do app. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'active') carregar()
+    })
+    return () => sub.remove()
+  }, [])
+
+  async function puxarParaAtualizar() {
+    setAtualizando(true)
+    await carregar()
+    setAtualizando(false)
+  }
+
+  /* O mesmo controle nas duas ramificações da tela — a do pedido em aberto e a
+     da escolha de horário. */
+  const controleDeAtualizar = (
+    <RefreshControl
+      refreshing={atualizando}
+      onRefresh={puxarParaAtualizar}
+      tintColor={cores.limao}
+    />
+  )
 
   /* O destaque é o pedido em aberto, se houver; senão, a próxima do calendário.
      As demais viram linhas compactas embaixo — nenhuma some, que era o defeito:
@@ -163,7 +198,11 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
              Consulta já marcada é diferente — ela informa, mas não impede
              remarcar nada mais para a frente, então a lista continua. */
       aguardando || dias.length === 0 ? (
-        <ScrollView contentContainerStyle={styles.conteudo} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.conteudo}
+          showsVerticalScrollIndicator={false}
+          refreshControl={controleDeAtualizar}
+        >
           {!!erro && (
             <View style={styles.erro}>
               <Text style={styles.textoErro}>{erro}</Text>
@@ -198,6 +237,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
           keyExtractor={v => v.inicio}
           contentContainerStyle={styles.conteudo}
           showsVerticalScrollIndicator={false}
+          refreshControl={controleDeAtualizar}
           ListHeaderComponent={cabecalhoDaLista}
           /* Grudado no topo: rolando a lista de um dia cheio, o nome do dia sai
              da tela e os horários viram números sem contexto. */
