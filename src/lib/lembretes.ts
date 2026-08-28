@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
+import { falha } from './erros'
 
 /* Lembretes de refeição e de água.
  *
@@ -213,7 +214,10 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
     await AsyncStorage.setItem(CHAVE_LIGADO, '1')
     return { tipo: 'ok', quantos: ids.length }
   } catch (e) {
-    return { tipo: 'erro', mensagem: (e as Error).message }
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui agendar os lembretes agora. Tente de novo.', e),
+    }
   }
 }
 
@@ -283,7 +287,10 @@ export async function ligarLembretesDeAgua(): Promise<ResultadoLembretes> {
     await AsyncStorage.setItem(CHAVE_AGUA, '1')
     return { tipo: 'ok', quantos: ids.length }
   } catch (e) {
-    return { tipo: 'erro', mensagem: (e as Error).message }
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui agendar os lembretes agora. Tente de novo.', e),
+    }
   }
 }
 

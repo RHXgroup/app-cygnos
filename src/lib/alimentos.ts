@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { falha } from './erros'
 
 /* Todos os valores são POR 100 g — é assim que a tabela guarda, e converter na
    hora de exibir é mais barato que converter na hora de gravar. */
@@ -80,7 +81,10 @@ export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
     /* Devolvido, e não engolido: sem isto, banco fora do ar, migração não
        aplicada e busca sem resultado viram a mesma lista vazia na tela — e não
        há como saber qual dos três é. */
-    return { tipo: 'erro', mensagem: error.message }
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui buscar alimentos agora. Verifique a conexão.', error),
+    }
   }
 
   /* O banco devolve as colunas em snake_case; o app fala camelCase. A tradução

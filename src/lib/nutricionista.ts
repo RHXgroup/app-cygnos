@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { falha } from './erros'
 
 /* O catálogo de nutricionistas do app.
  *
@@ -154,7 +155,11 @@ async function comFotosAssinadas(lista: Nutricionista[]): Promise<Nutricionista[
 export async function carregarCatalogo(): Promise<ResultadoCatalogo> {
   const { data, error } = await supabase.rpc('app_nutricionistas')
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar as nutricionistas agora. Verifique a conexão.', error),
+    }
 
   const linhas = (data ?? []) as Linha[]
   const lista = await comFotosAssinadas(linhas.map(daLinha))

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { falha } from './erros'
 import { dataNumerica, milhar } from './formatar'
 
 /* O que a nutricionista tem para este paciente.
@@ -58,7 +59,11 @@ type Linha = {
 export async function carregarConteudo(): Promise<ResultadoConteudo> {
   const { data, error } = await supabase.rpc('app_conteudo_da_nutricionista')
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar o seu acompanhamento. Verifique a conexão.', error),
+    }
 
   const linha = ((data ?? []) as Linha[])[0]
   if (!linha) return { tipo: 'ok', conteudo: null }

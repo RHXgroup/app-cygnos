@@ -1,5 +1,6 @@
 import { dataISO } from './formatar'
 import { supabase } from './supabase'
+import { falha } from './erros'
 import type { DiaSemana } from './plano'
 
 /* Treino: a rotina que a pessoa monta e as sessões que ela de fato fez.
@@ -75,7 +76,11 @@ export async function carregarRotina(contaId: string): Promise<ResultadoRotina> 
     .order('dia', { ascending: true })
     .order('ordem', { ascending: true })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar a sua rotina de treino. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', exercicios: ((data ?? []) as LinhaExercicio[]).map(doExercicio) }
 }
 
@@ -100,13 +105,20 @@ export async function adicionarExercicio(
     .select('id, dia, nome, ordem, series, repeticoes, carga_kg, observacao')
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui adicionar o exercício agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', exercicio: doExercicio(data as LinhaExercicio) }
 }
 
 export async function apagarExercicio(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_treino_exercicios').delete().eq('id', id)
-  return error ? { erro: error.message } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui remover o exercício agora. Verifique a conexão.', error),
+  }
 }
 
 /* ── As sessões ────────────────────────────────────────────────────────────*/
@@ -165,7 +177,11 @@ export async function carregarSessoes(
     .order('registrado_em', { ascending: false })
     .limit(quantas)
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar os seus treinos. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', sessoes: ((data ?? []) as LinhaSessao[]).map(daSessao) }
 }
 
@@ -196,13 +212,20 @@ export async function registrarSessao(
     .select(COLUNAS_SESSAO)
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui registrar o treino agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', sessao: daSessao(data as LinhaSessao) }
 }
 
 export async function apagarSessao(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_treino_sessoes').delete().eq('id', id)
-  return error ? { erro: error.message } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui apagar este treino agora. Verifique a conexão.', error),
+  }
 }
 
 /* ── Leitura ───────────────────────────────────────────────────────────────*/

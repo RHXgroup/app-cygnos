@@ -1,5 +1,6 @@
 import { porcao } from './alimentos'
 import { supabase } from './supabase'
+import { falha } from './erros'
 import type { AlimentoEscolhido, Nutrientes } from './plano'
 
 /* Receitas do paciente: o que ele come junto e repete.
@@ -103,7 +104,11 @@ export async function carregarReceitas(contaId: string): Promise<ResultadoReceit
     .eq('conta_id', contaId)
     .order('criado_em', { ascending: false })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar as suas receitas. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', receitas: ((data ?? []) as unknown as LinhaReceita[]).map(daLinha) }
 }
 
@@ -142,13 +147,20 @@ export async function salvarReceita({
     })),
   })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui salvar a receita agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', id: data as string }
 }
 
 export async function apagarReceita(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_receitas').delete().eq('id', id)
-  return error ? { erro: error.message } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui apagar a receita agora. Verifique a conexão.', error),
+  }
 }
 
 /* ── Da receita para o prato ───────────────────────────────────────────────*/

@@ -1,6 +1,7 @@
 import { porcao } from './alimentos'
 import { DIAS_CURTOS } from './formatar'
 import { supabase } from './supabase'
+import { falha } from './erros'
 
 /* ── Dias da semana ────────────────────────────────────────────────────────
    0 = domingo … 6 = sábado, a numeração de Date.getDay(). Guardar no mesmo
@@ -218,7 +219,11 @@ export async function salvarPlano({
 
   /* A mensagem crua junto: sem ela, "sem internet", "migração não aplicada" e
      "constraint recusou" viram o mesmo aviso genérico na tela. */
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui salvar o plano agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', planoId: data as string }
 }
 
@@ -377,7 +382,11 @@ export async function carregarPlanos(contaId: string): Promise<ResultadoPlanos> 
     .eq('conta_id', contaId)
     .order('criado_em', { ascending: false })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar os seus planos. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', planos: ((data ?? []) as unknown as LinhaPlano[]).map(planoDaLinha) }
 }
 
@@ -397,7 +406,11 @@ export async function carregarPlanoAtivo(contaId: string): Promise<ResultadoPlan
     .limit(1)
     .maybeSingle()
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar o plano que está valendo. Verifique a conexão.', error),
+    }
   if (!data) return { tipo: 'ok', plano: null }
 
   return { tipo: 'ok', plano: planoDaLinha(data as unknown as LinhaPlano) }
@@ -407,7 +420,10 @@ export async function carregarPlanoAtivo(contaId: string): Promise<ResultadoPlan
    uma coisa só, e acontece no banco — ver a migração 20260731000003. */
 export async function ativarPlano(planoId: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.rpc('app_ativar_plano', { p_plano_id: planoId })
-  return error ? { erro: error.message } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui ativar este plano agora. Verifique a conexão.', error),
+  }
 }
 
 /* ── A próxima refeição ────────────────────────────────────────────────────*/
@@ -560,7 +576,10 @@ export const itensDoPlano = (refeicoes: { itens: Nutrientes[] }[]): Nutrientes[]
  * cascade` das tabelas filhas — não há o que limpar aqui. */
 export async function apagarPlano(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_planos').delete().eq('id', id)
-  return error ? { erro: error.message } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui apagar este plano agora. Verifique a conexão.', error),
+  }
 }
 
 /* ── Lista de compras ──────────────────────────────────────────────────────
