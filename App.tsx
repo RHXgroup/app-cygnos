@@ -645,6 +645,7 @@ function TelaDaAba({
           onAbrirPerfil={onAbrirPerfil}
           onAbrirCodigo={onAbrirCodigo}
           onAbrirCadastros={onAbrirCadastros}
+          onAbrirNutricionistas={onAbrirNutricionistas}
           onMontarPlano={onMontarPlano}
           onAbrirRefeicao={onAbrirRefeicao}
           onEditarPlano={onEditarPlano}

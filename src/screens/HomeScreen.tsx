@@ -97,6 +97,7 @@ export function HomeScreen({
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirCadastros,
+  onAbrirNutricionistas,
   onMontarPlano,
   onAbrirRefeicao,
   onEditarPlano,
@@ -125,6 +126,8 @@ export function HomeScreen({
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirCadastros: () => void
+  /* O destino do sino: é lá que a consulta mora. */
+  onAbrirNutricionistas: () => void
   onMontarPlano: () => void
   /* Sobem até o App porque estas telas precisam cobrir a barra de abas —
      abertas daqui de dentro, seriam recortadas pelo carrossel. */
@@ -150,6 +153,9 @@ export function HomeScreen({
      vínculo acabar. */
   const [planoDaNutri, setPlanoDaNutri] = useState<PlanoCompleto | null>(null)
   const [carregandoPlano, setCarregandoPlano] = useState(true)
+  /* Só para saber se o sino acende. A agenda inteira mora na tela de
+     agendamento; aqui a pergunta é de sim ou não. */
+  const [consultaPedeAtencao, setConsultaPedeAtencao] = useState(false)
   const [agua, setAgua] = useState<Agua | null>(null)
   const [metas, setMetas] = useState<Metas>(METAS_VAZIAS)
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
@@ -223,6 +229,35 @@ export function HomeScreen({
       setPlanoDaNutri(daNutri)
       setCarregandoPlano(false)
     })
+
+    return () => {
+      ativo = false
+    }
+  }, [sessao.user.id, versaoPlano])
+
+  /* O sino do topo.
+   *
+   * Ele pendurava um ponto vermelho fixo — aceso para todo mundo, o tempo todo,
+   * sem olhar coisa nenhuma. Um aviso que está sempre ligado não avisa nada: a
+   * pessoa aprende a ignorá-lo na primeira semana, e no dia em que houver algo
+   * de verdade ele já não será notícia.
+   *
+   * A única coisa que o app sabe hoje, sem depender de nada do sistema, é a
+   * agenda dela. Então é isso que o sino diz — e quando não há o que dizer, ele
+   * fica apagado.
+   *
+   * Pega carona no `versaoPlano` porque é ele que sobe quando o app volta do
+   * segundo plano: aceitar um pedido é ação DELA, e chega aqui do mesmo jeito
+   * que o plano dela chega.
+   *
+   * Falha vira "não há aviso", em silêncio. Um ponto vermelho por causa de uma
+   * queda de rede mandaria a pessoa procurar uma consulta que não existe. */
+  useEffect(() => {
+    let ativo = true
+
+    carregarMinhasConsultas()
+      .then(c => ativo && setConsultaPedeAtencao(mereceAtencao(c)))
+      .catch(() => ativo && setConsultaPedeAtencao(false))
 
     return () => {
       ativo = false
@@ -376,13 +411,21 @@ export function HomeScreen({
         >
           <Ionicons name="menu" size={21} color={cores.ink} />
         </Pressable>
+        {/* O ponto só acende quando há o que dizer, e o toque leva a quem tem a
+            resposta. Antes ele não fazia nem uma coisa nem outra: acendia
+            sempre e não respondia ao toque. */}
         <Pressable
+          onPress={onAbrirNutricionistas}
           style={styles.botaoTopo}
           accessibilityRole="button"
-          accessibilityLabel="Notificações"
+          accessibilityLabel={
+            consultaPedeAtencao
+              ? 'Consultas. Você tem uma consulta que precisa de atenção.'
+              : 'Consultas'
+          }
         >
           <Ionicons name="notifications-outline" size={20} color={cores.ink} />
-          <View style={styles.pontoAviso} />
+          {consultaPedeAtencao && <View style={styles.pontoAviso} />}
         </Pressable>
       </View>
 
