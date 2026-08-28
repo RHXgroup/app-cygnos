@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -63,19 +64,37 @@ export function EscreverRefeicaoScreen({
   /* Qual linha está com a lista de alternativas aberta. */
   const [trocando, setTrocando] = useState<number | null>(null)
 
+  /* Fecha o teclado ANTES de sair.
+   *
+   * Com o teclado no ar, a janela do Android está encolhida — o edge-to-edge
+   * não redimensiona, mas o KeyboardAvoidingView encolhe o conteúdo. Sair
+   * assim faz a tela de trás ser medida no tamanho errado e se desenhar
+   * comprimida, e ela só se conserta quando algo a força a medir de novo.
+   *
+   * Todas as saídas passam por aqui: o botão de voltar, o do aparelho e o
+   * "adicionar". Uma delas de fora e o defeito volta pelo caminho esquecido. */
+  function sair() {
+    Keyboard.dismiss()
+    onFechar()
+  }
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onFechar()
+      sair()
       return true
     })
     return () => sub.remove()
-  }, [onFechar])
+  })
 
   /* Procura cada item na base. Uma consulta por linha, e não uma só com tudo:
      a busca do banco recebe um termo, e "pão café mamão" não é um alimento. */
   async function conferir() {
     const itens = lerRefeicao(texto)
     if (itens.length === 0) return
+
+    /* O teclado ocupa metade da tela, e o que a pessoa precisa ver agora é a
+       lista do que foi entendido — que nasce logo abaixo do botão. */
+    Keyboard.dismiss()
 
     setProcurando(true)
     setConferido(true)
@@ -160,7 +179,7 @@ export function EscreverRefeicaoScreen({
     }
 
     if (escolhidos.length > 0) onAdicionar(escolhidos)
-    onFechar()
+    sair()
   }
 
   const encontrados = linhas.filter(l => l.alimento).length
@@ -173,7 +192,7 @@ export function EscreverRefeicaoScreen({
     >
       <View style={styles.cabecalho}>
         <Pressable
-          onPress={onFechar}
+          onPress={sair}
           style={styles.botaoVoltar}
           hitSlop={8}
           accessibilityRole="button"

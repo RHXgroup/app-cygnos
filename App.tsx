@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   BackHandler,
+  Keyboard,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -194,6 +195,23 @@ function Raiz() {
       </SafeAreaView>
     </>
   )
+}
+
+/* A moldura de toda tela sobreposta.
+ *
+ * Faz duas coisas que estavam faltando em quinze lugares iguais.
+ *
+ * Pinta o fundo: absoluteFill posiciona, mas é transparente, e bastava a tela
+ * de cima não cobrir cada pixel para a de baixo aparecer atrás dela.
+ *
+ * E solta o teclado ao sair. Com o teclado no ar a janela está encolhida, e a
+ * tela de trás volta a ser medida nesse tamanho — desenhando-se comprimida até
+ * algo forçá-la a medir de novo. Aqui no desmonte, e não em cada saída de cada
+ * tela: são nove telas com campo de texto, cada uma com três ou quatro saídas, e
+ * uma esquecida traz o defeito de volta pelo caminho que ninguém lembrou. */
+function Sobreposta({ children }: { children: React.ReactNode }) {
+  useEffect(() => () => Keyboard.dismiss(), [])
+  return <View style={styles.sobreposta}>{children}</View>
 }
 
 /* Componente à parte porque tem estado e refs próprios: montá-lo só depois do
@@ -443,7 +461,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
             e não um Modal de propósito: no iOS, abrir a câmera de dentro de um
             Modal deixa a promise do picker pendurada para sempre. */}
         {perfilAberto && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <PerfilScreen
               sessao={sessao}
               onFechar={() => setPerfilAberto(false)}
@@ -451,23 +469,23 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                  telas que salvar uma meta invalida. */
               onObjetivoMudou={aoSalvarMetas}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {codigoAberto && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <CodigoScreen sessao={sessao} onFechar={() => setCodigoAberto(false)} />
-          </View>
+          </Sobreposta>
         )}
 
         {nutricionistasAbertas && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <NutricionistasScreen onFechar={() => setNutricionistasAbertas(false)} />
-          </View>
+          </Sobreposta>
         )}
 
         {avisosAbertos && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <AvisosScreen
               onFechar={() => setAvisosAbertos(false)}
               /* Fecha os avisos ao ir: voltar da ficha devolve à tela inicial,
@@ -477,25 +495,25 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 setNutricionistasAbertas(true)
               }}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {/* Não precisa de nada para fechar quando dá certo: apagar a conta
             termina em signOut, o listener de sessão lá em cima zera tudo e o
             App inteiro volta para o login. */}
         {excluirContaAberta && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <ExcluirContaScreen
               email={sessao.user.email ?? ''}
               onFechar={() => setExcluirContaAberta(false)}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {/* Antes da edição no JSX de propósito: abrir um plano daqui empilha a
             tela de edição POR CIMA desta, e é para ela que o voltar devolve. */}
         {cadastrosAberto && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <MeusCadastrosScreen
               contaId={sessao.user.id}
               versao={versaoPlano}
@@ -514,11 +532,11 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 setVersaoMetas(v => v + 1)
               }}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {planoEmEdicao && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <EditarPlanoScreen
               plano={planoEmEdicao}
               onFechar={() => setPlanoEmEdicao(null)}
@@ -527,78 +545,78 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 setVersaoPlano(v => v + 1)
               }}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {comprasDe && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <ListaDeComprasScreen plano={comprasDe} onFechar={() => setComprasDe(null)} />
-          </View>
+          </Sobreposta>
         )}
 
         {aguaAberta && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <AguaScreen
               contaId={sessao.user.id}
               onFechar={() => setAguaAberta(false)}
               onMudou={() => setVersaoAgua(v => v + 1)}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {metasAbertas !== null && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <MetasScreen
               contaId={sessao.user.id}
               alvo={metasAbertas}
               onFechar={() => setMetasAbertas(null)}
               onSalvo={aoSalvarMetas}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {sonoAberto && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <SonoScreen
               contaId={sessao.user.id}
               onFechar={() => setSonoAberto(false)}
               onMudou={() => setVersaoSono(v => v + 1)}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {contadorAberto && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <ContadorCaloriasScreen
               contaId={sessao.user.id}
               onFechar={() => setContadorAberto(false)}
               onMudou={() => setVersaoConsumo(v => v + 1)}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {pesoAberto && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <PesoScreen
               contaId={sessao.user.id}
               onFechar={() => setPesoAberto(false)}
               onMudou={() => setVersaoPeso(v => v + 1)}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {refeicaoAberta && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <RefeicaoScreen
               refeicao={refeicaoAberta.refeicao}
               quando={refeicaoAberta.quando}
               onFechar={() => setRefeicaoAberta(null)}
             />
-          </View>
+          </Sobreposta>
         )}
 
         {registrar && (
-          <View style={styles.sobreposta}>
+          <Sobreposta>
             <RegistrarScreen
               contaId={sessao.user.id}
               inicial={registrar.inicial}
@@ -614,7 +632,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
               onSonoMudou={() => setVersaoSono(v => v + 1)}
               onTreinoMudou={() => setVersaoTreino(v => v + 1)}
             />
-          </View>
+          </Sobreposta>
         )}
       </View>
     </>
