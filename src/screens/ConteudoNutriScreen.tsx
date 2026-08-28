@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  AppState,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
@@ -63,20 +72,71 @@ export function ConteudoNutriScreen({
   const { top } = useSafeAreaInsets()
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [atualizando, setAtualizando] = useState(false)
+  /* Sobe para forçar uma releitura do MESMO conteúdo. */
+  const [versao, setVersao] = useState(0)
+
+  /* Trocar de conteúdo limpa a tela; reler o mesmo conteúdo não.
+     Se a limpeza morasse junto do efeito de baixo, cada volta do segundo plano
+     apagaria o que está à vista para redesenhar quase sempre a mesma coisa — e a
+     tela piscaria um indicador por uma leitura que raramente muda algo. */
+  useEffect(() => {
+    setDados(null)
+    setErro(null)
+  }, [chave])
 
   useEffect(() => {
     let vivo = true
-    setDados(null)
-    setErro(null)
 
     carregar(chave)
-      .then(d => vivo && setDados(d))
-      .catch((e: Error) => vivo && setErro(e.message))
+      .then(d => {
+        if (!vivo) return
+        /* Limpa o erro no sucesso: agora que a tela relê sozinha, uma mensagem
+           que não sai quando a leitura seguinte dá certo esconderia o conteúdo
+           atrás de um aviso vencido. */
+        setErro(null)
+        setDados(d)
+      })
+      .catch((e: Error) => {
+        if (vivo) setErro(e.message)
+      })
+      .finally(() => {
+        if (vivo) setAtualizando(false)
+      })
 
     return () => {
       vivo = false
     }
-  }, [chave])
+  }, [chave, versao])
+
+  /* As fotos são o motivo de isto existir aqui.
+   *
+   * Elas chegam com URL assinada que vale UMA HORA — ver lib/fotos.ts. E a tela
+   * carregava uma vez e nunca mais: quem abrisse as fotos, deixasse o app de
+   * lado e voltasse depois do almoço encontrava tudo quebrado, com uma única
+   * saída — fechar e reabrir a tela, que é justamente o que ninguém deduz. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'active') setVersao(v => v + 1)
+    })
+    return () => sub.remove()
+  }, [])
+
+  function puxarParaAtualizar() {
+    setAtualizando(true)
+    setVersao(v => v + 1)
+  }
+
+  /* O mesmo controle nas duas ramificações. A de erro é a que mais precisa:
+     ela diz "tente de novo daqui a pouco" e, até aqui, não oferecia nenhum
+     jeito de tentar. */
+  const controleDeAtualizar = (
+    <RefreshControl
+      refreshing={atualizando}
+      onRefresh={puxarParaAtualizar}
+      tintColor={cores.limao}
+    />
+  )
 
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
@@ -95,15 +155,23 @@ export function ConteudoNutriScreen({
       </View>
 
       {erro ? (
-        <View style={styles.conteudo}>
-          <Aviso texto="Não foi possível carregar agora. Tente de novo daqui a pouco." />
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.conteudo}
+          showsVerticalScrollIndicator={false}
+          refreshControl={controleDeAtualizar}
+        >
+          <Aviso texto="Não foi possível carregar agora. Puxe para baixo para tentar de novo." />
+        </ScrollView>
       ) : !dados ? (
         <View style={styles.centro}>
           <ActivityIndicator color={cores.verde} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.conteudo} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.conteudo}
+          showsVerticalScrollIndicator={false}
+          refreshControl={controleDeAtualizar}
+        >
           <Miolo dados={dados} />
         </ScrollView>
       )}
