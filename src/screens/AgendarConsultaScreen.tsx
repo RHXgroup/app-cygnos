@@ -251,8 +251,11 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
             </>
           )}
 
+          {/* Manda para a aba Mensagens, e não "para o WhatsApp" solto: lá existe
+              um botão que abre a conversa com ela. Dizer o meio sem dizer o
+              caminho deixa a pessoa procurando o número sozinha. */}
           {!aguardando && (
-            <Aviso texto="Não há horários livres na agenda da sua nutricionista nas próximas semanas. Fale com ela pelo WhatsApp." />
+            <Aviso texto="Não há horários livres na agenda da sua nutricionista nas próximas semanas. Você pode falar com ela pela aba Mensagens." />
           )}
         </ScrollView>
       ) : (

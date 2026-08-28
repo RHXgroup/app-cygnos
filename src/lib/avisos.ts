@@ -148,6 +148,24 @@ export async function carregarAvisos(): Promise<Avisos> {
 
     if (!mudou) continue
 
+    /* Só anuncia como MARCADA o que o app sabe que quer dizer marcada.
+     *
+     * Um status que ele não conhece cairia aqui como "pedido aceito" — e o
+     * próximo a chegar do banco é justamente 'recusada'. Dizer que foi aceito o
+     * que foi recusado é a mentira mais cara que este app pode contar: termina
+     * com a pessoa no consultório num dia em que não era esperada. Ver a
+     * armadilha 10 do AGENTS.md, que é sobre exatamente isto. */
+    if (c.status !== 'pendente' && c.status !== 'confirmada') {
+      lista.push({
+        id: `consulta:${c.id}:${c.status}`,
+        titulo: 'A sua consulta mudou',
+        texto: `Houve uma mudança na consulta de ${quando}. Confirme com a sua nutricionista antes de se programar para o dia.`,
+        icone: 'calendar',
+        novo: true,
+      })
+      continue
+    }
+
     /* Ela marcou sozinha (a consulta nem existia na visita passada) é diferente
        de ela ter aceitado o pedido dele. As duas viram consulta marcada, mas a
        frase que explica o que aconteceu não é a mesma. */
