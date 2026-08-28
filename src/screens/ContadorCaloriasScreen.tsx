@@ -13,11 +13,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
 import {
   REFEICOES,
+  ajustarQuantidade,
   analisarFoto,
   apagarConsumo,
   carregarConsumo,
   carregarFrequentes,
   carregarUltimaRefeicao,
+  moverDeRefeicao,
   porRefeicao,
   refeicaoPelaHora,
   registrarConsumo,
@@ -75,6 +77,10 @@ export function ContadorCaloriasScreen({
   const [frequentes, setFrequentes] = useState<ItemFrequente[]>([])
   const [ultima, setUltima] = useState<UltimaRefeicao | null>(null)
   const [buscandoRepetir, setBuscandoRepetir] = useState(false)
+  /* O item do diário com o menu de correção aberto. Errar a refeição e comer
+     diferente do que se anotou são os dois enganos comuns, e até aqui os dois
+     custavam apagar e descrever tudo de novo. */
+  const [acoesDe, setAcoesDe] = useState<ItemConsumo | null>(null)
   const [analisando, setAnalisando] = useState(false)
   /* A estimativa esperando confirmação. Nada é gravado antes de a pessoa ver o
      número — a IA erra, e um item errado no diário estraga o total do dia. */
@@ -113,6 +119,10 @@ export function ContadorCaloriasScreen({
    * o que faz o voltar descascar uma camada por vez. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (acoesDe) {
+        setAcoesDe(null)
+        return true
+      }
       /* A estimativa da foto vem por cima de tudo, inclusive das portas. */
       if (estimativa) {
         setEstimativa(null)
@@ -128,7 +138,7 @@ export function ContadorCaloriasScreen({
     })
 
     return () => sub.remove()
-  }, [porta, estimativa])
+  }, [porta, estimativa, acoesDe])
 
   function fechar() {
     if (mudou) onMudou()
@@ -164,6 +174,47 @@ export function ContadorCaloriasScreen({
       return
     }
 
+    setMudou(true)
+  }
+
+  /* Muda a refeição de um item já registrado.
+   *
+   * Otimista, como o apagar: a lista se reorganiza na hora e volta atrás se o
+   * banco recusar. A correção é de um toque, e esperar a ida e volta para ver o
+   * item mudar de grupo faria parecer que nada aconteceu. */
+  async function mover(item: ItemConsumo, destino: string) {
+    setAcoesDe(null)
+    if (destino === item.refeicao) return
+
+    setErro('')
+    setItens(atuais => atuais.map(i => (i.id === item.id ? { ...i, refeicao: destino } : i)))
+
+    const falha = await moverDeRefeicao(item.id, destino)
+
+    if (falha) {
+      setItens(atuais => atuais.map(i => (i.id === item.id ? item : i)))
+      setErro(falha.erro)
+      return
+    }
+
+    setMudou(true)
+  }
+
+  /* Comi metade, comi o dobro. Proporção, e não peso novo: a tabela guarda os
+     nutrientes absolutos da porção e não o quanto era, então dobrar tudo é a
+     única conta que fecha sem inventar um número que ninguém informou. */
+  async function ajustar(item: ItemConsumo, fator: number) {
+    setAcoesDe(null)
+    setErro('')
+
+    const r = await ajustarQuantidade(item, fator)
+
+    if (r.tipo === 'erro') {
+      setErro(r.mensagem)
+      return
+    }
+
+    setItens(atuais => atuais.map(i => (i.id === r.item.id ? r.item : i)))
     setMudou(true)
   }
 
@@ -393,7 +444,12 @@ export function ContadorCaloriasScreen({
                 </View>
 
                 {g.itens.map(i => (
-                  <LinhaItem key={i.id} item={i} onApagar={() => apagar(i)} />
+                  <LinhaItem
+                    key={i.id}
+                    item={i}
+                    onApagar={() => apagar(i)}
+                    onCorrigir={() => setAcoesDe(i)}
+                  />
                 ))}
               </View>
             ))
@@ -434,6 +490,16 @@ export function ContadorCaloriasScreen({
           plano={plano}
           onEscolher={comerDoPlano}
           onFechar={() => setPorta(null)}
+        />
+      )}
+
+      {acoesDe && (
+        <AcoesDoItem
+          item={acoesDe}
+          onMover={destino => mover(acoesDe, destino)}
+          onAjustar={fator => ajustar(acoesDe, fator)}
+          onApagar={() => { const i = acoesDe; setAcoesDe(null); apagar(i) }}
+          onFechar={() => setAcoesDe(null)}
         />
       )}
 
@@ -620,9 +686,25 @@ function Porta({
   )
 }
 
-function LinhaItem({ item, onApagar }: { item: ItemConsumo; onApagar: () => void }) {
+function LinhaItem({
+  item,
+  onApagar,
+  onCorrigir,
+}: {
+  item: ItemConsumo
+  onApagar: () => void
+  onCorrigir: () => void
+}) {
   return (
-    <View style={styles.linhaItem}>
+    /* A linha inteira abre a correção; o X continua apagando direto. Apagar é o
+       que já existia e é o gesto mais rápido — escondê-lo dentro do menu seria
+       trocar um toque por três para o caso mais comum. */
+    <Pressable
+      onPress={onCorrigir}
+      style={({ pressed }) => [styles.linhaItem, pressed && styles.linhaItemPressionada]}
+      accessibilityRole="button"
+      accessibilityLabel={`Corrigir ${item.nome}`}
+    >
       <View style={styles.textoItem}>
         <View style={styles.linhaNomeItem}>
           <Text style={styles.nomeItem} numberOfLines={2}>
@@ -657,7 +739,7 @@ function LinhaItem({ item, onApagar }: { item: ItemConsumo; onApagar: () => void
       >
         <Ionicons name="close" size={16} color={inkFraco} />
       </Pressable>
-    </View>
+    </Pressable>
   )
 }
 
@@ -941,7 +1023,140 @@ function diaRelativo(iso: string): string {
   return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
 }
 
+/* Corrigir um item já registrado.
+ *
+ * Três enganos, três saídas. Errar a refeição — o pão do café lançado no almoço
+ * porque o relógio já tinha virado — se conserta mudando de grupo. Comer
+ * diferente do que se anotou se conserta por proporção. E apagar continua ali,
+ * para quando o registro não deveria existir.
+ *
+ * Antes disto, os três custavam o mesmo: apagar e descrever tudo de novo. Um
+ * preço alto para consertar um toque errado, e alto o bastante para a pessoa
+ * deixar o diário errado em vez de arrumar. */
+function AcoesDoItem({
+  item,
+  onMover,
+  onAjustar,
+  onApagar,
+  onFechar,
+}: {
+  item: ItemConsumo
+  onMover: (destino: string) => void
+  onAjustar: (fator: number) => void
+  onApagar: () => void
+  onFechar: () => void
+}) {
+  const { bottom } = useSafeAreaInsets()
+
+  /* A refeição atual sai da lista de destinos: mover para onde já está não é
+     uma opção, é um caminho sem efeito ocupando espaço. */
+  const destinos = REFEICOES.filter(r => r !== item.refeicao)
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
+        <View style={styles.puxador} />
+
+        <Text style={styles.tituloFolha} numberOfLines={2}>
+          {item.nome}
+        </Text>
+        <Text style={styles.porcaoFolha}>
+          {[item.descricao, item.refeicao].filter(Boolean).join(' · ')}
+        </Text>
+
+        <ScrollView style={styles.listaPlano} bounces={false}>
+          <Text style={styles.subtituloAcoes}>Comi diferente do que anotei</Text>
+
+          <View style={styles.linhaProporcao}>
+            <Pressable
+              onPress={() => onAjustar(0.5)}
+              style={({ pressed }) => [styles.botaoProporcao, pressed && styles.chipPressionado]}
+              accessibilityRole="button"
+              accessibilityLabel="Comi metade"
+            >
+              <Text style={styles.textoProporcao}>Comi metade</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onAjustar(2)}
+              style={({ pressed }) => [styles.botaoProporcao, pressed && styles.chipPressionado]}
+              accessibilityRole="button"
+              accessibilityLabel="Comi o dobro"
+            >
+              <Text style={styles.textoProporcao}>Comi o dobro</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.subtituloAcoes}>Era outra refeição</Text>
+
+          {destinos.map(destino => (
+            <Pressable
+              key={destino}
+              onPress={() => onMover(destino)}
+              style={({ pressed }) => [styles.refeicaoPlano, pressed && styles.chipPressionado]}
+              accessibilityRole="button"
+              accessibilityLabel={`Mover para ${destino}`}
+            >
+              <View style={styles.horaPlano}>
+                <Ionicons name="arrow-forward" size={16} color={cores.verde} />
+              </View>
+              <View style={styles.textoItem}>
+                <Text style={styles.nomeItem}>{destino}</Text>
+              </View>
+            </Pressable>
+          ))}
+
+          <Pressable
+            onPress={onApagar}
+            style={({ pressed }) => [styles.botaoApagarItem, pressed && styles.chipPressionado]}
+            accessibilityRole="button"
+            accessibilityLabel={`Apagar ${item.nome}`}
+          >
+            <Ionicons name="trash-outline" size={16} color={cores.erroTexto} />
+            <Text style={styles.textoApagarItem}>Apagar do diário</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
+  linhaItemPressionada: { opacity: 0.65 },
+  subtituloAcoes: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: inkFraco,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  linhaProporcao: { flexDirection: 'row', gap: 10 },
+  botaoProporcao: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
+  textoProporcao: { fontSize: 14, fontWeight: '700', color: cores.ink },
+  botaoApagarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18,
+    paddingVertical: 13,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: cores.erroBorda,
+    backgroundColor: cores.erroFundo,
+  },
+  textoApagarItem: { fontSize: 14, fontWeight: '700', color: cores.erroTexto },
+
   tela: { flex: 1, backgroundColor: cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centroRepetir: { paddingVertical: 40, alignItems: 'center' },
