@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
@@ -53,6 +53,16 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
  * A refeição é escolhida UMA vez, no alto, e vale para todas elas. Perguntar
  * "em qual refeição?" no fim de cada fluxo somaria um toque a cada registro, e
  * são vários por dia. */
+/* Quanto tempo o item apagado continua recuperável. Cinco segundos é o que
+   leva para os olhos irem da lista até a barra e voltarem; abaixo disso ela
+   some antes de ser lida, e acima vira um cartaz preso na tela. */
+const SEGUNDOS_PARA_DESFAZER = 5
+
+/* Prefixo do id de um item que está na lista mas ainda não no banco. Prefixo e
+   não campo à parte: o id já viaja por toda a tela, e um segundo dado paralelo
+   para dizer a mesma coisa acabaria divergindo dele. */
+const PROVISORIO = 'provisorio:'
+
 export function ContadorCaloriasScreen({
   contaId,
   onFechar,
@@ -93,6 +103,14 @@ export function ContadorCaloriasScreen({
      vezes; quando não é, a tela precisa dizer — senão a pessoa acha que o
      item sumiu. */
   const [pendentes, setPendentes] = useState(0)
+  /* O item que acabou de sair da lista e ainda dá para trazer de volta.
+     Ver `apagar`, logo abaixo, para por que ele existe. */
+  const [desfazivel, setDesfazivel] = useState<ItemConsumo | null>(null)
+  /* O apagar de verdade, esperando o prazo do desfazer. Em ref e não em estado
+     porque quem precisa dele é o temporizador e a limpeza de saída, não o
+     desenho da tela — e porque a limpeza precisa enxergar o valor ATUAL, não o
+     da renderização em que ela foi criada. */
+  const emEspera = useRef<{ item: ItemConsumo; prazo: ReturnType<typeof setTimeout> } | null>(null)
 
   useEffect(() => {
     let ativo = true
@@ -167,7 +185,31 @@ export function ContadorCaloriasScreen({
 
   async function gravar(novos: ItemParaGravar[]) {
     setErro('')
-    const r = await registrarConsumo(contaId, novos)
+
+    /* Aparece na lista ANTES de a rede responder.
+     *
+     * Era o contrário, e o contrário estava errado: adicionar esperava a ida e
+     * volta, e apagar era instantâneo. O gesto perigoso era o rápido e o gesto
+     * seguro era o lento — quem acabou de escolher um alimento ficava olhando
+     * para uma lista que não mudou, sem saber se tinha registrado. */
+    const quando = new Date()
+    const provisorios: ItemConsumo[] = novos.map((n, i) => ({
+      refeicao: n.refeicao,
+      nome: n.nome,
+      descricao: n.descricao,
+      calorias: n.calorias,
+      proteinas: n.proteinas,
+      carboidratos: n.carboidratos,
+      gorduras: n.gorduras,
+      fibras: n.fibras,
+      origem: n.origem,
+      confianca: n.confianca,
+      id: `${PROVISORIO}${quando.getTime()}-${i}`,
+      comidoEm: quando.toISOString(),
+    }))
+    setItens(atuais => [...atuais, ...provisorios])
+
+    const r = await registrarConsumo(contaId, novos, quando)
 
     if (r.tipo === 'erro') {
       /* Falhou: o registro NÃO se perde.
@@ -179,6 +221,10 @@ export function ContadorCaloriasScreen({
        *
        * Agora fica guardado no aparelho e sobe quando a rede voltar. A mensagem
        * diz isso, em vez de repetir a falha do banco, que não ajuda ninguém. */
+      /* Os provisórios FICAM na lista. Some-los aqui contradiria a própria
+         mensagem que aparece logo abaixo: ela diz que o registro está
+         guardado, e uma lista vazia diz que não está. Eles não são editáveis
+         até subirem — ver `abrirAcoes`. */
       await guardarPendentes(contaId, novos)
       setPendentes(await quantosPendentes())
       setErro(
@@ -190,20 +236,40 @@ export function ContadorCaloriasScreen({
     }
 
     setMudou(true)
-    setItens(atuais => [...atuais, ...r.itens])
+    /* Troca os provisórios pelos de verdade, que já vêm com id do banco e a
+       hora que ele carimbou. */
+    const idsProvisorios = new Set(provisorios.map(p => p.id))
+    setItens(atuais => [...atuais.filter(i => !idsProvisorios.has(i.id)), ...r.itens])
   }
 
-  async function apagar(item: ItemConsumo) {
-    /* Some da lista na hora e volta se o banco recusar — mesma escolha da água
-       e do peso. A lista é ordenada por relógio, então ele reaparece no lugar. */
+  /* A folha de correção só abre para item que já existe no banco: mover,
+     ajustar e apagar são todos operações sobre um id, e o provisório não tem
+     um. Dizer isso é melhor do que abrir a folha e falhar em cada botão. */
+  function abrirAcoes(item: ItemConsumo) {
+    if (item.id.startsWith(PROVISORIO)) {
+      setErro('Este item ainda está subindo. Quando a internet voltar ele fica editável.')
+      return
+    }
     setErro('')
-    setItens(atuais => atuais.filter(i => i.id !== item.id))
+    setAcoesDe(item)
+  }
 
-    const falha = await apagarConsumo(item.id)
+  /* Apaga de verdade o que estava esperando o prazo do desfazer. */
+  async function efetivar() {
+    const espera = emEspera.current
+    if (!espera) return
+
+    clearTimeout(espera.prazo)
+    emEspera.current = null
+    setDesfazivel(null)
+
+    const falha = await apagarConsumo(espera.item.id)
 
     if (falha) {
+      /* Volta para a lista. Ela é ordenada por relógio, então ele reaparece no
+         lugar de onde saiu, e não no fim. */
       setItens(atuais =>
-        [...atuais, item].sort((a, b) => a.comidoEm.localeCompare(b.comidoEm)),
+        [...atuais, espera.item].sort((a, b) => a.comidoEm.localeCompare(b.comidoEm)),
       )
       setErro(falha.erro)
       return
@@ -211,6 +277,69 @@ export function ContadorCaloriasScreen({
 
     setMudou(true)
   }
+
+  /* Tira da lista agora e segura o apagar por alguns segundos.
+   *
+   * Antes era irreversível: um toque e o item sumia do diário para sempre. Isso
+   * numa lista onde o alvo de apagar tinha dezesseis pixels e ficava encostado
+   * na área que abre a correção — errar era questão de tempo, e quem errava não
+   * tinha como saber o que perdeu, porque o item já não estava lá para ler.
+   *
+   * O prazo é o conserto certo, e não uma pergunta de confirmação: apagar uma
+   * linha do diário é gesto de rotina, e perguntar "tem certeza?" toda vez
+   * cobra de todo mundo o preço do engano de alguns. Aqui não se paga nada
+   * quando se acerta, e se recupera tudo quando se erra.
+   *
+   * Segurar o apagar de VERDADE, em vez de apagar e recriar, é o que mantém a
+   * hora do item. `registrarConsumo` só carimba o dia; a hora vem do banco, e
+   * um item recriado voltaria marcado como agora — o café da manhã reapareceria
+   * às duas da tarde. */
+  function apagar(item: ItemConsumo) {
+    setErro('')
+    /* Dois seguidos: o primeiro perde o direito de voltar e vai embora. Guardar
+       uma fila de desfazeres seria prometer o que a barra não mostra. */
+    void efetivar()
+
+    setItens(atuais => atuais.filter(i => i.id !== item.id))
+    /* Marca aqui, e não em `efetivar`: quem apaga e fecha a tela em menos de
+       cinco segundos sai com o apagar ainda pendente, e a efetivação acontece
+       na saída — tarde demais para avisar a tela inicial, que ficaria com o
+       total do dia de antes. O que mudou, do ponto de vista de quem usa, mudou
+       no toque. */
+    setMudou(true)
+    setDesfazivel(item)
+    emEspera.current = {
+      item,
+      prazo: setTimeout(() => {
+        void efetivar()
+      }, SEGUNDOS_PARA_DESFAZER * 1000),
+    }
+  }
+
+  function desfazer() {
+    const espera = emEspera.current
+    if (!espera) return
+
+    clearTimeout(espera.prazo)
+    emEspera.current = null
+    setDesfazivel(null)
+    setItens(atuais =>
+      [...atuais, espera.item].sort((a, b) => a.comidoEm.localeCompare(b.comidoEm)),
+    )
+  }
+
+  /* Sair não cancela o apagar: quem fechou a tela já viu o item sumir, e
+     encontrá-lo de volta na próxima abertura seria o app desfazendo sozinho. */
+  useEffect(
+    () => () => {
+      const espera = emEspera.current
+      if (!espera) return
+      clearTimeout(espera.prazo)
+      emEspera.current = null
+      void apagarConsumo(espera.item.id)
+    },
+    [],
+  )
 
   /* Muda a refeição de um item já registrado.
    *
@@ -565,8 +694,7 @@ export function ContadorCaloriasScreen({
                   <LinhaItem
                     key={i.id}
                     item={i}
-                    onApagar={() => apagar(i)}
-                    onCorrigir={() => setAcoesDe(i)}
+                    onCorrigir={() => abrirAcoes(i)}
                   />
                 ))}
               </View>
@@ -639,6 +767,27 @@ export function ContadorCaloriasScreen({
             <ActivityIndicator color={cores.verde} />
             <Text style={styles.textoAnalise}>Analisando a foto…</Text>
           </View>
+        </View>
+      )}
+
+      {/* Por último no JSX, e por isso por cima de tudo: a barra precisa
+          aparecer mesmo com a folha de correção aberta, já que é de lá que sai
+          a maior parte dos apagares. */}
+      {desfazivel && (
+        <View style={[styles.barraDesfazer, { bottom: bottom + 16 }]}>
+          <Text style={styles.textoDesfazer} numberOfLines={1}>
+            {desfazivel.nome} saiu do diário
+          </Text>
+          <Pressable
+            onPress={desfazer}
+            hitSlop={10}
+            style={({ pressed }) => [styles.botaoDesfazer, pressed && styles.chipPressionado]}
+            accessibilityRole="button"
+            accessibilityLabel={`Trazer ${desfazivel.nome} de volta`}
+          >
+            <Ionicons name="arrow-undo-outline" size={15} color={cores.sobreLimao} />
+            <Text style={styles.textoBotaoDesfazer}>Desfazer</Text>
+          </Pressable>
         </View>
       )}
     </View>
@@ -804,19 +953,16 @@ function Porta({
   )
 }
 
-function LinhaItem({
-  item,
-  onApagar,
-  onCorrigir,
-}: {
-  item: ItemConsumo
-  onApagar: () => void
-  onCorrigir: () => void
-}) {
+function LinhaItem({ item, onCorrigir }: { item: ItemConsumo; onCorrigir: () => void }) {
   return (
-    /* A linha inteira abre a correção; o X continua apagando direto. Apagar é o
-       que já existia e é o gesto mais rápido — escondê-lo dentro do menu seria
-       trocar um toque por três para o caso mais comum. */
+    /* A linha inteira abre a folha de correção, e é o único jeito de tocar
+       nela. Havia um X aqui, de dezesseis pixels, encostado nesta mesma área e
+       DENTRO deste mesmo Pressable — apagava na hora, sem volta, e a folha que
+       ele abria já tinha um "apagar". Ou seja: o caminho perigoso existia para
+       poupar um toque num caminho que já levava ao mesmo lugar.
+
+       Um alvo pequeno colado num alvo grande erra dos dois lados: quem mirava a
+       linha apagava o item, e quem mirava o X abria a correção. */
     <Pressable
       onPress={onCorrigir}
       style={({ pressed }) => [styles.linhaItem, pressed && styles.linhaItemPressionada]}
@@ -848,15 +994,7 @@ function LinhaItem({
         {item.calorias === null ? '—' : `${milhar(item.calorias)}`}
       </Text>
 
-      <Pressable
-        onPress={onApagar}
-        hitSlop={10}
-        style={({ pressed }) => [styles.apagar, pressed && styles.apagarPressionado]}
-        accessibilityRole="button"
-        accessibilityLabel={`Apagar ${item.nome}`}
-      >
-        <Ionicons name="close" size={16} color={inkFraco} />
-      </Pressable>
+      <Ionicons name="chevron-forward" size={16} color={inkFraco} />
     </Pressable>
   )
 }
@@ -1240,6 +1378,35 @@ function AcoesDoItem({
 }
 
 const styles = StyleSheet.create({
+  /* Flutua sobre a lista em vez de empurrá-la: o conteúdo não pode pular de
+     lugar por causa de um aviso que dura cinco segundos. */
+  barraDesfazer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: cores.superficie,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  textoDesfazer: { flex: 1, fontSize: 13.5, color: cores.ink },
+  botaoDesfazer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: cores.limao,
+  },
+  textoBotaoDesfazer: { fontSize: 13.5, fontWeight: '800', color: cores.sobreLimao },
+
   blocoPendentes: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1423,8 +1590,6 @@ const styles = StyleSheet.create({
   textoSeloFoto: { fontSize: 9.5, fontWeight: '800', color: cores.verdeEscuro },
   detalheItem: { marginTop: 1, fontSize: 11.5, color: inkSuave },
   kcalItem: { fontSize: 14, fontWeight: '800', color: cores.verde },
-  apagar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  apagarPressionado: { backgroundColor: cores.trilho },
 
   /* ── Véu de análise ── */
   veu: {
