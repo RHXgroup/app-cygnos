@@ -77,6 +77,7 @@ export function PerfilScreen({
      mesma razão: ter caminho gravado não é ter imagem que responde. Guardando o
      endereço, e não um sim/não, uma foto nova entra tentando de novo. */
   const [fotoFalhou, setFotoFalhou] = useState<string | null>(null)
+  const [urlFoto, setUrlFoto] = useState<string | null>(null)
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
   const [erroObjetivo, setErroObjetivo] = useState('')
 
@@ -114,6 +115,28 @@ export function PerfilScreen({
     }
   }, [sessao.user.id])
 
+  /* O endereço da foto agora é assinado, e assinar é ida ao servidor — então ele
+     vira estado em vez de ser calculado no meio do render. Refaz sempre que o
+     caminho muda, que é o que acontece ao trocar a foto: caminho novo, endereço
+     novo, e a imagem entra sem depender de o cache soltar a anterior. */
+  useEffect(() => {
+    let ativo = true
+    const caminho = conta?.avatar_path ?? null
+
+    if (!caminho) {
+      setUrlFoto(null)
+      return
+    }
+
+    urlDoAvatar(caminho).then(url => {
+      if (ativo) setUrlFoto(url)
+    })
+
+    return () => {
+      ativo = false
+    }
+  }, [conta?.avatar_path])
+
   /* Sem botão de salvar: o toque É a gravação.
    *
    * Otimista, como a água e o peso — três opções numa fileira não comportam um
@@ -137,7 +160,6 @@ export function PerfilScreen({
   }
 
   const nome = conta?.nome_completo ?? sessao.user.email?.split('@')[0] ?? ''
-  const urlFoto = urlDoAvatar(conta?.avatar_path ?? null)
 
   async function escolherFoto(origem: 'galeria' | 'camera') {
     setOpcoesAbertas(false)

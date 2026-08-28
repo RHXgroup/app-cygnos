@@ -14,11 +14,37 @@ export type ResultadoAvatar =
   | { tipo: 'cancelado' }
   | { tipo: 'erro'; mensagem: string }
 
+/* Quanto tempo o endereço assinado vale. Uma hora é folgado para o que ele
+   serve — mostrar a foto enquanto a tela de Perfil está aberta —, e a imagem já
+   carregada não some quando o prazo vence. */
+const VALIDADE_SEGUNDOS = 60 * 60
+
 /* Monta a URL a partir do caminho. O banco guarda só o caminho de propósito —
-   ver o comentário da migration. */
-export function urlDoAvatar(path: string | null): string | null {
+ * ver o comentário da migration.
+ *
+ * ASSINADA, e não pública. O bucket é privado, e `getPublicUrl` não pergunta
+ * nada a ninguém: ele concatena uma string e devolve um endereço com cara de
+ * válido, que o servidor recusa com "Bucket not found". Era isso que deixava a
+ * foto de perfil de todo mundo sem carregar — sem erro na tela, porque do ponto
+ * de vista do app estava tudo certo até a imagem simplesmente não aparecer.
+ *
+ * Privado é o certo aqui: foto de paciente não é vitrine, e endereço público
+ * vale para sempre e para qualquer um que o tenha. Assinado expira.
+ *
+ * Nada disto mexe no que está gravado. O `avatar_path` continua o mesmo, e quem
+ * mais lê esse campo — relatório, PDF, o sistema — continua lendo igual. O que
+ * mudou é só como ESTE app transforma o caminho em endereço na hora de exibir. */
+export async function urlDoAvatar(path: string | null): Promise<string | null> {
   if (!path) return null
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, VALIDADE_SEGUNDOS)
+
+  /* Devolve null em vez de estourar: a tela já sabe desenhar as iniciais quando
+     não há endereço, e é uma resposta melhor do que um erro para uma foto. */
+  if (error) return null
+  return data.signedUrl
 }
 
 async function pedirPermissao(origem: 'galeria' | 'camera'): Promise<boolean> {
