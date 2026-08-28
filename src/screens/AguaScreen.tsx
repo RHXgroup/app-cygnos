@@ -18,7 +18,10 @@ import {
   carregarAgua,
   coposDaMeta,
   coposDe,
+  mediaDiaria,
+  porHoraDoDia,
   registrarAgua,
+  sequenciaNaMeta,
   totalDe,
   volume,
   COPO_MAX_ML,
@@ -266,6 +269,8 @@ export function AguaScreen({
             </View>
           )}
 
+          <AoLongoDoDia registros={agua.hoje} />
+
           <ListaDeHoje registros={agua.hoje} onApagar={apagar} />
 
           <Semana dias={agua.semana} metaMl={agua.metaMl} />
@@ -412,6 +417,92 @@ function CampoOutro({ onRegistrar }: { onRegistrar: (ml: number) => void }) {
   )
 }
 
+/* Quando, dentro do dia, a água foi bebida.
+ *
+ * É a leitura que o app tinha desde sempre e nunca mostrou. O horário de cada
+ * gole está gravado; o total do topo da tela, não. E dois litros bebidos todos
+ * depois das nove da noite não é a mesma coisa que dois litros distribuídos —
+ * só que o número diz exatamente a mesma coisa nos dois casos.
+ *
+ * Vinte e quatro barras finas, uma por hora, sem esconder nada: agrupar de três
+ * em três caberia melhor, mas apagaria justamente a informação que faz a pessoa
+ * mudar de hábito, que é reconhecer o próprio buraco da tarde.
+ *
+ * A altura é relativa à MAIOR hora do dia, e não à meta: a pergunta aqui é
+ * "quando", não "quanto" — o quanto já está no cartão de cima. */
+function AoLongoDoDia({ registros }: { registros: RegistroAgua[] }) {
+  const horas = porHoraDoDia(registros)
+  const pico = Math.max(...horas)
+
+  return (
+    <View style={styles.bloco}>
+      <View style={styles.linhaTituloBloco}>
+        <Text style={styles.tituloBloco}>Ao longo do dia</Text>
+        {pico > 0 && <Text style={styles.contagemBloco}>{resumoDoDia(horas)}</Text>}
+      </View>
+
+      {pico === 0 ? (
+        <Text style={styles.vazioBloco}>
+          Assim que você registrar o primeiro copo, o horário aparece aqui.
+        </Text>
+      ) : (
+        <>
+          <View style={styles.faixaHoras}>
+            {horas.map((ml, hora) => (
+              <View key={hora} style={styles.colunaHora}>
+                <View
+                  style={[
+                    styles.barraHora,
+                    /* Zero fica como trilho, e não como barra de altura mínima:
+                       aqui a ausência É a informação. */
+                    ml > 0 && { height: Math.max((ml / pico) * ALTURA_HORAS, 4) },
+                    ml > 0 && styles.barraHoraCheia,
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
+
+          {/* Quatro marcas, e não vinte e quatro: o eixo serve para situar, e
+              legenda ilegível não situa ninguém. */}
+          <View style={styles.eixoHoras}>
+            {['0h', '6h', '12h', '18h'].map(h => (
+              <Text key={h} style={styles.marcaHora}>
+                {h}
+              </Text>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
+  )
+}
+
+/* "mais da metade depois das 18h" — a frase só aparece quando há concentração
+   de verdade. Sem um período dominante ela não é dita: inventar padrão onde não
+   há é o mesmo defeito do anel que mistura dois dias. */
+function resumoDoDia(horas: number[]): string {
+  const total = horas.reduce((s, h) => s + h, 0)
+  if (total === 0) return ''
+
+  const faixas: { rotulo: string; de: number; ate: number }[] = [
+    { rotulo: 'de manhã', de: 6, ate: 12 },
+    { rotulo: 'à tarde', de: 12, ate: 18 },
+    { rotulo: 'à noite', de: 18, ate: 24 },
+    { rotulo: 'de madrugada', de: 0, ate: 6 },
+  ]
+
+  const somas = faixas.map(f => ({
+    ...f,
+    ml: horas.slice(f.de, f.ate).reduce((s, h) => s + h, 0),
+  }))
+  const maior = somas.reduce((a, b) => (b.ml > a.ml ? b : a))
+  const parte = maior.ml / total
+
+  if (parte < 0.5) return 'bem distribuído'
+  return `${Math.round(parte * 100)}% ${maior.rotulo}`
+}
+
 function ListaDeHoje({
   registros,
   onApagar,
@@ -466,6 +557,8 @@ function ListaDeHoje({
 function Semana({ dias, metaMl }: { dias: DiaAgua[]; metaMl: number }) {
   const teto = Math.max(metaMl, ...dias.map(d => d.ml), 1)
   const bateram = dias.filter(d => d.ml >= metaMl).length
+  const seguidos = sequenciaNaMeta(dias, metaMl)
+  const media = mediaDiaria(dias)
 
   return (
     <View style={styles.bloco}>
@@ -474,6 +567,24 @@ function Semana({ dias, metaMl }: { dias: DiaAgua[]; metaMl: number }) {
         <Text style={styles.contagemBloco}>
           {bateram} de 7 {bateram === 1 ? 'dia na meta' : 'dias na meta'}
         </Text>
+      </View>
+
+      {/* Dois números que o app já sabia e nunca disse. A sequência é o que
+          sustenta hábito — "não quebrar" move mais gente do que "bater a meta" —
+          e a média responde o que sete barras não respondem de relance: no
+          geral, você bebe quanto? */}
+      <View style={styles.linhaResumo}>
+        <View style={styles.resumo}>
+          <Text style={styles.numeroResumo}>{seguidos}</Text>
+          <Text style={styles.rotuloResumo}>
+            {seguidos === 1 ? 'dia seguido na meta' : 'dias seguidos na meta'}
+          </Text>
+        </View>
+        <View style={styles.divisorResumo} />
+        <View style={styles.resumo}>
+          <Text style={styles.numeroResumo}>{volume(media)}</Text>
+          <Text style={styles.rotuloResumo}>por dia, em média</Text>
+        </View>
       </View>
 
       <View style={styles.grafico}>
@@ -646,6 +757,9 @@ function BlocoMeta({
 }
 
 const ALTURA_GRAFICO = 96
+/* Mais baixo que o da semana: são vinte e quatro colunas em vez de sete, e a
+   mesma altura viraria um paredão. */
+const ALTURA_HORAS = 56
 
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: cores.fundo },
@@ -767,6 +881,26 @@ const styles = StyleSheet.create({
 
   /* ── Gráfico da semana ── */
   grafico: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 6 },
+
+  linhaResumo: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
+  resumo: { flex: 1, alignItems: 'center', gap: 2 },
+  numeroResumo: { fontSize: 20, fontWeight: '800', color: cores.limao },
+  rotuloResumo: { fontSize: 11.5, color: inkFraco, textAlign: 'center' },
+  divisorResumo: { width: 1, alignSelf: 'stretch', backgroundColor: cores.borda },
+
+  faixaHoras: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+    height: ALTURA_HORAS,
+    marginTop: 10,
+  },
+  colunaHora: { flex: 1, height: '100%', justifyContent: 'flex-end' },
+  barraHora: { height: 2, borderRadius: 2, backgroundColor: cores.trilho },
+  barraHoraCheia: { backgroundColor: cores.limao },
+  eixoHoras: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  marcaHora: { fontSize: 10.5, color: inkFraco },
+  vazioBloco: { marginTop: 8, fontSize: 13, lineHeight: 19, color: inkFraco },
   linhaMeta: {
     position: 'absolute',
     left: 0,

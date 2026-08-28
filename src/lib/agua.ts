@@ -46,6 +46,59 @@ export type Agua = {
 
 export type ResultadoAgua = { tipo: 'ok'; agua: Agua } | { tipo: 'erro'; mensagem: string }
 
+/* ── Leituras do período ───────────────────────────────────────────────────
+ *
+ * As três saem do que a tela já carregou. Nenhuma vai ao banco: os sete dias e
+ * os registros de hoje estão em mãos desde a primeira busca, e o que faltava era
+ * alguém perguntar alguma coisa a eles. */
+
+/* Quantos dias seguidos, contando de hoje para trás, a meta foi cumprida.
+ *
+ * O dia de HOJE não quebra a sequência quando ainda não fechou: às nove da manhã
+ * ninguém bateu a meta, e zerar o contador ali seria punir a pessoa por ter
+ * acordado. Se hoje já bateu, entra; se não, a conta começa em ontem — mesma
+ * regra da sequência de treinos, em lib/treino.ts.
+ *
+ * Está limitada à janela carregada (sete dias). Sete seguidos é o máximo que
+ * esta função sabe dizer, e ela não finge saber mais. */
+export function sequenciaNaMeta(dias: DiaAgua[], metaMl: number): number {
+  if (metaMl <= 0) return 0
+
+  let i = dias.length - 1
+  if (i >= 0 && dias[i].ml < metaMl) i-- /* hoje ainda em andamento */
+
+  let total = 0
+  while (i >= 0 && dias[i].ml >= metaMl) {
+    total++
+    i--
+  }
+  return total
+}
+
+/* A média do período, em ml. Conta os dias sem registro como zero: eles fazem
+   parte do período e escondê-los inflaria a média de quem bebeu em dois dias e
+   esqueceu nos outros cinco. */
+export const mediaDiaria = (dias: DiaAgua[]) =>
+  dias.length === 0 ? 0 : Math.round(dias.reduce((s, d) => s + d.ml, 0) / dias.length)
+
+/* Quanto foi bebido em cada hora do dia. Vinte e quatro posições, índice = hora.
+ *
+ * É a leitura que o app tinha e nunca mostrou: o horário de cada gole está
+ * gravado desde sempre, e dois litros bebidos todos depois das nove da noite não
+ * é a mesma coisa que dois litros distribuídos pelo dia — mas o número do topo
+ * da tela diz exatamente a mesma coisa nos dois casos. */
+export function porHoraDoDia(registros: RegistroAgua[]): number[] {
+  const horas = new Array(24).fill(0) as number[]
+
+  for (const r of registros) {
+    const d = new Date(r.bebidoEm)
+    if (isNaN(d.getTime())) continue
+    horas[d.getHours()] += r.ml
+  }
+
+  return horas
+}
+
 /* Quantos copos cheios um volume dá. Arredonda para baixo: seis copos e meio
    são seis copos bebidos — o meio ainda está na mão. */
 export const coposDe = (ml: number, copoMl: number) =>
