@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
   ScrollView,
   StyleSheet,
@@ -252,6 +253,24 @@ function AreaLogada({ sessao }: { sessao: Session }) {
      A prop contentOffset só funciona no iOS; posicionar no primeiro layout
      funciona nos dois. */
   const jaPosicionou = useRef(false)
+
+  /* Voltar do segundo plano relê o plano.
+   *
+   * É o contador do plano, e não outro, porque é ele que puxa junto o plano DA
+   * NUTRICIONISTA — e esse é o único conteúdo da tela inicial que muda sem o
+   * paciente ter feito nada. Ela publica o plano dela do consultório, ou vincula
+   * a conta, e nada avisa o aparelho: sem isto, a tela inicial continuaria
+   * mostrando o plano próprio (ou o convite para montar um) até o app ser
+   * fechado e aberto de novo.
+   *
+   * A Home não pisca por causa disto — ver o efeito do plano lá, que só mostra o
+   * indicador na primeira carga. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'active') setVersaoPlano(v => v + 1)
+    })
+    return () => sub.remove()
+  }, [])
 
   /* Um caminho só para os dois contadores: a meta de água mora na mesma linha
      que as de caloria e passos, então gravar metas invalida as duas telas. */
