@@ -256,6 +256,14 @@ function AreaLogada({ sessao }: { sessao: Session }) {
      A prop contentOffset só funciona no iOS; posicionar no primeiro layout
      funciona nos dois. */
   const jaPosicionou = useRef(false)
+  /* Com que largura o carrossel foi posicionado.
+   *
+   * A posição é um deslocamento em pixels — aba 2 vive em 2 × largura. Se a
+   * largura mudar depois (girar o aparelho, tela dividida), o deslocamento
+   * antigo passa a apontar para o meio de duas abas, e a tela fica com metade
+   * de uma e metade da outra. Era posicionar uma vez e nunca mais; agora
+   * reposiciona quando a régua muda. */
+  const larguraPosicionada = useRef(0)
 
   /* Voltar do segundo plano relê o plano.
    *
@@ -382,9 +390,17 @@ function AreaLogada({ sessao }: { sessao: Session }) {
           overScrollMode="never"
           onMomentumScrollEnd={aoTerminarDeslizar}
           onLayout={() => {
-            if (jaPosicionou.current) return
+            /* Na primeira vez vai para o Início; nas seguintes, só se a largura
+               mudou — e aí mantém a aba em que a pessoa está, em vez de
+               arrastá-la de volta para o Início por causa de um giro. */
+            const primeira = !jaPosicionou.current
+            if (!primeira && larguraPosicionada.current === width) return
+
             jaPosicionou.current = true
-            carrossel.current?.scrollTo({ x: ORDEM_ABAS.indexOf('inicio') * width, animated: false })
+            larguraPosicionada.current = width
+
+            const destino = primeira ? 'inicio' : aba
+            carrossel.current?.scrollTo({ x: ORDEM_ABAS.indexOf(destino) * width, animated: false })
           }}
           style={styles.carrossel}
         >
@@ -427,7 +443,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
             e não um Modal de propósito: no iOS, abrir a câmera de dentro de um
             Modal deixa a promise do picker pendurada para sempre. */}
         {perfilAberto && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <PerfilScreen
               sessao={sessao}
               onFechar={() => setPerfilAberto(false)}
@@ -439,19 +455,19 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {codigoAberto && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <CodigoScreen sessao={sessao} onFechar={() => setCodigoAberto(false)} />
           </View>
         )}
 
         {nutricionistasAbertas && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <NutricionistasScreen onFechar={() => setNutricionistasAbertas(false)} />
           </View>
         )}
 
         {avisosAbertos && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <AvisosScreen
               onFechar={() => setAvisosAbertos(false)}
               /* Fecha os avisos ao ir: voltar da ficha devolve à tela inicial,
@@ -468,7 +484,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
             termina em signOut, o listener de sessão lá em cima zera tudo e o
             App inteiro volta para o login. */}
         {excluirContaAberta && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <ExcluirContaScreen
               email={sessao.user.email ?? ''}
               onFechar={() => setExcluirContaAberta(false)}
@@ -479,7 +495,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         {/* Antes da edição no JSX de propósito: abrir um plano daqui empilha a
             tela de edição POR CIMA desta, e é para ela que o voltar devolve. */}
         {cadastrosAberto && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <MeusCadastrosScreen
               contaId={sessao.user.id}
               versao={versaoPlano}
@@ -502,7 +518,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {planoEmEdicao && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <EditarPlanoScreen
               plano={planoEmEdicao}
               onFechar={() => setPlanoEmEdicao(null)}
@@ -515,13 +531,13 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {comprasDe && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <ListaDeComprasScreen plano={comprasDe} onFechar={() => setComprasDe(null)} />
           </View>
         )}
 
         {aguaAberta && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <AguaScreen
               contaId={sessao.user.id}
               onFechar={() => setAguaAberta(false)}
@@ -531,7 +547,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {metasAbertas !== null && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <MetasScreen
               contaId={sessao.user.id}
               alvo={metasAbertas}
@@ -542,7 +558,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {sonoAberto && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <SonoScreen
               contaId={sessao.user.id}
               onFechar={() => setSonoAberto(false)}
@@ -552,7 +568,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {contadorAberto && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <ContadorCaloriasScreen
               contaId={sessao.user.id}
               onFechar={() => setContadorAberto(false)}
@@ -562,7 +578,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {pesoAberto && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <PesoScreen
               contaId={sessao.user.id}
               onFechar={() => setPesoAberto(false)}
@@ -572,7 +588,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {refeicaoAberta && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <RefeicaoScreen
               refeicao={refeicaoAberta.refeicao}
               quando={refeicaoAberta.quando}
@@ -582,7 +598,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         )}
 
         {registrar && (
-          <View style={StyleSheet.absoluteFill}>
+          <View style={styles.sobreposta}>
             <RegistrarScreen
               contaId={sessao.user.id}
               inicial={registrar.inicial}
@@ -710,6 +726,16 @@ function TelaDaAba({
 
 const styles = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: cores.fundo },
+  /* Toda tela sobreposta pinta o próprio fundo.
+   *
+   * absoluteFill sozinho é transparente: bastava a tela de cima não cobrir cada
+   * pixel — por um respiro de notch, pelo teclado empurrando o conteúdo, por um
+   * recorte de rolagem — para a de baixo aparecer atrás dela. Duas telas
+   * misturadas na mesma imagem, que é o que se via.
+   *
+   * O fundo aqui, e não em cada tela, porque o buraco é da moldura: quem esquecer
+   * de pintar a sua continua coberto. */
+  sobreposta: { ...StyleSheet.absoluteFillObject, backgroundColor: cores.fundo },
   /* Login e cadastro ficam um degrau acima do fundo da área logada, para o
      cartão de formulário não sumir dentro da tela. */
   telaAuth: { flex: 1, backgroundColor: cores.mist },
