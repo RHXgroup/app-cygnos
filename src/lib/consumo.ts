@@ -247,6 +247,169 @@ export async function apagarConsumo(id: string): Promise<{ erro: string } | null
   return error ? { erro: error.message } : null
 }
 
+/* ── Repetir o que já se come ──────────────────────────────────────────────
+ *
+ * Quem toma o mesmo café da manhã todo dia descrevia tudo de novo, todo dia. É
+ * o atrito que mais faz gente largar app de dieta, e as duas leituras abaixo
+ * existem para tirá-lo do caminho.
+ *
+ * Nada de tabela nova: o histórico já está em app_consumo_itens. O agrupamento
+ * é feito aqui, e não no banco, porque uma função nova exigiria migração — e
+ * isto precisa funcionar hoje, no aparelho que já está na mão da pessoa. */
+
+/* Quantos dias para trás olhar. Sessenta cobre o hábito de quem come a mesma
+   coisa em dias de semana alternados, sem trazer o que a pessoa comia numa fase
+   que já passou. */
+const DIAS_DE_HISTORICO = 60
+
+/* Teto de linhas lidas. Um item por refeição por dia dá menos de 400 em 60
+   dias; o dobro disso é folga suficiente para quem registra alimento a alimento
+   sem virar uma consulta cara. */
+const TETO_HISTORICO = 800
+
+/* Nome e descrição, sem acento nem caixa, é o que identifica "o mesmo alimento"
+   para efeito de contagem. Duas grafias do mesmo pão viram a mesma linha. */
+const chaveDoItem = (nome: string, descricao: string | null) =>
+  `${nome}|${descricao ?? ''}`
+    .toLowerCase()
+    .normalize('NFD')
+    /* Escrito por código, e não com os acentos literais: são caracteres
+       invisíveis no editor, e um salvamento em outra codificação os perderia
+       sem ninguém notar — a busca passaria a diferenciar "pão" de "pao". */
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+
+export type ItemFrequente = {
+  chave: string
+  nome: string
+  descricao: string | null
+  calorias: number | null
+  proteinas: number | null
+  carboidratos: number | null
+  gorduras: number | null
+  fibras: number | null
+  /* Quantas vezes apareceu na janela lida. É o que ordena a lista, e a tela
+     mostra para a pessoa entender por que aquilo está ali. */
+  vezes: number
+}
+
+export type ResultadoFrequentes =
+  | { tipo: 'ok'; itens: ItemFrequente[] }
+  | { tipo: 'erro'; mensagem: string }
+
+/* Os alimentos que mais se repetem NESTA refeição.
+ *
+ * Por refeição, e não no geral: café da manhã e jantar quase não têm alimento
+ * em comum, e uma lista única ofereceria ovo mexido no jantar para caber pão na
+ * lista do almoço. */
+export async function carregarFrequentes(
+  contaId: string,
+  refeicao: string,
+  limite = 8,
+): Promise<ResultadoFrequentes> {
+  const de = new Date()
+  de.setDate(de.getDate() - DIAS_DE_HISTORICO)
+
+  const { data, error } = await supabase
+    .from('app_consumo_itens')
+    .select(COLUNAS)
+    .eq('conta_id', contaId)
+    .eq('refeicao', refeicao)
+    .gte('data', dataISO(de))
+    .order('comido_em', { ascending: false })
+    .limit(TETO_HISTORICO)
+
+  if (error) return { tipo: 'erro', mensagem: error.message }
+
+  const porChave = new Map<string, ItemFrequente>()
+
+  for (const linha of (data ?? []) as Linha[]) {
+    const item = daLinha(linha)
+    const chave = chaveDoItem(item.nome, item.descricao)
+    const visto = porChave.get(chave)
+
+    if (visto) {
+      visto.vezes += 1
+      continue
+    }
+
+    /* Os nutrientes vêm do registro MAIS RECENTE, e a lista chega ordenada do
+       mais novo para o mais velho — então o primeiro que se vê é o que vale.
+       Quem corrigiu a porção do próprio pão semana passada não deve receber de
+       volta o número errado de um mês atrás. */
+    porChave.set(chave, {
+      chave,
+      nome: item.nome,
+      descricao: item.descricao,
+      calorias: item.calorias,
+      proteinas: item.proteinas,
+      carboidratos: item.carboidratos,
+      gorduras: item.gorduras,
+      fibras: item.fibras,
+      vezes: 1,
+    })
+  }
+
+  const itens = [...porChave.values()]
+    /* Repetido antes de único: o que se come duas vezes por semana é um hábito;
+       o que apareceu uma vez só foi um dia atípico, e ocupar o atalho com ele
+       tiraria o lugar de quem realmente se repete. */
+    .sort((a, b) => b.vezes - a.vezes)
+    .slice(0, limite)
+
+  return { tipo: 'ok', itens }
+}
+
+export type UltimaRefeicao = {
+  /* O dia de onde ela veio, em ISO. A tela transforma em "ontem" ou na data. */
+  data: string
+  itens: ItemConsumo[]
+}
+
+export type ResultadoUltima =
+  | { tipo: 'ok'; refeicao: UltimaRefeicao | null }
+  | { tipo: 'erro'; mensagem: string }
+
+/* A última vez que esta refeição foi registrada, inteira.
+ *
+ * Serve o caso que a lista de frequentes não cobre: repetir o almoço de ontem
+ * com os cinco alimentos de uma vez, em um toque só, em vez de escolher cinco
+ * atalhos em sequência.
+ *
+ * O dia de hoje fica de fora: repetir o que já está na tela duplicaria a
+ * refeição em vez de montá-la. */
+export async function carregarUltimaRefeicao(
+  contaId: string,
+  refeicao: string,
+  hoje = new Date(),
+): Promise<ResultadoUltima> {
+  const de = new Date(hoje)
+  de.setDate(de.getDate() - DIAS_DE_HISTORICO)
+
+  const { data, error } = await supabase
+    .from('app_consumo_itens')
+    .select(`${COLUNAS}, data`)
+    .eq('conta_id', contaId)
+    .eq('refeicao', refeicao)
+    .gte('data', dataISO(de))
+    .lt('data', dataISO(hoje))
+    .order('data', { ascending: false })
+    .order('comido_em', { ascending: true })
+    .limit(TETO_HISTORICO)
+
+  if (error) return { tipo: 'erro', mensagem: error.message }
+
+  const linhas = (data ?? []) as (Linha & { data: string })[]
+  if (linhas.length === 0) return { tipo: 'ok', refeicao: null }
+
+  /* A consulta já vem ordenada por data desc, então o primeiro registro marca o
+     dia mais recente — e tudo daquele dia entra junto, na ordem do relógio. */
+  const dia = linhas[0].data
+  const itens = linhas.filter(l => l.data === dia).map(daLinha)
+
+  return { tipo: 'ok', refeicao: { data: dia, itens } }
+}
+
 /* ── A foto ────────────────────────────────────────────────────────────────*/
 
 export type Estimativa = {

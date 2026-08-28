@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,13 +16,17 @@ import {
   analisarFoto,
   apagarConsumo,
   carregarConsumo,
+  carregarFrequentes,
+  carregarUltimaRefeicao,
   porRefeicao,
   refeicaoPelaHora,
   registrarConsumo,
   totaisConsumidos,
   type Estimativa,
   type ItemConsumo,
+  type ItemFrequente,
   type ItemParaGravar,
+  type UltimaRefeicao,
 } from '../lib/consumo'
 import { METAS_VAZIAS, carregarMetas, type Metas } from '../lib/metas'
 import { carregarPlanoAtivo, type PlanoCompleto, type RefeicaoSalva } from '../lib/plano'
@@ -32,13 +37,14 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
 /* O contador de calorias: o que a pessoa comeu hoje, contra a meta dela.
  *
- * Três portas para registrar, e a escolha entre elas é sobre esforço, não sobre
+ * Quatro portas para registrar, e a escolha entre elas é sobre esforço, não sobre
  * capricho: fotografar resolve o prato de restaurante que ninguém sabe pesar;
  * a busca resolve o alimento embalado, com número de tabela; e "do meu plano"
  * resolve o caso mais comum de todos — quem montou um plano e comeu o que
- * planejou não deveria ter de descrever isso de novo, alimento por alimento.
+ * planejou não deveria ter de descrever isso de novo, alimento por alimento; e
+ * "repetir" resolve o dia comum, em que se come o mesmo de ontem.
  *
- * A refeição é escolhida UMA vez, no alto, e vale para as três portas. Perguntar
+ * A refeição é escolhida UMA vez, no alto, e vale para as quatro portas. Perguntar
  * "em qual refeição?" no fim de cada fluxo somaria um toque a cada registro, e
  * são vários por dia. */
 export function ContadorCaloriasScreen({
@@ -61,8 +67,14 @@ export function ContadorCaloriasScreen({
   const [mudou, setMudou] = useState(false)
   const [refeicao, setRefeicao] = useState(() => refeicaoPelaHora())
 
-  /* null = a tela principal. As três portas abrem por cima dela. */
-  const [porta, setPorta] = useState<'busca' | 'plano' | null>(null)
+  /* null = a tela principal. As quatro portas abrem por cima dela. */
+  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | null>(null)
+  /* O que a pessoa já come nesta refeição. Carregado só quando a porta abre —
+     são duas consultas que a maioria das visitas não usa, e pagá-las na abertura
+     da tela atrasaria o caso comum por causa do caso eventual. */
+  const [frequentes, setFrequentes] = useState<ItemFrequente[]>([])
+  const [ultima, setUltima] = useState<UltimaRefeicao | null>(null)
+  const [buscandoRepetir, setBuscandoRepetir] = useState(false)
   const [analisando, setAnalisando] = useState(false)
   /* A estimativa esperando confirmação. Nada é gravado antes de a pessoa ver o
      número — a IA erra, e um item errado no diário estraga o total do dia. */
@@ -88,6 +100,35 @@ export function ContadorCaloriasScreen({
       ativo = false
     }
   }, [contaId])
+
+  /* O voltar do Android dentro desta tela.
+   *
+   * Sem isto, quem abre a busca, digita "pão" e aperta voltar perde o contador
+   * inteiro e cai na tela inicial — em vez de voltar para a refeição que estava
+   * montando. O App tem o seu próprio tratamento, mas ele só enxerga as telas
+   * que ele mesmo abriu; o que acontece DENTRO desta é esta tela que sabe.
+   *
+   * Registrado depois do App de propósito: o React Native chama os tratadores
+   * na ordem inversa do registro, então o mais interno decide primeiro — que é
+   * o que faz o voltar descascar uma camada por vez. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      /* A estimativa da foto vem por cima de tudo, inclusive das portas. */
+      if (estimativa) {
+        setEstimativa(null)
+        return true
+      }
+      if (porta) {
+        setPorta(null)
+        return true
+      }
+      /* Nada aberto aqui dentro: devolve o evento, e quem fecha a tela é o App
+         — que precisa avisar a Home de que houve mudança. */
+      return false
+    })
+
+    return () => sub.remove()
+  }, [porta, estimativa])
 
   function fechar() {
     if (mudou) onMudou()
@@ -137,6 +178,73 @@ export function ContadorCaloriasScreen({
     else if (r.tipo === 'ok') setEstimativa(r.estimativa)
     /* 'cancelado' não é erro: a pessoa desistiu da foto e a tela fica como
        estava, sem aviso nenhum. */
+  }
+
+  /* Abre a porta do repetir e busca as duas listas.
+   *
+   * A busca refaz-se a cada abertura em vez de guardar o que já veio: a pessoa
+   * registra algo, fecha, abre de novo — e o que ela acabou de comer precisa
+   * aparecer entre os frequentes, senão a lista parece desatualizada logo no
+   * momento em que ela está prestando atenção nela. */
+  async function abrirRepetir() {
+    setPorta('repetir')
+    setBuscandoRepetir(true)
+    setFrequentes([])
+    setUltima(null)
+
+    const [rFreq, rUlt] = await Promise.all([
+      carregarFrequentes(contaId, refeicao),
+      carregarUltimaRefeicao(contaId, refeicao),
+    ])
+
+    setBuscandoRepetir(false)
+    /* Falha aqui não vira aviso vermelho: a porta é um atalho, e quem não
+       conseguir carregá-la ainda tem as outras três. Uma lista vazia com o
+       texto de "nada ainda" diz o suficiente. */
+    if (rFreq.tipo === 'ok') setFrequentes(rFreq.itens)
+    if (rUlt.tipo === 'ok') setUltima(rUlt.refeicao)
+  }
+
+  /* Um frequente vira consumo. Os nutrientes vão como estão: já são absolutos
+     da porção, porque saíram de um registro anterior — não passam pela conversão
+     de 100 g que o plano e a busca precisam. */
+  function repetirItem(f: ItemFrequente) {
+    gravar([
+      {
+        refeicao,
+        nome: f.nome,
+        descricao: f.descricao,
+        calorias: f.calorias,
+        proteinas: f.proteinas,
+        carboidratos: f.carboidratos,
+        gorduras: f.gorduras,
+        fibras: f.fibras,
+        origem: 'manual',
+        /* Sem confiança: ela existe para marcar estimativa de foto. Repetir o
+           que já foi registrado herda a exatidão do original, seja qual for. */
+        confianca: null,
+      },
+    ])
+  }
+
+  /* A refeição inteira de outro dia, de uma vez. */
+  function repetirUltima() {
+    if (!ultima) return
+    setPorta(null)
+    gravar(
+      ultima.itens.map(i => ({
+        refeicao,
+        nome: i.nome,
+        descricao: i.descricao,
+        calorias: i.calorias,
+        proteinas: i.proteinas,
+        carboidratos: i.carboidratos,
+        gorduras: i.gorduras,
+        fibras: i.fibras,
+        origem: 'manual' as const,
+        confianca: null,
+      })),
+    )
   }
 
   /* Uma refeição inteira do plano vira consumo de uma vez.
@@ -239,6 +347,14 @@ export function ContadorCaloriasScreen({
               desligada={!plano}
               onPress={() => setPorta('plano')}
             />
+            {/* A quarta porta resolve o caso mais frequente de todos: comer
+                hoje o mesmo que ontem. As outras três descrevem comida nova. */}
+            <Porta
+              icone="repeat-outline"
+              titulo="Repetir"
+              detalhe="O de sempre"
+              onPress={abrirRepetir}
+            />
           </View>
 
           <Text style={styles.dicaPortas}>
@@ -260,7 +376,7 @@ export function ContadorCaloriasScreen({
             <View style={styles.bloco}>
               <Text style={styles.tituloBloco}>Hoje</Text>
               <Text style={styles.vazio}>
-                Nada registrado ainda. Escolha a refeição acima e use uma das três portas.
+                Nada registrado ainda. Escolha a refeição acima e use uma das quatro portas.
               </Text>
             </View>
           ) : (
@@ -317,6 +433,18 @@ export function ContadorCaloriasScreen({
         <EscolherDoPlano
           plano={plano}
           onEscolher={comerDoPlano}
+          onFechar={() => setPorta(null)}
+        />
+      )}
+
+      {porta === 'repetir' && (
+        <Repetir
+          refeicao={refeicao}
+          buscando={buscandoRepetir}
+          ultima={ultima}
+          frequentes={frequentes}
+          onRepetirUltima={repetirUltima}
+          onRepetirItem={repetirItem}
           onFechar={() => setPorta(null)}
         />
       )}
@@ -689,9 +817,143 @@ function EscolherDoPlano({
   )
 }
 
+/* A porta do repetir.
+ *
+ * Duas listas, e a ordem entre elas é a do esforço: primeiro a refeição inteira
+ * de outro dia, que resolve tudo num toque; depois os alimentos avulsos, para
+ * quem come quase o mesmo, mas não exatamente.
+ *
+ * Sem confirmação em nenhuma das duas. O que se grava aqui já foi comido antes
+ * pela própria pessoa, e apagar da lista do dia é um toque — pedir "tem
+ * certeza?" a cada café da manhã seria devolver o atrito que esta tela existe
+ * para tirar. */
+function Repetir({
+  refeicao,
+  buscando,
+  ultima,
+  frequentes,
+  onRepetirUltima,
+  onRepetirItem,
+  onFechar,
+}: {
+  refeicao: string
+  buscando: boolean
+  ultima: UltimaRefeicao | null
+  frequentes: ItemFrequente[]
+  onRepetirUltima: () => void
+  onRepetirItem: (f: ItemFrequente) => void
+  onFechar: () => void
+}) {
+  const { bottom } = useSafeAreaInsets()
+
+  const kcalUltima =
+    ultima?.itens.reduce((s, i) => s + (i.calorias ?? 0), 0) ?? 0
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
+        <View style={styles.puxador} />
+
+        <Text style={styles.tituloFolha}>O que você já come</Text>
+        <Text style={styles.porcaoFolha}>Em {refeicao.toLowerCase()}</Text>
+
+        {buscando ? (
+          <View style={styles.centroRepetir}>
+            <ActivityIndicator color={cores.verde} />
+          </View>
+        ) : (
+          <ScrollView style={styles.listaPlano} bounces={false}>
+            {ultima && (
+              <Pressable
+                onPress={onRepetirUltima}
+                style={({ pressed }) => [styles.refeicaoPlano, pressed && styles.chipPressionado]}
+                accessibilityRole="button"
+                accessibilityLabel={`Repetir ${refeicao} de ${diaRelativo(ultima.data)}`}
+              >
+                <View style={styles.horaPlano}>
+                  <Ionicons name="repeat-outline" size={18} color={cores.verde} />
+                </View>
+                <View style={styles.textoItem}>
+                  <Text style={styles.nomeItem}>Repetir a de {diaRelativo(ultima.data)}</Text>
+                  <Text style={styles.detalheItem}>
+                    {ultima.itens.length} {ultima.itens.length === 1 ? 'item' : 'itens'}
+                    {kcalUltima > 0 && ` · ${milhar(kcalUltima)} kcal`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={inkFraco} />
+              </Pressable>
+            )}
+
+            {frequentes.length > 0 && (
+              <Text style={styles.subtituloRepetir}>Seus mais frequentes</Text>
+            )}
+
+            {frequentes.map(f => (
+              <Pressable
+                key={f.chave}
+                onPress={() => onRepetirItem(f)}
+                style={({ pressed }) => [styles.refeicaoPlano, pressed && styles.chipPressionado]}
+                accessibilityRole="button"
+                accessibilityLabel={`Adicionar ${f.nome}`}
+              >
+                <View style={styles.horaPlano}>
+                  <Text style={styles.textoHoraPlano}>{f.vezes}×</Text>
+                </View>
+                <View style={styles.textoItem}>
+                  <Text style={styles.nomeItem} numberOfLines={1}>
+                    {f.nome}
+                  </Text>
+                  <Text style={styles.detalheItem} numberOfLines={1}>
+                    {f.descricao ? `${f.descricao} · ` : ''}
+                    {f.calorias === null ? 'sem caloria' : `${milhar(f.calorias)} kcal`}
+                  </Text>
+                </View>
+                <Ionicons name="add" size={20} color={cores.verde} />
+              </Pressable>
+            ))}
+
+            {!ultima && frequentes.length === 0 && (
+              <Text style={styles.vazio}>
+                Você ainda não registrou nada em {refeicao.toLowerCase()}. Depois do primeiro
+                registro, o que se repetir aparece aqui para você repetir num toque.
+              </Text>
+            )}
+          </ScrollView>
+        )}
+      </View>
+    </View>
+  )
+}
+
+/* "ontem" pesa mais que "25/08" para quem está olhando o próprio dia. Além de
+   anteontem a data volta a ser mais clara que a contagem — "há 9 dias" obriga a
+   fazer a conta de cabeça. */
+function diaRelativo(iso: string): string {
+  const [ano, mes, dia] = iso.split('-').map(Number)
+  const alvo = new Date(ano, mes - 1, dia)
+  const hoje = new Date()
+  const zerar = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const dias = Math.round((zerar(hoje) - zerar(alvo)) / 86400000)
+
+  if (dias === 1) return 'ontem'
+  if (dias === 2) return 'anteontem'
+  return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
+}
+
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  centroRepetir: { paddingVertical: 40, alignItems: 'center' },
+  subtituloRepetir: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: inkFraco,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginTop: 14,
+    marginBottom: 6,
+  },
 
   cabecalho: {
     flexDirection: 'row',
