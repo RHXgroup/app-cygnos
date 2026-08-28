@@ -150,19 +150,69 @@ function doDiaISO(dia: string): Date {
 /* "Quinta-feira, 6 de Agosto" — o cabeçalho de cada dia na lista. */
 export const diaPorExtenso = (dia: string) => dataPorExtenso(doDiaISO(dia))
 
+/* O relógio da consulta, no fuso em que ela acontece.
+ *
+ * ── O problema ─────────────────────────────────────────────────────────────
+ * As VAGAS chegam com `dia` e `hora` prontos, no fuso da nutricionista, e o app
+ * as mostra como vieram — está certo, e o comentário lá em cima explica por quê:
+ * o paciente em viagem precisa ler o horário da sala de espera, não o do lugar
+ * onde ele está.
+ *
+ * As consultas MARCADAS chegavam só como instante, e `new Date(...)` mais
+ * `getHours()` devolvem o relógio DO APARELHO. Duas réguas na mesma tela: o
+ * paciente em Lisboa escolhia "14:00" e, depois de marcado, lia "18:00".
+ *
+ * ── O que dá para fazer daqui ──────────────────────────────────────────────
+ * O instante vem com o deslocamento escrito ("...T14:00:00-03:00"), e esse
+ * deslocamento É o fuso dela. Lendo os campos literais da string, sem construir
+ * Date nenhum, sai o relógio da sala de espera — que é o que a pessoa quer.
+ *
+ * Quando o banco manda em UTC (`+00:00` ou `Z`), o deslocamento não diz nada
+ * sobre o fuso dela e não há o que deduzir: aí cai no comportamento antigo, o
+ * relógio do aparelho. Não é regressão — é exatamente o que a tela já fazia.
+ *
+ * ── O conserto de verdade ──────────────────────────────────────────────────
+ * É `app_minhas_consultas` devolver `dia` e `hora` prontos, como
+ * `app_horarios_livres` já faz. Aí isto aqui vira duas linhas. Ver
+ * docs/o-que-o-app-precisa-do-sistema.md, item 1.2. */
+
+/* "2026-08-06T14:00:00-03:00" → os campos como estão escritos. Null quando não
+   há deslocamento, ou quando ele é zero — nos dois casos a string não conta
+   nada sobre o fuso da nutricionista. */
+function relogioDaNutri(dataHora: string): { data: Date; hora: string } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?(?:\.\d+)?([+-]\d{2}):?(\d{2})$/.exec(
+    dataHora,
+  )
+  if (!m) return null
+
+  const [, ano, mes, dia, hora, minuto, desloque, deslocMin] = m
+  if (Number(desloque) === 0 && Number(deslocMin) === 0) return null
+
+  /* Date montado campo a campo e lido como local, só para o dia da semana e o
+     nome do mês saírem certos. Ele NÃO representa o instante da consulta — a
+     hora vem da string, não daqui. */
+  return {
+    data: new Date(Number(ano), Number(mes) - 1, Number(dia)),
+    hora: `${hora}:${minuto}`,
+  }
+}
+
 /* "Qui, 6 de Ago. · 14:00" — a linha compacta das consultas que não estão em
    destaque. Curta porque são várias, uma embaixo da outra. */
 export function consultaCompacta(dataHora: string): string {
+  const dela = relogioDaNutri(dataHora)
+  if (dela) return `${dataCurta(dela.data)} · ${dela.hora}`
+
   const d = new Date(dataHora)
   if (isNaN(d.getTime())) return 'Horário a confirmar'
   return `${dataCurta(d)} · ${horaCurta(d)}`
 }
 
-/* "Quinta-feira, 6 de Agosto, às 14:00".
- *
- * Aqui o `new Date` é o certo, ao contrário do de cima: `dataHora` é instante
- * com fuso escrito, e é isso que o construtor lê bem. */
+/* "Quinta-feira, 6 de Agosto, às 14:00". */
 export function consultaLegivel(dataHora: string): string {
+  const dela = relogioDaNutri(dataHora)
+  if (dela) return `${dataPorExtenso(dela.data)}, às ${dela.hora}`
+
   const d = new Date(dataHora)
   if (isNaN(d.getTime())) return 'Horário a confirmar'
   return `${dataPorExtenso(d)}, às ${horaCurta(d)}`
