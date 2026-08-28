@@ -18,9 +18,12 @@ import { supabase } from '../lib/supabase'
 import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
 import {
   desligarLembretes,
+  desligarLembretesDeAgua,
+  lembretesDeAguaLigados,
   lembretesLigados,
   reagendarSeLigados,
   ligarLembretes,
+  ligarLembretesDeAgua,
 } from '../lib/lembretes'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
@@ -53,6 +56,12 @@ export function MaisScreen({
   const [lembretes, setLembretes] = useState(false)
   const [mexendoLembretes, setMexendoLembretes] = useState(false)
   const [avisoLembretes, setAvisoLembretes] = useState('')
+  /* Estado próprio, e não um só para os dois: os interruptores são
+     independentes — o da refeição depende de existir plano, o da água não
+     depende de nada. */
+  const [agua, setAgua] = useState(false)
+  const [mexendoAgua, setMexendoAgua] = useState(false)
+  const [avisoAgua, setAvisoAgua] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
@@ -70,6 +79,7 @@ export function MaisScreen({
     let vivo = true
 
     lembretesLigados().then(l => vivo && setLembretes(l))
+    lembretesDeAguaLigados().then(l => vivo && setAgua(l))
     carregarPlanoAtivo(contaId).then(r => {
       if (!vivo || r.tipo !== 'ok') return
       setPlano(r.plano)
@@ -144,6 +154,35 @@ export function MaisScreen({
      na mão do paciente. Não há evento nenhum avisando o aparelho disso — então
      o puxar-para-atualizar é o caminho, e por isso ele existe numa tela que de
      resto quase não muda. */
+  async function alternarAgua() {
+    setAvisoAgua('')
+    setMexendoAgua(true)
+
+    if (agua) {
+      await desligarLembretesDeAgua()
+      setAgua(false)
+      setMexendoAgua(false)
+      return
+    }
+
+    const r = await ligarLembretesDeAgua()
+    setMexendoAgua(false)
+
+    if (r.tipo === 'negado') {
+      setAvisoAgua(
+        'O Android não autorizou as notificações. Você pode liberar em Configurações → Aplicativos → Cygnos → Notificações.',
+      )
+      return
+    }
+    if (r.tipo === 'erro') {
+      setAvisoAgua(r.mensagem)
+      return
+    }
+
+    setAgua(true)
+    setAvisoAgua(`${r.quantos} avisos por dia, das 9h às 21h.`)
+  }
+
   async function puxarParaAtualizar() {
     setAtualizando(true)
     await buscar()
@@ -174,7 +213,8 @@ export function MaisScreen({
       />
 
       <View style={styles.cartao}>
-        <Text style={styles.tituloCartao}>Lembretes de refeição</Text>
+        <Text style={styles.tituloCartao}>Lembretes</Text>
+        <Text style={styles.rotuloLembrete}>Refeição</Text>
         <Text style={styles.explicacaoLembrete}>
           {plano
             ? `Um aviso no horário de cada refeição do plano "${plano.nome}".`
@@ -205,6 +245,38 @@ export function MaisScreen({
         </Pressable>
 
         {!!avisoLembretes && <Text style={styles.avisoLembrete}>{avisoLembretes}</Text>}
+
+        <View style={styles.divisor} />
+
+        <Text style={styles.rotuloLembrete}>Água</Text>
+        <Text style={styles.explicacaoLembrete}>
+          Um aviso de três em três horas, das 9h às 21h. Não depende de plano.
+        </Text>
+
+        <Pressable
+          onPress={alternarAgua}
+          disabled={mexendoAgua}
+          style={({ pressed }) => [
+            styles.botaoLembrete,
+            agua && styles.botaoLembreteAtivo,
+            mexendoAgua && styles.botaoLembreteDesligado,
+            pressed && styles.botaoSairPressionado,
+          ]}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: agua }}
+          accessibilityLabel="Lembretes de beber água"
+        >
+          <Ionicons
+            name={agua ? 'water' : 'water-outline'}
+            size={17}
+            color={agua ? cores.sobreLimao : cores.verde}
+          />
+          <Text style={[styles.textoBotaoSair, agua && styles.textoBotaoLembreteAtivo]}>
+            {mexendoAgua ? 'Um instante…' : agua ? 'Lembretes ligados' : 'Ligar lembretes'}
+          </Text>
+        </Pressable>
+
+        {!!avisoAgua && <Text style={styles.avisoLembrete}>{avisoAgua}</Text>}
       </View>
 
       <View style={styles.cartao}>
@@ -465,6 +537,18 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
     backgroundColor: cores.superficie,
   },
+  rotuloLembrete: {
+    marginTop: 2,
+    fontSize: 11.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: cores.verde,
+  },
+  /* Separa os dois interruptores sem virar um segundo cartão: são o mesmo
+     assunto, e dois cartões iguais lado a lado dariam a entender que um
+     substitui o outro. */
+  divisor: { height: 1, backgroundColor: cores.borda, marginVertical: 16 },
   botaoLembreteAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
   botaoLembreteDesligado: { opacity: 0.45 },
   textoBotaoLembreteAtivo: { color: cores.sobreLimao },
