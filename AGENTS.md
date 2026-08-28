@@ -35,7 +35,7 @@ useEffect(() => {
 }, [painelAberto, buscaAberta])
 ```
 
-Três regras que vieram de erro real:
+Quatro regras que vieram de erro real:
 
 - **Registre no filho, não no pai.** O React Native chama os tratadores na ordem
   inversa do registro, então o mais interno decide primeiro — é isso que faz o
@@ -46,6 +46,22 @@ Três regras que vieram de erro real:
   deve passar por ela, e não por `onFechar` direto. Um caminho de saída que pula
   o aviso existe só para quem usa o botão do aparelho — e é justamente quem mais
   o usa.
+- **O `App.tsx` tem um voltar central, e ele pode engolir o seu.** A lista
+  `deCimaParaBaixo` fecha as sobreposições, e o efeito dela tem lista de
+  dependências com o estado de cada uma. Como o React roda os efeitos do FILHO
+  antes dos do PAI, abrir uma sobreposição que está naquela lista faz o pai
+  registrar por último — e ganhar. Duas saídas:
+  - Se a tela **não tem degrau interno**, deixe o central cuidar e não escreva
+    tratador nenhum. É o caso da maioria.
+  - Se a tela **tem degrau interno** (índice → seção, lista → editor), escreva o
+    tratador **sem lista de dependências**. Re-registrar a cada renderização é o
+    que o põe na frente do central a partir da primeira re-renderização — que
+    sempre acontece, nem que seja na carga dos dados. Explique isso num
+    comentário, senão o próximo a ler vai achar que um dos dois é código morto e
+    apagar o errado.
+
+  Descoberto em `MeusCadastrosScreen`: quem entrava em "Metas" para conferir uma
+  linha era jogado para fora da tela inteira, porque o central só sabia fechar.
 
 ## 2. O teclado cobre o campo se ninguém cuidar
 
