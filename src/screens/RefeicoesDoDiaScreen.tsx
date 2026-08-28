@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ModoPlanoScreen } from './ModoPlanoScreen'
 import { MontarPlanoScreen } from './MontarPlanoScreen'
+import { SugerirPlanoScreen } from './SugerirPlanoScreen'
+import type { ItemAlimento } from '../lib/plano'
 import { mascaraHora, validarHora } from '../lib/formulario'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
@@ -77,10 +79,20 @@ function mover<T>(lista: T[], de: number, para: number): T[] {
  * mesma coisa, mas não são: quem trabalha à noite pode querer a ceia antes do
  * café, e ordenar pelo relógio desmancharia isso a cada digitação. */
 export function RefeicoesDoDiaScreen({
+  contaId,
   onFechar,
   onSalvo,
+  onDefinirMetas,
 }: {
+  /* Só a sugestão da Aurora usa: ela precisa ler as metas e o cálculo
+     energético para saber o tamanho das porções. O resto do fluxo monta o
+     plano sem consultar nada da conta. */
+  contaId: string
   onFechar: () => void
+  /* Sem meta de calorias a Aurora não tem o que sugerir, e a tela oferece o
+     caminho em vez de virar beco sem saída. Sobe até o App porque a tela de
+     metas precisa cobrir esta. */
+  onDefinirMetas: () => void
   /* Plano gravado: o fluxo inteiro fecha e quem chamou volta para a tela
      inicial, onde o plano agora aparece. */
   onSalvo: () => void
@@ -89,6 +101,15 @@ export function RefeicoesDoDiaScreen({
   const [itens, setItens] = useState<Item[]>(inicial)
   const [erroGeral, setErroGeral] = useState('')
   const [escolhidas, setEscolhidas] = useState<RefeicaoEscolhida[] | null>(null)
+  const [sugerindo, setSugerindo] = useState(false)
+  /* O dia que a Aurora montou, esperando a tela de montar abrir. */
+  const [iniciais, setIniciais] = useState<Record<string, ItemAlimento[]> | undefined>(undefined)
+  /* E o que ela tem a dizer sobre o que montou — o que não achou na base, e o
+     que achou incoerente no pedido. Vai junto porque a tela de montar é onde a
+     pessoa confere, e é ali que o aviso tem serventia. */
+  const [avisoDaAurora, setAvisoDaAurora] = useState<
+    { observacao: string; alerta: string | null; estimados: number } | undefined
+  >(undefined)
   const [montando, setMontando] = useState(false)
 
   /* O arraste roda dentro de callbacks criados uma vez só; sem este espelho
@@ -297,16 +318,54 @@ export function RefeicoesDoDiaScreen({
   if (escolhidas) {
     return (
       <View style={styles.tela}>
-        {montando ? (
+        {sugerindo ? (
+          <SugerirPlanoScreen
+            contaId={contaId}
+            refeicoes={escolhidas}
+            onPronto={plano => {
+              /* Casa a resposta da IA com as refeições escolhidas por POSIÇÃO.
+                 A função pediu para ela devolver uma para cada, na ordem, mas
+                 uma a mais ou a menos não pode derrubar nada: o que sobrar do
+                 lado da IA é ignorado, e o que faltar fica vazio para a pessoa
+                 preencher — que é exatamente o estado de quem veio pela porta
+                 manual. */
+              const porRefeicao: Record<string, ItemAlimento[]> = {}
+              escolhidas.forEach((r, i) => {
+                const daIA = plano.refeicoes[i]
+                if (daIA) porRefeicao[r.id] = daIA.itens
+              })
+              setIniciais(porRefeicao)
+              setAvisoDaAurora({
+                observacao: plano.observacao,
+                alerta: plano.alerta,
+                estimados: plano.estimados,
+              })
+              setSugerindo(false)
+              setMontando(true)
+            }}
+            onVoltar={() => setSugerindo(false)}
+            onDefinirMetas={onDefinirMetas}
+          />
+        ) : montando ? (
           <MontarPlanoScreen
             refeicoes={escolhidas}
-            onVoltar={() => setMontando(false)}
+            iniciais={iniciais}
+            avisoDaAurora={avisoDaAurora}
+            onVoltar={() => {
+              setMontando(false)
+              /* Voltar descarta a sugestão: quem voltou está trocando de
+                 caminho, e reencontrar o plano da IA ao entrar no manual seria
+                 o app decidindo por ele. */
+              setIniciais(undefined)
+              setAvisoDaAurora(undefined)
+            }}
             onSalvo={onSalvo}
           />
         ) : (
           <ModoPlanoScreen
             quantasRefeicoes={escolhidas.length}
             onManual={() => setMontando(true)}
+            onAurora={() => setSugerindo(true)}
             onVoltar={() => setEscolhidas(null)}
           />
         )}

@@ -15,15 +15,37 @@ import type { RefeicaoEscolhida } from './RefeicoesDoDiaScreen'
    junto, porque toda leitura desta tela é "o que tem nesta refeição". */
 export function MontarPlanoScreen({
   refeicoes,
+  iniciais,
+  avisoDaAurora,
   onVoltar,
   onSalvo,
 }: {
   refeicoes: RefeicaoEscolhida[]
+  /* O dia já preenchido, quando se chega aqui pela sugestão da Aurora em vez
+     da tela em branco. A partir daqui é tudo igual: a pessoa tira, troca e
+     ajusta o que quiser, e grava pelo mesmo caminho.
+
+     É por isso que a IA desemboca NESTA tela, e não numa tela própria de
+     "confirmar sugestão": uma segunda tela de conferência teria de repetir a
+     edição inteira que já existe aqui — ou não repetir, e aí a pessoa
+     aprovaria um plano que ela não pôde corrigir. */
+  iniciais?: Record<string, ItemAlimento[]>
+  /* O que a Aurora tem a dizer sobre a sugestão que ela acabou de montar.
+     Ausente quando se chegou aqui pela porta manual. */
+  avisoDaAurora?: {
+    observacao: string
+    /* O que ela achou incoerente no que foi pedido. */
+    alerta: string | null
+    /* Quantos itens não foram achados na nossa base e estão com a estimativa
+       DELA. É o aviso que não pode faltar: número estimado e número conferido
+       não valem o mesmo, e a soma do dia é feita com os dois juntos. */
+    estimados: number
+  }
   onVoltar: () => void
   onSalvo: () => void
 }) {
   const { top, bottom } = useSafeAreaInsets()
-  const [itens, setItens] = useState<Record<string, ItemAlimento[]>>({})
+  const [itens, setItens] = useState<Record<string, ItemAlimento[]>>(iniciais ?? {})
   const [buscandoPara, setBuscandoPara] = useState<RefeicaoEscolhida | null>(null)
   /* A mesma refeição, pela outra porta: escrever tudo de uma vez em vez de
      buscar alimento por alimento. */
@@ -143,6 +165,36 @@ export function MontarPlanoScreen({
         bounces={false}
         overScrollMode="never"
       >
+        {avisoDaAurora && (
+          <View style={styles.blocoAurora}>
+            <View style={styles.linhaTituloAurora}>
+              <Ionicons name="sparkles-outline" size={15} color={cores.verde} />
+              <Text style={styles.tituloAurora}>Sugestão da Aurora</Text>
+            </View>
+
+            {!!avisoDaAurora.observacao && (
+              <Text style={styles.textoAurora}>{avisoDaAurora.observacao}</Text>
+            )}
+
+            <Text style={styles.textoAurora}>
+              Confira item por item antes de salvar. Tire o que você não come e ajuste as
+              quantidades — depois de salvo, o plano é seu.
+            </Text>
+
+            {avisoDaAurora.estimados > 0 && (
+              <Text style={styles.estimadosAurora}>
+                {avisoDaAurora.estimados === 1
+                  ? '1 alimento não está na nossa tabela, e os nutrientes dele são estimativa da Aurora.'
+                  : `${avisoDaAurora.estimados} alimentos não estão na nossa tabela, e os nutrientes deles são estimativa da Aurora.`}
+              </Text>
+            )}
+
+            {!!avisoDaAurora.alerta && (
+              <Text style={styles.alertaAurora}>{avisoDaAurora.alerta}</Text>
+            )}
+          </View>
+        )}
+
         {refeicoes.map(r => {
           const lista = itens[r.id] ?? []
           const t = totaisDe(lista)
@@ -252,6 +304,25 @@ export function MontarPlanoScreen({
 }
 
 const styles = StyleSheet.create({
+  blocoAurora: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: cores.verde,
+    backgroundColor: cores.verdeMenta,
+    gap: 7,
+    marginBottom: 14,
+  },
+  linhaTituloAurora: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  tituloAurora: { fontSize: 14, fontWeight: '800', color: cores.ink },
+  textoAurora: { fontSize: 12.5, lineHeight: 18, color: inkMedio },
+  estimadosAurora: { fontSize: 12.5, lineHeight: 18, color: inkSuave },
+  alertaAurora: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: cores.erroTexto,
+  },
+
   cabecalho: {
     flexDirection: 'row',
     alignItems: 'center',

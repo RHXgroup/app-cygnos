@@ -5,16 +5,19 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
 /* Depois de definir as refeições do dia, como preenchê-las.
  *
- * O caminho da Aurora está desenhado e desligado de propósito: esconder até
- * ficar pronto obrigaria a redesenhar a tela inteira depois, e quem usa não
- * saberia que a opção vai existir. */
+ * O caminho da Aurora ficou desenhado e desligado por meses, com o selo "Em
+ * breve". Agora ele funciona — e continua sendo o segundo cartão, e não o
+ * primeiro: quem já sabe o que vai comer não precisa de sugestão nenhuma, e
+ * empurrar a IA na frente de quem tem certeza é atrapalhar. */
 export function ModoPlanoScreen({
   quantasRefeicoes,
   onManual,
+  onAurora,
   onVoltar,
 }: {
   quantasRefeicoes: number
   onManual: () => void
+  onAurora: () => void
   onVoltar: () => void
 }) {
   const { top } = useSafeAreaInsets()
@@ -65,22 +68,23 @@ export function ModoPlanoScreen({
           <Ionicons name="chevron-forward" size={20} color={inkFraco} />
         </Pressable>
 
-        <View style={[styles.cartao, styles.cartaoDesligado]}>
-          <View style={[styles.icone, styles.iconeDesligado]}>
-            <Ionicons name="sparkles-outline" size={22} color={inkFraco} />
+        <Pressable
+          onPress={onAurora}
+          style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
+          accessibilityRole="button"
+        >
+          <View style={styles.icone}>
+            <Ionicons name="sparkles-outline" size={22} color={cores.verde} />
           </View>
           <View style={styles.textoCartao}>
-            <View style={styles.linhaTitulo}>
-              <Text style={[styles.tituloCartao, styles.tituloDesligado]}>Ajuda da Aurora</Text>
-              <View style={styles.selo}>
-                <Text style={styles.textoSelo}>Em breve</Text>
-              </View>
-            </View>
+            <Text style={styles.tituloCartao}>Ajuda da Aurora</Text>
             <Text style={styles.descricaoCartao}>
-              A Aurora monta uma sugestão a partir da sua rotina, e você ajusta o que quiser.
+              A Aurora monta uma sugestão a partir das suas metas, e você ajusta o que quiser antes
+              de salvar.
             </Text>
           </View>
-        </View>
+          <Ionicons name="chevron-forward" size={20} color={inkFraco} />
+        </Pressable>
       </ScrollView>
     </>
   )

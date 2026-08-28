@@ -44,6 +44,11 @@ export type Pedido = {
   carboidratos: number | null
   gorduras: number | null
   refeicoes: number
+  /* As refeições que a pessoa já definiu, com hora: "Café da manhã (07:30)".
+     Quando vêm, a IA preenche exatamente essas, na ordem, e o app casa a
+     resposta por POSIÇÃO — deixar a IA inventar os nomes obrigaria a casar
+     "Lanche da tarde" com "Lanche 2" por texto, e isso erra. */
+  nomesRefeicoes: string[]
   idade: number | null
   genero: string | null
   pesoKg: number | null
@@ -71,6 +76,7 @@ export async function sugerirPlano(p: Pedido): Promise<ResultadoSugestao> {
         carboidratos: p.carboidratos,
         gorduras: p.gorduras,
         refeicoes: p.refeicoes,
+        nomesRefeicoes: p.nomesRefeicoes,
         idade: p.idade,
         genero: p.genero,
         pesoKg: p.pesoKg,

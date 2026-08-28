@@ -82,7 +82,18 @@ export function RegistrarScreen({
      vez de aparecer embaixo do cabeçalho daqui — dois voltares empilhados na
      mesma tela seria confuso. */
   if (escolhida?.chave === 'plano') {
-    return <RefeicoesDoDiaScreen onFechar={voltarDaOpcao} onSalvo={onPlanoSalvo} />
+    return (
+      <RefeicoesDoDiaScreen
+        contaId={contaId}
+        onFechar={voltarDaOpcao}
+        onSalvo={onPlanoSalvo}
+        /* Troca a opção aberta em vez de empilhar mais uma tela: quem chegou
+           aqui pela sugestão e descobriu que falta a meta vai definir a meta, e
+           voltar dela ao meio do assistente de plano seria devolver a pessoa a
+           um lugar que ela já abandonou. */
+        onDefinirMetas={() => setEscolhida(OPCOES.find(o => o.chave === 'metas') ?? null)}
+      />
+    )
   }
 
   if (escolhida?.chave === 'agua') {
