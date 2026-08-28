@@ -15,6 +15,12 @@ import { AvatarNutri } from '../components/AvatarNutri'
 import { LINKS, abrirLink } from '../lib/links'
 import { carregarCatalogo, type Catalogo } from '../lib/nutricionista'
 import { supabase } from '../lib/supabase'
+import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
+import {
+  desligarLembretes,
+  lembretesLigados,
+  ligarLembretes,
+} from '../lib/lembretes'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
 const MARGEM = 20
@@ -26,11 +32,13 @@ const PADDING_CARTAO = 16
  * propósito: era a única coisa que aquela tela realmente fazia, e perdê-la na
  * troca deixaria a pessoa sem caminho para sair da conta. */
 export function MaisScreen({
+  contaId,
   email,
   onAbrirNutricionistas,
   onAbrirCodigo,
   onAbrirExcluirConta,
 }: {
+  contaId: string
   email: string
   onAbrirNutricionistas: () => void
   onAbrirCodigo: () => void
@@ -38,6 +46,12 @@ export function MaisScreen({
 }) {
   const { top } = useSafeAreaInsets()
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
+  /* Os lembretes saem dos horários do plano, então ele precisa estar em mãos na
+     hora de ligar — não há o que lembrar sem plano. */
+  const [plano, setPlano] = useState<PlanoCompleto | null>(null)
+  const [lembretes, setLembretes] = useState(false)
+  const [mexendoLembretes, setMexendoLembretes] = useState(false)
+  const [avisoLembretes, setAvisoLembretes] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
@@ -53,6 +67,11 @@ export function MaisScreen({
 
   useEffect(() => {
     let vivo = true
+
+    lembretesLigados().then(l => vivo && setLembretes(l))
+    carregarPlanoAtivo(contaId).then(r => {
+      if (vivo && r.tipo === 'ok') setPlano(r.plano)
+    })
     buscar().finally(() => {
       if (vivo) setCarregando(false)
     })
@@ -74,6 +93,44 @@ export function MaisScreen({
     })
     return () => sub.remove()
   }, [buscar])
+
+  /* Ligar e desligar. O estado só muda depois de o sistema responder: mostrar
+     "ligado" antes de a permissão ser concedida seria prometer um aviso que não
+     vai tocar. */
+  async function alternarLembretes() {
+    setAvisoLembretes('')
+    setMexendoLembretes(true)
+
+    if (lembretes) {
+      await desligarLembretes()
+      setLembretes(false)
+      setMexendoLembretes(false)
+      return
+    }
+
+    const r = await ligarLembretes(plano)
+    setMexendoLembretes(false)
+
+    if (r.tipo === 'negado') {
+      setAvisoLembretes(
+        'O Android não autorizou as notificações. Você pode liberar em Configurações → Aplicativos → Cygnos → Notificações.',
+      )
+      return
+    }
+    if (r.tipo === 'erro') {
+      setAvisoLembretes(r.mensagem)
+      return
+    }
+    if (r.quantos === 0) {
+      setAvisoLembretes('Seu plano não tem refeições com horário, então não há o que lembrar.')
+      return
+    }
+
+    setLembretes(true)
+    setAvisoLembretes(
+      `${r.quantos} ${r.quantos === 1 ? 'lembrete agendado' : 'lembretes agendados'}, todo dia.`,
+    )
+  }
 
   /* Quem vincula é a nutricionista, do lado dela, enquanto o app já está aberto
      na mão do paciente. Não há evento nenhum avisando o aparelho disso — então
@@ -107,6 +164,40 @@ export function MaisScreen({
         onAbrir={onAbrirNutricionistas}
         onAbrirCodigo={onAbrirCodigo}
       />
+
+      <View style={styles.cartao}>
+        <Text style={styles.tituloCartao}>Lembretes de refeição</Text>
+        <Text style={styles.explicacaoLembrete}>
+          {plano
+            ? `Um aviso no horário de cada refeição do plano "${plano.nome}".`
+            : 'Os lembretes saem dos horários do seu plano alimentar. Cadastre um plano para ligá-los.'}
+        </Text>
+
+        <Pressable
+          onPress={alternarLembretes}
+          disabled={!plano || mexendoLembretes}
+          style={({ pressed }) => [
+            styles.botaoLembrete,
+            lembretes && styles.botaoLembreteAtivo,
+            (!plano || mexendoLembretes) && styles.botaoLembreteDesligado,
+            pressed && styles.botaoSairPressionado,
+          ]}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: lembretes, disabled: !plano }}
+          accessibilityLabel="Lembretes de refeição"
+        >
+          <Ionicons
+            name={lembretes ? 'notifications' : 'notifications-off-outline'}
+            size={17}
+            color={lembretes ? cores.sobreLimao : cores.verde}
+          />
+          <Text style={[styles.textoBotaoSair, lembretes && styles.textoBotaoLembreteAtivo]}>
+            {mexendoLembretes ? 'Um instante…' : lembretes ? 'Lembretes ligados' : 'Ligar lembretes'}
+          </Text>
+        </Pressable>
+
+        {!!avisoLembretes && <Text style={styles.avisoLembrete}>{avisoLembretes}</Text>}
+      </View>
 
       <View style={styles.cartao}>
         <Text style={styles.tituloCartao}>Conta</Text>
@@ -354,6 +445,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: cores.verde,
   },
+  explicacaoLembrete: { fontSize: 13, color: inkSuave, lineHeight: 19, marginBottom: 12 },
+  botaoLembrete: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
+  botaoLembreteAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
+  botaoLembreteDesligado: { opacity: 0.45 },
+  textoBotaoLembreteAtivo: { color: cores.sobreLimao },
+  avisoLembrete: { fontSize: 12.5, color: inkSuave, lineHeight: 18, marginTop: 10 },
   botaoSairPressionado: { backgroundColor: cores.verdeMenta },
   textoBotaoSair: { fontSize: 15, fontWeight: '600', color: cores.verde },
 

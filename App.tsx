@@ -673,6 +673,7 @@ function TelaDaAba({
     case 'mais':
       return (
         <MaisScreen
+          contaId={sessao.user.id}
           email={sessao.user.email ?? ''}
           onAbrirNutricionistas={onAbrirNutricionistas}
           onAbrirCodigo={onAbrirCodigo}
