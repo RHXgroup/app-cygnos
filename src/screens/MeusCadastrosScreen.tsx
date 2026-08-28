@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { dataNumerica, decimal, milhar } from '../lib/formatar'
 import {
+  apagarPlano,
   ativarPlano,
   carregarPlanos,
   itensDoPlano,
@@ -26,6 +27,7 @@ import {
   carregarCalculos,
   type CalculoSalvo,
 } from '../lib/energia'
+import { Confirmacao } from '../components/Confirmacao'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
 /* O que o paciente cadastrou no app, em dois degraus: primeiro QUAL cadastro
@@ -73,6 +75,9 @@ export function MeusCadastrosScreen({
   const [planos, setPlanos] = useState<PlanoCompleto[]>([])
   const [metas, setMetas] = useState<MetasSalvas[]>([])
   const [calculos, setCalculos] = useState<CalculoSalvo[]>([])
+  /* O plano esperando confirmação. Guarda o plano inteiro, e não o id: a
+     pergunta precisa dizer o nome do que vai sumir. */
+  const [apagando, setApagando] = useState<PlanoCompleto | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
   /* Qual linha está sendo ativada agora. Guardado por id, e não um booleano: é
@@ -141,6 +146,33 @@ export function MeusCadastrosScreen({
 
     setErro('')
     onAtivou()
+  }
+
+  /* Apagar um plano.
+   *
+   * Faltava, e a falta aparecia de um jeito torto: quem quisesse se livrar de
+   * um plano tentava esvaziar as refeições e salvar, e a validação recusava —
+   * plano sem refeição não é plano. Ficava-se com um cadastro impossível de
+   * usar e impossível de remover.
+   *
+   * Otimista como os outros dois desta tela, e com a mesma volta atrás se o
+   * banco recusar. */
+  async function apagarOPlano(p: PlanoCompleto) {
+    setApagando(null)
+    setErro('')
+    setPlanos(atuais => atuais.filter(x => x.id !== p.id))
+
+    const falha = await apagarPlano(p.id)
+
+    if (falha) {
+      setPlanos(atuais => [...atuais, p].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)))
+      setErro(falha.erro)
+      return
+    }
+
+    /* Apagar o que estava valendo deixa a tela inicial mostrando um plano que
+       não existe mais até alguém recarregar. */
+    if (p.ativo) onAtivou()
   }
 
   async function apagarConjunto(m: MetasSalvas) {
@@ -300,6 +332,7 @@ export function MeusCadastrosScreen({
                   ativando={ativando === p.id}
                   onPress={() => onAbrirPlano(p)}
                   onAtivar={() => ativar(p)}
+                  onApagar={() => setApagando(p)}
                 />
               ))
             ))}
@@ -365,6 +398,16 @@ export function MeusCadastrosScreen({
           </Pressable>
         </View>
       )}
+
+      <Confirmacao
+        visivel={apagando !== null}
+        titulo="Apagar este plano?"
+        mensagem={`"${apagando?.nome ?? ''}" e todas as refeições dele serão removidos. Não dá para desfazer.`}
+        rotuloConfirmar="Apagar"
+        destrutiva
+        onCancelar={() => setApagando(null)}
+        onConfirmar={() => apagando && apagarOPlano(apagando)}
+      />
     </View>
   )
 }
@@ -619,11 +662,13 @@ function CartaoPlano({
   ativando,
   onPress,
   onAtivar,
+  onApagar,
 }: {
   plano: PlanoCompleto
   ativando: boolean
   onPress: () => void
   onAtivar: () => void
+  onApagar: () => void
 }) {
   const totais = totaisDe(itensDoPlano(plano.refeicoes))
   const quantasRefeicoes = plano.refeicoes.length
@@ -663,6 +708,16 @@ function CartaoPlano({
         </View>
 
         <Ionicons name="chevron-forward" size={19} color={inkFraco} />
+      </Pressable>
+
+      <Pressable
+        onPress={onApagar}
+        hitSlop={10}
+        style={({ pressed }) => [styles.apagar, pressed && styles.apagarPressionado]}
+        accessibilityRole="button"
+        accessibilityLabel={`Apagar o plano ${plano.nome}`}
+      >
+        <Ionicons name="close" size={17} color={inkFraco} />
       </Pressable>
 
       {plano.ativo ? (

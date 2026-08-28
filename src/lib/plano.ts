@@ -548,6 +548,21 @@ export function paraEdicao(plano: PlanoCompleto): RefeicaoMontada[] {
 export const itensDoPlano = (refeicoes: { itens: Nutrientes[] }[]): Nutrientes[] =>
   refeicoes.flatMap(r => r.itens)
 
+/* Apaga um plano inteiro.
+ *
+ * Faltava, e a falta aparecia de um jeito torto: quem quisesse se livrar de um
+ * plano tentava esvaziar as refeições e salvar — e a validação recusava, porque
+ * plano sem refeição não é plano. A pessoa ficava com um cadastro que não
+ * conseguia usar nem remover.
+ *
+ * Metas e cálculos energéticos já tinham o seu apagar; o plano era o único dos
+ * três sem. As refeições, os itens e as variações vão junto pelo `on delete
+ * cascade` das tabelas filhas — não há o que limpar aqui. */
+export async function apagarPlano(id: string): Promise<{ erro: string } | null> {
+  const { error } = await supabase.from('app_planos').delete().eq('id', id)
+  return error ? { erro: error.message } : null
+}
+
 /* ── Lista de compras ──────────────────────────────────────────────────────
  *
  * O plano diz o que comer; a lista diz o que comprar. São a mesma informação

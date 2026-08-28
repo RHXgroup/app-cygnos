@@ -118,12 +118,22 @@ async function comFotosAssinadas(lista: Nutricionista[]): Promise<Nutricionista[
 
   await Promise.all(
     [...porBucket].map(async ([bucket, caminhos]) => {
-      const { data } = await supabase.storage
-        .from(bucket)
-        .createSignedUrls(caminhos, VALIDADE_SEGUNDOS)
+      /* O try é o que impede uma foto de derrubar o catálogo. Assinar é ida à
+         rede: sem sinal, a promessa REJEITA em vez de devolver `error`, e essa
+         rejeição subiria por `carregarCatalogo` até a tela — que ficaria sem
+         nutricionista nenhuma por causa de uma imagem.
+         Sem assinatura, cada uma fica com o endereço que veio, e o AvatarNutri
+         desenha as iniciais para as que não carregarem. */
+      try {
+        const { data } = await supabase.storage
+          .from(bucket)
+          .createSignedUrls(caminhos, VALIDADE_SEGUNDOS)
 
-      for (const item of data ?? []) {
-        if (item.path && item.signedUrl) assinados.set(`${bucket}/${item.path}`, item.signedUrl)
+        for (const item of data ?? []) {
+          if (item.path && item.signedUrl) assinados.set(`${bucket}/${item.path}`, item.signedUrl)
+        }
+      } catch {
+        /* Silêncio de propósito: a lista continua, só sem foto. */
       }
     }),
   )

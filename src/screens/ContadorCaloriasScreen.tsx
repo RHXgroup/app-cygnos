@@ -1243,9 +1243,16 @@ const styles = StyleSheet.create({
   textoChipAtivo: { color: cores.branco },
 
   /* ── Portas ── */
-  portas: { flexDirection: 'row', gap: 10 },
+  /* Duas por linha, e não quatro lado a lado. Com três cabia; a quarta
+     espremeu todas, e "Do meu plano" — o rótulo mais longo — passou a sair do
+     enquadramento. Numa tela de telefone, quatro colunas dão menos de 80
+     pontos por porta, que não sustenta nem o texto nem o alvo do dedo. */
+  portas: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   porta: {
-    flex: 1,
+    /* Base de 47% para caberem duas por linha com o vão de 10 entre elas, e
+       crescendo para dividir a sobra por igual. */
+    flexBasis: '47%',
+    flexGrow: 1,
     alignItems: 'center',
     gap: 4,
     paddingVertical: 16,
@@ -1256,9 +1263,9 @@ const styles = StyleSheet.create({
   },
   portaPressionada: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
   portaDesligada: { opacity: 0.55 },
-  tituloPorta: { fontSize: 13, fontWeight: '800', color: cores.ink },
+  tituloPorta: { fontSize: 13, fontWeight: '800', color: cores.ink, textAlign: 'center' },
   textoDesligado: { color: inkFraco },
-  detalhePorta: { fontSize: 10.5, color: inkSuave },
+  detalhePorta: { fontSize: 10.5, color: inkSuave, textAlign: 'center' },
   dicaPortas: { marginTop: -6, fontSize: 11, lineHeight: 15, color: inkFraco },
 
   blocoErro: {

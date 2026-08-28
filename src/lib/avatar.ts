@@ -37,14 +37,22 @@ const VALIDADE_SEGUNDOS = 60 * 60
 export async function urlDoAvatar(path: string | null): Promise<string | null> {
   if (!path) return null
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(path, VALIDADE_SEGUNDOS)
+  /* Nunca rejeita, e o try é a metade que importa: assinar é ida à rede, e no
+     elevador sem sinal a promessa REJEITA em vez de devolver `error`. Sem o try,
+     essa rejeição sobe até a tela, que só chamou isto num `.then` — e uma foto
+     de perfil derrubaria o Perfil inteiro por falta de sinal.
+     Devolver null é a resposta certa: a tela já sabe desenhar as iniciais quando
+     não há endereço. */
+  try {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .createSignedUrl(path, VALIDADE_SEGUNDOS)
 
-  /* Devolve null em vez de estourar: a tela já sabe desenhar as iniciais quando
-     não há endereço, e é uma resposta melhor do que um erro para uma foto. */
-  if (error) return null
-  return data.signedUrl
+    if (error) return null
+    return data.signedUrl
+  } catch {
+    return null
+  }
 }
 
 async function pedirPermissao(origem: 'galeria' | 'camera'): Promise<boolean> {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   BackHandler,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CampoTexto } from '../components/CampoTexto'
+import { Confirmacao } from '../components/Confirmacao'
 import { SeletorDias } from '../components/SeletorDias'
 import { TotaisPlano } from '../components/TotaisPlano'
 import { BuscarAlimentoScreen, type MotivoBusca } from './BuscarAlimentoScreen'
@@ -88,6 +88,8 @@ export function EditarPlanoScreen({
   const [acoesDe, setAcoesDe] = useState<{ refeicao: string; item: ItemAlimento } | null>(null)
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
+  /* A pergunta de descartar, agora com a cara do app. */
+  const [perguntandoDescarte, setPerguntandoDescarte] = useState(false)
 
   /* O estado de partida, congelado no primeiro render. Inicializador preguiçoso
      e não useRef(retrato(…)): o argumento do useRef é avaliado a cada render, e
@@ -138,10 +140,7 @@ export function EditarPlanoScreen({
 
     /* Sair com alteração pendente é a única forma de perder trabalho aqui, e
        ela acontece com um toque no canto da tela. Vale a pergunta. */
-    Alert.alert('Descartar alterações?', 'O que você mudou neste plano será perdido.', [
-      { text: 'Continuar editando', style: 'cancel' },
-      { text: 'Descartar', style: 'destructive', onPress: onFechar },
-    ])
+    setPerguntandoDescarte(true)
   }
 
   async function salvar() {
@@ -390,6 +389,21 @@ export function EditarPlanoScreen({
           </View>
         </View>
       )}
+
+      <Confirmacao
+        visivel={perguntandoDescarte}
+        titulo="Descartar alterações?"
+        mensagem="O que você mudou neste plano será perdido."
+        rotuloCancelar="Continuar editando"
+        rotuloConfirmar="Descartar"
+        destrutiva
+        onCancelar={() => setPerguntandoDescarte(false)}
+        onConfirmar={() => {
+          setPerguntandoDescarte(false)
+          onFechar()
+        }}
+      />
+
     </KeyboardAvoidingView>
   )
 }
