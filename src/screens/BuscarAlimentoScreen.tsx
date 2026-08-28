@@ -347,6 +347,21 @@ export function BuscarAlimentoScreen({
                   fecharTeclado()
                   setSelecionado(a)
                   setGramas(GRAMAS_PADRAO)
+
+                  /* Quando a base sabe a medida deste alimento — "colher de
+                     sopa" e quanto uma pesa —, ela vira o ponto de partida: o
+                     modo abre em quantidade, com a medida certa e o peso já
+                     preenchido. É a diferença entre escolher "2 colheres" e
+                     escolher "2 colheres" e depois adivinhar quanto pesa cada
+                     uma, que era o que a tela pedia. */
+                  if (a.medidaCaseira && a.porcaoG) {
+                    setModo('medida')
+                    setMedida(a.medidaCaseira)
+                    setPesoUnidade(String(a.porcaoG))
+                    setQuantidade(QUANTIDADE_PADRAO)
+                  } else {
+                    setModo('gramas')
+                  }
                 }}
                 style={({ pressed }) => [styles.resultado, pressed && styles.resultadoPressionado]}
                 accessibilityRole="button"

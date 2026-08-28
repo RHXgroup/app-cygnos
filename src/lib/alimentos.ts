@@ -51,6 +51,19 @@ export type Alimento = {
   zinco: number | null
   vitaminaC: number | null
   indiceGlicemico: number | null
+
+  /* ── A medida caseira com peso ───────────────────────────────────────────
+   *
+   * "colher de sopa" e quanto UMA delas pesa. É o que dispensa a pessoa de
+   * adivinhar o peso da colher — hoje ela escolhe a medida e o app pergunta o
+   * peso logo em seguida, que ninguém sabe de cabeça.
+   *
+   * Opcionais no tipo, e não `| null`, porque as colunas chegam com a migração
+   * 20260827180000 do repositório do sistema: enquanto ela não for aplicada, o
+   * campo simplesmente não vem, e a tela precisa continuar funcionando como
+   * antes em vez de quebrar. */
+  medidaCaseira?: string | null
+  porcaoG?: number | null
 }
 
 export type ResultadoBusca =
@@ -86,6 +99,10 @@ export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
     zinco_mg: number | null
     vitamina_c_mg: number | null
     indice_glicemico: number | null
+    /* Opcionais: chegam com a migração 20260827180000 do sistema. Antes dela a
+       consulta simplesmente não traz as colunas. */
+    medida_caseira?: string | null
+    porcao_g?: number | null
   }
 
   const alimentos = ((data ?? []) as Linha[]).map(l => ({
@@ -105,6 +122,8 @@ export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
     zinco: numero(l.zinco_mg),
     vitaminaC: numero(l.vitamina_c_mg),
     indiceGlicemico: numero(l.indice_glicemico),
+    medidaCaseira: l.medida_caseira ?? null,
+    porcaoG: numero(l.porcao_g),
   }))
 
   return { tipo: 'ok', alimentos }
