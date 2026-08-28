@@ -172,7 +172,11 @@ export async function carregarConsumo(
     .eq('data', dataISO(dia))
     .order('comido_em', { ascending: true })
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar o que você comeu. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar o que você comeu. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', itens: ((data ?? []) as Linha[]).map(daLinha) }
 }
 
@@ -200,7 +204,11 @@ export async function carregarConsumoPeriodo(
     .lte('data', ate)
     .order('comido_em', { ascending: true })
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar o seu histórico de refeições. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar o seu histórico de refeições. Verifique a conexão.', error),
+    }
 
   const linhas = (data ?? []) as (Linha & { data: string })[]
   return { tipo: 'ok', itens: linhas.map(l => ({ ...daLinha(l), data: l.data })) }
@@ -239,13 +247,20 @@ export async function registrarConsumo(
     )
     .select(COLUNAS)
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui registrar este alimento agora. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui registrar este alimento agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', itens: ((data ?? []) as Linha[]).map(daLinha) }
 }
 
 export async function apagarConsumo(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_consumo_itens').delete().eq('id', id)
-  return error ? { erro: falha('Não consegui remover este alimento agora. Verifique a conexão.', error) } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui remover este alimento agora. Verifique a conexão.', error),
+  }
 }
 
 /* ── Corrigir o que já foi registrado ──────────────────────────────────────
@@ -267,7 +282,10 @@ export async function moverDeRefeicao(
     .update({ refeicao: refeicao.trim() })
     .eq('id', id)
 
-  return error ? { erro: falha('Não consegui mudar este alimento de refeição agora. Verifique a conexão.', error) } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui mudar este alimento de refeição agora. Verifique a conexão.', error),
+  }
 }
 
 /* Multiplica os nutrientes do item. `fator` 0.5 é "comi metade", 2 é "comi o
@@ -296,7 +314,11 @@ export async function ajustarQuantidade(
     .select(COLUNAS)
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui ajustar a quantidade agora. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui ajustar a quantidade agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', item: daLinha(data as Linha) }
 }
 
@@ -381,7 +403,11 @@ export async function carregarFrequentes(
     .order('comido_em', { ascending: false })
     .limit(TETO_HISTORICO)
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar os seus alimentos frequentes. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar os seus alimentos frequentes. Verifique a conexão.', error),
+    }
 
   const porChave = new Map<string, ItemFrequente>()
 
@@ -459,7 +485,11 @@ export async function carregarUltimaRefeicao(
     .order('comido_em', { ascending: true })
     .limit(TETO_HISTORICO)
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar a sua última refeição. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar a sua última refeição. Verifique a conexão.', error),
+    }
 
   const linhas = (data ?? []) as (Linha & { data: string })[]
   if (linhas.length === 0) return { tipo: 'ok', refeicao: null }

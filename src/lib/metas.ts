@@ -130,7 +130,11 @@ export async function carregarMetas(contaId: string): Promise<ResultadoMetas> {
     .limit(1)
     .maybeSingle()
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar as suas metas. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar as suas metas. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', metas: data ? daLinha(data as LinhaMetas) : METAS_VAZIAS }
 }
 
@@ -148,7 +152,11 @@ export async function carregarMetasAtivas(
     .limit(1)
     .maybeSingle()
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar as metas que estão valendo. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar as metas que estão valendo. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', metas: data ? daLinha(data as LinhaMetas) : null }
 }
 
@@ -159,7 +167,11 @@ export async function carregarListaDeMetas(contaId: string): Promise<ResultadoLi
     .eq('conta_id', contaId)
     .order('criado_em', { ascending: false })
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar os seus conjuntos de metas. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar os seus conjuntos de metas. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', lista: ((data ?? []) as LinhaMetas[]).map(daLinha) }
 }
 
@@ -191,7 +203,11 @@ export async function salvarMetas(
       .update({ nome: nome.trim(), ...paraOBanco(metas) })
       .eq('id', id)
 
-    if (error) return { tipo: 'erro', mensagem: falha('Não consegui salvar as suas metas agora. Verifique a conexão.', error) }
+    if (error)
+      return {
+        tipo: 'erro',
+        mensagem: falha('Não consegui salvar as suas metas agora. Verifique a conexão.', error),
+      }
     return { tipo: 'ok', id }
   }
 
@@ -204,7 +220,11 @@ export async function salvarMetas(
     .select('id')
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui salvar as suas metas agora. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui salvar as suas metas agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', id: data.id as string }
 }
 
@@ -212,12 +232,18 @@ export async function salvarMetas(
    coisa só, e acontece no banco — ver a migração 20260801000005. */
 export async function ativarMetas(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.rpc('app_ativar_metas', { p_metas_id: id })
-  return error ? { erro: falha('Não consegui ativar este conjunto de metas agora. Verifique a conexão.', error) } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui ativar este conjunto de metas agora. Verifique a conexão.', error),
+  }
 }
 
 export async function apagarMetas(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_metas').delete().eq('id', id)
-  return error ? { erro: falha('Não consegui remover este conjunto de metas agora. Verifique a conexão.', error) } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui remover este conjunto de metas agora. Verifique a conexão.', error),
+  }
 }
 
 /* Só a meta de água, para a tela de Água poder ajustá-la sem abrir Metas.
@@ -239,7 +265,10 @@ export async function salvarMetaAgua(
     .eq('ativo', true)
     .select('id')
 
-  if (error) return { erro: falha('Não consegui salvar a sua meta de água agora. Verifique a conexão.', error) }
+  if (error)
+    return {
+      erro: falha('Não consegui salvar a sua meta de água agora. Verifique a conexão.', error),
+    }
   /* Alguma linha respondeu: era a ativa, e já está atualizada. */
   if ((data ?? []).length > 0) return null
 
@@ -275,7 +304,11 @@ export async function carregarObjetivoPeso(
     .eq('id', contaId)
     .maybeSingle()
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar o seu foco de peso. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar o seu foco de peso. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', objetivo: (data?.objetivo_peso as ObjetivoPeso) ?? null }
 }
 
@@ -288,7 +321,10 @@ export async function salvarObjetivoPeso(
     .update({ objetivo_peso: objetivo })
     .eq('id', contaId)
 
-  return error ? { erro: falha('Não consegui salvar o seu foco de peso agora. Verifique a conexão.', error) } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui salvar o seu foco de peso agora. Verifique a conexão.', error),
+  }
 }
 
 /* O movimento do peso vai no sentido que a pessoa pediu?

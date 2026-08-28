@@ -169,7 +169,11 @@ export async function carregarNoites(contaId: string, quantas = 30): Promise<Res
     .order('data', { ascending: false })
     .limit(quantas)
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar as suas noites. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar as suas noites. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', noites: ((data ?? []) as Linha[]).map(daLinha) }
 }
 
@@ -204,13 +208,20 @@ export async function salvarNoite(
     .select(COLUNAS)
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: falha('Não consegui salvar esta noite agora. Verifique a conexão.', error) }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui salvar esta noite agora. Verifique a conexão.', error),
+    }
   return { tipo: 'ok', noite: daLinha(data as Linha) }
 }
 
 export async function apagarNoite(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_sono_noites').delete().eq('id', id)
-  return error ? { erro: falha('Não consegui remover esta noite agora. Verifique a conexão.', error) } : null
+  if (!error) return null
+  return {
+    erro: falha('Não consegui remover esta noite agora. Verifique a conexão.', error),
+  }
 }
 
 /* ── Leitura das últimas noites ────────────────────────────────────────────*/
