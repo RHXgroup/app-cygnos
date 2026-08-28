@@ -25,6 +25,7 @@ import { CodigoScreen } from './src/screens/CodigoScreen'
 import { ContadorCaloriasScreen } from './src/screens/ContadorCaloriasScreen'
 import { EmBreveScreen } from './src/screens/EmBreveScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
+import { ListaDeComprasScreen } from './src/screens/ListaDeComprasScreen'
 import { LoginScreen } from './src/screens/LoginScreen'
 import { EditarPlanoScreen } from './src/screens/EditarPlanoScreen'
 import { ExcluirContaScreen } from './src/screens/ExcluirContaScreen'
@@ -208,6 +209,9 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [excluirContaAberta, setExcluirContaAberta] = useState(false)
   const [cadastrosAberto, setCadastrosAberto] = useState(false)
   const [aguaAberta, setAguaAberta] = useState(false)
+  /* Guarda o plano, e nao um booleano: a lista de compras nao existe sem um,
+     e passar o plano junto evita a tela ter de busca-lo de novo. */
+  const [comprasDe, setComprasDe] = useState<PlanoCompleto | null>(null)
   /* null = fechada. Aberta, guarda O QUE editar: um conjunto escolhido na lista,
      'nova' para começar em branco, ou 'ativa' quando veio do menu e a pessoa só
      quer mexer no que está valendo. */
@@ -291,6 +295,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         [contadorAberto, () => setContadorAberto(false)],
         [sonoAberto, () => setSonoAberto(false)],
         [metasAbertas !== null, () => setMetasAbertas(null)],
+        [comprasDe !== null, () => setComprasDe(null)],
         [aguaAberta, () => setAguaAberta(false)],
         [planoEmEdicao !== null, () => setPlanoEmEdicao(null)],
         [cadastrosAberto, () => setCadastrosAberto(false)],
@@ -327,6 +332,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     contadorAberto,
     sonoAberto,
     metasAbertas,
+    comprasDe,
     aguaAberta,
     planoEmEdicao,
     cadastrosAberto,
@@ -378,6 +384,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 onAbrirRefeicao={(refeicao, quando) => setRefeicaoAberta({ refeicao, quando })}
                 onEditarPlano={setPlanoEmEdicao}
                 onAbrirAgua={() => setAguaAberta(true)}
+                onAbrirCompras={setComprasDe}
                 /* Da tela inicial vai-se para o conjunto que está valendo: o
                    convite ali é "defina sua meta", não "crie mais uma". */
                 onAbrirMetas={() => setMetasAbertas('ativa')}
@@ -465,6 +472,12 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 setVersaoPlano(v => v + 1)
               }}
             />
+          </View>
+        )}
+
+        {comprasDe && (
+          <View style={StyleSheet.absoluteFill}>
+            <ListaDeComprasScreen plano={comprasDe} onFechar={() => setComprasDe(null)} />
           </View>
         )}
 
@@ -570,6 +583,7 @@ function TelaDaAba({
   onAbrirRefeicao,
   onEditarPlano,
   onAbrirAgua,
+  onAbrirCompras,
   onAbrirMetas,
   onAbrirPeso,
   onAbrirContador,
@@ -592,6 +606,7 @@ function TelaDaAba({
   onAbrirRefeicao: (refeicao: RefeicaoSalva, quando: string) => void
   onEditarPlano: (plano: PlanoCompleto) => void
   onAbrirAgua: () => void
+  onAbrirCompras: (plano: PlanoCompleto) => void
   onAbrirMetas: () => void
   onAbrirPeso: () => void
   onAbrirContador: () => void
@@ -615,6 +630,7 @@ function TelaDaAba({
           onAbrirRefeicao={onAbrirRefeicao}
           onEditarPlano={onEditarPlano}
           onAbrirAgua={onAbrirAgua}
+          onAbrirCompras={onAbrirCompras}
           onAbrirMetas={onAbrirMetas}
           onAbrirPeso={onAbrirPeso}
           onAbrirContador={onAbrirContador}

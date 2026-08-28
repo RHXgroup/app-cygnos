@@ -100,6 +100,7 @@ export function HomeScreen({
   onAbrirRefeicao,
   onEditarPlano,
   onAbrirAgua,
+  onAbrirCompras,
   onAbrirMetas,
   onAbrirPeso,
   onAbrirContador,
@@ -129,6 +130,8 @@ export function HomeScreen({
   onAbrirRefeicao: (refeicao: RefeicaoSalva, quando: string) => void
   onEditarPlano: (plano: PlanoCompleto) => void
   onAbrirAgua: () => void
+  /* A lista de compras nasce de um plano, entao quem abre entrega o plano. */
+  onAbrirCompras: (plano: PlanoCompleto) => void
   onAbrirMetas: () => void
   onAbrirPeso: () => void
   onAbrirContador: () => void
@@ -418,6 +421,7 @@ export function HomeScreen({
         carregando={carregandoPlano}
         onMontarPlano={onMontarPlano}
         onEditarPlano={onEditarPlano}
+        onAbrirCompras={onAbrirCompras}
       />
 
       {/* ── Água + próxima refeição ── */}
@@ -486,11 +490,13 @@ function BlocoPlano({
   carregando,
   onMontarPlano,
   onEditarPlano,
+  onAbrirCompras,
 }: {
   plano: PlanoCompleto | null
   carregando: boolean
   onMontarPlano: () => void
   onEditarPlano: (plano: PlanoCompleto) => void
+  onAbrirCompras: (plano: PlanoCompleto) => void
 }) {
   if (carregando) {
     return (
@@ -589,6 +595,26 @@ function BlocoPlano({
           {plano.refeicoes.map(r => (
             <RefeicaoDoPlano key={r.id} refeicao={r} />
           ))}
+
+          {/* A lista de compras sai do próprio plano, então o lugar dela é aqui
+              embaixo dele, e não numa aba distante: quem acabou de olhar o que
+              vai comer é quem está a um passo de ir ao mercado.
+           *
+           * O toque é isolado do cartão: no plano do próprio paciente o cartão
+           * inteiro abre a edição, e sem isto ir às compras viraria editar o
+           * plano sem querer. */}
+          <Pressable
+            onPress={e => {
+              e.stopPropagation()
+              onAbrirCompras(plano)
+            }}
+            style={({ pressed }) => [styles.botaoCompras, pressed && styles.botaoComprasPressionado]}
+            accessibilityRole="button"
+            accessibilityLabel="Ver a lista de compras deste plano"
+          >
+            <Ionicons name="cart-outline" size={16} color={cores.verde} />
+            <Text style={styles.textoBotaoCompras}>Lista de compras</Text>
+          </Pressable>
         </>
       )}
     </>
@@ -1510,6 +1536,21 @@ const styles = StyleSheet.create({
   dataPlano: { marginTop: 6, fontSize: 11.5, color: inkFraco },
   observacaoPlano: { marginTop: 6, fontSize: 13, lineHeight: 19, color: inkSuave },
   /* O totalizador vem com cartão próprio: aqui ele só ganha o respiro em volta. */
+  /* Discreto de proposito: e um atalho util, nao o assunto do cartao. */
+  botaoCompras: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 12,
+    paddingVertical: 11,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
+  botaoComprasPressionado: { opacity: 0.7 },
+  textoBotaoCompras: { fontSize: 14, fontWeight: '700', color: cores.verde },
   totaisPlano: { marginTop: 14 },
 
   /* Cada refeição num painel próprio, um degrau mais claro que o cartão. Sem
