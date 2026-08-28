@@ -1,5 +1,6 @@
 import { dataISO } from './formatar'
 import { supabase } from './supabase'
+import { falha } from './erros'
 
 /* Peso: um registro por dia, e o PRIMEIRO deles é a régua.
  *
@@ -42,7 +43,7 @@ export async function carregarPeso(contaId: string): Promise<ResultadoPeso> {
     .eq('conta_id', contaId)
     .order('data', { ascending: false })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar o seu peso. Verifique a conexão.', error) }
 
   return {
     tipo: 'ok',
@@ -82,7 +83,7 @@ export async function registrarPeso(
     .select('id, kg, data')
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error) return { tipo: 'erro', mensagem: falha('Não consegui registrar o seu peso agora. Verifique a conexão.', error) }
   return {
     tipo: 'ok',
     registro: { id: data.id as string, kg: Number(data.kg), data: data.data as string },
@@ -91,7 +92,7 @@ export async function registrarPeso(
 
 export async function apagarRegistroPeso(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_peso_registros').delete().eq('id', id)
-  return error ? { erro: error.message } : null
+  return error ? { erro: falha('Não consegui remover este registro agora. Verifique a conexão.', error) } : null
 }
 
 /* ── Evolução ──────────────────────────────────────────────────────────────*/

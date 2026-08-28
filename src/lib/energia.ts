@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { falha } from './erros'
 
 /* Cálculo energético: quanto o corpo gasta, e qual é o alvo a partir disso.
  *
@@ -273,7 +274,7 @@ export async function carregarCalculos(contaId: string): Promise<ResultadoCalcul
     .eq('conta_id', contaId)
     .order('criado_em', { ascending: false })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar os seus cálculos. Verifique a conexão.', error) }
   return { tipo: 'ok', calculos: (data ?? []).map(daLinha) }
 }
 
@@ -294,7 +295,7 @@ export async function carregarCalculoAtivo(
     .limit(1)
     .maybeSingle()
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error) return { tipo: 'erro', mensagem: falha('Não consegui carregar o cálculo que está valendo. Verifique a conexão.', error) }
   return { tipo: 'ok', calculo: data ? daLinha(data) : null }
 }
 
@@ -328,7 +329,7 @@ export async function salvarCalculo(
     .select('id')
     .single()
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error) return { tipo: 'erro', mensagem: falha('Não consegui salvar o cálculo agora. Verifique a conexão.', error) }
   return { tipo: 'ok', id: data.id as string }
 }
 
@@ -336,12 +337,12 @@ export async function salvarCalculo(
    coisa só, e acontece no banco — ver a migração 20260801000004. */
 export async function ativarCalculo(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.rpc('app_ativar_calculo', { p_calculo_id: id })
-  return error ? { erro: error.message } : null
+  return error ? { erro: falha('Não consegui ativar este cálculo agora. Verifique a conexão.', error) } : null
 }
 
 export async function apagarCalculo(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_calculos_energeticos').delete().eq('id', id)
-  return error ? { erro: error.message } : null
+  return error ? { erro: falha('Não consegui remover este cálculo agora. Verifique a conexão.', error) } : null
 }
 
 /* A altura fica no cadastro para não ser perguntada a cada cálculo. */
@@ -351,7 +352,7 @@ export async function salvarAltura(contaId: string, alturaCm: number): Promise<{
     .update({ altura_cm: Math.round(alturaCm) })
     .eq('id', contaId)
 
-  return error ? { erro: error.message } : null
+  return error ? { erro: falha('Não consegui salvar a sua altura agora. Verifique a conexão.', error) } : null
 }
 
 /* '1990-04-27' → idade em anos completos hoje. Contada na mão porque a

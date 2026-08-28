@@ -33,6 +33,7 @@ import {
   type ItemParaGravar,
   type UltimaRefeicao,
 } from '../lib/consumo'
+import { enviarPendentes, guardarPendentes, quantosPendentes } from '../lib/pendentes'
 import { METAS_VAZIAS, carregarMetas, type Metas } from '../lib/metas'
 import { carregarPlanoAtivo, type PlanoCompleto, type RefeicaoSalva } from '../lib/plano'
 import { porcao } from '../lib/alimentos'
@@ -42,14 +43,14 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
 /* O contador de calorias: o que a pessoa comeu hoje, contra a meta dela.
  *
- * Quatro portas para registrar, e a escolha entre elas é sobre esforço, não sobre
+ * Sete portas para registrar, e a escolha entre elas é sobre esforço, não sobre
  * capricho: fotografar resolve o prato de restaurante que ninguém sabe pesar;
  * a busca resolve o alimento embalado, com número de tabela; e "do meu plano"
  * resolve o caso mais comum de todos — quem montou um plano e comeu o que
  * planejou não deveria ter de descrever isso de novo, alimento por alimento; e
  * "repetir" resolve o dia comum, em que se come o mesmo de ontem.
  *
- * A refeição é escolhida UMA vez, no alto, e vale para as quatro portas. Perguntar
+ * A refeição é escolhida UMA vez, no alto, e vale para todas elas. Perguntar
  * "em qual refeição?" no fim de cada fluxo somaria um toque a cada registro, e
  * são vários por dia. */
 export function ContadorCaloriasScreen({
@@ -72,7 +73,7 @@ export function ContadorCaloriasScreen({
   const [mudou, setMudou] = useState(false)
   const [refeicao, setRefeicao] = useState(() => refeicaoPelaHora())
 
-  /* null = a tela principal. As quatro portas abrem por cima dela. */
+  /* null = a tela principal. As portas abrem por cima dela. */
   const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | 'escrever' | 'codigo' | 'receitas' | null>(null)
   /* O que a pessoa já come nesta refeição. Carregado só quando a porta abre —
      são duas consultas que a maioria das visitas não usa, e pagá-las na abertura
@@ -88,9 +89,25 @@ export function ContadorCaloriasScreen({
   /* A estimativa esperando confirmação. Nada é gravado antes de a pessoa ver o
      número — a IA erra, e um item errado no diário estraga o total do dia. */
   const [estimativa, setEstimativa] = useState<Estimativa | null>(null)
+  /* Quantos registros estão esperando a rede voltar. Zero na maioria das
+     vezes; quando não é, a tela precisa dizer — senão a pessoa acha que o
+     item sumiu. */
+  const [pendentes, setPendentes] = useState(0)
 
   useEffect(() => {
     let ativo = true
+
+    /* Tenta subir o que ficou esperando antes de ler o dia: assim o que subiu
+       agora já aparece na lista, em vez de só na próxima abertura. */
+    enviarPendentes()
+      .then(r => {
+        if (!ativo) return
+        setPendentes(r.restantes)
+        return r.enviados > 0 ? carregarConsumo(contaId) : null
+      })
+      .then(novo => {
+        if (ativo && novo && novo.tipo === 'ok') setItens(novo.itens)
+      })
 
     Promise.all([carregarConsumo(contaId), carregarMetas(contaId), carregarPlanoAtivo(contaId)]).then(
       ([rConsumo, rMetas, rPlano]) => {
@@ -153,7 +170,22 @@ export function ContadorCaloriasScreen({
     const r = await registrarConsumo(contaId, novos)
 
     if (r.tipo === 'erro') {
-      setErro(r.mensagem)
+      /* Falhou: o registro NÃO se perde.
+       *
+       * Registrar comida acontece no restaurante, na rua, no elevador. Antes,
+       * uma gravação sem sinal mostrava o erro e jogava fora o que a pessoa
+       * acabou de descrever — ela olhava para a tela, não via o item, e
+       * descrevia tudo de novo. Ou desistia.
+       *
+       * Agora fica guardado no aparelho e sobe quando a rede voltar. A mensagem
+       * diz isso, em vez de repetir a falha do banco, que não ajuda ninguém. */
+      await guardarPendentes(contaId, novos)
+      setPendentes(await quantosPendentes())
+      setErro(
+        novos.length === 1
+          ? 'Sem conexão agora. O registro está guardado e sobe sozinho quando a internet voltar.'
+          : `Sem conexão agora. Os ${novos.length} itens estão guardados e sobem sozinhos quando a internet voltar.`,
+      )
       return
     }
 
@@ -471,6 +503,30 @@ export function ContadorCaloriasScreen({
             Segure em "Fotografar" para escolher uma foto da galeria em vez de tirar na hora.
           </Text>
 
+          {pendentes > 0 && (
+            <Pressable
+              onPress={async () => {
+                const r = await enviarPendentes()
+                setPendentes(r.restantes)
+                if (r.enviados > 0) {
+                  const novo = await carregarConsumo(contaId)
+                  if (novo.tipo === 'ok') setItens(novo.itens)
+                  setMudou(true)
+                }
+              }}
+              style={({ pressed }) => [styles.blocoPendentes, pressed && styles.chipPressionado]}
+              accessibilityRole="button"
+              accessibilityLabel="Tentar enviar os registros guardados"
+            >
+              <Ionicons name="cloud-upload-outline" size={16} color={cores.gold} />
+              <Text style={styles.textoPendentes}>
+                {pendentes === 1
+                  ? '1 registro guardado esperando internet. Toque para tentar agora.'
+                  : `${pendentes} registros guardados esperando internet. Toque para tentar agora.`}
+              </Text>
+            </Pressable>
+          )}
+
           {!!erro && (
             <View style={styles.blocoErro}>
               <Text style={styles.tituloErro}>Não deu certo</Text>
@@ -486,7 +542,7 @@ export function ContadorCaloriasScreen({
             <View style={styles.bloco}>
               <Text style={styles.tituloBloco}>Hoje</Text>
               <Text style={styles.vazio}>
-                Nada registrado ainda. Escolha a refeição acima e use uma das quatro portas.
+                Nada registrado ainda. Escolha a refeição acima e use uma das portas abaixo.
               </Text>
             </View>
           ) : (
@@ -1181,6 +1237,16 @@ function AcoesDoItem({
 }
 
 const styles = StyleSheet.create({
+  blocoPendentes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: cores.atencaoFundo,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  textoPendentes: { flex: 1, fontSize: 12.5, color: cores.ink, lineHeight: 18 },
   linhaItemPressionada: { opacity: 0.65 },
   subtituloAcoes: {
     fontSize: 12,
