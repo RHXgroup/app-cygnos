@@ -24,6 +24,7 @@ import {
   evolucaoDe,
   kg,
   registrarPeso,
+  ritmoSemanal,
   serieDe,
   variacaoEmKg,
   type Evolucao,
@@ -170,6 +171,8 @@ export function PesoScreen({
   })
 
   const evolucao = registros ? evolucaoDe(registros) : null
+  const ritmo = registros ? ritmoSemanal(registros) : null
+
   const larguraGrafico = larguraTela - MARGEM * 2 - PADDING_CARTAO * 2
 
   return (
@@ -282,6 +285,33 @@ export function PesoScreen({
                 Os últimos {Math.min(registros.length, 30)} registros, do mais antigo para o mais
                 recente.
               </Text>
+
+              {/* O ritmo é o que faz a variação querer dizer alguma coisa:
+                  "perdeu 2,3 kg" é uma frase diferente em três semanas e em oito
+                  meses, e o cartão de cima diz a mesma para as duas.
+
+                  Sem julgamento junto. Se o ritmo é saudável, rápido ou lento é
+                  conversa com a nutricionista — o app mede. */}
+              {ritmo !== null && (
+                <View style={styles.linhaRitmo}>
+                  <Ionicons
+                    name={
+                      Math.abs(ritmo) < 0.05
+                        ? 'remove-outline'
+                        : ritmo > 0
+                          ? 'trending-up-outline'
+                          : 'trending-down-outline'
+                    }
+                    size={15}
+                    color={cores.limao}
+                  />
+                  <Text style={styles.textoRitmo}>
+                    {Math.abs(ritmo) < 0.05
+                      ? 'Estável no período'
+                      : `${variacaoEmKg(ritmo)} kg por semana, em média`}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -553,7 +583,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   linhaTituloBloco: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
+linhaRitmo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: cores.borda,
+  },
+  textoRitmo: { fontSize: 13, fontWeight: '600', color: cores.ink },
+    tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
   contagemBloco: { fontSize: 11.5, fontWeight: '600', color: inkSuave },
   ajuda: { fontSize: 11.5, lineHeight: 16, color: inkFraco },
 

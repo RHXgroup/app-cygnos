@@ -156,6 +156,37 @@ export function evolucaoDe(registros: RegistroPeso[]): Evolucao | null {
   }
 }
 
+/* O período mínimo para falar em ritmo.
+ *
+ * Duas semanas, e não uma. O peso oscila cerca de um quilo entre a manhã e a
+ * noite só por causa de água e comida no corpo — e transformar essa oscilação
+ * em "você está perdendo 1 kg por semana" seria vender ruído como tendência.
+ * Em catorze dias o ruído ainda existe, mas já não manda na conta. */
+export const DIAS_PARA_RITMO = 14
+
+/* Quantos quilos por semana, entre o primeiro e o último registro.
+ *
+ * É o que faltava para a variação querer dizer alguma coisa: "perdeu 2,3 kg"
+ * é uma frase diferente em três semanas e em oito meses, e a tela dizia a mesma
+ * para as duas.
+ *
+ * Sem julgamento junto, de propósito. Se o ritmo é saudável, rápido demais ou
+ * lento demais é conversa com a nutricionista — o app mede, e dizer "está
+ * rápido demais" seria dar um parecer que ele não tem como sustentar. */
+export function ritmoSemanal(registros: RegistroPeso[]): number | null {
+  if (registros.length < 2) return null
+
+  const atual = registros.reduce((a, b) => (a.data >= b.data ? a : b))
+  const primeiro = registros.reduce((a, b) => (a.data <= b.data ? a : b))
+
+  const dias = Math.round(
+    (Date.parse(`${atual.data}T00:00:00`) - Date.parse(`${primeiro.data}T00:00:00`)) / 86400000,
+  )
+  if (!Number.isFinite(dias) || dias < DIAS_PARA_RITMO) return null
+
+  return ((atual.kg - primeiro.kg) / dias) * 7
+}
+
 /* Os pesos em ordem de calendário, para o traço do gráfico. Do mais antigo para
    o mais novo — ao contrário da lista —, porque um gráfico que anda para trás
    no tempo mostraria a evolução ao contrário. */
