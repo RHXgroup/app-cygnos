@@ -73,6 +73,10 @@ export function PerfilScreen({
   const [opcoesAbertas, setOpcoesAbertas] = useState(false)
   const [enviandoFoto, setEnviandoFoto] = useState(false)
   const [erroFoto, setErroFoto] = useState('')
+  /* Qual endereço de foto não carregou — mesmo cuidado do AvatarNutri, e pela
+     mesma razão: ter caminho gravado não é ter imagem que responde. Guardando o
+     endereço, e não um sim/não, uma foto nova entra tentando de novo. */
+  const [fotoFalhou, setFotoFalhou] = useState<string | null>(null)
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
   const [erroObjetivo, setErroObjetivo] = useState('')
 
@@ -199,8 +203,12 @@ export function PerfilScreen({
               accessibilityLabel={urlFoto ? 'Trocar foto de perfil' : 'Adicionar foto de perfil'}
             >
               <View style={styles.avatar}>
-                {urlFoto ? (
-                  <Image source={{ uri: urlFoto }} style={styles.foto} />
+                {urlFoto && urlFoto !== fotoFalhou ? (
+                  <Image
+                    source={{ uri: urlFoto }}
+                    style={styles.foto}
+                    onError={() => setFotoFalhou(urlFoto)}
+                  />
                 ) : (
                   <Text style={styles.textoAvatar}>{iniciais(nome)}</Text>
                 )}
