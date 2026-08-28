@@ -52,8 +52,12 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
   const [cancelando, setCancelando] = useState(false)
   const [atualizando, setAtualizando] = useState(false)
 
-  async function carregar() {
-    setErro(null)
+  /* `limparErro` existe por causa de um caso só, e é o que mais importa nesta
+     tela: quando o pedido é recusado, quem recarrega em seguida é o próprio
+     tratamento da recusa — e limpar o erro ali apagaria a explicação antes de
+     ela ser lida. Ver `pedir`. */
+  async function carregar(limparErro = true) {
+    if (limparErro) setErro(null)
     try {
       /* As duas juntas: em sequência, a tela decidiria o que mostrar antes de
          saber a resposta da segunda, e piscaria a escolha de horário antes de
@@ -122,8 +126,19 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
          também. */
       await carregar()
     } catch (e) {
+      /* A recarga NÃO limpa este erro.
+       *
+       * O banco recusa horário que já saiu da lista e segundo pedido em aberto,
+       * e devolve os dois como frase pronta para ler ("Esse horário não está
+       * mais disponível."). Essa frase é a única coisa que explica ao paciente
+       * por que o toque dele não virou consulta.
+       *
+       * Antes, o `carregar()` logo abaixo começava zerando o erro — então a
+       * mensagem era apagada no mesmo instante em que aparecia. Quem tocasse num
+       * horário já tomado via a linha sumir da lista e mais nada, e a leitura
+       * natural disso é "o app não fez nada". */
       setErro((e as Error).message)
-      await carregar()
+      await carregar(false)
     } finally {
       setEnviando(null)
     }
