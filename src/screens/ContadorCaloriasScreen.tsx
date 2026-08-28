@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
 import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
 import { LerCodigoScreen } from './LerCodigoScreen'
@@ -53,11 +54,6 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
  * A refeição é escolhida UMA vez, no alto, e vale para todas elas. Perguntar
  * "em qual refeição?" no fim de cada fluxo somaria um toque a cada registro, e
  * são vários por dia. */
-/* Quanto tempo o item apagado continua recuperável. Cinco segundos é o que
-   leva para os olhos irem da lista até a barra e voltarem; abaixo disso ela
-   some antes de ser lida, e acima vira um cartaz preso na tela. */
-const SEGUNDOS_PARA_DESFAZER = 5
-
 /* Prefixo do id de um item que está na lista mas ainda não no banco. Prefixo e
    não campo à parte: o id já viaja por toda a tela, e um segundo dado paralelo
    para dizer a mesma coisa acabaria divergindo dele. */
@@ -103,14 +99,6 @@ export function ContadorCaloriasScreen({
      vezes; quando não é, a tela precisa dizer — senão a pessoa acha que o
      item sumiu. */
   const [pendentes, setPendentes] = useState(0)
-  /* O item que acabou de sair da lista e ainda dá para trazer de volta.
-     Ver `apagar`, logo abaixo, para por que ele existe. */
-  const [desfazivel, setDesfazivel] = useState<ItemConsumo | null>(null)
-  /* O apagar de verdade, esperando o prazo do desfazer. Em ref e não em estado
-     porque quem precisa dele é o temporizador e a limpeza de saída, não o
-     desenho da tela — e porque a limpeza precisa enxergar o valor ATUAL, não o
-     da renderização em que ela foi criada. */
-  const emEspera = useRef<{ item: ItemConsumo; prazo: ReturnType<typeof setTimeout> } | null>(null)
 
   useEffect(() => {
     let ativo = true
@@ -254,98 +242,25 @@ export function ContadorCaloriasScreen({
     setAcoesDe(item)
   }
 
-  /* Apaga de verdade o que estava esperando o prazo do desfazer. */
-  async function efetivar() {
-    const espera = emEspera.current
-    if (!espera) return
-
-    clearTimeout(espera.prazo)
-    emEspera.current = null
-    setDesfazivel(null)
-
-    const falha = await apagarConsumo(espera.item.id)
-
-    if (falha) {
-      /* Volta para a lista. Ela é ordenada por relógio, então ele reaparece no
-         lugar de onde saiu, e não no fim. */
-      setItens(atuais =>
-        [...atuais, espera.item].sort((a, b) => a.comidoEm.localeCompare(b.comidoEm)),
-      )
-      setErro(falha.erro)
-      return
-    }
-
-    setMudou(true)
-  }
-
-  /* Tira da lista agora e segura o apagar por alguns segundos.
-   *
-   * Antes era irreversível: um toque e o item sumia do diário para sempre. Isso
-   * numa lista onde o alvo de apagar tinha dezesseis pixels e ficava encostado
-   * na área que abre a correção — errar era questão de tempo, e quem errava não
-   * tinha como saber o que perdeu, porque o item já não estava lá para ler.
-   *
-   * O prazo é o conserto certo, e não uma pergunta de confirmação: apagar uma
-   * linha do diário é gesto de rotina, e perguntar "tem certeza?" toda vez
-   * cobra de todo mundo o preço do engano de alguns. Aqui não se paga nada
-   * quando se acerta, e se recupera tudo quando se erra.
-   *
-   * Segurar o apagar de VERDADE, em vez de apagar e recriar, é o que mantém a
-   * hora do item. `registrarConsumo` só carimba o dia; a hora vem do banco, e
-   * um item recriado voltaria marcado como agora — o café da manhã reapareceria
-   * às duas da tarde. */
-  function apagar(item: ItemConsumo) {
-    setErro('')
-    /* Dois seguidos: o primeiro perde o direito de voltar e vai embora. Guardar
-       uma fila de desfazeres seria prometer o que a barra não mostra. */
-    void efetivar()
-
-    setItens(atuais => atuais.filter(i => i.id !== item.id))
-    /* Marca aqui, e não em `efetivar`: quem apaga e fecha a tela em menos de
-       cinco segundos sai com o apagar ainda pendente, e a efetivação acontece
-       na saída — tarde demais para avisar a tela inicial, que ficaria com o
-       total do dia de antes. O que mudou, do ponto de vista de quem usa, mudou
-       no toque. */
-    setMudou(true)
-    setDesfazivel(item)
-    emEspera.current = {
-      item,
-      prazo: setTimeout(() => {
-        void efetivar()
-      }, SEGUNDOS_PARA_DESFAZER * 1000),
-    }
-  }
-
-  function desfazer() {
-    const espera = emEspera.current
-    if (!espera) return
-
-    clearTimeout(espera.prazo)
-    emEspera.current = null
-    setDesfazivel(null)
-    setItens(atuais =>
-      [...atuais, espera.item].sort((a, b) => a.comidoEm.localeCompare(b.comidoEm)),
-    )
-  }
-
-  /* Sair não cancela o apagar: quem fechou a tela já viu o item sumir, e
-     encontrá-lo de volta na próxima abertura seria o app desfazendo sozinho. */
-  useEffect(
-    () => () => {
-      const espera = emEspera.current
-      if (!espera) return
-      clearTimeout(espera.prazo)
-      emEspera.current = null
-      void apagarConsumo(espera.item.id)
+  /* Apagar com cinco segundos de volta. Ver `components/Desfazer` para por que
+     é prazo e não pergunta de confirmação, e por que segurar o apagar em vez de
+     apagar e recriar. */
+  const { apagar, desfazer, desfazivel } = useApagarComDesfazer<ItemConsumo>({
+    remover: item => setItens(atuais => atuais.filter(i => i.id !== item.id)),
+    /* A lista é ordenada por relógio, então o item volta para o lugar de onde
+       saiu, e não para o fim. */
+    restaurar: item =>
+      setItens(atuais => [...atuais, item].sort((a, b) => a.comidoEm.localeCompare(b.comidoEm))),
+    apagarDeVerdade: item => apagarConsumo(item.id),
+    aoFalhar: setErro,
+    /* Limpa o erro de antes junto: a regra vale aqui como em toda tela que
+       relê — mensagem vencida escondendo conteúdo bom. */
+    aoMudar: () => {
+      setErro('')
+      setMudou(true)
     },
-    [],
-  )
+  })
 
-  /* Muda a refeição de um item já registrado.
-   *
-   * Otimista, como o apagar: a lista se reorganiza na hora e volta atrás se o
-   * banco recusar. A correção é de um toque, e esperar a ida e volta para ver o
-   * item mudar de grupo faria parecer que nada aconteceu. */
   async function mover(item: ItemConsumo, destino: string) {
     setAcoesDe(null)
     if (destino === item.refeicao) return
@@ -774,21 +689,11 @@ export function ContadorCaloriasScreen({
           aparecer mesmo com a folha de correção aberta, já que é de lá que sai
           a maior parte dos apagares. */}
       {desfazivel && (
-        <View style={[styles.barraDesfazer, { bottom: bottom + 16 }]}>
-          <Text style={styles.textoDesfazer} numberOfLines={1}>
-            {desfazivel.nome} saiu do diário
-          </Text>
-          <Pressable
-            onPress={desfazer}
-            hitSlop={10}
-            style={({ pressed }) => [styles.botaoDesfazer, pressed && styles.chipPressionado]}
-            accessibilityRole="button"
-            accessibilityLabel={`Trazer ${desfazivel.nome} de volta`}
-          >
-            <Ionicons name="arrow-undo-outline" size={15} color={cores.sobreLimao} />
-            <Text style={styles.textoBotaoDesfazer}>Desfazer</Text>
-          </Pressable>
-        </View>
+        <BarraDesfazer
+          texto={`${desfazivel.nome} saiu do diário`}
+          onDesfazer={desfazer}
+          bottom={bottom + 16}
+        />
       )}
     </View>
   )
@@ -1378,34 +1283,6 @@ function AcoesDoItem({
 }
 
 const styles = StyleSheet.create({
-  /* Flutua sobre a lista em vez de empurrá-la: o conteúdo não pode pular de
-     lugar por causa de um aviso que dura cinco segundos. */
-  barraDesfazer: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: cores.superficie,
-    borderWidth: 1,
-    borderColor: cores.borda,
-  },
-  textoDesfazer: { flex: 1, fontSize: 13.5, color: cores.ink },
-  botaoDesfazer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: cores.limao,
-  },
-  textoBotaoDesfazer: { fontSize: 13.5, fontWeight: '800', color: cores.sobreLimao },
 
   blocoPendentes: {
     flexDirection: 'row',

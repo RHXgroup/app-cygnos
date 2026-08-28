@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
 import {
   COMO_ACORDOU,
   FATORES,
@@ -185,20 +186,19 @@ export function SonoScreen({
     setNoites(atuais => [r.noite, ...atuais.filter(n => n.data !== r.noite.data)])
   }
 
-  async function apagar(n: Noite) {
-    setErro('')
-    setNoites(atuais => atuais.filter(x => x.id !== n.id))
-
-    const falha = await apagarNoite(n.id)
-
-    if (falha) {
-      setNoites(atuais => [...atuais, n].sort((a, b) => b.data.localeCompare(a.data)))
-      setErro(falha.erro)
-      return
-    }
-
-    setMudou(true)
-  }
+  /* Apagar com cinco segundos de volta. Como no peso, a noite apagada por
+     engano não se recupera de memória: ninguém lembra a que horas dormiu e
+     acordou na quinta da semana passada. */
+  const { apagar, desfazer, desfazivel } = useApagarComDesfazer<Noite>({
+    remover: n => setNoites(atuais => atuais.filter(x => x.id !== n.id)),
+    restaurar: n => setNoites(atuais => [...atuais, n].sort((a, b) => b.data.localeCompare(a.data))),
+    apagarDeVerdade: n => apagarNoite(n.id),
+    aoFalhar: setErro,
+    aoMudar: () => {
+      setErro('')
+      setMudou(true)
+    },
+  })
 
   function fechar() {
     if (mudou) onMudou()
@@ -548,6 +548,14 @@ export function SonoScreen({
             </Pressable>
           </View>
         </>
+      )}
+
+      {desfazivel && (
+        <BarraDesfazer
+          texto={`Noite de ${rotuloDoDia(desfazivel.data)} apagada`}
+          onDesfazer={desfazer}
+          bottom={bottom + 16}
+        />
       )}
     </KeyboardAvoidingView>
   )

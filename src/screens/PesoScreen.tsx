@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
 import { MiniGrafico } from '../components/MiniGrafico'
 import {
   KG_MAX,
@@ -139,25 +140,34 @@ export function PesoScreen({
     setRegistros(atuais => [r.registro, ...(atuais ?? []).filter(x => x.data !== r.registro.data)])
   }
 
-  async function apagar(registro: RegistroPeso) {
-    setErro('')
-    setRegistros(atuais => (atuais ?? []).filter(x => x.id !== registro.id))
-
-    const falha = await apagarRegistroPeso(registro.id)
-
-    if (falha) {
+  /* Apagar com cinco segundos de volta.
+   *
+   * Aqui o prazo importa mais do que no diário de comida: um peso apagado por
+   * engano não se recupera de memória. Ninguém lembra o que a balança marcou na
+   * terça de três semanas atrás, e a linha do gráfico fica com um buraco que
+   * não tem como preencher. */
+  const { apagar, desfazer, desfazivel } = useApagarComDesfazer<RegistroPeso>({
+    remover: registro => {
+      setRegistros(atuais => (atuais ?? []).filter(x => x.id !== registro.id))
+      /* Apagou o de hoje: o campo volta a ficar em branco, senão ele continuaria
+         mostrando um número que já não existe em lugar nenhum. */
+      if (registro.data === hoje) setTexto('')
+    },
+    restaurar: registro => {
       setRegistros(atuais =>
         [...(atuais ?? []), registro].sort((a, b) => b.data.localeCompare(a.data)),
       )
-      setErro(falha.erro)
-      return
-    }
-
-    setMudou(true)
-    /* Apagou o de hoje: o campo volta a ficar em branco, senão ele continuaria
-       mostrando um número que já não existe em lugar nenhum. */
-    if (registro.data === hoje) setTexto('')
-  }
+      /* Voltou o de hoje: o campo volta a mostrá-lo, senão ficaria vazio ao
+         lado de um registro que existe. */
+      if (registro.data === hoje) setTexto(String(registro.kg).replace('.', ','))
+    },
+    apagarDeVerdade: registro => apagarRegistroPeso(registro.id),
+    aoFalhar: setErro,
+    aoMudar: () => {
+      setErro('')
+      setMudou(true)
+    },
+  })
 
   const evolucao = registros ? evolucaoDe(registros) : null
   const larguraGrafico = larguraTela - MARGEM * 2 - PADDING_CARTAO * 2
@@ -277,6 +287,14 @@ export function PesoScreen({
 
           <Historico registros={registros} onApagar={apagar} />
         </ScrollView>
+      )}
+
+      {desfazivel && (
+        <BarraDesfazer
+          texto={`Registro de ${kg(desfazivel.kg)} kg apagado`}
+          onDesfazer={desfazer}
+          bottom={bottom + 16}
+        />
       )}
     </KeyboardAvoidingView>
   )
