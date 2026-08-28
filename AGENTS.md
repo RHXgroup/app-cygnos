@@ -106,13 +106,124 @@ A base não tem todo nutriente de todo alimento. Um `0` no lugar do desconhecido
 soma como se fosse verdade e produz um total errado que ninguém questiona.
 Mantenha `null` e faça a tela dizer "—" ou "sem caloria".
 
-## 7. Antes de dar por pronto
+## 7. Imagem do Storage: URL pública é um endereço que não existe
+
+Os buckets são **privados**. `getPublicUrl` não pergunta nada a ninguém: ele
+concatena uma string e devolve um endereço com cara de válido, que o servidor
+recusa com `Bucket not found`. A foto de perfil de todo mundo ficou meses assim,
+e **sem erro nenhum** — do ponto de vista do app estava tudo certo até a imagem
+simplesmente não aparecer.
+
+```ts
+// errado, e falha em silêncio
+supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+
+// certo
+const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
+```
+
+Duas consequências que vêm junto:
+
+- **Assinar é `async`.** O endereço deixa de ser calculado no meio do render e
+  vira estado, refeito quando o caminho muda. Ver `PerfilScreen`.
+- **Endereço assinado VENCE.** Uma hora, no caso das fotos. Tela que carrega uma
+  vez e fica aberta mostra foto quebrada depois do almoço — ver o item 9.
+
+E **toda `<Image>` remota precisa de `onError`**. Sem ele, a imagem que falha não
+desenha nada e sobra um buraco do tamanho dela, que se lê como app quebrado —
+pior do que nunca ter tido foto. Guarde **qual** endereço falhou, e não um
+booleano, para que um endereço novo entre tentando de novo:
+
+```tsx
+const [falhou, setFalhou] = useState<string | null>(null)
+{url && url !== falhou
+  ? <Image source={{ uri: url }} onError={() => setFalhou(url)} />
+  : <Iniciais />}
+```
+
+## 8. O que muda do lado da nutricionista nunca chega sozinho
+
+Vínculo, consulta aceita, plano publicado: tudo isso acontece **no sistema dela**,
+e nada avisa o aparelho. Não há realtime em lugar nenhum do app.
+
+O caso que custou a rodada: o paciente dita o código, ela vincula ali na frente
+dele, ele volta ao app — e a tela continua dizendo que ele não tem nutricionista.
+Só fechando e abrindo o app resolvia. **E ninguém fecha app.**
+
+Toda tela que mostra dado vindo do sistema precisa de:
+
+```tsx
+useEffect(() => {
+  const sub = AppState.addEventListener('change', e => {
+    if (e === 'active') setVersao(v => v + 1)   // relê
+  })
+  return () => sub.remove()
+}, [])
+```
+
+Mais o `RefreshControl`, **inclusive na ramificação de erro** — é justamente ali
+que puxar para tentar de novo é o gesto óbvio, e mais de uma tela prometia
+"tente de novo" por escrito sem ter o controle que atende ao gesto.
+
+Ao ligar a releitura, **não pisque**: o indicador de carregando só vale para a
+primeira carga. Trocar o conteúdo por um spinner a cada volta do segundo plano
+paga um susto por uma leitura que quase sempre não muda nada.
+
+## 9. Erro que não se limpa no sucesso
+
+Enquanto a tela carregava uma vez só, escrever o erro e nunca apagá-lo era
+inofensivo. Assim que ela passa a reler sozinha, vira defeito: a leitura seguinte
+dá certo e o conteúdo fica escondido atrás de uma mensagem vencida.
+
+```ts
+if (r.tipo === 'erro') setErro(r.mensagem)
+else { setErro(null); setDados(r.dados) }   // o else limpa
+```
+
+O contrário também morde: em `AgendarConsultaScreen`, o tratamento da recusa
+recarregava a tela, e a recarga começava zerando o erro — a explicação do banco
+("Esse horário não está mais disponível") era apagada no mesmo instante em que
+aparecia. Quem recarrega depois de falhar precisa dizer para **não** limpar.
+
+## 10. Valor que vem do banco não indexa um `Record` direto
+
+`ESTADO_DA_CONSULTA[status]` devolve `undefined` para qualquer palavra fora das
+três conhecidas, e a linha seguinte lê `.titulo` dele — a tela inteira morre por
+causa de um valor novo numa coluna. E esse dia tem hora marcada: no momento em
+que a nutricionista puder recusar do lado dela, a recusa chega aqui como um
+status que o app nunca viu.
+
+Sempre uma função com genérico de reserva, nunca o índice cru:
+
+```ts
+export const estadoDaConsulta = (s: string): Estado =>
+  ESTADO_DA_CONSULTA[s as StatusConsulta] ?? DESCONHECIDO
+```
+
+E o texto do genérico deve **admitir que o app não sabe**, nunca chutar
+significado. Inventar "confirmada" para um estado desconhecido faz alguém
+aparecer no consultório num dia em que não era esperado.
+
+## 11. Função de apoio de UI não pode rejeitar
+
+Ida à rede **rejeita** quando não há sinal, em vez de devolver `{ error }`. Uma
+rejeição não tratada sobe até quem só chamou a função dentro de um `.then` — e aí
+uma foto derruba a tela inteira: sem sinal, o catálogo ficava sem nutricionista
+nenhuma por causa de uma imagem.
+
+Função que existe para alimentar a tela devolve `null` e engole a falha. Quem
+decide o que fazer com a ausência é a tela, que já sabe desenhar as iniciais.
+
+## 12. Antes de dar por pronto
 
 - `npx tsc --noEmit` — a suíte de testes deste projeto é esta.
 - Se mexeu em campo numérico, teste a conversão com valores reais (`10.000`,
   `7,5`, vazio).
 - Se criou tela com camadas, teste o voltar em cada uma.
 - Se criou campo, abra o teclado e veja se o campo continua visível.
+- Se a tela mostra imagem remota, veja o que aparece quando ela **não** carrega.
+- Se a tela mostra dado do sistema, mande o app para o segundo plano, mude o
+  dado do outro lado, e volte.
 
 ## Como rodar
 
