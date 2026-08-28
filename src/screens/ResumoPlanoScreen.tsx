@@ -94,7 +94,7 @@ export function ResumoPlanoScreen({
       style={styles.tela}
       /* No Android o sistema já encolhe a janela; no iOS não, e sem isto o
          teclado do nome cobre o botão de salvar. */
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.cabecalho, { paddingTop: top + 8 }]}>
         <Pressable

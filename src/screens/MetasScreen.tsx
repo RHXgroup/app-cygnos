@@ -253,7 +253,7 @@ export function MetasScreen({
   return (
     <KeyboardAvoidingView
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable

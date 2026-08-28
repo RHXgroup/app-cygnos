@@ -187,7 +187,7 @@ export function EditarPlanoScreen({
   return (
     <KeyboardAvoidingView
       style={styles.tela}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.cabecalho, { paddingTop: top + 8 }]}>
         <Pressable

@@ -175,10 +175,17 @@ export function AguaScreen({
   return (
     /* Na raiz, como nas outras telas com campo: sem isto o teclado numérico
        sobe por cima do bloco da meta, que é o último da rolagem, e a pessoa
-       digita às cegas. */
+       digita às cegas.
+     *
+     * 'height' no Android, e não `undefined`. Sem comportamento definido este
+     * componente não faz nada — e o que antes cobria a lacuna era o sistema
+     * encolher a janela sozinho, que deixou de acontecer quando o Expo passou a
+     * ligar edge-to-edge por padrão. A documentação do SDK avisa disso e aponta
+     * o KeyboardAvoidingView como o caminho; sem os dois, o campo ficava
+     * escondido atrás do teclado. */
     <KeyboardAvoidingView
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable

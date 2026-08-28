@@ -247,7 +247,7 @@ export function BuscarAlimentoScreen({
           teclado — quem o levanta é a altura medida acima. */}
       <KeyboardAvoidingView
         style={styles.corpo}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.cabecalho}>
           <Pressable

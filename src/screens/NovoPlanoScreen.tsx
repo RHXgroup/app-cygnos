@@ -71,7 +71,7 @@ export function NovoPlanoScreen({
       style={[styles.tela, { paddingTop: top + 8 }]}
       /* No Android o próprio sistema já encolhe a janela; no iOS não, e sem
          isto o teclado cobre o botão de salvar. */
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
