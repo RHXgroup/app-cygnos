@@ -122,21 +122,36 @@ const NENHUM: CamposPrescritos = new Set<CampoMeta>()
  * permissão de comer seis vezes o que foi prescrito. Dividir por sete aqui
  * também não serve: seria o app decidindo uma distribuição que ela não
  * escreveu. Devolve as pessoais e deixa a tela explicar. */
+/* Quais campos ela definiu, sem precisar das metas pessoais para saber.
+ *
+ * A tela de metas usa isto para marcar campo por campo. Marcar importa: sem a
+ * marca, a pessoa edita um número, salva, e vê a tela inicial continuar
+ * mostrando outro — porque aquele campo está sendo prescrito e o dela ficou
+ * por baixo. Sem explicação, isso se lê como app quebrado. */
+export function camposPrescritos(p: MetasPrescritas | null): CamposPrescritos {
+  if (!p || p.tipo !== 'otimizado' || (p.periodo !== null && p.periodo !== 'dia')) return NENHUM
+
+  const campos = new Set<CampoMeta>()
+  if (p.calorias !== null) campos.add('calorias')
+  if (p.proteinas !== null) campos.add('proteinas')
+  if (p.carboidratos !== null) campos.add('carboidratos')
+  if (p.fibras !== null) campos.add('fibras')
+  if (p.aguaMl !== null) campos.add('aguaMl')
+  if (p.passos !== null) campos.add('passos')
+  if (p.sonoHoras !== null) campos.add('sonoHoras')
+  return campos
+}
+
 export function aplicarPrescricao(
   pessoais: Metas,
   p: MetasPrescritas | null,
 ): { metas: Metas; prescritos: CamposPrescritos } {
-  if (!p || p.tipo !== 'otimizado' || (p.periodo !== null && p.periodo !== 'dia')) {
-    return { metas: pessoais, prescritos: NENHUM }
-  }
+  const prescritos = camposPrescritos(p)
+  if (!p || prescritos.size === 0) return { metas: pessoais, prescritos: NENHUM }
 
   const metas = { ...pessoais }
-  const prescritos = new Set<CampoMeta>()
-
   const por = <C extends CampoMeta>(campo: C, valor: number | null) => {
-    if (valor === null) return
-    metas[campo] = valor as Metas[C]
-    prescritos.add(campo)
+    if (prescritos.has(campo) && valor !== null) metas[campo] = valor as Metas[C]
   }
 
   por('calorias', p.calorias)

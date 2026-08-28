@@ -22,6 +22,12 @@ import {
   type Metas,
   type MetasSalvas,
 } from '../lib/metas'
+import {
+  camposPrescritos,
+  carregarMetasPrescritas,
+  type CamposPrescritos,
+  type MetasPrescritas,
+} from '../lib/metasPrescritas'
 import { milhar } from '../lib/formatar'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 
@@ -160,6 +166,25 @@ export function MetasScreen({
   const [carregando, setCarregando] = useState(alvo === 'ativa' || alvo === 'nova')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
+  /* O que a nutricionista prescreveu, se houver. Não muda nada do que se grava
+     aqui — o que se edita nesta tela continua sendo do paciente. Serve para a
+     tela DIZER quais campos estão cobertos por ela, porque senão a pessoa edita
+     um número, salva, e vê a tela inicial mostrando outro. */
+  const [prescricao, setPrescricao] = useState<MetasPrescritas | null>(null)
+  const prescritos = camposPrescritos(prescricao)
+
+  /* Independente da carga das metas, e sem segurar a tela: quem não tem
+     nutricionista — a maior parte de quem usa — não pode esperar por uma
+     consulta que vai voltar vazia. `carregarMetasPrescritas` nunca rejeita. */
+  useEffect(() => {
+    let ativo = true
+    carregarMetasPrescritas().then(p => {
+      if (ativo) setPrescricao(p)
+    })
+    return () => {
+      ativo = false
+    }
+  }, [contaId])
 
   useEffect(() => {
     if (alvo !== 'ativa' && alvo !== 'nova') return
@@ -288,6 +313,38 @@ export function MetasScreen({
               nenhum do app.
             </Text>
 
+            {/* O app tem duas frentes, e é aqui que elas se encontram. Quem não
+                tem nutricionista não vê nada disto e a tela é a de sempre.
+
+                Quem tem precisa entender uma coisa que, sem este aviso, se lê
+                como defeito: o que ela prescreveu vence, então editar um campo
+                marcado não muda o que a tela inicial mostra. O aviso diz isso
+                antes de a pessoa digitar, e não depois de salvar. */}
+            {prescricao && (
+              <View style={styles.blocoDela}>
+                <View style={styles.linhaTituloDela}>
+                  <Ionicons name="ribbon-outline" size={15} color={cores.verde} />
+                  <Text style={styles.tituloDela} numberOfLines={2}>
+                    {prescricao.nome}
+                  </Text>
+                </View>
+
+                <Text style={styles.textoDela}>
+                  {prescritos.size > 0
+                    ? 'Sua nutricionista prescreveu este plano, e os campos marcados abaixo seguem o que ela definiu. As suas metas continuam guardadas aqui, e valem para tudo que ela não definiu.'
+                    : prescricao.tipo === 'detalhado'
+                      ? 'Sua nutricionista montou este plano em tarefas por dia, e não em números — então ele não muda as metas daqui. Veja com ela como acompanhar.'
+                      : `Sua nutricionista montou este plano por ${prescricao.periodo === 'mensal' ? 'mês' : 'semana'}, e as metas daqui são por dia. O app não tem como repartir os números dela sem inventar uma divisão que ela não escreveu — então continua valendo o que está abaixo.`}
+                </Text>
+
+                {!!prescricao.objetivo && (
+                  <Text style={styles.objetivoDela} numberOfLines={3}>
+                    {prescricao.objetivo}
+                  </Text>
+                )}
+              </View>
+            )}
+
             {!!erro && (
               <View style={styles.blocoErro}>
                 <Text style={styles.tituloErro}>Não foi possível salvar</Text>
@@ -318,6 +375,7 @@ export function MetasScreen({
             <Secao titulo="Alimentação" icone="restaurant-outline">
               {ALIMENTACAO.map(c => (
                 <LinhaCampo
+                  prescritos={prescritos}
                   key={c.chave}
                   campo={c}
                   valor={textos[c.chave]}
@@ -344,6 +402,7 @@ export function MetasScreen({
 
             <Secao titulo="Água" icone="water-outline">
               <LinhaCampo
+                prescritos={prescritos}
                 campo={{
                   chave: 'aguaMl',
                   rotulo: 'Água',
@@ -358,6 +417,7 @@ export function MetasScreen({
                 onChange={escrever('aguaMl')}
               />
               <LinhaCampo
+                prescritos={prescritos}
                 campo={{
                   chave: 'copoMl',
                   rotulo: 'Seu copo',
@@ -383,6 +443,7 @@ export function MetasScreen({
             <Secao titulo="Movimento" icone="walk-outline">
               {MOVIMENTO.map(c => (
                 <LinhaCampo
+                  prescritos={prescritos}
                   key={c.chave}
                   campo={c}
                   valor={textos[c.chave]}
@@ -399,6 +460,7 @@ export function MetasScreen({
             <Secao titulo="Descanso" icone="moon-outline">
               {DESCANSO.map(c => (
                 <LinhaCampo
+                  prescritos={prescritos}
                   key={c.chave}
                   campo={c}
                   valor={textos[c.chave]}
@@ -474,14 +536,19 @@ function LinhaCampo({
   campo,
   valor,
   invalido,
+  prescritos,
   onChange,
 }: {
   campo: Campo
   valor: string
   invalido: boolean
+  /* Os campos que a nutricionista está cobrindo. Vazio para quem não tem uma —
+     e aí a linha se desenha exatamente como antes. */
+  prescritos: CamposPrescritos
   onChange: (t: string) => void
 }) {
   const { min, max } = LIMITES[campo.chave]
+  const dela = prescritos.has(campo.chave)
 
   return (
     <View style={styles.linha}>
@@ -491,8 +558,16 @@ function LinhaCampo({
 
       <View style={styles.textoLinha}>
         <Text style={styles.rotuloLinha}>{campo.rotulo}</Text>
-        <Text style={styles.periodoLinha}>
-          {invalido ? `de ${milhar(min)} a ${milhar(max)} ${campo.unidade}` : campo.periodo}
+        {/* Três coisas disputam esta linha e a ordem é essa: o erro primeiro,
+            porque impede de salvar; a prescrição depois, porque explica por que
+            o número digitado aqui não vai aparecer; e o período por último, que
+            é o texto de sempre. */}
+        <Text style={[styles.periodoLinha, dela && !invalido && styles.periodoDela]}>
+          {invalido
+            ? `de ${milhar(min)} a ${milhar(max)} ${campo.unidade}`
+            : dela
+              ? 'sua nutricionista definiu este'
+              : campo.periodo}
         </Text>
       </View>
 
@@ -587,6 +662,20 @@ const styles = StyleSheet.create({
      aceito: são a mesma informação — "o que cabe aqui" — e duas linhas de apoio
      por campo em onze campos viraria uma parede de texto miúdo. */
   periodoLinha: { marginTop: 1, fontSize: 11.5, color: inkSuave },
+  periodoDela: { color: cores.verde, fontWeight: '700' },
+
+  blocoDela: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: cores.verde,
+    backgroundColor: cores.verdeMenta,
+    gap: 7,
+  },
+  linhaTituloDela: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  tituloDela: { flex: 1, fontSize: 14, fontWeight: '800', color: cores.ink },
+  textoDela: { fontSize: 12.5, lineHeight: 18, color: inkMedio },
+  objetivoDela: { fontSize: 12.5, lineHeight: 18, color: inkSuave, fontStyle: 'italic' },
 
   blocoCampo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   campo: {
