@@ -74,6 +74,7 @@ import {
   tempoDormindo,
   type Noite,
 } from '../lib/sono'
+import { carregarSessoes, sequencia, sessoesNaSemana, type Sessao } from '../lib/treino'
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
 import { cores, coresMacro, degrades, inkFraco, inkMedio, inkSuave } from '../theme'
 
@@ -94,6 +95,7 @@ export function HomeScreen({
   versaoPeso,
   versaoConsumo,
   versaoSono,
+  versaoTreino,
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirCadastros,
@@ -107,6 +109,7 @@ export function HomeScreen({
   onAbrirPeso,
   onAbrirContador,
   onAbrirSono,
+  onAbrirTreino,
 }: {
   sessao: Session
   /* Muda toda vez que um plano é salvo. Serve só para disparar a busca de novo:
@@ -123,6 +126,7 @@ export function HomeScreen({
   versaoPeso: number
   versaoConsumo: number
   versaoSono: number
+  versaoTreino: number
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirCadastros: () => void
@@ -140,6 +144,7 @@ export function HomeScreen({
   onAbrirPeso: () => void
   onAbrirContador: () => void
   onAbrirSono: () => void
+  onAbrirTreino: () => void
 }) {
   const { top } = useSafeAreaInsets()
   const { width: larguraTela } = useWindowDimensions()
@@ -166,6 +171,7 @@ export function HomeScreen({
      cartões de acompanhamento contínuo e não do prato de uma data. */
   const [diaSelecionado, setDiaSelecionado] = useState(() => new Date())
   const [noites, setNoites] = useState<Noite[]>([])
+  const [sessoes, setSessoes] = useState<Sessao[]>([])
   const [detalheDoDia, setDetalheDoDia] = useState(false)
 
   useEffect(() => {
@@ -339,6 +345,22 @@ export function HomeScreen({
     }
   }, [sessao.user.id, versaoSono])
 
+  /* Trinta sessões, e não sete: a sequência conta dias seguidos para trás e
+     pararia sozinha no sétimo, transformando qualquer constância mais longa
+     num teto de "7 dias". A consulta é pequena — trinta linhas de quatro
+     colunas. */
+  useEffect(() => {
+    let ativo = true
+
+    carregarSessoes(sessao.user.id, 30).then(r => {
+      if (ativo && r.tipo === 'ok') setSessoes(r.sessoes)
+    })
+
+    return () => {
+      ativo = false
+    }
+  }, [sessao.user.id, versaoTreino])
+
   /* Um copo, do próprio cartão. Otimista pelo mesmo motivo da tela de Água: o
      gesto é tocar e guardar o telefone, e um número que só sobe depois da ida e
      volta faz a pessoa tocar de novo — e aí são dois copos. */
@@ -501,6 +523,14 @@ export function HomeScreen({
         largura={larguraGrafico}
         onAbrir={onAbrirSono}
       />
+
+      {/* ── Treino ──
+          Por último porque é o único assunto daqui que não é de nutrição.
+          Está na tela mesmo assim: era a única rotina do app sem presença
+          nenhuma no Início — água, peso, sono, plano e calorias todos têm
+          cartão, e treino só existia atrás do "+". Rotina que não aparece é
+          rotina que se esquece. */}
+      <CartaoTreino sessoes={sessoes} onAbrir={onAbrirTreino} />
     </ScrollView>
 
     {detalheDoDia && <FolhaDoDia doDia={doDia} onFechar={() => setDetalheDoDia(false)} />}
@@ -1118,6 +1148,87 @@ function LinhaPilar({ pilar }: { pilar: Pilar }) {
         <Text style={styles.detalhePilar}>{pilar.detalhe}</Text>
       </View>
     </View>
+  )
+}
+
+/* Treino: constância e sequência, e nada de carga.
+ *
+ * O que este cartão responde é "eu venho treinando?", que é a pergunta que a
+ * nutricionista faz e a única que muda alguma conta dela. Quanto a pessoa
+ * levantou no supino não entra em conta nenhuma — isso vive na rotina, dentro
+ * da tela de treino, onde serve de lembrete para quem treina.
+ *
+ * Dois números, e o segundo é o que faz voltar: a semana diz como está indo, e
+ * a sequência diz o que se perde parando hoje. Ela conta ontem de propósito
+ * (ver `sequencia`, em lib/treino) — cortar no relógio faria o número sumir
+ * toda manhã e reaparecer toda noite.
+ *
+ * Sem sequência nenhuma o cartão não mostra um zero. "0 dias seguidos" é
+ * verdade, mas é uma verdade que só desanima quem acabou de voltar. */
+function CartaoTreino({ sessoes, onAbrir }: { sessoes: Sessao[]; onAbrir: () => void }) {
+  const cabecalho = (
+    <View style={styles.linhaTituloProgresso}>
+      <Ionicons name="barbell-outline" size={16} color={cores.verde} />
+      <Text style={[styles.tituloCartao, styles.tituloPlano]}>Seu treino</Text>
+      <Ionicons name="chevron-forward" size={17} color={inkFraco} />
+    </View>
+  )
+
+  if (sessoes.length === 0) {
+    return (
+      <Pressable
+        onPress={onAbrir}
+        style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
+        accessibilityRole="button"
+        accessibilityLabel="Registrar um treino"
+      >
+        {cabecalho}
+        <Text style={styles.chamadaVazio}>Você treinou hoje?</Text>
+        <Text style={styles.planoVazio}>
+          Monte a sua rotina da semana e registre o que fez. O app passa a mostrar aqui a sua
+          constância — e a sua nutricionista enxerga o mesmo.
+        </Text>
+
+        <View style={styles.botaoPlano}>
+          <Ionicons name="add" size={18} color={cores.branco} />
+          <Text style={styles.textoBotaoPlano}>Registrar o treino</Text>
+        </View>
+      </Pressable>
+    )
+  }
+
+  const naSemana = sessoesNaSemana(sessoes)
+  const seguidos = sequencia(sessoes)
+
+  return (
+    <Pressable
+      onPress={onAbrir}
+      style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={`${naSemana} ${naSemana === 1 ? 'treino' : 'treinos'} nos últimos sete dias. Abrir.`}
+    >
+      {cabecalho}
+
+      <View style={styles.linhaProgresso}>
+        <View style={styles.colunaPeso}>
+          <Text style={styles.rotuloPeso}>Nesta semana</Text>
+          <View style={styles.linhaValorGrande}>
+            <Text style={styles.valorPeso}>{naSemana}</Text>
+            <Text style={styles.unidadePeso}>{naSemana === 1 ? 'treino' : 'treinos'}</Text>
+          </View>
+        </View>
+
+        {seguidos > 1 && (
+          <View style={styles.colunaPeso}>
+            <Text style={styles.rotuloPeso}>Sequência</Text>
+            <View style={styles.linhaValorGrande}>
+              <Text style={styles.valorPeso}>{seguidos}</Text>
+              <Text style={styles.unidadePeso}>dias</Text>
+            </View>
+          </View>
+        )}
+      </View>
+    </Pressable>
   )
 }
 

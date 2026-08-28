@@ -248,7 +248,11 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   /* null = fechada. Aberta, guarda em que opção ela deve nascer: 'plano' quando
      veio do botão da Home, 'energetico' quando veio de Meus cadastros, undefined
      quando veio do + e a grade é o começo. */
-  const [registrar, setRegistrar] = useState<{ inicial?: 'plano' | 'energetico' } | null>(null)
+  /* Quais opções do "+" alguém abre direto, sem passar pela lista. Vem de fora
+     — do cartão de plano, de "Meus cadastros" e do cartão de treino. */
+  const [registrar, setRegistrar] = useState<{
+    inicial?: 'plano' | 'energetico' | 'treino'
+  } | null>(null)
   /* A refeição aberta a partir do cartão "Próxima refeição". Carrega junto o
      "Hoje"/"Amanhã" de onde ela foi aberta: quem calculou isso foi a Home, e
      recalcular aqui poderia dar outra resposta se a hora virasse no meio. */
@@ -438,6 +442,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 versaoPeso={versaoPeso}
                 versaoConsumo={versaoConsumo}
                 versaoSono={versaoSono}
+                versaoTreino={versaoTreino}
                 onAbrirPerfil={() => setPerfilAberto(true)}
                 onAbrirCodigo={() => setCodigoAberto(true)}
                 onAbrirNutricionistas={() => setNutricionistasAbertas(true)}
@@ -455,6 +460,10 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 onAbrirPeso={() => setPesoAberto(true)}
                 onAbrirContador={() => setContadorAberto(true)}
                 onAbrirSono={() => setSonoAberto(true)}
+                /* Treino não tem tela própria no App: ele mora dentro do "+",
+                   e abrir o "+" já naquela opção é o mesmo caminho que o
+                   cartão de plano usa para "montar plano". */
+                onAbrirTreino={() => setRegistrar({ inicial: 'treino' })}
               />
             </View>
           ))}
@@ -662,6 +671,7 @@ function TelaDaAba({
   versaoPeso,
   versaoConsumo,
   versaoSono,
+  versaoTreino,
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirNutricionistas,
@@ -677,6 +687,7 @@ function TelaDaAba({
   onAbrirPeso,
   onAbrirContador,
   onAbrirSono,
+  onAbrirTreino,
 }: {
   chave: Aba
   sessao: Session
@@ -686,6 +697,7 @@ function TelaDaAba({
   versaoPeso: number
   versaoConsumo: number
   versaoSono: number
+  versaoTreino: number
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirNutricionistas: () => void
@@ -702,6 +714,7 @@ function TelaDaAba({
   onAbrirPeso: () => void
   onAbrirContador: () => void
   onAbrirSono: () => void
+  onAbrirTreino: () => void
 }) {
   switch (chave) {
     case 'inicio':
@@ -714,6 +727,7 @@ function TelaDaAba({
           versaoPeso={versaoPeso}
           versaoConsumo={versaoConsumo}
           versaoSono={versaoSono}
+          versaoTreino={versaoTreino}
           onAbrirPerfil={onAbrirPerfil}
           onAbrirCodigo={onAbrirCodigo}
           onAbrirCadastros={onAbrirCadastros}
@@ -727,6 +741,7 @@ function TelaDaAba({
           onAbrirPeso={onAbrirPeso}
           onAbrirContador={onAbrirContador}
           onAbrirSono={onAbrirSono}
+          onAbrirTreino={onAbrirTreino}
         />
       )
     case 'relatorios':
