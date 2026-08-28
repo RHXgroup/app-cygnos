@@ -256,6 +256,47 @@ export const serieDeSono = (noites: Noite[], quantas = 7): number[] =>
 export const noitesNaMeta = (noites: Noite[], metaHoras: number): number =>
   noites.filter(n => tempoDormindo(n) >= metaHoras * 60).length
 
+/* ── A faixa da noite ──────────────────────────────────────────────────────
+ *
+ * O eixo vai das 18h de um dia às 12h do outro: dezoito horas, que é onde cabe
+ * praticamente toda noite humana. Fora disso — quem deita às duas da tarde — o
+ * traço encosta na borda em vez de sumir; distorcer a ponta é melhor do que
+ * apagar a noite inteira do desenho.
+ *
+ * A conversão existe porque 23:30 e 00:30 estão a uma hora de distância e, em
+ * minutos crus, a 1380 — o que faria a regularidade de quem dorme sempre à meia
+ * -noite parecer a pior de todas. Hora antes do meio-dia pertence ao dia
+ * seguinte, e é isso que a soma de 24h diz. */
+export const INICIO_DA_FAIXA = 18 * 60
+export const FIM_DA_FAIXA = 36 * 60
+
+export function minutoDaNoite(hora: string): number {
+  const [h, m] = hora.split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return INICIO_DA_FAIXA
+  return h < 12 ? (h + 24) * 60 + m : h * 60 + m
+}
+
+/* Quanto o horário de DEITAR varia, em minutos, de uma noite para a outra.
+ *
+ * É a leitura que falta nesta tela. Dormir sete horas todo dia entre meia-noite
+ * e sete não é a mesma coisa que dormir sete horas indo para a cama às nove numa
+ * noite e às três na outra — e a média de duração, que é o que a tela mostrava,
+ * dá exatamente o mesmo número para os dois casos.
+ *
+ * Desvio médio absoluto, e não desvio padrão: "varia uns 40 minutos" é uma frase
+ * que alguém entende, e é a mesma conta que a pessoa faria no papel.
+ *
+ * Null com menos de três noites: duas noites sempre "variam" alguma coisa entre
+ * si, e chamar isso de padrão seria inventar. */
+export function regularidade(noites: Noite[]): number | null {
+  if (noites.length < 3) return null
+
+  const deitares = noites.map(n => minutoDaNoite(n.deitou))
+  const media = deitares.reduce((s, d) => s + d, 0) / deitares.length
+
+  return Math.round(deitares.reduce((s, d) => s + Math.abs(d - media), 0) / deitares.length)
+}
+
 export function resumoDe(noites: Noite[]): ResumoSono | null {
   if (noites.length === 0) return null
 

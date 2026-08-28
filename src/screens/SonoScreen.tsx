@@ -22,6 +22,10 @@ import {
   duracao,
   eficiencia,
   noitePadrao,
+  regularidade,
+  minutoDaNoite,
+  INICIO_DA_FAIXA,
+  FIM_DA_FAIXA,
   resumoDe,
   salvarNoite,
   tempoDormindo,
@@ -202,6 +206,7 @@ export function SonoScreen({
   }
 
   const resumo = resumoDe(noites)
+  const varia = regularidade(noites)
 
   return (
     <KeyboardAvoidingView
@@ -458,7 +463,20 @@ export function SonoScreen({
                     <Text style={styles.rotuloNumero}>Eficiência média</Text>
                     <Text style={styles.valorNumero}>{Math.round(resumo.mediaEficiencia)}%</Text>
                   </View>
+                  {/* A terceira coluna é a que faltava. Dormir sete horas todo
+                      dia entre meia-noite e sete não é a mesma coisa que dormir
+                      sete horas indo para a cama às nove numa noite e às três na
+                      outra — e as duas colunas ao lado dão o mesmo número para
+                      os dois casos. */}
+                  <View style={styles.numeroResumo}>
+                    <Text style={styles.rotuloNumero}>Varia</Text>
+                    <Text style={styles.valorNumero}>
+                      {varia === null ? '—' : duracao(varia)}
+                    </Text>
+                  </View>
                 </View>
+
+                <FaixaDasNoites noites={noites} />
                 {/* Sobre quantas noites a média foi feita. Uma média de duas
                     noites e uma de trinta não valem o mesmo. */}
                 <Text style={styles.ajudaCampo}>
@@ -532,6 +550,62 @@ export function SonoScreen({
         </>
       )}
     </KeyboardAvoidingView>
+  )
+}
+
+/* Quando cada noite aconteceu, e não quanto ela durou.
+ *
+ * Sete traços no mesmo eixo — das 18h às 12h do dia seguinte. Quem deita e
+ * levanta sempre na mesma hora vê sete traços alinhados; quem não, vê uma
+ * escada. É a única leitura desta tela que se entende sem ler número nenhum, e
+ * é a que o sono realmente pede: regularidade importa tanto quanto duração, e
+ * a duração já está em todo o resto da tela.
+ *
+ * A lista chega do mais novo para o mais velho; aqui ela é invertida, porque um
+ * gráfico que anda para trás no tempo mostra a evolução ao contrário. */
+function FaixaDasNoites({ noites }: { noites: Noite[] }) {
+  const ultimas = [...noites].sort((a, b) => a.data.localeCompare(b.data)).slice(-7)
+  if (ultimas.length === 0) return null
+
+  const largura = FIM_DA_FAIXA - INICIO_DA_FAIXA
+  const posicao = (m: number) => Math.min(Math.max((m - INICIO_DA_FAIXA) / largura, 0), 1)
+
+  return (
+    <View style={styles.faixa}>
+      {ultimas.map(n => {
+        const de = posicao(minutoDaNoite(n.deitou))
+        const ate = posicao(minutoDaNoite(n.levantou))
+        const [ano, mes, dia] = n.data.split('-').map(Number)
+        const diaSemana = new Date(ano, mes - 1, dia).getDay()
+
+        return (
+          <View key={n.id} style={styles.linhaFaixa}>
+            <Text style={styles.diaFaixa}>{DIAS_CURTOS[diaSemana]}</Text>
+            <View style={styles.trilhoFaixa}>
+              <View
+                style={[
+                  styles.tracoFaixa,
+                  {
+                    left: `${de * 100}%`,
+                    /* Um mínimo para a noite curtíssima não sumir: um traço
+                       invisível seria lido como noite não registrada. */
+                    width: `${Math.max(ate - de, 0.02) * 100}%`,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+        )
+      })}
+
+      <View style={styles.eixoFaixa}>
+        {['18h', '0h', '6h', '12h'].map(h => (
+          <Text key={h} style={styles.marcaFaixa}>
+            {h}
+          </Text>
+        ))}
+      </View>
+    </View>
   )
 }
 
@@ -785,6 +859,16 @@ const styles = StyleSheet.create({
 
   /* ── Histórico ── */
   linhaResumo: { flexDirection: 'row', gap: 12 },
+
+  faixa: { marginTop: 14, gap: 5 },
+  linhaFaixa: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  diaFaixa: { width: 26, fontSize: 10.5, color: inkFraco },
+  trilhoFaixa: { flex: 1, height: 10, borderRadius: 5, backgroundColor: cores.trilho },
+  tracoFaixa: { position: 'absolute', top: 0, height: 10, borderRadius: 5, backgroundColor: cores.limao },
+  /* Alinhado ao trilho, não ao bloco: as marcas precisam cair sobre o eixo, e o
+     rótulo do dia ocupa a largura dele mais o espaço. */
+  eixoFaixa: { flexDirection: 'row', justifyContent: 'space-between', marginLeft: 34, marginTop: 2 },
+  marcaFaixa: { fontSize: 10, color: inkFraco },
   numeroResumo: { flex: 1 },
   rotuloNumero: { fontSize: 11.5, color: inkSuave },
   valorNumero: { marginTop: 2, fontSize: 20, fontWeight: '800', color: cores.verde },
