@@ -35,6 +35,7 @@ import { MaisScreen } from './src/screens/MaisScreen'
 import { MensagensScreen } from './src/screens/MensagensScreen'
 import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
 import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
+import { ReceitasScreen } from './src/screens/ReceitasScreen'
 import { NutricionistasScreen } from './src/screens/NutricionistasScreen'
 import { PerfilScreen } from './src/screens/PerfilScreen'
 import { RecuperarSenhaScreen } from './src/screens/RecuperarSenhaScreen'
@@ -229,6 +230,10 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [avisosAbertos, setAvisosAbertos] = useState(false)
   const [excluirContaAberta, setExcluirContaAberta] = useState(false)
   const [cadastrosAberto, setCadastrosAberto] = useState(false)
+  /* Receitas abertas para ORGANIZAR, a partir de "Meus cadastros". A outra
+     entrada, pelo contador de calorias, é para COMER e mora lá dentro — esta
+     não passa `onUsar`, e é isso que separa as duas. */
+  const [receitasAbertas, setReceitasAbertas] = useState(false)
   const [aguaAberta, setAguaAberta] = useState(false)
   /* Guarda o plano, e nao um booleano: a lista de compras nao existe sem um,
      e passar o plano junto evita a tela ter de busca-lo de novo. */
@@ -524,6 +529,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
               onAbrirMetas={setMetasAbertas}
               onNovasMetas={() => setMetasAbertas('nova')}
               onNovoCalculo={() => setRegistrar({ inicial: 'energetico' })}
+              onAbrirReceitas={() => setReceitasAbertas(true)}
               /* Ativar plano e ativar cálculo passam pelo mesmo aviso: os dois
                  mudam o que a tela inicial mostra. Bater nos dois contadores é
                  mais barato que um caminho por assunto. */
@@ -532,6 +538,14 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 setVersaoMetas(v => v + 1)
               }}
             />
+          </Sobreposta>
+        )}
+
+        {/* Depois de "Meus cadastros" no JSX: abre POR CIMA dele, e o voltar
+            devolve para a lista de onde se veio. */}
+        {receitasAbertas && (
+          <Sobreposta>
+            <ReceitasScreen contaId={sessao.user.id} onFechar={() => setReceitasAbertas(false)} />
           </Sobreposta>
         )}
 

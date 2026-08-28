@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { dataNumerica, decimal, milhar } from '../lib/formatar'
@@ -37,7 +45,14 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
  * comportam igual — vários guardados, um ativo, e o ativo é o que o resto do app
  * usa. Água e peso NÃO entram aqui de propósito: são diários do dia a dia, e o
  * lugar deles é a própria tela, com o histórico. Cadastro é o que se define e
- * passa a valer; registro é o que se anota todo dia. */
+ * passa a valer; registro é o que se anota todo dia.
+ *
+ * Receitas aparecem no índice mas não viram seção: nenhuma delas é "a ativa",
+ * então a mecânica das outras três não se aplica, e a tela de receitas já
+ * existe inteira. A porta leva para lá. Ela precisa estar aqui porque receita
+ * É cadastro — se define uma vez e passa a valer — e até agora só se chegava
+ * nela por dentro do contador de calorias, que é onde se REGISTRA. Quem
+ * quisesse criar uma receita fora da hora de comer não achava. */
 type Secao = 'planos' | 'metas' | 'calculos'
 
 export function MeusCadastrosScreen({
@@ -50,6 +65,7 @@ export function MeusCadastrosScreen({
   onAbrirMetas,
   onNovasMetas,
   onNovoCalculo,
+  onAbrirReceitas,
   onAtivou,
 }: {
   contaId: string
@@ -65,6 +81,7 @@ export function MeusCadastrosScreen({
   onAbrirMetas: (metas: MetasSalvas) => void
   onNovasMetas: () => void
   onNovoCalculo: () => void
+  onAbrirReceitas: () => void
   /* Avisa o App para a tela inicial buscar de novo — e, de volta, esta lista
      recarrega pelas versões. Um caminho só para as duas telas. */
   onAtivou: () => void
@@ -83,6 +100,35 @@ export function MeusCadastrosScreen({
   /* Qual linha está sendo ativada agora. Guardado por id, e não um booleano: é
      o cartão daquele item que mostra o giro, não a tela toda. */
   const [ativando, setAtivando] = useState<string | null>(null)
+
+  /* O botão do aparelho faz o mesmo que a seta do topo: dentro de uma seção,
+     volta para o índice; no índice, fecha a tela. Sem isto, quem entrou em
+     "Metas" para conferir uma linha era jogado para fora da tela inteira.
+
+     ── Por que este handler existe se o App já tem um ─────────────────────────
+     O App tem um voltar central, e ele já fecha esta tela. O que ele não sabe
+     é que existe um degrau aqui dentro — `secao` é estado local, e de fora só
+     dá para fechar tudo.
+
+     Os dois convivem porque o React roda os efeitos do filho ANTES dos do pai,
+     e o BackHandler chama o último registrado primeiro. Ao abrir, o pai
+     registra depois e ganha — e no índice os dois fazem a mesma coisa, então
+     não muda nada. A partir da primeira re-renderização daqui (a carga dos
+     dados, que sempre acontece), este passa a ser o último e ganha, que é
+     justamente quando já existe seção para voltar.
+
+     Sem lista de dependências de propósito, por duas razões: `secao` muda
+     enquanto a tela está aberta, e um efeito que rodasse só uma vez guardaria
+     o valor da primeira renderização; e é re-registrar a cada renderização que
+     mantém este handler na frente do central. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (secao) setSecao(null)
+      else onFechar()
+      return true
+    })
+    return () => sub.remove()
+  })
 
   /* As três buscas acontecem já no índice, e não ao entrar em cada seção: são
      elas que deixam cada porta dizer o que tem atrás dela. Sem isso o índice
@@ -317,6 +363,17 @@ export function MeusCadastrosScreen({
                   'cálculos cadastrados',
                 )}
                 onPress={() => setSecao('calculos')}
+              />
+
+              {/* Sai daqui para a tela de receitas em vez de abrir uma seção:
+                  ver o resumo dos outros três custa uma contagem que o índice
+                  já fez, e receita custaria uma quarta consulta para dizer um
+                  número que ninguém procura aqui. */}
+              <Porta
+                icone="book-outline"
+                titulo="Minhas receitas"
+                resumo="O que você come junto e repete"
+                onPress={onAbrirReceitas}
               />
             </>
           )}

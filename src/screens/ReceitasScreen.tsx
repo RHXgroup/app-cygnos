@@ -45,8 +45,12 @@ export function ReceitasScreen({
   onFechar,
 }: {
   contaId: string
-  /* Os alimentos de uma porção, prontos para o consumo ou para o plano. */
-  onUsar: (itens: AlimentoEscolhido[], nomeDaReceita: string) => void
+  /* Os alimentos de uma porção, prontos para o consumo ou para o plano.
+     Ausente quando a tela é aberta para ORGANIZAR e não para comer — em
+     "Meus cadastros" não existe refeição em curso para onde mandar a receita,
+     e um botão "usar" ali perguntaria "usar onde?". Sem ele, tocar na receita
+     abre a edição, que é o que se quer fazer naquele lugar. */
+  onUsar?: (itens: AlimentoEscolhido[], nomeDaReceita: string) => void
   onFechar: () => void
 }) {
   const { top, bottom } = useSafeAreaInsets()
@@ -102,6 +106,7 @@ export function ReceitasScreen({
   }
 
   function usar(r: Receita, porcoes: number) {
+    if (!onUsar) return
     setUsando(null)
     onUsar(porcaoDaReceita(r, porcoes), r.nome)
     onFechar()
@@ -162,10 +167,14 @@ export function ReceitasScreen({
               return (
                 <View key={r.id} style={styles.cartao}>
                   <Pressable
-                    onPress={() => (r.porcoes === 1 ? usar(r, 1) : setUsando(r))}
+                    onPress={() =>
+                      !onUsar ? setEditando(r) : r.porcoes === 1 ? usar(r, 1) : setUsando(r)
+                    }
                     style={({ pressed }) => [styles.corpoCartao, pressed && styles.pressionado]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Usar a receita ${r.nome}`}
+                    accessibilityLabel={
+                      onUsar ? `Usar a receita ${r.nome}` : `Editar a receita ${r.nome}`
+                    }
                   >
                     <View style={styles.textoCartao}>
                       <Text style={styles.nomeReceita} numberOfLines={1}>
@@ -177,7 +186,11 @@ export function ReceitasScreen({
                         {kcal !== null && ` · ${milhar(kcal)} kcal por porção`}
                       </Text>
                     </View>
-                    <Ionicons name="add-circle-outline" size={22} color={cores.verde} />
+                    <Ionicons
+                      name={onUsar ? 'add-circle-outline' : 'chevron-forward'}
+                      size={22}
+                      color={onUsar ? cores.verde : inkFraco}
+                    />
                   </Pressable>
 
                   <View style={styles.acoes}>
