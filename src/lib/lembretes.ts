@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 
@@ -24,17 +23,40 @@ import type { PlanoCompleto } from './plano'
 
 const CHAVE_LIGADO = 'lembretes.ligado'
 
-/* Como a notificação se comporta com o app aberto. Sem isto o Android engole a
-   que chega em primeiro plano, e quem está com o app na mão — o caso mais comum
-   na hora da refeição — não vê nada. */
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-})
+/* O pacote é carregado sob demanda, e não no topo do arquivo.
+ *
+ * Ao ser importado, o expo-notifications reclama em VERMELHO no console que
+ * push no Android saiu do Expo Go no SDK 53. É verdade e é irrelevante para nós
+ * — o que usamos é notificação local, que continua funcionando —, mas o aviso
+ * aparecia a cada abertura do app, para todo mundo, inclusive para quem nunca
+ * ligou um lembrete. Um erro vermelho que não é erro treina quem desenvolve a
+ * ignorar erros vermelhos.
+ *
+ * Assim ele só é carregado por quem abre a aba Mais e liga os lembretes, e de
+ * quebra o app inicia sem esse custo. */
+type ModuloNotificacoes = typeof import('expo-notifications')
+
+let modulo: Promise<ModuloNotificacoes> | null = null
+
+function notificacoes(): Promise<ModuloNotificacoes> {
+  if (!modulo) {
+    modulo = import('expo-notifications').then(n => {
+      /* Como a notificação se comporta com o app aberto. Sem isto o Android
+         engole a que chega em primeiro plano, e quem está com o app na mão — o
+         caso mais comum na hora da refeição — não vê nada. */
+      n.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowBanner: true,
+          shouldShowList: true,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        }),
+      })
+      return n
+    })
+  }
+  return modulo
+}
 
 export async function lembretesLigados(): Promise<boolean> {
   try {
@@ -59,6 +81,7 @@ export type ResultadoLembretes =
  * que a pessoa mexesse no plano — e um app que avisa duas vezes a mesma coisa é
  * desinstalado mais rápido do que um que não avisa. */
 export async function ligarLembretes(plano: PlanoCompleto | null): Promise<ResultadoLembretes> {
+  const Notifications = await notificacoes()
   const permissao = await Notifications.getPermissionsAsync()
   let concedida = permissao.granted
 
@@ -119,6 +142,7 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
 }
 
 export async function desligarLembretes(): Promise<void> {
+  const Notifications = await notificacoes()
   await Notifications.cancelAllScheduledNotificationsAsync()
   try {
     await AsyncStorage.setItem(CHAVE_LIGADO, '0')
