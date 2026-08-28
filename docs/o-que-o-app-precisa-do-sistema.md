@@ -174,18 +174,29 @@ depende de ela lembrar de clicar.
 Em ordem de valor por esforço. As três primeiras são o que separa o Cygnos dos
 dois maiores do Brasil.
 
-### 3.1 Mural de avisos
+### 3.1 Mural de avisos — JÁ EXISTE no app, numa versão derivada
 
-Antes do bate-papo, e com a mesma tabela. "Sua consulta foi confirmada", "você
-foi vinculado a Fulana", "ela publicou um plano novo".
+**Não comecem por aqui.** O app já tem a tela (`AvisosScreen`) e o sino já
+funciona, sem depender de nada do sistema.
 
-**Por que primeiro:** entrega a maior parte do valor da conversa sem criar
-expectativa de tempo de resposta, e sem moderação. E o sino da tela inicial hoje
-mostra uma bolinha vermelha fixa que não quer dizer nada — promessa de aviso que
-não existe.
+Como: `lib/avisos.ts` guarda no aparelho um retrato do que a pessoa viu na última
+visita — quais consultas, em que status, qual vínculo, qual plano — e compara
+com o que está lá agora. A diferença é o aviso. Vínculo novo, plano novo, pedido
+aceito, consulta que ela marcou, pedido ainda esperando resposta.
 
-**Precisa:** tabela de eventos por paciente, com lido/não lido, e as gravações
-sendo feitas pelo sistema quando o estado muda.
+**O que a versão derivada não faz**, e é o que a tabela resolveria um dia:
+
+- não avisa com o app fechado (sem push, o aviso nasce quando a pessoa abre)
+- não vê o que aconteceu e desaconteceu entre duas visitas
+- não sabe de nada que o app não lê — comentário no diário, mensagem, receita
+
+**Se um dia a tabela de eventos existir**, `carregarAvisos` troca de fonte e as
+telas continuam iguais. Mas ela deixou de ser bloqueio, e há coisa mais urgente
+na frente.
+
+**O que ela ainda precisa do sistema:** a recusa (item 1.3). Hoje a tela sabe
+dizer "a sua consulta mudou" para um status que não conhece, mas não sabe dizer
+que foi recusada — porque o status não chega.
 
 ### 3.2 O laço do diário — ela vê e comenta o que ele comeu
 
@@ -237,6 +248,11 @@ push. **Dentro do sistema, não no WhatsApp** — a conversa é parte do
 acompanhamento e é patrimônio da plataforma, além de ser prova de que o paciente
 veio pelo aplicativo.
 
+**Enquanto isso**, a aba Mensagens deixou de ser uma casca: ela mostra a
+nutricionista vinculada e abre a conversa no WhatsApp dela, dizendo numa linha
+que a conversa por dentro está a caminho. Quando a tabela existir, essa mesma
+tela vira a lista da conversa e o cartão do WhatsApp desce para o rodapé.
+
 ### 3.6 Videoconsulta e pagamento
 
 Os dois maiores em esforço, e os dois com dependência externa (provedor de vídeo,
@@ -263,6 +279,9 @@ Para o time do sistema saber o que **não** precisa pedir:
 - água, sono, peso, metas e relatórios
 - lista de compras e lembrete de refeição
 - código de vínculo e exclusão de conta
+
+- avisos do sino, derivados do que mudou desde a última visita
+- conversa apontando para o WhatsApp dela, enquanto a de dentro não existe
 
 Todas as telas que mostram dado do sistema já releem sozinhas ao voltar do
 segundo plano e aceitam puxar-para-atualizar. Não há realtime em lugar nenhum: se
