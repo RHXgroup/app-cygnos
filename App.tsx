@@ -25,13 +25,13 @@ import { AvisosScreen } from './src/screens/AvisosScreen'
 import { CadastroScreen } from './src/screens/CadastroScreen'
 import { CodigoScreen } from './src/screens/CodigoScreen'
 import { ContadorCaloriasScreen } from './src/screens/ContadorCaloriasScreen'
-import { EmBreveScreen } from './src/screens/EmBreveScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { ListaDeComprasScreen } from './src/screens/ListaDeComprasScreen'
 import { LoginScreen } from './src/screens/LoginScreen'
 import { EditarPlanoScreen } from './src/screens/EditarPlanoScreen'
 import { ExcluirContaScreen } from './src/screens/ExcluirContaScreen'
 import { MaisScreen } from './src/screens/MaisScreen'
+import { MensagensScreen } from './src/screens/MensagensScreen'
 import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
 import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
 import { NutricionistasScreen } from './src/screens/NutricionistasScreen'
@@ -684,7 +684,7 @@ function TelaDaAba({
         />
       )
     case 'mensagens':
-      return <EmBreveScreen titulo="Mensagens" icone="chatbubble-ellipses-outline" />
+      return <MensagensScreen onAbrirNutricionistas={onAbrirNutricionistas} />
     case 'mais':
       return (
         <MaisScreen
