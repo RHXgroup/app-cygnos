@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
@@ -26,6 +26,28 @@ export function MontarPlanoScreen({
   const [buscandoPara, setBuscandoPara] = useState<RefeicaoEscolhida | null>(null)
   const [resumindo, setResumindo] = useState(false)
   const [erro, setErro] = useState('')
+
+  /* O voltar do Android nas camadas desta tela.
+   *
+   * Sem isto, voltar do resumo caía na etapa anterior do assistente e levava
+   * junto todos os alimentos já adicionados — o trabalho inteiro de montar o
+   * dia, perdido por um toque no botão do aparelho.
+   *
+   * A busca não aparece aqui porque ela cuida de si: o tratador dela é
+   * registrado depois e decide primeiro. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (buscandoPara) return false
+      if (resumindo) {
+        setResumindo(false)
+        return true
+      }
+      onVoltar()
+      return true
+    })
+
+    return () => sub.remove()
+  }, [buscandoPara, resumindo, onVoltar])
 
   /* O que segue para o resumo e para o banco: a refeição sem o id da tela, que
      não interessa a mais ninguém, e com os alimentos já dentro. A ordem é a
