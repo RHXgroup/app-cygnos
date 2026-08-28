@@ -21,9 +21,23 @@ export const AVISO_NAO_E_PACIENTE =
   'Esta conta é do sistema Cygnos para nutricionistas, e o aplicativo é para pacientes. Entre pelo site com ela, ou crie sua conta de paciente aqui.'
 
 export async function ehContaDePaciente(): Promise<boolean | null> {
+  /* Do storage local, sem ida à rede — o cliente já tem a sessão na mão. */
+  const { data: sessao } = await supabase.auth.getSession()
+  const id = sessao.session?.user.id
+  /* Sem sessão não há o que perguntar, e `null` já quer dizer "não deu para
+     perguntar" — o App trata isso deixando entrar, que é o certo aqui também. */
+  if (!id) return null
+
   const { data, error } = await supabase
     .from('app_contas')
     .select('id')
+    /* O filtro por id é redundante COM a RLS funcionando, e é justamente por
+       isso que ele entra: sem ele, esta pergunta — que decide quem entra no app
+       — depende inteira de uma política que mora noutro repositório. Uma RLS
+       frouxa devolveria a linha de outra pessoa (ou duas linhas, e aí o
+       maybeSingle erra e a função responde `null`, liberando). Com o filtro, o
+       pior caso volta a ser uma resposta errada só sobre a própria conta. */
+    .eq('id', id)
     .maybeSingle()
 
   if (error) return null

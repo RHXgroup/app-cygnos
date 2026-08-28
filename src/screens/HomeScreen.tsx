@@ -192,7 +192,15 @@ export function HomeScreen({
      cada gravação, e juntar os dois faria o nome ser relido à toa toda vez. */
   useEffect(() => {
     let ativo = true
-    setCarregandoPlano(true)
+    /* O indicador NÃO volta a ligar nas releituras — só a primeira carga o
+       mostra, e ele já nasce ligado.
+       Antes isto era `setCarregandoPlano(true)` a cada rodada, o que era
+       inofensivo enquanto o plano só era relido depois de uma gravação. Agora
+       ele é relido também toda vez que o app volta do segundo plano, e piscar o
+       cartão inteiro para trocá-lo pelo mesmo conteúdo seria pagar um susto por
+       uma leitura que quase sempre não muda nada. O conteúdo velho fica na tela
+       até o novo chegar — que é o que o resto deste arquivo já faz com a água,
+       o peso e o sono. */
 
     /* Os dois planos de uma vez: o que o paciente montou e o que a
        nutricionista dele deixou ativo. Qual dos dois vai para a tela é decidido

@@ -14,7 +14,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
+import { NOME_NOVA, buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
 import { mascaraQuantidade, numeroDigitado, soDigitos } from '../lib/formulario'
 import { decimal } from '../lib/formatar'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
@@ -400,6 +400,12 @@ export function BuscarAlimentoScreen({
             </Text>
             {!!selecionado.marca && <Text style={styles.marcaPainel}>{selecionado.marca}</Text>}
 
+            {/* O que a tabela sabe além dos macros, e que estava sendo
+                descartado no caminho: a classificação NOVA e o que costuma vir
+                com aviso no rótulo. Só aparece o que a base informou — linha
+                vazia diria "não tem" sobre um dado que apenas falta. */}
+            <DetalheDoAlimento alimento={selecionado} />
+
             {/* Duas formas de dizer a mesma coisa: arroz se pesa, pão francês se
                 conta. Obrigar a escolher uma só empurraria alguém a chutar. */}
             <View style={styles.seletor}>
@@ -567,7 +573,80 @@ function resumoMacros(a: Alimento, gramas: number): string {
   return [parte('P', p), parte('C', c), parte('G', g)].filter(Boolean).join(' · ')
 }
 
+/* O detalhe nutricional que não são os macros.
+ *
+ * Fica escondido atrás da própria ausência: quem escolhe uma maçã não vê nada,
+ * porque a base não tem gordura trans de maçã — e não deve ver. Quem escolhe um
+ * biscoito recheado vê ultraprocessado, açúcar adicionado e gordura trans, que
+ * é a informação que muda a decisão no segundo antes de registrar.
+ *
+ * Valores POR 100 g, como a tabela guarda. Não são reescalados para a porção de
+ * propósito: aqui a pessoa ainda está escolhendo o alimento, e comparar dois
+ * rótulos exige a mesma base — que é como o rótulo do mundo real também fala. */
+function DetalheDoAlimento({ alimento }: { alimento: Alimento }) {
+  const linhas: { rotulo: string; valor: string; alerta?: boolean }[] = []
+
+  if (alimento.nova !== null && NOME_NOVA[alimento.nova]) {
+    linhas.push({
+      rotulo: 'Classificação',
+      valor: NOME_NOVA[alimento.nova],
+      /* Só o ultraprocessado vira alerta. Marcar "processado" de vermelho faria
+         queijo e pão virarem vilões, e o aviso perderia o sentido de tanto
+         aparecer. */
+      alerta: alimento.nova === 4,
+    })
+  }
+
+  const g = (v: number | null) => `${decimal(v ?? 0, 1)} g`
+
+  if (alimento.acucaresAdicionados !== null && alimento.acucaresAdicionados > 0) {
+    linhas.push({ rotulo: 'Açúcar adicionado', valor: g(alimento.acucaresAdicionados), alerta: true })
+  } else if (alimento.acucaresTotais !== null && alimento.acucaresTotais > 0) {
+    /* O total só aparece quando não há o adicionado: dizer os dois lado a lado
+       confundiria, e o adicionado é o que interessa — o açúcar da fruta não é o
+       mesmo problema que o do refrigerante. */
+    linhas.push({ rotulo: 'Açúcares', valor: g(alimento.acucaresTotais) })
+  }
+
+  if (alimento.gorduraTrans !== null && alimento.gorduraTrans > 0) {
+    linhas.push({ rotulo: 'Gordura trans', valor: g(alimento.gorduraTrans), alerta: true })
+  }
+  if (alimento.gorduraSaturada !== null && alimento.gorduraSaturada > 0) {
+    linhas.push({ rotulo: 'Gordura saturada', valor: g(alimento.gorduraSaturada) })
+  }
+
+  if (linhas.length === 0) return null
+
+  return (
+    <View style={styles.detalhe}>
+      {linhas.map(l => (
+        <View key={l.rotulo} style={styles.linhaDetalhe}>
+          <Text style={styles.rotuloDetalhe}>{l.rotulo}</Text>
+          <Text style={[styles.valorDetalhe, l.alerta && styles.valorAlerta]}>{l.valor}</Text>
+        </View>
+      ))}
+      <Text style={styles.baseDetalhe}>por 100 g</Text>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
+  detalhe: {
+    marginTop: 10,
+    gap: 4,
+    backgroundColor: cores.cartao,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  linhaDetalhe: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rotuloDetalhe: { fontSize: 12.5, color: inkSuave },
+  valorDetalhe: { fontSize: 12.5, fontWeight: '700', color: cores.ink },
+  valorAlerta: { color: cores.gold },
+  baseDetalhe: { fontSize: 11, color: inkFraco, marginTop: 2 },
+
   tela: { flex: 1, backgroundColor: cores.fundo },
   corpo: { flex: 1 },
 
