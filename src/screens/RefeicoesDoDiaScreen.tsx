@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import {
   Animated,
+  BackHandler,
   KeyboardAvoidingView,
   PanResponder,
   Platform,
@@ -94,6 +95,29 @@ export function RefeicoesDoDiaScreen({
      eles enxergariam para sempre a lista do primeiro render. */
   const itensRef = useRef(itens)
   itensRef.current = itens
+
+  /* O voltar do Android desfaz uma etapa do assistente por vez.
+   *
+   * São três em sequência — escolher as refeições, escolher como montar, montar
+   * — e sem isto o botão do aparelho abandonava o plano inteiro a partir de
+   * qualquer uma delas. Quem estava na terceira etapa perdia as duas primeiras
+   * sem aviso, que é exatamente o tipo de perda que faz desistir de recomeçar. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (montando) {
+        setMontando(false)
+        return true
+      }
+      if (escolhidas) {
+        setEscolhidas(null)
+        return true
+      }
+      onFechar()
+      return true
+    })
+
+    return () => sub.remove()
+  }, [montando, escolhidas, onFechar])
 
   const [arrastandoId, setArrastandoId] = useState<string | null>(null)
   /* Um deslocamento por linha, e a lista NÃO muda enquanto o dedo está na tela.

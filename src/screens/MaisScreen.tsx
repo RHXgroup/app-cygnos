@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  AppState,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -58,6 +59,20 @@ export function MaisScreen({
     return () => {
       vivo = false
     }
+  }, [buscar])
+
+  /* O mesmo motivo do puxar-para-atualizar, sem exigir o gesto.
+   *
+   * Voltar do segundo plano é o instante exato em que a resposta mudou: o
+   * caminho comum é o paciente ditar o código, sair do app para falar com ela, e
+   * voltar. Esperar que ele descubra sozinho que precisa arrastar o dedo para
+   * baixo é esperar demais — o cartão continuaria dizendo que ele não tem
+   * nutricionista com o vínculo já feito. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'active') buscar()
+    })
+    return () => sub.remove()
   }, [buscar])
 
   /* Quem vincula é a nutricionista, do lado dela, enquanto o app já está aberto

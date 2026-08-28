@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  BackHandler,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -132,6 +133,26 @@ export function BuscarAlimentoScreen({
   const [adicionados, setAdicionados] = useState(0)
   const busca = useRef<TextInput>(null)
   const alturaTeclado = useAlturaTeclado()
+
+  /* O voltar do Android com o painel de quantidade aberto.
+   *
+   * Escolher o alimento abre o painel POR CIMA da lista. Sem isto, quem
+   * selecionou "pão", viu a quantidade e apertou voltar saía da busca inteira —
+   * e voltava à refeição sem o alimento e sem o termo digitado, tendo de buscar
+   * de novo. Agora o voltar desfaz só a escolha, e a lista continua onde
+   * estava. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selecionado) {
+        setSelecionado(null)
+        return true
+      }
+      onFechar()
+      return true
+    })
+
+    return () => sub.remove()
+  }, [selecionado, onFechar])
 
   /* Keyboard.dismiss() sozinho não resolve: ele manda o teclado descer, mas o
      campo de busca continua sendo o campo focado, e o iOS o traz de volta assim

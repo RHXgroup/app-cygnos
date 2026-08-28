@@ -18,7 +18,7 @@ import {
   consultaEmDestaque,
   consultaLegivel,
   diaPorExtenso,
-  ESTADO_DA_CONSULTA,
+  estadoDaConsulta,
   solicitarConsulta,
   type DiaComVagas,
   type MinhaConsulta,
@@ -246,7 +246,7 @@ function ListaDeConsultas({ consultas }: { consultas: MinhaConsulta[] }) {
         <View key={c.id} style={styles.linhaConsulta}>
           <Text style={styles.dataConsulta}>{consultaCompacta(c.dataHora)}</Text>
           <View style={styles.etiqueta}>
-            <Text style={styles.textoEtiqueta}>{ESTADO_DA_CONSULTA[c.status].curto}</Text>
+            <Text style={styles.textoEtiqueta}>{estadoDaConsulta(c.status).curto}</Text>
           </View>
         </View>
       ))}
@@ -263,7 +263,7 @@ function CartaoDaConsulta({
   cancelando: boolean
   onDesistir?: () => void
 }) {
-  const estado = ESTADO_DA_CONSULTA[consulta.status]
+  const estado = estadoDaConsulta(consulta.status)
   const marcada = consulta.status !== 'solicitada'
 
   return (

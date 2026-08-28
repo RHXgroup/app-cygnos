@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  AppState,
   Linking,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,7 +31,7 @@ import {
   carregarMinhasConsultas,
   consultaEmDestaque,
   consultaLegivel,
-  ESTADO_DA_CONSULTA,
+  estadoDaConsulta,
   type MinhaConsulta,
 } from '../lib/agenda'
 import { ConteudoNutriScreen, type ChaveConteudo } from './ConteudoNutriScreen'
@@ -50,6 +52,9 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
   const [erroConteudo, setErroConteudo] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
+  /* Separado de `carregando`: a primeira carga troca a tela por um indicador, e
+     a atualização mantém a ficha na tela enquanto relê. */
+  const [atualizando, setAtualizando] = useState(false)
   /* Qual conteúdo está aberto. Estado DAQUI e não do App: o conteúdo só existe
      dentro desta tela, e o App não tem por que saber que ele existe. Mesma
      escolha do RegistrarScreen. */
@@ -60,6 +65,23 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
   /* Recarrega ao voltar da tela de agendamento: quem acabou de pedir horário
      precisa ver o pedido aparecer aqui, e não uma ficha igual à de antes. */
   const [versao, setVersao] = useState(0)
+
+  /* E recarrega também ao voltar do segundo plano.
+   *
+   * Quem vincula é a nutricionista, do lado dela, e nada avisa o aparelho. O
+   * caso comum é o paciente ditar o código com o app aberto na mão, ela vincular
+   * ali na frente dele, e ele voltar para cá — que é exatamente o instante em
+   * que esta tela ainda diz que ele não tem nutricionista. Sem isto, a resposta
+   * certa só chega depois de fechar e abrir o app, e ninguém fecha app.
+   *
+   * Vale para a consulta pelo mesmo motivo: aceitar o pedido também é ação dela,
+   * e o app só descobre relendo. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => {
+      if (estado === 'active') setVersao(v => v + 1)
+    })
+    return () => sub.remove()
+  }, [])
 
   useEffect(() => {
     let vivo = true
@@ -77,8 +99,14 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
     ]).then(([cat, cont, minhas]) => {
       if (!vivo) return
 
+      /* O erro é limpo no sucesso, e não só escrito na falha: agora que a tela
+         relê sozinha, um erro que não sai da tela quando a próxima leitura dá
+         certo faria a ficha ficar escondida atrás de uma mensagem vencida. */
       if (cat.tipo === 'erro') setErro(cat.mensagem)
-      else setCatalogo(cat.catalogo)
+      else {
+        setErro(null)
+        setCatalogo(cat.catalogo)
+      }
 
       setConsultas(minhas)
 
@@ -89,10 +117,13 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
          RPC quebrou de fato — cast de data inválido — a lista simplesmente não
          apareceu, sem nada na tela dizendo por quê. Falha que não se anuncia
          custa uma sessão de depuração para ser encontrada. */
-      if (cont.tipo === 'ok') setConteudo(cont.conteudo)
-      else setErroConteudo(cont.mensagem)
+      if (cont.tipo === 'ok') {
+        setErroConteudo(null)
+        setConteudo(cont.conteudo)
+      } else setErroConteudo(cont.mensagem)
 
       setCarregando(false)
+      setAtualizando(false)
     })
 
     return () => {
@@ -101,6 +132,20 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
   }, [versao])
 
   const vinculada = catalogo?.vinculada ?? null
+
+  /* O mesmo controle nas duas ramificações da tela — a da ficha e a do erro.
+     Puxar sobe a versão, e é o efeito de cima que relê: um caminho só para
+     recarregar, seja quem for que pediu. */
+  const puxarParaAtualizar = (
+    <RefreshControl
+      refreshing={atualizando}
+      onRefresh={() => {
+        setAtualizando(true)
+        setVersao(v => v + 1)
+      }}
+      tintColor={cores.limao}
+    />
+  )
 
   /* Substitui a tela em vez de sobrepor: o "voltar" do conteúdo devolve à ficha,
      e não fecha as duas de uma vez. */
@@ -139,13 +184,24 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
           <ActivityIndicator color={cores.verde} />
         </View>
       ) : erro ? (
-        <View style={styles.conteudo}>
+        /* Rola, e não é uma View parada: é aqui que puxar para tentar de novo é
+           o gesto óbvio, e a tela vinha prometendo isso por escrito sem ter o
+           controle que atende ao gesto. */
+        <ScrollView
+          contentContainerStyle={styles.conteudo}
+          showsVerticalScrollIndicator={false}
+          refreshControl={puxarParaAtualizar}
+        >
           <View style={styles.erro}>
             <Text style={styles.textoErro}>{erro}</Text>
           </View>
-        </View>
+        </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={styles.conteudo} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.conteudo}
+          showsVerticalScrollIndicator={false}
+          refreshControl={puxarParaAtualizar}
+        >
           {vinculada ? (
             <Ficha
               nutri={vinculada}
@@ -210,15 +266,15 @@ function Ficha({
           onPress={onAgendar}
           style={({ pressed }) => [styles.cartaoProxima, pressed && styles.cartaoProximaPressionado]}
           accessibilityRole="button"
-          accessibilityLabel={`${ESTADO_DA_CONSULTA[destaque.status].titulo}: ${consultaLegivel(destaque.dataHora)}${
+          accessibilityLabel={`${estadoDaConsulta(destaque.status).titulo}: ${consultaLegivel(destaque.dataHora)}${
             outras > 0 ? `. Mais ${outras} marcada${outras > 1 ? 's' : ''}.` : ''
           }`}
         >
           <View style={styles.iconeProxima}>
-            <Ionicons name={ESTADO_DA_CONSULTA[destaque.status].icone} size={17} color={cores.verde} />
+            <Ionicons name={estadoDaConsulta(destaque.status).icone} size={17} color={cores.verde} />
           </View>
           <View style={styles.textoProxima}>
-            <Text style={styles.rotuloProxima}>{ESTADO_DA_CONSULTA[destaque.status].titulo}</Text>
+            <Text style={styles.rotuloProxima}>{estadoDaConsulta(destaque.status).titulo}</Text>
             <Text style={styles.dataProxima}>{consultaLegivel(destaque.dataHora)}</Text>
             {/* A contagem do resto, para a ficha não dar a entender que esta é a
                 única. Quem tem duas no mesmo dia precisa saber disso aqui, não

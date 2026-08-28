@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -103,6 +104,31 @@ export function EditarPlanoScreen({
     setRefeicoes(lista => lista.map(r => (r.chave === chave ? { ...r, itens: f(r.itens) } : r)))
     setErro('')
   }
+
+  /* O voltar do Android, camada por camada.
+   *
+   * A busca e o menu de ações abrem POR CIMA da edição: fechar o plano inteiro
+   * a partir deles perderia tudo que já foi montado. E quando não há nada por
+   * cima, o voltar passa por `sair`, e não por `onFechar` — é ele que faz a
+   * pergunta sobre descartar alterações. Um caminho de saída que pula o aviso
+   * seria pior que não ter aviso nenhum: existiria só para quem sai pelo canto
+   * da tela, e não para quem sai pelo botão do aparelho. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (busca) {
+        setBusca(null)
+        return true
+      }
+      if (acoesDe) {
+        setAcoesDe(null)
+        return true
+      }
+      sair()
+      return true
+    })
+
+    return () => sub.remove()
+  })
 
   function sair() {
     if (!mudou) {

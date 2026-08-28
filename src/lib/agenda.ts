@@ -41,7 +41,10 @@ export type MinhaConsulta = {
   id: number
   /* ISO com fuso, o horário da consulta. */
   dataHora: string
-  status: StatusConsulta
+  /* Texto cru do banco, e não `StatusConsulta`: os três acima são os estados de
+     hoje, e o app não tem como impedir que amanhã chegue um quarto. Quem
+     traduz é `estadoDaConsulta`, que sabe cair no genérico. */
+  status: string
   pedidaEm: string
 }
 
@@ -75,7 +78,7 @@ export async function carregarMinhasConsultas(): Promise<MinhaConsulta[]> {
   return ((data ?? []) as any[]).map(l => ({
     id: l.id,
     dataHora: l.data_hora,
-    status: l.status as StatusConsulta,
+    status: l.status,
     pedidaEm: l.pedida_em,
   }))
 }
@@ -142,16 +145,17 @@ export function consultaLegivel(dataHora: string): string {
  * O texto de 'confirmada' é afirmativo e sem ressalva — é o único momento em
  * que o app pode dizer que a consulta está marcada, e depois de uma tela
  * inteira falando em "pedido" a pessoa precisa ver a diferença sem procurar. */
-export const ESTADO_DA_CONSULTA: Record<
-  StatusConsulta,
-  {
-    titulo: string
-    /* Uma palavra, para a etiqueta das linhas compactas. */
-    curto: string
-    icone: 'hourglass-outline' | 'checkmark-circle'
-    explicacao: string
-  }
-> = {
+type Estado = {
+  titulo: string
+  /* Uma palavra, para a etiqueta das linhas compactas. */
+  curto: string
+  icone: 'hourglass-outline' | 'checkmark-circle' | 'calendar-outline'
+  explicacao: string
+}
+
+/* Interno de propósito: quem lê de fora usa `estadoDaConsulta`, que é o único
+   caminho que sobrevive a um status que este arquivo não conhece. */
+const ESTADO_DA_CONSULTA: Record<StatusConsulta, Estado> = {
   solicitada: {
     titulo: 'Aguardando resposta',
     curto: 'Pedido',
@@ -174,3 +178,25 @@ export const ESTADO_DA_CONSULTA: Record<
       'Está tudo certo para este horário. Se não puder ir, avise a sua nutricionista com antecedência.',
   },
 }
+
+/* O estado que o app usa quando o banco manda uma palavra que ele não conhece.
+ *
+ * Sem isto, `ESTADO_DA_CONSULTA[status]` devolve undefined e a linha seguinte lê
+ * `.titulo` dele — a tela inteira morre por causa de um valor novo numa coluna.
+ * E esse dia tem hora marcada: no momento em que a nutricionista puder recusar
+ * do lado dela, a recusa chega aqui como um status que este arquivo nunca viu.
+ *
+ * O texto é vago de propósito. Inventar significado para um estado desconhecido
+ * é como errar dizendo "confirmada" — e o erro caro desta tela é sempre o mesmo,
+ * a pessoa aparecer no consultório num dia em que não era esperada. Admitir que
+ * o app não sabe, e mandar perguntar, é a única saída honesta. */
+const DESCONHECIDO: Estado = {
+  titulo: 'Consulta',
+  curto: 'Consulta',
+  icone: 'calendar-outline',
+  explicacao:
+    'Não foi possível identificar a situação desta consulta. Confirme com a sua nutricionista antes de se programar para o dia.',
+}
+
+export const estadoDaConsulta = (status: string): Estado =>
+  ESTADO_DA_CONSULTA[status as StatusConsulta] ?? DESCONHECIDO
