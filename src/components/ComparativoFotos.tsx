@@ -175,6 +175,11 @@ function Coluna({
   angulo: AnguloFoto
   onAmpliar: (f: { url: string; legenda: string }) => void
 }) {
+  /* Qual endereço não carregou. Guardado o endereço, e não um sim/não, para que
+     uma URL nova — e elas são renovadas a cada abertura da tela — entre
+     tentando de novo em vez de herdar a desistência da anterior. */
+  const [falhou, setFalhou] = useState<string | null>(null)
+
   const foto = fotoDoAngulo(sessao, angulo)
   const quando = dataDaSessao(sessao?.data ?? null)
   const legenda = titulo ? `${titulo} · ${quando}` : quando
@@ -183,20 +188,33 @@ function Coluna({
     <View style={styles.coluna}>
       {!!titulo && <Text style={styles.tituloColuna}>{titulo}</Text>}
 
-      {foto ? (
+      {foto && foto.url !== falhou ? (
         <Pressable
           onPress={() => onAmpliar({ url: foto.url, legenda })}
           accessibilityRole="imagebutton"
           accessibilityLabel={`${legenda}. Toque para ampliar.`}
         >
-          <Image source={{ uri: foto.url }} style={styles.foto} resizeMode="cover" />
+          <Image
+            source={{ uri: foto.url }}
+            style={styles.foto}
+            resizeMode="cover"
+            /* As URLs vêm assinadas e valem uma hora. Vencida, a Image não
+               desenha nada — e num comparativo lado a lado isso deixa uma
+               coluna cheia e outra oca, sem dizer por quê. Numa tela cujo
+               assunto é comparar duas fotos, meia comparação em silêncio é o
+               pior desfecho possível. */
+            onError={() => setFalhou(foto.url)}
+          />
         </Pressable>
       ) : (
-        /* Só acontece com dado torto (sessão listada sem a foto do ângulo). Diz
-           o que houve em vez de mostrar um quadrado cinza sem explicação. */
+        /* Dois motivos caem aqui, e o texto separa os dois: dado torto (sessão
+           listada sem a foto daquele ângulo) e foto que existe mas não carregou.
+           Diz o que houve em vez de mostrar um quadrado cinza sem explicação. */
         <View style={[styles.foto, styles.fotoVazia]}>
-          <Ionicons name="image-outline" size={22} color={inkFraco} />
-          <Text style={styles.textoFotoVazia}>Sem foto deste ângulo</Text>
+          <Ionicons name={foto ? 'cloud-offline-outline' : 'image-outline'} size={22} color={inkFraco} />
+          <Text style={styles.textoFotoVazia}>
+            {foto ? 'Não consegui carregar esta foto' : 'Sem foto deste ângulo'}
+          </Text>
         </View>
       )}
 
