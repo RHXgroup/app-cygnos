@@ -1,5 +1,11 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import {
+  aplicarPrescricao,
+  carregarMetasPrescritas,
+  type CamposPrescritos,
+  type MetasPrescritas,
+} from './metasPrescritas'
 
 /* Conjuntos de metas que a pessoa define para si mesma. Vários por conta, com um
  * ativo — como os planos alimentares e os cálculos energéticos. Ver a migração
@@ -71,7 +77,24 @@ export const LIMITES = {
 
 export type CampoMeta = keyof typeof LIMITES
 
-export type ResultadoMetas = { tipo: 'ok'; metas: Metas } | { tipo: 'erro'; mensagem: string }
+export type ResultadoMetas =
+  | {
+      tipo: 'ok'
+      /* O que vale AGORA: as pessoais com a prescrição da nutricionista por
+         cima, campo a campo. É este o número que toda tela desenha. */
+      metas: Metas
+      /* Quais desses campos vieram dela. Vazio quando não há nutricionista, que
+         é o caso da maior parte de quem baixa. A tela usa para poder dizer de
+         quem é o número — sem isso, a pessoa vê a meta mudar sozinha e não tem
+         como descobrir por quê. */
+      prescritos: CamposPrescritos
+      /* A prescrição crua, para quem precisa do nome do plano e do objetivo.
+         Vem preenchida MESMO quando nada foi aplicado — plano detalhado, ou
+         montado por semana — justamente para a tela conseguir explicar por que
+         existe prescrição e os números não mudaram. */
+      prescricao: MetasPrescritas | null
+    }
+  | { tipo: 'erro'; mensagem: string }
 export type ResultadoListaMetas =
   | { tipo: 'ok'; lista: MetasSalvas[] }
   | { tipo: 'erro'; mensagem: string }
@@ -121,21 +144,34 @@ const daLinha = (l: LinhaMetas): MetasSalvas => ({
  * carregarPlanoAtivo: se por algum caminho a conta ficar sem ativo, vale o mais
  * recente, em vez de a tela voltar aos padrões e dizer que não há meta nenhuma. */
 export async function carregarMetas(contaId: string): Promise<ResultadoMetas> {
-  const { data, error } = await supabase
-    .from('app_metas')
-    .select(COLUNAS)
-    .eq('conta_id', contaId)
-    .order('ativo', { ascending: false })
-    .order('criado_em', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  /* As duas juntas, e não uma depois da outra: são consultas independentes, e
+     encadeá-las dobraria a espera da tela inicial por nada.
+
+     `carregarMetasPrescritas` nunca rejeita nem devolve erro — sem vínculo, sem
+     plano ou sem sinal, ela devolve null e o app fica com as metas pessoais. É
+     o que impede uma consulta A MAIS de derrubar a tela de quem nunca teve
+     nutricionista, que é a maior parte de quem usa. */
+  const [{ data, error }, prescricao] = await Promise.all([
+    supabase
+      .from('app_metas')
+      .select(COLUNAS)
+      .eq('conta_id', contaId)
+      .order('ativo', { ascending: false })
+      .order('criado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    carregarMetasPrescritas(),
+  ])
 
   if (error)
     return {
       tipo: 'erro',
       mensagem: falha('Não consegui carregar as suas metas. Verifique a conexão.', error),
     }
-  return { tipo: 'ok', metas: data ? daLinha(data as LinhaMetas) : METAS_VAZIAS }
+
+  const pessoais = data ? daLinha(data as LinhaMetas) : METAS_VAZIAS
+  const { metas, prescritos } = aplicarPrescricao(pessoais, prescricao)
+  return { tipo: 'ok', metas, prescritos, prescricao }
 }
 
 /* O mesmo, mas com a identidade da linha — para quem precisa saber QUAL conjunto
