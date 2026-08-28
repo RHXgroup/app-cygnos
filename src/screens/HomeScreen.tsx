@@ -43,6 +43,7 @@ import {
   type RefeicaoSalva,
 } from '../lib/plano'
 import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
+import { carregarMinhasConsultas, mereceAtencao } from '../lib/agenda'
 import {
   METAS_VAZIAS,
   carregarMetas,

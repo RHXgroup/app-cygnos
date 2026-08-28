@@ -18,6 +18,7 @@ import { Confirmacao } from '../components/Confirmacao'
 import { SeletorDias } from '../components/SeletorDias'
 import { TotaisPlano } from '../components/TotaisPlano'
 import { BuscarAlimentoScreen, type MotivoBusca } from './BuscarAlimentoScreen'
+import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
 import { milhar } from '../lib/formatar'
 import { mascaraHora, validarHora } from '../lib/formulario'
 import {
@@ -84,6 +85,9 @@ export function EditarPlanoScreen({
   const [dias, setDias] = useState<DiaSemana[]>(plano.diasSemana)
   const [refeicoes, setRefeicoes] = useState<RefeicaoMontada[]>(() => paraEdicao(plano))
   const [busca, setBusca] = useState<Busca | null>(null)
+  /* A outra porta da mesma refeição: escrever tudo de uma vez. Guarda a
+     chave e o rótulo — a chave para saber onde cai, o rótulo para o título. */
+  const [escrevendo, setEscrevendo] = useState<{ chave: string; rotulo: string } | null>(null)
   /* Qual item está com o menu de ações aberto. */
   const [acoesDe, setAcoesDe] = useState<{ refeicao: string; item: ItemAlimento } | null>(null)
   const [erro, setErro] = useState('')
@@ -117,6 +121,10 @@ export function EditarPlanoScreen({
    * da tela, e não para quem sai pelo botão do aparelho. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (escrevendo) {
+        setEscrevendo(null)
+        return true
+      }
       if (busca) {
         setBusca(null)
         return true
@@ -181,6 +189,21 @@ export function EditarPlanoScreen({
     }
 
     onSalvo()
+  }
+
+  if (escrevendo) {
+    return (
+      <EscreverRefeicaoScreen
+        refeicao={escrevendo.rotulo}
+        onFechar={() => setEscrevendo(null)}
+        onAdicionar={novos =>
+          mexerNosItens(escrevendo.chave, itens => [
+            ...itens,
+            ...novos.map(a => ({ ...a, variacoes: [] })),
+          ])
+        }
+      />
+    )
   }
 
   if (busca) {
@@ -273,6 +296,9 @@ export function EditarPlanoScreen({
             }}
             onAdicionar={() =>
               setBusca({ refeicao: r.chave, motivo: 'adicionar', titulo: r.rotulo || 'Refeição' })
+            }
+            onEscrever={() =>
+              setEscrevendo({ chave: r.chave, rotulo: r.rotulo || 'Refeição' })
             }
             onAcoes={item => setAcoesDe({ refeicao: r.chave, item })}
             onRemoverVariacao={(item, variacao) =>
@@ -415,6 +441,7 @@ function BlocoRefeicao({
   onHora,
   onRemover,
   onAdicionar,
+  onEscrever,
   onAcoes,
   onRemoverVariacao,
 }: {
@@ -424,6 +451,7 @@ function BlocoRefeicao({
   onHora: (h: string) => void
   onRemover: () => void
   onAdicionar: () => void
+  onEscrever: () => void
   onAcoes: (item: ItemAlimento) => void
   onRemoverVariacao: (item: string, variacao: string) => void
 }) {
@@ -523,6 +551,19 @@ function BlocoRefeicao({
         <Ionicons name="add" size={17} color={cores.verde} />
         <Text style={styles.textoTracejado}>Adicionar alimentos</Text>
       </Pressable>
+
+      {/* A outra porta: escrever a refeição inteira em vez de buscar item a
+          item. Discreta, abaixo da principal — é atalho, não o caminho. */}
+      <Pressable
+        onPress={onEscrever}
+        disabled={desativado}
+        style={({ pressed }) => [styles.botaoEscrever, pressed && styles.tracejadoPressionado]}
+        accessibilityRole="button"
+        accessibilityLabel="Escrever a refeição de uma vez"
+      >
+        <Ionicons name="create-outline" size={15} color={inkMedio} />
+        <Text style={styles.textoBotaoEscrever}>Escrever tudo de uma vez</Text>
+      </Pressable>
     </View>
   )
 }
@@ -558,6 +599,18 @@ function AcaoMenu({
 }
 
 const styles = StyleSheet.create({
+  botaoEscrever: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 8,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  textoBotaoEscrever: { fontSize: 12.5, fontWeight: '700', color: inkMedio },
   tela: { flex: 1, backgroundColor: cores.fundo },
 
   cabecalho: {
