@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
+import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
 import {
   REFEICOES,
   ajustarQuantidade,
@@ -70,7 +71,7 @@ export function ContadorCaloriasScreen({
   const [refeicao, setRefeicao] = useState(() => refeicaoPelaHora())
 
   /* null = a tela principal. As quatro portas abrem por cima dela. */
-  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | null>(null)
+  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | 'escrever' | null>(null)
   /* O que a pessoa já come nesta refeição. Carregado só quando a porta abre —
      são duas consultas que a maioria das visitas não usa, e pagá-las na abertura
      da tela atrasaria o caso comum por causa do caso eventual. */
@@ -308,6 +309,16 @@ export function ContadorCaloriasScreen({
     gravar(r.itens.map(i => doPlano(i, r.rotulo)))
   }
 
+  if (porta === 'escrever') {
+    return (
+      <EscreverRefeicaoScreen
+        refeicao={refeicao}
+        onFechar={() => setPorta(null)}
+        onAdicionar={novos => gravar(novos.map(a => doAlimento(a, refeicao)))}
+      />
+    )
+  }
+
   if (porta === 'busca') {
     return (
       <BuscarAlimentoScreen
@@ -405,6 +416,15 @@ export function ContadorCaloriasScreen({
               titulo="Repetir"
               detalhe="O de sempre"
               onPress={abrirRepetir}
+            />
+            {/* Escrever a refeição inteira: a porta que dispensa buscar
+                alimento por alimento. Fica por último porque erra mais que as
+                outras — e quem escolhe assumir isso o faz de propósito. */}
+            <Porta
+              icone="create-outline"
+              titulo="Escrever"
+              detalhe="Tudo de uma vez"
+              onPress={() => setPorta('escrever')}
             />
           </View>
 
