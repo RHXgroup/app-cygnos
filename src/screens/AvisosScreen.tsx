@@ -16,15 +16,23 @@ import { cores, inkFraco, inkSuave } from '../theme'
 
 /* O que aconteceu do lado da nutricionista.
  *
- * A tela é uma lista e nada mais: aqui não se responde, não se marca e não se
- * cancela nada. Cada aviso é uma frase e o caminho para o assunto dela está na
- * tela própria — o sino informa, e é só isso que ele promete.
+ * Aqui não se responde, não se marca e não se cancela nada: cada aviso é uma
+ * frase, e agir é assunto da tela do assunto. O que o cartão faz é LEVAR até
+ * ela — ler "pedido aguardando resposta" e não ter para onde ir é meia
+ * informação. Quem não tem destino não afunda ao toque nem mostra seta: um alvo
+ * que não responde ensina a pessoa a não tocar em nenhum.
  *
  * ── Carregar não é ver ─────────────────────────────────────────────────────
  * O retrato do estado atual só é guardado DEPOIS de a lista aparecer, e é isso
  * que faz um aviso continuar novo se a pessoa abriu o app no bolso e nem olhou.
  * Guardar no momento da busca marcaria como visto o que ninguém viu. */
-export function AvisosScreen({ onFechar }: { onFechar: () => void }) {
+export function AvisosScreen({
+  onFechar,
+  onAbrirNutricionistas,
+}: {
+  onFechar: () => void
+  onAbrirNutricionistas: () => void
+}) {
   const { top } = useSafeAreaInsets()
 
   const [lista, setLista] = useState<Aviso[] | null>(null)
@@ -98,7 +106,19 @@ export function AvisosScreen({ onFechar }: { onFechar: () => void }) {
           {lista.length === 0 ? (
             <Vazio />
           ) : (
-            lista.map(a => <Linha key={a.id} aviso={a} />)
+            lista.map(a => (
+              <Linha
+                key={a.id}
+                aviso={a}
+                onIr={
+                  a.destino === 'nutricionista'
+                    ? onAbrirNutricionistas
+                    : a.destino === 'inicio'
+                      ? onFechar
+                      : undefined
+                }
+              />
+            ))
           )}
         </ScrollView>
       )}
@@ -106,9 +126,11 @@ export function AvisosScreen({ onFechar }: { onFechar: () => void }) {
   )
 }
 
-function Linha({ aviso }: { aviso: Aviso }) {
-  return (
-    <View style={[styles.cartao, aviso.novo && styles.cartaoNovo]}>
+/* Sem destino, o cartão não afunda ao toque e não mostra a seta: um alvo que
+   não responde ensina a pessoa a não tocar em nenhum. */
+function Linha({ aviso, onIr }: { aviso: Aviso; onIr?: () => void }) {
+  const miolo = (
+    <>
       <View style={styles.circulo}>
         <Ionicons name={aviso.icone} size={18} color={cores.verde} />
       </View>
@@ -124,7 +146,26 @@ function Linha({ aviso }: { aviso: Aviso }) {
         </View>
         <Text style={styles.corpo}>{aviso.texto}</Text>
       </View>
-    </View>
+
+      {!!onIr && <Ionicons name="chevron-forward" size={16} color={inkFraco} />}
+    </>
+  )
+
+  if (!onIr) return <View style={[styles.cartao, aviso.novo && styles.cartaoNovo]}>{miolo}</View>
+
+  return (
+    <Pressable
+      onPress={onIr}
+      style={({ pressed }) => [
+        styles.cartao,
+        aviso.novo && styles.cartaoNovo,
+        pressed && styles.cartaoPressionado,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${aviso.titulo}. ${aviso.texto}`}
+    >
+      {miolo}
+    </Pressable>
   )
 }
 
@@ -164,6 +205,7 @@ const styles = StyleSheet.create({
 
   cartao: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     padding: 14,
     borderRadius: 16,
@@ -172,6 +214,7 @@ const styles = StyleSheet.create({
   /* O que é novidade ganha o menta, e não um ponto: a diferença precisa
      aparecer com a tela inteira à vista, não item por item. */
   cartaoNovo: { backgroundColor: cores.verdeMenta },
+  cartaoPressionado: { backgroundColor: cores.superficie },
 
   circulo: {
     width: 36,

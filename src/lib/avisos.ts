@@ -36,6 +36,13 @@ export type Aviso = {
      pedido em aberto, por exemplo — entra com `novo: false`: ele é estado, e
      não notícia, e piscar como novidade toda vez o transformaria em ruído. */
   novo: boolean
+  /* Para onde o toque leva. Um aviso que não leva a lugar nenhum é meia
+     informação: a pessoa lê "pedido aguardando resposta" e fica sem saber onde
+     olhar o resto.
+       'nutricionista' → a ficha dela, onde a consulta aparece por extenso
+       'inicio'        → fecha os avisos, porque o assunto já está na tela inicial
+       null            → não há para onde ir, e o cartão não finge que há */
+  destino: 'nutricionista' | 'inicio' | null
 }
 
 /* O retrato da última visita. Só chaves, nada de conteúdo: o que interessa é se
@@ -116,6 +123,7 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
         texto: `${agora.nutricionista.nome} passou a acompanhar você. O que ela registrar aparece aqui no app.`,
         icone: 'person-add',
         novo: true,
+        destino: 'nutricionista',
       })
     }
 
@@ -126,6 +134,8 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
         texto: 'A sua nutricionista publicou um plano novo. Ele já está valendo na tela inicial.',
         icone: 'restaurant',
         novo: true,
+        /* O plano novo já está valendo na tela inicial: o toque devolve para lá. */
+        destino: 'inicio',
       })
     }
   }
@@ -144,6 +154,7 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
         texto: `Você pediu ${c.quando}. A consulta ainda não está marcada.`,
         icone: 'hourglass-outline',
         novo: mudou && antes === undefined,
+        destino: 'nutricionista',
       })
       continue
     }
@@ -164,6 +175,7 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
         texto: `Houve uma mudança na consulta de ${c.quando}. Confirme com a sua nutricionista antes de se programar para o dia.`,
         icone: 'calendar',
         novo: true,
+        destino: 'nutricionista',
       })
       continue
     }
@@ -180,6 +192,7 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
         : `A sua consulta ficou marcada para ${c.quando}.`,
       icone: 'checkmark-circle',
       novo: true,
+      destino: 'nutricionista',
     })
   }
 

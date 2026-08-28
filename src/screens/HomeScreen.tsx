@@ -43,7 +43,7 @@ import {
   type RefeicaoSalva,
 } from '../lib/plano'
 import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
-import { carregarAvisos } from '../lib/avisos'
+import { carregarAvisos, quantosNovos } from '../lib/avisos'
 import {
   METAS_VAZIAS,
   carregarMetas,
@@ -256,7 +256,13 @@ export function HomeScreen({
     let ativo = true
 
     carregarAvisos()
-      .then(({ lista }) => ativo && setTemAviso(lista.length > 0))
+      /* Só o que ainda NÃO foi visto acende o ponto.
+       *
+       * Pela lista inteira, o pedido em aberto manteria o sino aceso até ela
+       * responder — e um ponto que nunca apaga é o defeito que este sino tinha
+       * antes, com outra roupa. Quem olhou, apagou; o pedido continua na lista
+       * de quem abrir. */
+      .then(({ lista }) => ativo && setTemAviso(quantosNovos(lista) > 0))
       .catch(() => ativo && setTemAviso(false))
 
     return () => {

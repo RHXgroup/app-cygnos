@@ -452,7 +452,15 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
         {avisosAbertos && (
           <View style={StyleSheet.absoluteFill}>
-            <AvisosScreen onFechar={() => setAvisosAbertos(false)} />
+            <AvisosScreen
+              onFechar={() => setAvisosAbertos(false)}
+              /* Fecha os avisos ao ir: voltar da ficha devolve à tela inicial,
+                 e não a uma lista de avisos que a pessoa já leu. */
+              onAbrirNutricionistas={() => {
+                setAvisosAbertos(false)
+                setNutricionistasAbertas(true)
+              }}
+            />
           </View>
         )}
 
