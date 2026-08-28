@@ -19,6 +19,7 @@ import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
 import {
   desligarLembretes,
   lembretesLigados,
+  reagendarSeLigados,
   ligarLembretes,
 } from '../lib/lembretes'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
@@ -70,7 +71,14 @@ export function MaisScreen({
 
     lembretesLigados().then(l => vivo && setLembretes(l))
     carregarPlanoAtivo(contaId).then(r => {
-      if (vivo && r.tipo === 'ok') setPlano(r.plano)
+      if (!vivo || r.tipo !== 'ok') return
+      setPlano(r.plano)
+
+      /* Reagenda quando o plano mudou desde a última vez. Quem muda o almoço
+         das 12:30 para as 13h continuaria sendo avisado no horário velho, sem
+         ter como saber por quê — e esta é a tela onde os lembretes moram, então
+         é aqui que a correção acontece sem custar nada a quem não os usa. */
+      reagendarSeLigados(r.plano)
     })
     buscar().finally(() => {
       if (vivo) setCarregando(false)
