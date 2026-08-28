@@ -92,34 +92,6 @@ export async function carregarMinhasConsultas(): Promise<MinhaConsulta[]> {
 export const consultaEmDestaque = (consultas: MinhaConsulta[]): MinhaConsulta | null =>
   consultas.find(c => c.status === 'solicitada') ?? consultas[0] ?? null
 
-/* Daqui a quantas horas uma consulta marcada deixa de ser "um dia desses" e vira
-   assunto de hoje. Dois dias cobrem o "é amanhã" sem virar aviso permanente para
-   quem tem retorno marcado para o mês que vem. */
-const HORAS_DE_AVISO = 48
-
-/* Isto aqui vale um ponto vermelho no sino da tela inicial?
- *
- * Só dois estados merecem: o pedido que ainda espera resposta, porque é o único
- * item da agenda que depende de alguém agir; e a consulta que está chegando,
- * porque é a que muda o dia da pessoa.
- *
- * Retorno marcado para daqui a três semanas NÃO merece. Um ponto que fica aceso
- * o tempo todo deixa de ser aviso e vira decoração — que era exatamente o
- * problema do sino antes disto existir: ele acendia sempre, sem olhar nada. */
-export function mereceAtencao(consultas: MinhaConsulta[]): boolean {
-  const limite = Date.now() + HORAS_DE_AVISO * 60 * 60 * 1000
-
-  return consultas.some(c => {
-    if (c.status === 'solicitada') return true
-
-    /* A lista só traz futuras, então caber dentro do limite é o mesmo que
-       acontecer nas próximas 48 horas. Data ilegível não acende nada: um ponto
-       vermelho por causa de um campo torto é pior do que nenhum. */
-    const quando = new Date(c.dataHora).getTime()
-    return !isNaN(quando) && quando <= limite
-  })
-}
-
 /* O banco recusa horário que saiu da lista e segundo pedido em aberto, e as
    duas recusas chegam aqui como mensagem pronta para ler ("Esse horário não
    está mais disponível."). Repassar essa mensagem é melhor do que traduzi-la:

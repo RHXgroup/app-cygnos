@@ -43,7 +43,7 @@ import {
   type RefeicaoSalva,
 } from '../lib/plano'
 import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
-import { carregarMinhasConsultas, mereceAtencao } from '../lib/agenda'
+import { carregarAvisos } from '../lib/avisos'
 import {
   METAS_VAZIAS,
   carregarMetas,
@@ -97,7 +97,7 @@ export function HomeScreen({
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirCadastros,
-  onAbrirNutricionistas,
+  onAbrirAvisos,
   onMontarPlano,
   onAbrirRefeicao,
   onEditarPlano,
@@ -126,8 +126,8 @@ export function HomeScreen({
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirCadastros: () => void
-  /* O destino do sino: é lá que a consulta mora. */
-  onAbrirNutricionistas: () => void
+  /* O destino do sino do topo. */
+  onAbrirAvisos: () => void
   onMontarPlano: () => void
   /* Sobem até o App porque estas telas precisam cobrir a barra de abas —
      abertas daqui de dentro, seriam recortadas pelo carrossel. */
@@ -153,9 +153,9 @@ export function HomeScreen({
      vínculo acabar. */
   const [planoDaNutri, setPlanoDaNutri] = useState<PlanoCompleto | null>(null)
   const [carregandoPlano, setCarregandoPlano] = useState(true)
-  /* Só para saber se o sino acende. A agenda inteira mora na tela de
-     agendamento; aqui a pergunta é de sim ou não. */
-  const [consultaPedeAtencao, setConsultaPedeAtencao] = useState(false)
+  /* Só para saber se o sino acende. A lista mora na tela de avisos; aqui a
+     pergunta é de sim ou não. */
+  const [temAviso, setTemAviso] = useState(false)
   const [agua, setAgua] = useState<Agua | null>(null)
   const [metas, setMetas] = useState<Metas>(METAS_VAZIAS)
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
@@ -255,9 +255,9 @@ export function HomeScreen({
   useEffect(() => {
     let ativo = true
 
-    carregarMinhasConsultas()
-      .then(c => ativo && setConsultaPedeAtencao(mereceAtencao(c)))
-      .catch(() => ativo && setConsultaPedeAtencao(false))
+    carregarAvisos()
+      .then(({ lista }) => ativo && setTemAviso(lista.length > 0))
+      .catch(() => ativo && setTemAviso(false))
 
     return () => {
       ativo = false
@@ -415,17 +415,15 @@ export function HomeScreen({
             resposta. Antes ele não fazia nem uma coisa nem outra: acendia
             sempre e não respondia ao toque. */}
         <Pressable
-          onPress={onAbrirNutricionistas}
+          onPress={onAbrirAvisos}
           style={styles.botaoTopo}
           accessibilityRole="button"
           accessibilityLabel={
-            consultaPedeAtencao
-              ? 'Consultas. Você tem uma consulta que precisa de atenção.'
-              : 'Consultas'
+            temAviso ? 'Avisos. Você tem avisos novos.' : 'Avisos'
           }
         >
           <Ionicons name="notifications-outline" size={20} color={cores.ink} />
-          {consultaPedeAtencao && <View style={styles.pontoAviso} />}
+          {temAviso && <View style={styles.pontoAviso} />}
         </Pressable>
       </View>
 

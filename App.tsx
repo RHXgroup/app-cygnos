@@ -21,6 +21,7 @@ import { BarraAbas, ORDEM_ABAS, type Aba } from './src/components/BarraAbas'
 import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from './src/lib/conta'
 import { supabase } from './src/lib/supabase'
 import { AguaScreen } from './src/screens/AguaScreen'
+import { AvisosScreen } from './src/screens/AvisosScreen'
 import { CadastroScreen } from './src/screens/CadastroScreen'
 import { CodigoScreen } from './src/screens/CodigoScreen'
 import { ContadorCaloriasScreen } from './src/screens/ContadorCaloriasScreen'
@@ -207,6 +208,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [perfilAberto, setPerfilAberto] = useState(false)
   const [codigoAberto, setCodigoAberto] = useState(false)
   const [nutricionistasAbertas, setNutricionistasAbertas] = useState(false)
+  const [avisosAbertos, setAvisosAbertos] = useState(false)
   const [excluirContaAberta, setExcluirContaAberta] = useState(false)
   const [cadastrosAberto, setCadastrosAberto] = useState(false)
   const [aguaAberta, setAguaAberta] = useState(false)
@@ -320,6 +322,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         [cadastrosAberto, () => setCadastrosAberto(false)],
         [excluirContaAberta, () => setExcluirContaAberta(false)],
         [nutricionistasAbertas, () => setNutricionistasAbertas(false)],
+        [avisosAbertos, () => setAvisosAbertos(false)],
         [codigoAberto, () => setCodigoAberto(false)],
         [perfilAberto, () => setPerfilAberto(false)],
       ]
@@ -357,6 +360,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     cadastrosAberto,
     excluirContaAberta,
     nutricionistasAbertas,
+    avisosAbertos,
     codigoAberto,
     perfilAberto,
   ])
@@ -397,6 +401,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 onAbrirPerfil={() => setPerfilAberto(true)}
                 onAbrirCodigo={() => setCodigoAberto(true)}
                 onAbrirNutricionistas={() => setNutricionistasAbertas(true)}
+                onAbrirAvisos={() => setAvisosAbertos(true)}
                 onAbrirExcluirConta={() => setExcluirContaAberta(true)}
                 onAbrirCadastros={() => setCadastrosAberto(true)}
                 onMontarPlano={() => setRegistrar({ inicial: 'plano' })}
@@ -441,6 +446,12 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         {nutricionistasAbertas && (
           <View style={StyleSheet.absoluteFill}>
             <NutricionistasScreen onFechar={() => setNutricionistasAbertas(false)} />
+          </View>
+        )}
+
+        {avisosAbertos && (
+          <View style={StyleSheet.absoluteFill}>
+            <AvisosScreen onFechar={() => setAvisosAbertos(false)} />
           </View>
         )}
 
@@ -596,6 +607,7 @@ function TelaDaAba({
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirNutricionistas,
+  onAbrirAvisos,
   onAbrirExcluirConta,
   onAbrirCadastros,
   onMontarPlano,
@@ -619,6 +631,8 @@ function TelaDaAba({
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirNutricionistas: () => void
+  /* O destino do sino do topo. */
+  onAbrirAvisos: () => void
   onAbrirExcluirConta: () => void
   onAbrirCadastros: () => void
   onMontarPlano: () => void
@@ -645,7 +659,7 @@ function TelaDaAba({
           onAbrirPerfil={onAbrirPerfil}
           onAbrirCodigo={onAbrirCodigo}
           onAbrirCadastros={onAbrirCadastros}
-          onAbrirNutricionistas={onAbrirNutricionistas}
+          onAbrirAvisos={onAbrirAvisos}
           onMontarPlano={onMontarPlano}
           onAbrirRefeicao={onAbrirRefeicao}
           onEditarPlano={onEditarPlano}
