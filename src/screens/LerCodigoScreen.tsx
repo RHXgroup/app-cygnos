@@ -1,0 +1,424 @@
+import { useEffect, useRef, useState } from 'react'
+import {
+  ActivityIndicator,
+  BackHandler,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
+import { CameraView, useCameraPermissions } from 'expo-camera'
+import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { consultarCodigo, type ProdutoLido } from '../lib/codigoBarras'
+import { porcao } from '../lib/alimentos'
+import { novaChave, type AlimentoEscolhido } from '../lib/plano'
+import { milhar } from '../lib/formatar'
+import { cores, inkFraco, inkMedio, inkSuave, veu } from '../theme'
+
+/* Ler o código de barras do produto.
+ *
+ * O pacote na mão já diz exatamente qual produto é. Digitar "biscoito recheado
+ * chocolate" e escolher entre doze parecidos é o oposto do gesto — e é o que o
+ * app pedia até aqui para qualquer coisa embalada.
+ *
+ * ── O que aparece antes de gravar ──────────────────────────────────────────
+ * O produto, de onde veio o dado e a quantidade. Nunca grava direto: um código
+ * lido errado — e acontece, com etiqueta amassada — colocaria comida que a
+ * pessoa não comeu no diário dela. */
+export function LerCodigoScreen({
+  onAdicionar,
+  onFechar,
+}: {
+  onAdicionar: (item: AlimentoEscolhido) => void
+  onFechar: () => void
+}) {
+  const { top, bottom } = useSafeAreaInsets()
+  const [permissao, pedirPermissao] = useCameraPermissions()
+  const [consultando, setConsultando] = useState(false)
+  const [produto, setProduto] = useState<ProdutoLido | null>(null)
+  const [erro, setErro] = useState('')
+  const [gramas, setGramas] = useState(100)
+
+  /* O leitor dispara várias vezes por segundo enquanto o código está no
+     enquadramento. Sem esta trava, uma leitura vira dez consultas. */
+  const lendo = useRef(false)
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (produto) {
+        /* Volta a ler em vez de sair: quem escaneou o produto errado quer o
+           próximo, não a tela anterior. */
+        setProduto(null)
+        lendo.current = false
+        return true
+      }
+      onFechar()
+      return true
+    })
+    return () => sub.remove()
+  }, [produto, onFechar])
+
+  async function aoLer(codigo: string) {
+    if (lendo.current) return
+    lendo.current = true
+
+    setErro('')
+    setConsultando(true)
+    const r = await consultarCodigo(codigo)
+    setConsultando(false)
+
+    if (r.tipo === 'ok') {
+      setProduto(r.produto)
+      /* A embalagem inteira quando o produto informa o peso; 100 g quando não.
+         Quem escaneia costuma comer o pacote ou uma fração dele, e 100 g é a
+         base da tabela — o número que a pessoa reconhece do rótulo. */
+      setGramas(r.produto.porcaoEmbalagem ?? 100)
+      return
+    }
+
+    if (r.tipo === 'nao_encontrado') {
+      setErro(
+        'Não achei este produto. Ele pode não estar cadastrado ainda — use a busca pelo nome.',
+      )
+    } else {
+      setErro(r.mensagem)
+    }
+    /* Destrava para tentar outro código sem sair da tela. */
+    lendo.current = false
+  }
+
+  function adicionar() {
+    if (!produto) return
+
+    onAdicionar({
+      chave: novaChave(),
+      /* Sem id: este produto não está na nossa base, e inventar um vínculo
+         apontaria para uma linha que não existe. O nome e os nutrientes vão
+         copiados, que é como o app já guarda tudo. */
+      alimentoId: null,
+      nome: produto.nome,
+      marca: produto.marca,
+      descricao: `${milhar(gramas)} g`,
+      gramasTotais: gramas,
+      caloriasPor100g: produto.calorias,
+      proteinasPor100g: produto.proteinas,
+      carboidratosPor100g: produto.carboidratos,
+      gordurasPor100g: produto.gorduras,
+      fibrasPor100g: produto.fibras,
+    })
+    onFechar()
+  }
+
+  /* ── Permissão ──────────────────────────────────────────────────────────*/
+  if (!permissao) {
+    return (
+      <View style={[styles.tela, styles.centro]}>
+        <ActivityIndicator color={cores.verde} />
+      </View>
+    )
+  }
+
+  if (!permissao.granted) {
+    return (
+      <View style={[styles.tela, { paddingTop: top + 8 }]}>
+        <Cabecalho onFechar={onFechar} titulo="Código de barras" />
+        <View style={styles.aviso}>
+          <Ionicons name="camera-outline" size={34} color={cores.verde} />
+          <Text style={styles.tituloAviso}>A câmera precisa da sua permissão</Text>
+          <Text style={styles.textoAviso}>
+            Ela é usada só para ler o código de barras do produto, aqui na tela. Nada é
+            fotografado nem enviado.
+          </Text>
+          <Pressable
+            onPress={pedirPermissao}
+            style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.textoBotao}>Permitir a câmera</Text>
+          </Pressable>
+        </View>
+      </View>
+    )
+  }
+
+  /* ── O produto lido ─────────────────────────────────────────────────────*/
+  if (produto) {
+    const kcal = porcao(produto.calorias, gramas)
+
+    return (
+      <View style={[styles.tela, { paddingTop: top + 8 }]}>
+        <Cabecalho onFechar={onFechar} titulo="Confira o produto" />
+
+        <View style={styles.conteudo}>
+          <View style={styles.cartao}>
+            <Text style={styles.nomeProduto}>{produto.nome}</Text>
+            {!!produto.marca && <Text style={styles.marcaProduto}>{produto.marca}</Text>}
+
+            <View style={styles.numeros}>
+              <Numero rotulo="Calorias" valor={kcal === null ? '—' : `${milhar(kcal)} kcal`} />
+              <Numero
+                rotulo="Proteínas"
+                valor={naPorcao(produto.proteinas, gramas)}
+              />
+              <Numero
+                rotulo="Carboidratos"
+                valor={naPorcao(produto.carboidratos, gramas)}
+              />
+              <Numero rotulo="Gorduras" valor={naPorcao(produto.gorduras, gramas)} />
+            </View>
+
+            {/* De onde veio o número. Um dado da nossa base foi conferido por
+                alguém; um do Open Food Facts é colaborativo. Esconder a
+                diferença seria dar a mesma confiança aos dois. */}
+            <Text style={styles.origem}>
+              {produto.origem === 'base'
+                ? 'Da base do Cygnos'
+                : 'Do Open Food Facts · dado colaborativo, confira o rótulo'}
+            </Text>
+          </View>
+
+          <Text style={styles.rotuloQuantidade}>Quanto você comeu</Text>
+          <View style={styles.atalhos}>
+            {atalhosDePeso(produto.porcaoEmbalagem).map(g => (
+              <Pressable
+                key={g}
+                onPress={() => setGramas(g)}
+                style={({ pressed }) => [
+                  styles.atalho,
+                  gramas === g && styles.atalhoAtivo,
+                  pressed && styles.pressionado,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: gramas === g }}
+              >
+                <Text style={[styles.textoAtalho, gramas === g && styles.textoAtalhoAtivo]}>
+                  {milhar(g)} g
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable
+            onPress={adicionar}
+            style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
+            accessibilityRole="button"
+          >
+            <Ionicons name="add" size={18} color={cores.branco} />
+            <Text style={styles.textoBotao}>Adicionar</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              setProduto(null)
+              lendo.current = false
+            }}
+            style={styles.linkOutro}
+            accessibilityRole="button"
+          >
+            <Text style={styles.textoLinkOutro}>Ler outro código</Text>
+          </Pressable>
+        </View>
+      </View>
+    )
+  }
+
+  /* ── A câmera ───────────────────────────────────────────────────────────*/
+  return (
+    <View style={styles.tela}>
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        barcodeScannerSettings={{
+          /* Os formatos de produto embalado. Sem QR de propósito: aqui um QR
+             nunca é comida, e aceitá-lo só produziria consultas inúteis. */
+          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'],
+        }}
+        onBarcodeScanned={({ data }) => aoLer(data)}
+      />
+
+      <View style={[styles.sobreposto, { paddingTop: top + 8, paddingBottom: bottom + 24 }]}>
+        <Cabecalho onFechar={onFechar} titulo="Código de barras" claro />
+
+        <View style={styles.miraArea}>
+          <View style={styles.mira} />
+          <Text style={styles.dica}>Aponte para o código de barras do produto</Text>
+        </View>
+
+        {consultando && (
+          <View style={styles.consultando}>
+            <ActivityIndicator color={cores.branco} />
+            <Text style={styles.textoConsultando}>Procurando o produto…</Text>
+          </View>
+        )}
+
+        {!!erro && (
+          <View style={styles.erroCaixa}>
+            <Text style={styles.textoErro}>{erro}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  )
+}
+
+function Cabecalho({
+  titulo,
+  onFechar,
+  claro = false,
+}: {
+  titulo: string
+  onFechar: () => void
+  claro?: boolean
+}) {
+  return (
+    <View style={styles.cabecalho}>
+      <Pressable
+        onPress={onFechar}
+        style={styles.botaoVoltar}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Voltar"
+      >
+        <Ionicons name="chevron-back" size={22} color={claro ? cores.branco : cores.ink} />
+      </Pressable>
+      <Text style={[styles.tituloTela, claro && styles.tituloClaro]}>{titulo}</Text>
+      <View style={styles.botaoVoltar} />
+    </View>
+  )
+}
+
+function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <View style={styles.numero}>
+      <Text style={styles.valorNumero}>{valor}</Text>
+      <Text style={styles.rotuloNumero}>{rotulo}</Text>
+    </View>
+  )
+}
+
+const naPorcao = (por100g: number | null, gramas: number): string => {
+  const v = porcao(por100g, gramas)
+  return v === null ? '—' : `${milhar(v)} g`
+}
+
+/* Os pesos que fazem sentido oferecer. A embalagem inteira entra quando o
+   produto a informa, e o resto são frações da tabela — 100 g é a base de
+   qualquer rótulo, e metade e um terço cobrem "comi um pedaço". */
+function atalhosDePeso(embalagem: number | null): number[] {
+  const base = [30, 50, 100, 200]
+  if (!embalagem || embalagem <= 0) return base
+
+  const comEmbalagem = [
+    Math.round(embalagem),
+    Math.round(embalagem / 2),
+    Math.round(embalagem / 4),
+    100,
+  ]
+  /* Sem repetidos e em ordem: uma embalagem de 100 g produziria dois botões
+     iguais, e dois botões iguais parecem defeito. */
+  return [...new Set(comEmbalagem)].filter(g => g > 0).sort((a, b) => a - b)
+}
+
+const styles = StyleSheet.create({
+  tela: { flex: 1, backgroundColor: cores.fundo },
+  centro: { alignItems: 'center', justifyContent: 'center' },
+
+  cabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloClaro: { color: cores.branco },
+
+  sobreposto: { flex: 1, justifyContent: 'space-between' },
+  miraArea: { alignItems: 'center', gap: 14 },
+  mira: {
+    width: '78%',
+    height: 150,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: cores.limao,
+    backgroundColor: 'transparent',
+  },
+  dica: { fontSize: 14, color: cores.branco, textAlign: 'center', paddingHorizontal: 32 },
+
+  consultando: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: veu,
+    marginHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  textoConsultando: { fontSize: 14, fontWeight: '700', color: cores.branco },
+
+  erroCaixa: {
+    backgroundColor: veu,
+    marginHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+  },
+  textoErro: { fontSize: 13.5, color: cores.branco, lineHeight: 20 },
+
+  conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 14 },
+  cartao: {
+    backgroundColor: cores.cartao,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    padding: 16,
+    gap: 4,
+  },
+  nomeProduto: { fontSize: 18, fontWeight: '800', color: cores.ink, letterSpacing: -0.3 },
+  marcaProduto: { fontSize: 13, color: inkSuave },
+
+  numeros: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  numero: { flex: 1, alignItems: 'center', gap: 2 },
+  valorNumero: { fontSize: 15, fontWeight: '800', color: cores.limao },
+  rotuloNumero: { fontSize: 10.5, color: inkSuave, textAlign: 'center' },
+
+  origem: { fontSize: 11.5, color: inkFraco, marginTop: 12, lineHeight: 17 },
+
+  rotuloQuantidade: { fontSize: 13, fontWeight: '700', color: inkMedio },
+  atalhos: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  atalho: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
+  atalhoAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
+  textoAtalho: { fontSize: 14, fontWeight: '700', color: cores.ink },
+  textoAtalhoAtivo: { color: cores.sobreLimao },
+
+  aviso: { paddingHorizontal: 28, paddingTop: 40, alignItems: 'center', gap: 10 },
+  tituloAviso: { fontSize: 18, fontWeight: '800', color: cores.ink, textAlign: 'center' },
+  textoAviso: { fontSize: 14, color: inkMedio, textAlign: 'center', lineHeight: 21 },
+
+  botao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: 13,
+    backgroundColor: cores.verde,
+    marginTop: 8,
+  },
+  textoBotao: { fontSize: 15, fontWeight: '800', color: cores.branco },
+  pressionado: { opacity: 0.75 },
+
+  linkOutro: { alignItems: 'center', paddingVertical: 10 },
+  textoLinkOutro: { fontSize: 13.5, fontWeight: '700', color: inkMedio },
+})

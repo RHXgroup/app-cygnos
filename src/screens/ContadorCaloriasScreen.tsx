@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
 import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
+import { LerCodigoScreen } from './LerCodigoScreen'
 import {
   REFEICOES,
   ajustarQuantidade,
@@ -71,7 +72,7 @@ export function ContadorCaloriasScreen({
   const [refeicao, setRefeicao] = useState(() => refeicaoPelaHora())
 
   /* null = a tela principal. As quatro portas abrem por cima dela. */
-  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | 'escrever' | null>(null)
+  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | 'escrever' | 'codigo' | null>(null)
   /* O que a pessoa já come nesta refeição. Carregado só quando a porta abre —
      são duas consultas que a maioria das visitas não usa, e pagá-las na abertura
      da tela atrasaria o caso comum por causa do caso eventual. */
@@ -309,6 +310,15 @@ export function ContadorCaloriasScreen({
     gravar(r.itens.map(i => doPlano(i, r.rotulo)))
   }
 
+  if (porta === 'codigo') {
+    return (
+      <LerCodigoScreen
+        onFechar={() => setPorta(null)}
+        onAdicionar={a => gravar([doAlimento(a, refeicao)])}
+      />
+    )
+  }
+
   if (porta === 'escrever') {
     return (
       <EscreverRefeicaoScreen
@@ -425,6 +435,15 @@ export function ContadorCaloriasScreen({
               titulo="Escrever"
               detalhe="Tudo de uma vez"
               onPress={() => setPorta('escrever')}
+            />
+            {/* O pacote na mão já diz qual produto é. Fica ao lado de
+                "Buscar" porque resolve o mesmo problema — achar o alimento —
+                sem a parte de digitar e escolher entre parecidos. */}
+            <Porta
+              icone="barcode-outline"
+              titulo="Código de barras"
+              detalhe="Produto embalado"
+              onPress={() => setPorta('codigo')}
             />
           </View>
 
