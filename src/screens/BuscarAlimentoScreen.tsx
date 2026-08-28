@@ -83,21 +83,26 @@ const ESPERA_BUSCA = 350
  * — o painel ficava exatamente onde estava, atrás do teclado. Com a altura na
  * mão, o painel sobe sozinho.
  *
- * No Android a janela inteira encolhe quando o teclado abre (softwareKeyboard-
- * LayoutMode "resize", o padrão do Expo), então lá o `bottom: 0` já nasce acima
- * do teclado e somar a altura empurraria duas vezes. Por isso só o iOS desloca. */
+ * Os dois sistemas deslocam. Antes só o iOS o fazia, porque o Android encolhia
+ * a janela inteira quando o teclado subia e somar a altura empurraria duas
+ * vezes. Essa premissa caiu: o Expo passou a ligar edge-to-edge por padrão, a
+ * janela deixou de encolher, e o painel voltou a ficar escondido atrás do
+ * teclado — justamente no campo de quantidade, que é onde se digita. */
 function useAlturaTeclado(): number {
   const [altura, setAltura] = useState(0)
 
   useEffect(() => {
-    if (Platform.OS !== 'ios') return
+    /* Will* no iOS acompanha a animação do teclado; o Android só emite Did*, e
+       lá o painel salta depois que ela termina — feio, mas visível, que é o
+       oposto do que acontecia antes. */
+    const ehIOS = Platform.OS === 'ios'
 
-    /* Will*, e não Did*: acompanha a animação do teclado em vez de saltar
-       depois que ela termina. Só o iOS emite esses eventos. */
-    const aoAbrir = Keyboard.addListener('keyboardWillShow', e =>
+    const aoAbrir = Keyboard.addListener(ehIOS ? 'keyboardWillShow' : 'keyboardDidShow', e =>
       setAltura(e.endCoordinates.height),
     )
-    const aoFechar = Keyboard.addListener('keyboardWillHide', () => setAltura(0))
+    const aoFechar = Keyboard.addListener(ehIOS ? 'keyboardWillHide' : 'keyboardDidHide', () =>
+      setAltura(0),
+    )
 
     return () => {
       aoAbrir.remove()

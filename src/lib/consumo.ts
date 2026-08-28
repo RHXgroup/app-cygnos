@@ -247,6 +247,67 @@ export async function apagarConsumo(id: string): Promise<{ erro: string } | null
   return error ? { erro: error.message } : null
 }
 
+/* ── Corrigir o que já foi registrado ──────────────────────────────────────
+ *
+ * Errar a refeição e comer mais ou menos do que se registrou são os dois
+ * enganos comuns, e até aqui os dois custavam o mesmo: apagar e descrever tudo
+ * de novo. Apagar é destrutivo e refazer é trabalhoso — para consertar um toque
+ * errado, é caro demais.
+ *
+ * A tabela não guarda a porção, só os nutrientes absolutos dela. Então a
+ * correção de quantidade é uma PROPORÇÃO, e não um peso novo: comer metade é
+ * metade de tudo, e essa conta fecha sem precisar saber quantos gramas eram. */
+export async function moverDeRefeicao(
+  id: string,
+  refeicao: string,
+): Promise<{ erro: string } | null> {
+  const { error } = await supabase
+    .from('app_consumo_itens')
+    .update({ refeicao: refeicao.trim() })
+    .eq('id', id)
+
+  return error ? { erro: error.message } : null
+}
+
+/* Multiplica os nutrientes do item. `fator` 0.5 é "comi metade", 2 é "comi o
+   dobro". A descrição ganha a nota do que foi ajustado, porque um item que
+   dizia "2 fatias" e agora vale 1 precisa dizer isso — senão o diário mente
+   sobre o que foi comido. */
+export async function ajustarQuantidade(
+  item: ItemConsumo,
+  fator: number,
+): Promise<{ tipo: 'ok'; item: ItemConsumo } | { tipo: 'erro'; mensagem: string }> {
+  const escalar = (v: number | null) => (v === null ? null : Math.round(v * fator * 10) / 10)
+
+  const valores = {
+    calorias: escalar(item.calorias),
+    proteinas: escalar(item.proteinas),
+    carboidratos: escalar(item.carboidratos),
+    gorduras: escalar(item.gorduras),
+    fibras: escalar(item.fibras),
+    descricao: descricaoAjustada(item.descricao, fator),
+  }
+
+  const { data, error } = await supabase
+    .from('app_consumo_itens')
+    .update(valores)
+    .eq('id', item.id)
+    .select(COLUNAS)
+    .single()
+
+  if (error) return { tipo: 'erro', mensagem: error.message }
+  return { tipo: 'ok', item: daLinha(data as Linha) }
+}
+
+/* "2 fatias" ajustado pela metade vira "2 fatias (metade)". Não tenta reescrever
+   a quantidade original — "1 fatia" seria uma invenção quando o que se comeu foi
+   metade de duas, e há caso em que a conta nem fecha em número inteiro. */
+function descricaoAjustada(descricao: string | null, fator: number): string {
+  const nota = fator === 0.5 ? 'metade' : fator === 2 ? 'o dobro' : `${fator}×`
+  const limpa = (descricao ?? '').replace(/\s*\((metade|o dobro|[\d.,]+×)\)$/, '').trim()
+  return limpa ? `${limpa} (${nota})` : nota
+}
+
 /* ── Repetir o que já se come ──────────────────────────────────────────────
  *
  * Quem toma o mesmo café da manhã todo dia descrevia tudo de novo, todo dia. É
