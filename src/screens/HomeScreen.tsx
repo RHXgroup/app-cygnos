@@ -74,7 +74,14 @@ import {
   tempoDormindo,
   type Noite,
 } from '../lib/sono'
-import { carregarSessoes, sequencia, sessoesNaSemana, type Sessao } from '../lib/treino'
+import {
+  carregarRotina,
+  carregarSessoes,
+  sequencia,
+  sessoesNaSemana,
+  type Exercicio,
+  type Sessao,
+} from '../lib/treino'
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
 import { cores, coresMacro, degrades, inkFraco, inkMedio, inkSuave } from '../theme'
 
@@ -183,6 +190,9 @@ export function HomeScreen({
   const [diaSelecionado, setDiaSelecionado] = useState(() => new Date())
   const [noites, setNoites] = useState<Noite[]>([])
   const [sessoes, setSessoes] = useState<Sessao[]>([])
+  /* Só o anel usa: é a rotina que diz se hoje é dia de treino ou de descanso.
+     Sem ela não há como cobrar treino de ninguém — ver lib/metaDoDia. */
+  const [rotina, setRotina] = useState<Exercicio[]>([])
   const [detalheDoDia, setDetalheDoDia] = useState(false)
 
   useEffect(() => {
@@ -384,6 +394,10 @@ export function HomeScreen({
       if (ativo && r.tipo === 'ok') setSessoes(r.sessoes)
     })
 
+    carregarRotina(sessao.user.id).then(r => {
+      if (ativo && r.tipo === 'ok') setRotina(r.exercicios)
+    })
+
     return () => {
       ativo = false
     }
@@ -445,6 +459,8 @@ export function HomeScreen({
     consumo: consumoDeHoje,
     noites,
     plano: planoNaTela,
+    rotina,
+    sessoes,
   })
 
   /* O que sobra para o gráfico depois das duas colunas de texto do cartão de
@@ -1156,7 +1172,7 @@ function FolhaDoDia({ doDia, onFechar }: { doDia: MetaDoDia; onFechar: () => voi
         <Text style={styles.notaFolha}>
           {doDia.soAgua
             ? 'Só a água está entrando na conta. Defina metas de caloria, macros ou sono — ou ative um plano alimentar — e o anel passa a medir o dia inteiro.'
-            : 'Cada assunto pesa o mesmo, e nenhum passa de 100% — beber quatro litros não compensa uma noite curta. Passos e treinos ficam de fora enquanto o app não registrar os dois.'}
+            : 'Cada assunto pesa o mesmo, e nenhum passa de 100% — beber quatro litros não compensa uma noite curta. Treino só entra nos dias que a sua rotina marca; passos ficam de fora enquanto o app não registrar.'}
         </Text>
       </View>
     </View>

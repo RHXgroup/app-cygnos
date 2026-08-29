@@ -4,6 +4,7 @@ import { dataISO } from './formatar'
 import type { Metas } from './metas'
 import type { PlanoCompleto } from './plano'
 import { tempoDormindo, type Noite } from './sono'
+import type { Exercicio, Sessao } from './treino'
 
 /* O anel de "Meta do dia" da tela inicial.
  *
@@ -22,10 +23,21 @@ import { tempoDormindo, type Noite } from './sono'
  * Mesma regra de todo o resto do app: null é "não acompanho isso", não zero.
  *
  * ── Só entra o que o app registra ─────────────────────────────────────────
- * Passos e treinos têm meta em app_metas, mas o app não registra nem um nem
- * outro. Entrassem, ficariam em 0% para sempre e o anel jamais passaria de 50% —
- * um teto invisível que a pessoa nunca entenderia. Voltam a contar no dia em que
- * tiverem tela.
+ * Passos ainda não têm tela: entrassem, ficariam em 0% para sempre e o anel
+ * jamais passaria do teto — um limite invisível que a pessoa nunca entenderia.
+ * Voltam a contar no dia em que houver como registrar.
+ *
+ * Treino passou a contar, mas não do jeito óbvio. A meta dele é POR SEMANA, e
+ * ninguém treina todo dia: um pilar "treinou hoje?" marcaria zero em toda
+ * segunda de descanso, punindo alguém que está seguindo o plano. E um pilar
+ * "quanto da semana já foi" começaria toda segunda em 25%, arrastando o anel
+ * para baixo de quem não fez nada de errado.
+ *
+ * Quem resolve isso é a ROTINA, que o app já guarda por dia da semana. Se hoje
+ * tem exercício marcado, o pilar pergunta se treinou hoje. Se hoje é dia de
+ * descanso, ou se não há rotina montada, o pilar simplesmente não existe — e o
+ * anel mede o resto do dia sem ele, como sempre fez com quem não definiu uma
+ * meta.
  *
  * ── Passar da meta não vale mais que cumpri-la ────────────────────────────
  * Cada pilar é limitado a 100%. Beber quatro litros não compensa uma noite mal
@@ -35,12 +47,17 @@ import { tempoDormindo, type Noite } from './sono'
  * que diz "480 kcal acima da meta" com todas as letras — o anel não precisa
  * repetir a bronca. */
 
-export type ChavePilar = 'alimentacao' | 'refeicoes' | 'agua' | 'sono'
+export type ChavePilar = 'alimentacao' | 'refeicoes' | 'agua' | 'sono' | 'treino'
 
 export type Pilar = {
   chave: ChavePilar
   rotulo: string
-  icone: 'flame-outline' | 'restaurant-outline' | 'water-outline' | 'moon-outline'
+  icone:
+    | 'flame-outline'
+    | 'restaurant-outline'
+    | 'water-outline'
+    | 'moon-outline'
+    | 'barbell-outline'
   /* 0 a 1, já limitado. */
   fracao: number
   /* O que o número quer dizer, em português. É o que torna o anel auditável:
@@ -152,12 +169,47 @@ function pilarSono(metas: Metas, noites: Noite[], hoje: Date): Pilar | null {
   }
 }
 
+/* O treino de HOJE, quando hoje é dia de treino na rotina.
+ *
+ * Binário de propósito, ao contrário de água e sono: não existe "metade de um
+ * treino" no que o app registra. A sessão aconteceu ou não aconteceu.
+ *
+ * Devolve null em dois casos, e os dois são legítimos: sem rotina montada não
+ * há como saber se hoje era dia de treino, e num dia de descanso não há o que
+ * cobrar. Nos dois o pilar some, em vez de valer zero. */
+function pilarTreino(
+  rotina: Exercicio[],
+  sessoes: Sessao[],
+  hoje: Date,
+): Pilar | null {
+  if (rotina.length === 0) return null
+
+  const diaDeHoje = hoje.getDay()
+  if (!rotina.some(e => e.dia === diaDeHoje)) return null
+
+  const data = dataISO(hoje)
+  const treinou = sessoes.some(s => s.data === data)
+  const quantos = rotina.filter(e => e.dia === diaDeHoje).length
+
+  return {
+    chave: 'treino',
+    rotulo: 'Treino',
+    icone: 'barbell-outline',
+    fracao: treinou ? 1 : 0,
+    detalhe: treinou
+      ? 'treino de hoje registrado'
+      : `${quantos} ${quantos === 1 ? 'exercício' : 'exercícios'} na rotina de hoje`,
+  }
+}
+
 export function calcularMetaDoDia({
   metas,
   agua,
   consumo,
   noites,
   plano,
+  rotina = [],
+  sessoes = [],
   hoje = new Date(),
 }: {
   metas: Metas
@@ -165,6 +217,11 @@ export function calcularMetaDoDia({
   consumo: ItemConsumo[]
   noites: Noite[]
   plano: PlanoCompleto | null
+  /* Com reserva vazia: quem chama sem treino continua tendo os quatro pilares
+     de sempre, e não precisa mudar por causa de um quinto que pode não existir
+     naquela tela. */
+  rotina?: Exercicio[]
+  sessoes?: Sessao[]
   hoje?: Date
 }): MetaDoDia {
   const pilares = [
@@ -172,6 +229,7 @@ export function calcularMetaDoDia({
     pilarRefeicoes(plano, consumo),
     pilarAgua(agua),
     pilarSono(metas, noites, hoje),
+    pilarTreino(rotina, sessoes, hoje),
   ].filter((p): p is Pilar => p !== null)
 
   const percentual =
