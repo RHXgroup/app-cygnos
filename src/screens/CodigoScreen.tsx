@@ -92,18 +92,27 @@ export function CodigoScreen({
 
     let ativo = true
     let timer: ReturnType<typeof setTimeout> | null = null
+    /* Qual laço é o válido.
+     *
+     * Sem isto, voltar do segundo plano enquanto uma pergunta ainda está no ar
+     * cria um segundo laço sem desligar o primeiro: o `clearTimeout` só alcança
+     * a espera, e não a chamada em voo. O primeiro laço volta, agenda a próxima
+     * pergunta e perde o seu próprio identificador — e a tela passa a perguntar
+     * duas vezes a cada quatro segundos, depois três, uma por ida ao segundo
+     * plano. Justamente na tela em que sair do app e voltar é o gesto esperado. */
+    let geracao = 0
 
-    async function perguntar() {
-      if (!ativo) return
+    async function perguntar(minha: number) {
+      if (!ativo || minha !== geracao) return
 
       if (await jaVinculado()) {
-        if (!ativo) return
+        if (!ativo || minha !== geracao) return
         /* Só agora o catálogo, e uma vez: é ele que sabe o nome dela, e é
            pesado demais para entrar no laço. Se ele falhar, o vínculo ainda
            assim aconteceu — a tela mostra sem o nome em vez de continuar
            dizendo que não aconteceu nada. */
         const r = await carregarCatalogo()
-        if (!ativo) return
+        if (!ativo || minha !== geracao) return
         setVinculada(
           (r.tipo === 'ok' && r.catalogo.vinculada?.nome) || 'a sua nutricionista',
         )
@@ -111,19 +120,21 @@ export function CodigoScreen({
         return
       }
 
-      if (ativo) timer = setTimeout(perguntar, SEGUNDOS_ENTRE_PERGUNTAS * 1000)
+      if (ativo && minha === geracao) {
+        timer = setTimeout(() => perguntar(minha), SEGUNDOS_ENTRE_PERGUNTAS * 1000)
+      }
     }
 
-    void perguntar()
+    void perguntar(geracao)
 
     const sub = AppState.addEventListener('change', e => {
-      if (e !== 'active') {
-        if (timer) clearTimeout(timer)
-        timer = null
-        return
-      }
       if (timer) clearTimeout(timer)
-      void perguntar()
+      timer = null
+
+      /* Sair aposenta o laço que estava rodando; voltar abre um novo. É a troca
+         de geração que garante que só um sobreviva. */
+      geracao++
+      if (e === 'active') void perguntar(geracao)
     })
 
     return () => {
