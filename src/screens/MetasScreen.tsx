@@ -73,6 +73,18 @@ const ALIMENTACAO: Campo[] = [
   { chave: 'fibras', rotulo: 'Fibras', unidade: 'g', sufixo: 'g', periodo: 'por dia', icone: 'leaf-outline', exemplo: '25' },
 ]
 
+/* Metas que o app guarda e ainda NÃO tem como medir.
+ *
+ * Passos precisa do histórico do aparelho (Health Connect no Android), que não
+ * existe no Expo Go — o sensor de lá só conta com o app aberto na frente, e um
+ * "passos de hoje" assim contaria só o que a pessoa andou olhando para a tela.
+ *
+ * A meta continua existindo de propósito: ela é da PESSOA, e apagá-la agora
+ * apagaria o número de quem já definiu. O que faltava era a tela dizer isso.
+ * Definir uma meta que nada mede, e não descobrir nunca por quê, é pior do que
+ * não poder definir. */
+const SEM_MEDICAO = new Set<CampoMeta>(['passos'])
+
 const MOVIMENTO: Campo[] = [
   { chave: 'passos', rotulo: 'Passos', unidade: 'passos', sufixo: '', periodo: 'por dia', icone: 'walk-outline', exemplo: '8000' },
   { chave: 'treinosSemana', rotulo: 'Treinos', unidade: 'treinos', sufixo: '', periodo: 'por semana', icone: 'barbell-outline', exemplo: '4' },
@@ -549,6 +561,7 @@ function LinhaCampo({
 }) {
   const { min, max } = LIMITES[campo.chave]
   const dela = prescritos.has(campo.chave)
+  const semMedicao = SEM_MEDICAO.has(campo.chave)
 
   return (
     <View style={styles.linha}>
@@ -562,12 +575,20 @@ function LinhaCampo({
             porque impede de salvar; a prescrição depois, porque explica por que
             o número digitado aqui não vai aparecer; e o período por último, que
             é o texto de sempre. */}
-        <Text style={[styles.periodoLinha, dela && !invalido && styles.periodoDela]}>
+        <Text
+          style={[
+            styles.periodoLinha,
+            dela && !invalido && styles.periodoDela,
+            semMedicao && !invalido && !dela && styles.periodoSemMedicao,
+          ]}
+        >
           {invalido
             ? `de ${milhar(min)} a ${milhar(max)} ${campo.unidade}`
             : dela
               ? 'sua nutricionista definiu este'
-              : campo.periodo}
+              : semMedicao
+                ? 'o app ainda não conta isso'
+                : campo.periodo}
         </Text>
       </View>
 
@@ -663,6 +684,7 @@ const styles = StyleSheet.create({
      por campo em onze campos viraria uma parede de texto miúdo. */
   periodoLinha: { marginTop: 1, fontSize: 11.5, color: inkSuave },
   periodoDela: { color: cores.verde, fontWeight: '700' },
+  periodoSemMedicao: { color: cores.gold },
 
   blocoDela: {
     padding: 14,

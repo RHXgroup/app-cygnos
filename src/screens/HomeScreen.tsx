@@ -581,7 +581,7 @@ export function HomeScreen({
           nenhuma no Início — água, peso, sono, plano e calorias todos têm
           cartão, e treino só existia atrás do "+". Rotina que não aparece é
           rotina que se esquece. */}
-      <CartaoTreino sessoes={sessoes} onAbrir={onAbrirTreino} />
+      <CartaoTreino sessoes={sessoes} metaSemana={metas.treinosSemana} onAbrir={onAbrirTreino} />
     </ScrollView>
 
     {detalheDoDia && <FolhaDoDia doDia={doDia} onFechar={() => setDetalheDoDia(false)} />}
@@ -1216,7 +1216,17 @@ function LinhaPilar({ pilar }: { pilar: Pilar }) {
  *
  * Sem sequência nenhuma o cartão não mostra um zero. "0 dias seguidos" é
  * verdade, mas é uma verdade que só desanima quem acabou de voltar. */
-function CartaoTreino({ sessoes, onAbrir }: { sessoes: Sessao[]; onAbrir: () => void }) {
+function CartaoTreino({
+  sessoes,
+  metaSemana,
+  onAbrir,
+}: {
+  sessoes: Sessao[]
+  /* Quantos treinos por semana a pessoa definiu. Null quando ela não definiu —
+     e aí o cartão conta sem comparar, em vez de inventar um alvo. */
+  metaSemana: number | null
+  onAbrir: () => void
+}) {
   const cabecalho = (
     <View style={styles.linhaTituloProgresso}>
       <Ionicons name="barbell-outline" size={16} color={cores.verde} />
@@ -1263,9 +1273,15 @@ function CartaoTreino({ sessoes, onAbrir }: { sessoes: Sessao[]; onAbrir: () => 
       <View style={styles.linhaProgresso}>
         <View style={styles.colunaPeso}>
           <Text style={styles.rotuloPeso}>Nesta semana</Text>
+          {/* "2 de 4" e não "2 treinos", quando há meta: o número sozinho não
+              diz se está bom ou ruim, e era esse o defeito — a meta estava
+              gravada, o cartão tinha o número à mão, e mostrava a contagem
+              como se ninguém tivesse combinado nada. */}
           <View style={styles.linhaValorGrande}>
             <Text style={styles.valorPeso}>{naSemana}</Text>
-            <Text style={styles.unidadePeso}>{naSemana === 1 ? 'treino' : 'treinos'}</Text>
+            <Text style={styles.unidadePeso}>
+              {metaSemana ? `de ${metaSemana}` : naSemana === 1 ? 'treino' : 'treinos'}
+            </Text>
           </View>
         </View>
 
