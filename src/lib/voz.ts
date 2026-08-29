@@ -39,7 +39,16 @@ import { supabase } from './supabase'
  * O LOW_QUALITY pronto continua sem servir, e por outro motivo: no Android ele
  * cai em 3gp/AMR a 8 kHz, que é qualidade de telefone antigo e faz o Whisper
  * errar palavra. */
-export const OPCOES_DITADO: RecordingOptions = RecordingPresets.HIGH_QUALITY
+export const OPCOES_DITADO: RecordingOptions = {
+  ...RecordingPresets.HIGH_QUALITY,
+  /* Liga a medição do nível de entrada.
+   *
+   * Serve para a tela mostrar que está OUVINDO, e não só que está gravando —
+   * são coisas diferentes, e a diferença entre elas é exatamente o defeito que
+   * um gravador mudo tem. Uma barra parada enquanto a pessoa fala diz na hora o
+   * que nenhuma mensagem de erro depois consegue dizer. */
+  isMeteringEnabled: true,
+}
 
 /* Um minuto. Ninguém dita uma refeição em mais que isso, e o limite existe
    para o caso de a tela ficar aberta esquecida: sem ele, o gravador rodaria

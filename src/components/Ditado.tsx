@@ -66,6 +66,26 @@ export function Ditado({
 
   const segundos = estadoDoGravador.durationMillis / 1000
 
+  /* O nível de entrada, de 0 a 1.
+   *
+   * `metering` vem em dBFS: -160 é silêncio absoluto e 0 é o máximo antes de
+   * distorcer. Fala normal a um palmo do aparelho fica entre -30 e -10. A
+   * conversão corta em -60 porque abaixo disso é ruído de fundo, e esticar a
+   * barra até -160 deixaria toda fala colada no topo. */
+  const nivel = (() => {
+    const db = estadoDoGravador.metering
+    if (db === undefined || db === null) return 0
+    return Math.max(0, Math.min(1, (db + 60) / 60))
+  })()
+
+  /* O pico da gravação inteira. Vai para o log ao parar: uma barra que a pessoa
+     viu mexer e um número que eu leio dizem a mesma coisa, e o número sobrevive
+     à conversa. */
+  const pico = useRef(-160)
+  if (estado === 'gravando' && (estadoDoGravador.metering ?? -160) > pico.current) {
+    pico.current = estadoDoGravador.metering ?? -160
+  }
+
   /* Para sozinho no limite. Sem isto, a tela esquecida aberta grava até a
      bateria acabar — e o arquivo cresceria além do que o servidor aceita. */
   useEffect(() => {
@@ -84,6 +104,7 @@ export function Ditado({
     }
 
     setGravacaoMuda(null)
+    pico.current = -160
 
     try {
       await gravador.prepareToRecordAsync()
@@ -98,6 +119,8 @@ export function Ditado({
     /* Marca antes de esperar: o `stop` demora o suficiente para caber um
        segundo toque, e dois `stop` seguidos derrubam o gravador. */
     setEstado('enviando')
+
+    console.log('[cygnos] ditado: pico de entrada', pico.current.toFixed(1), 'dBFS')
 
     /* O tempo tem de ser lido ANTES do stop — depois dele o estado zera, e a
        gravação de dez segundos seria descartada como curta demais. */
@@ -156,7 +179,12 @@ export function Ditado({
       >
         <View style={styles.ponto} />
         <Text style={styles.textoGravando}>Ouvindo… {relogio(segundos)}</Text>
-        <Text style={styles.toqueParaParar}>toque para parar</Text>
+        {/* A barra é a prova de que o microfone está captando. Parada com a
+            pessoa falando significa que o áudio não está entrando — e é melhor
+            descobrir isso agora que depois de trinta segundos de fala. */}
+        <View style={styles.trilhoNivel}>
+          <View style={[styles.nivel, { width: `${Math.round(nivel * 100)}%` }]} />
+        </View>
       </Pressable>
     )
   }
@@ -221,6 +249,15 @@ const estilos = estilosDe(t =>
     borderColor: t.cores.borda,
   },
   textoOuvir: { fontSize: 13.5, fontWeight: '600', color: t.inkMedio },
+
+  trilhoNivel: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: t.cores.trilho,
+    overflow: 'hidden',
+  },
+  nivel: { height: 6, borderRadius: 3, backgroundColor: t.cores.limao },
 
   gravando: { borderColor: t.cores.verde, backgroundColor: t.cores.verdeMenta },
   ponto: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.cores.erroTexto },
