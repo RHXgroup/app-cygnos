@@ -16,6 +16,7 @@ import {
   SafeAreaProvider,
   SafeAreaView,
   initialWindowMetrics,
+  useSafeAreaInsets,
 } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
 import { BarraAbas, ORDEM_ABAS, type Aba } from './src/components/BarraAbas'
@@ -251,6 +252,9 @@ function Sobreposta({ children }: { children: React.ReactNode }) {
 function AreaLogada({ sessao }: { sessao: Session }) {
   const styles = estilos()
   const { width } = useWindowDimensions()
+  /* Só a faixa da barra de status usa: o respiro do conteúdo é assunto de cada
+     tela, e continua sendo. */
+  const insets = useSafeAreaInsets()
   const [aba, setAba] = useState<Aba>('inicio')
   /* As telas do menu vivem aqui, e não dentro da Home, para poder cobrir também
      a barra de abas. Dentro da Home elas seriam recortadas pelo carrossel. */
@@ -702,6 +706,25 @@ function AreaLogada({ sessao }: { sessao: Session }) {
             />
           </Sobreposta>
         )}
+
+        {/* A faixa da barra de status.
+         *
+         * O Android desenha o app de borda a borda, então a área do relógio e
+         * dos ícones do sistema é NOSSA — e o conteúdo passava por baixo dela ao
+         * rolar. Medido na tela inicial: o número de calorias ficava atrás do
+         * relógio, ilegível, e a leitura disso é "o app está quebrado".
+         *
+         * Começar o conteúdo abaixo da barra, que é o que a tela já fazia com o
+         * `paddingTop`, resolve só o estado inicial: assim que a pessoa rola, o
+         * conteúdo sobe.
+         *
+         * Fica aqui e não em cada tela por dois motivos. É uma só, em vez de
+         * uma por tela que rola — e são muitas. E vem por ÚLTIMO no JSX, então
+         * cobre também as sobreposições, que rolam do mesmo jeito.
+         *
+         * `pointerEvents="none"` porque ela é pintura, não alvo: sem isso,
+         * roubaria o toque de qualquer botão que passasse por baixo. */}
+        <View style={[styles.faixaStatus, { height: insets.top }]} pointerEvents="none" />
       </View>
     </>
   )
@@ -835,6 +858,13 @@ const estilos = estilosDe(t =>
   /* Login e cadastro ficam um degrau acima do fundo da área logada, para o
      cartão de formulário não sumir dentro da tela. */
   telaAuth: { flex: 1, backgroundColor: t.cores.mist },
+  faixaStatus: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: t.cores.fundo,
+  },
   telaApp: { flex: 1, backgroundColor: t.cores.fundo },
   carrossel: { flex: 1 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.cores.fundo },
