@@ -107,6 +107,15 @@ export async function sugerirPlano(p: Pedido): Promise<ResultadoSugestao> {
       if (codigo === 'forbidden' || codigo === 'unauthorized') {
         return { tipo: 'erro', mensagem: 'Sua sessão expirou. Entre de novo para pedir o plano.' }
       }
+      /* O limite tem mensagem escrita pela função, e ela diz quanto tempo
+         esperar — repor por uma genérica aqui apagaria a única informação
+         acionável da resposta. */
+      if (codigo === 'limite') {
+        return {
+          tipo: 'erro',
+          mensagem: String(corpo?.message ?? '') || 'Muitos planos em pouco tempo. Tente mais tarde.',
+        }
+      }
       if (codigo === 'plano_longo') {
         return { tipo: 'erro', mensagem: 'O plano ficou grande demais. Tente com menos refeições.' }
       }
