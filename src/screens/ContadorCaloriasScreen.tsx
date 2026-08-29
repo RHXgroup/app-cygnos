@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
+import { retornoDoRegistro, type Retorno } from '../lib/retornoDoRegistro'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
 import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
 import { LerCodigoScreen } from './LerCodigoScreen'
@@ -116,6 +117,9 @@ export function ContadorCaloriasScreen({
      item sumiu. */
   /* As quatro formas menos usadas ficam recolhidas, como no "+". */
   const [maisFormas, setMaisFormas] = useState(false)
+  /* A resposta ao último registro. Some sozinha — ver `gravar`. */
+  const [retorno, setRetorno] = useState<Retorno | null>(null)
+  const prazoDoRetorno = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pendentes, setPendentes] = useState(0)
 
   useEffect(() => {
@@ -245,8 +249,41 @@ export function ContadorCaloriasScreen({
     /* Troca os provisórios pelos de verdade, que já vêm com id do banco e a
        hora que ele carimbou. */
     const idsProvisorios = new Set(provisorios.map(p => p.id))
-    setItens(atuais => [...atuais.filter(i => !idsProvisorios.has(i.id)), ...r.itens])
+    const atualizados = [...itens.filter(i => !idsProvisorios.has(i.id)), ...r.itens]
+    setItens(atualizados)
+
+    /* ── O retorno do gesto ──
+       Registrar era mudo: a linha aparecia na lista e mais nada. Agora o app
+       responde o que mudou no dia — informação, e não prêmio. O porquê dessa
+       escolha está em lib/retornoDoRegistro. */
+    const somadas = r.itens.reduce<number | null>(
+      (soma, i) => (i.calorias === null ? soma : (soma ?? 0) + i.calorias),
+      null,
+    )
+    mostrarRetorno(
+      retornoDoRegistro({
+        adicionadas: somadas,
+        totalDoDia: totaisConsumidos(atualizados).calorias,
+        meta: metas.calorias,
+        quantos: r.itens.length,
+      }),
+    )
   }
+
+  /* Mostra e agenda o desaparecimento. Cinco segundos: o mesmo do desfazer, e
+     pelo mesmo motivo — é o tempo de os olhos irem até a barra e voltarem. */
+  function mostrarRetorno(r: Retorno) {
+    setRetorno(r)
+    if (prazoDoRetorno.current) clearTimeout(prazoDoRetorno.current)
+    prazoDoRetorno.current = setTimeout(() => setRetorno(null), 5000)
+  }
+
+  useEffect(
+    () => () => {
+      if (prazoDoRetorno.current) clearTimeout(prazoDoRetorno.current)
+    },
+    [],
+  )
 
   /* A folha de correção só abre para item que já existe no banco: mover,
      ajustar e apagar são todos operações sobre um id, e o provisório não tem
@@ -276,6 +313,9 @@ export function ContadorCaloriasScreen({
     aoMudar: () => {
       setErro('')
       setMudou(true)
+      /* A barra de retorno fala do total do dia, e apagar mexe nele. Deixá-la
+         no ar seria mostrar uma conta de antes do apagar. */
+      setRetorno(null)
     },
   })
 
@@ -730,6 +770,24 @@ export function ContadorCaloriasScreen({
       {/* Por último no JSX, e por isso por cima de tudo: a barra precisa
           aparecer mesmo com a folha de correção aberta, já que é de lá que sai
           a maior parte dos apagares. */}
+      {/* Nunca as duas juntas: `aoMudar` limpa o retorno ao apagar, e gravar
+          não abre desfazer. Se um dia puderem coexistir, esta fica embaixo. */}
+      {retorno && !desfazivel && (
+        <View style={[styles.barraRetorno, retorno.fechou && styles.barraRetornoFechou, { bottom: bottom + 16 }]}>
+          <Ionicons
+            name={retorno.fechou ? 'checkmark-circle' : 'arrow-up-circle-outline'}
+            size={17}
+            color={retorno.fechou ? paleta().cores.sobreLimao : paleta().cores.verde}
+          />
+          <Text
+            style={[styles.textoRetorno, retorno.fechou && styles.textoRetornoFechou]}
+            numberOfLines={1}
+          >
+            {retorno.texto}
+          </Text>
+        </View>
+      )}
+
       {desfazivel && (
         <BarraDesfazer
           texto={`${desfazivel.nome} saiu do diário`}
@@ -1517,6 +1575,24 @@ const estilos = estilosDe(t =>
   tituloPorta: { fontSize: 13, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
   textoDesligado: { color: t.inkFraco },
   detalhePorta: { fontSize: 10.5, color: t.inkSuave, textAlign: 'center' },
+  barraRetorno: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: t.cores.superficie,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
+  },
+  barraRetornoFechou: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
+  textoRetorno: { flex: 1, fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+  textoRetornoFechou: { color: t.cores.sobreLimao },
+
   listaFormas: {
     borderRadius: 16,
     borderWidth: 1,
