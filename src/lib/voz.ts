@@ -25,18 +25,21 @@ import { supabase } from './supabase'
  * devolve 403 para quem não é nutricionista — o nome engana, ela é o áudio
  * SOBRE o paciente, não o dele. */
 
-/* Fala, não música. Mono a 22 kHz cobre a banda da voz inteira e gera um
-   arquivo quatro vezes menor que o preset de alta qualidade — o que importa
-   para quem dita no 4G do supermercado.
-
-   O LOW_QUALITY pronto não serve: no Android ele cai em 3gp/AMR a 8 kHz, que é
-   qualidade de telefone antigo e faz o Whisper errar palavra. */
-export const OPCOES_DITADO: RecordingOptions = {
-  ...RecordingPresets.HIGH_QUALITY,
-  sampleRate: 22050,
-  numberOfChannels: 1,
-  bitRate: 64000,
-}
+/* O preset de alta qualidade, sem tocar em nada.
+ *
+ * A primeira versão mexia: 22 kHz mono, para o arquivo ficar quatro vezes
+ * menor. A banda da voz cabe nisso em teoria, mas o encoder AAC do Android é
+ * confiável a 44.100 Hz e só a ele — taxa fora do padrão produz, em vários
+ * aparelhos, um arquivo válido e MUDO. Sem erro, sem aviso: o app grava, envia,
+ * e o Whisper devolve nada, como se a pessoa não tivesse falado.
+ *
+ * Foi otimização prematura, e cara: custou o recurso inteiro. Meio megabyte
+ * numa gravação de trinta segundos não é problema para ninguém.
+ *
+ * O LOW_QUALITY pronto continua sem servir, e por outro motivo: no Android ele
+ * cai em 3gp/AMR a 8 kHz, que é qualidade de telefone antigo e faz o Whisper
+ * errar palavra. */
+export const OPCOES_DITADO: RecordingOptions = RecordingPresets.HIGH_QUALITY
 
 /* Um minuto. Ninguém dita uma refeição em mais que isso, e o limite existe
    para o caso de a tela ficar aberta esquecida: sem ele, o gravador rodaria
@@ -89,6 +92,18 @@ export async function transcrever(
   duracaoSegundos: number,
 ): Promise<ResultadoTranscricao> {
   if (duracaoSegundos < MINIMO_SEGUNDOS) return { tipo: 'curto_demais' }
+
+  /* Quanto o arquivo realmente tem. Custa uma leitura local e vale a pena: sem
+     este número, "não ouvi nada" pode ser gravação muda, arquivo vazio ou
+     upload que não anexou — três defeitos diferentes com a mesma cara na tela.
+     Aparece no terminal do Metro com o prefixo [cygnos]. */
+  try {
+    const arquivo = await fetch(uri)
+    const bytes = (await arquivo.blob()).size
+    console.log('[cygnos] ditado:', Math.round(duracaoSegundos), 's,', bytes, 'bytes,', uri)
+  } catch {
+    console.log('[cygnos] ditado: não consegui medir o arquivo', uri)
+  }
 
   const forma = new FormData()
   forma.append('audio', {
