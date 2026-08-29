@@ -730,6 +730,13 @@ function AreaLogada({ sessao }: { sessao: Session }) {
          * `pointerEvents="none"` porque ela é pintura, não alvo: sem isso,
          * roubaria o toque de qualquer botão que passasse por baixo. */}
         <View style={[styles.faixaStatus, { height: insets.top }]} pointerEvents="none" />
+
+        {/* E a mesma coisa em baixo, pela barra de navegação do Android.
+            A barra de abas já se afasta dela e usa esta mesma cor, então aqui
+            não muda nada — o que muda é nas telas que abrem POR CIMA da barra
+            de abas e rolam: o diário, o peso, o sono. Nelas o conteúdo passava
+            por trás dos três botões do sistema. */}
+        <View style={[styles.faixaSistema, { height: insets.bottom }]} pointerEvents="none" />
       </View>
     </>
   )
@@ -866,6 +873,13 @@ const estilos = estilosDe(t =>
   faixaStatus: {
     position: 'absolute',
     top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: t.cores.fundo,
+  },
+  faixaSistema: {
+    position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: t.cores.fundo,
