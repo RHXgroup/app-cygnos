@@ -177,11 +177,19 @@ export function Ditado({
         accessibilityRole="button"
         accessibilityLabel="Parar de gravar"
       >
-        <View style={styles.ponto} />
-        <Text style={styles.textoGravando}>Ouvindo… {relogio(segundos)}</Text>
-        {/* A barra é a prova de que o microfone está captando. Parada com a
-            pessoa falando significa que o áudio não está entrando — e é melhor
-            descobrir isso agora que depois de trinta segundos de fala. */}
+        <View style={styles.linhaGravando}>
+          <View style={styles.ponto} />
+          <Text style={styles.textoGravando}>Ouvindo… {relogio(segundos)}</Text>
+          <Text style={styles.toqueParaParar}>toque para parar</Text>
+        </View>
+
+        {/* A barra é a prova de que o microfone está captando: parada com a
+            pessoa falando significa que o áudio não está entrando.
+
+            Em linha PRÓPRIA, e não ao lado do cronômetro. Dividindo a mesma
+            linha ela espremia o texto até a palavra quebrar no meio — e o que
+            ficou ilegível foi justamente "toque para parar", que é a instrução
+            de que a pessoa precisa naquele instante. */}
         <View style={styles.trilhoNivel}>
           <View style={[styles.nivel, { width: `${Math.round(nivel * 100)}%` }]} />
         </View>
@@ -251,7 +259,7 @@ const estilos = estilosDe(t =>
   textoOuvir: { fontSize: 13.5, fontWeight: '600', color: t.inkMedio },
 
   trilhoNivel: {
-    flex: 1,
+    alignSelf: 'stretch',
     height: 6,
     borderRadius: 3,
     backgroundColor: t.cores.trilho,
@@ -259,7 +267,18 @@ const estilos = estilosDe(t =>
   },
   nivel: { height: 6, borderRadius: 3, backgroundColor: t.cores.limao },
 
-  gravando: { borderColor: t.cores.verde, backgroundColor: t.cores.verdeMenta },
+  gravando: {
+    borderColor: t.cores.verde,
+    backgroundColor: t.cores.verdeMenta,
+    /* Deixa de ser uma linha só: agora são duas, e a altura acompanha. */
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 7,
+    height: 'auto',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  linhaGravando: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   ponto: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.cores.erroTexto },
   textoGravando: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
   toqueParaParar: { fontSize: 12, color: t.inkMedio },
