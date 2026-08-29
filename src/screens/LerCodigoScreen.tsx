@@ -15,7 +15,7 @@ import { consultarCodigo, type ProdutoLido } from '../lib/codigoBarras'
 import { porcao } from '../lib/alimentos'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave, veu } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Ler o código de barras do produto.
  *
@@ -46,6 +46,7 @@ export function LerCodigoScreen({
   onAdicionar: (item: AlimentoEscolhido) => void
   onFechar: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [permissao, pedirPermissao] = useCameraPermissions()
   const [consultando, setConsultando] = useState(false)
@@ -141,7 +142,7 @@ export function LerCodigoScreen({
   if (!permissao) {
     return (
       <View style={[styles.tela, styles.centro]}>
-        <ActivityIndicator color={cores.verde} />
+        <ActivityIndicator color={paleta().cores.verde} />
       </View>
     )
   }
@@ -151,7 +152,7 @@ export function LerCodigoScreen({
       <View style={[styles.tela, { paddingTop: top + 8 }]}>
         <Cabecalho onFechar={onFechar} titulo="Código de barras" />
         <View style={styles.aviso}>
-          <Ionicons name="camera-outline" size={34} color={cores.verde} />
+          <Ionicons name="camera-outline" size={34} color={paleta().cores.verde} />
           <Text style={styles.tituloAviso}>A câmera precisa da sua permissão</Text>
           <Text style={styles.textoAviso}>
             Ela é usada só para ler o código de barras do produto, aqui na tela. Nada é
@@ -219,7 +220,7 @@ export function LerCodigoScreen({
               accessibilityRole="button"
               accessibilityLabel="Preencher os dados do rótulo"
             >
-              <Ionicons name="alert-circle-outline" size={17} color={cores.gold} />
+              <Ionicons name="alert-circle-outline" size={17} color={paleta().cores.gold} />
               <Text style={styles.textoFalta}>
                 Esta base não tem {listar(produto.faltando)} deste produto. Toque para digitar do
                 rótulo.
@@ -242,7 +243,7 @@ export function LerCodigoScreen({
                     placeholder={
                       produto[c.chave] === null ? '—' : String(produto[c.chave])
                     }
-                    placeholderTextColor={inkFraco}
+                    placeholderTextColor={paleta().inkFraco}
                     keyboardType="decimal-pad"
                     keyboardAppearance="dark"
                     maxLength={7}
@@ -285,7 +286,7 @@ export function LerCodigoScreen({
             style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
             accessibilityRole="button"
           >
-            <Ionicons name="add" size={18} color={cores.branco} />
+            <Ionicons name="add" size={18} color={paleta().cores.branco} />
             <Text style={styles.textoBotao}>Adicionar</Text>
           </Pressable>
 
@@ -328,7 +329,7 @@ export function LerCodigoScreen({
 
         {consultando && (
           <View style={styles.consultando}>
-            <ActivityIndicator color={cores.branco} />
+            <ActivityIndicator color={paleta().cores.branco} />
             <Text style={styles.textoConsultando}>Procurando o produto…</Text>
           </View>
         )}
@@ -352,6 +353,7 @@ function Cabecalho({
   onFechar: () => void
   claro?: boolean
 }) {
+  const styles = estilos()
   return (
     <View style={styles.cabecalho}>
       <Pressable
@@ -361,7 +363,7 @@ function Cabecalho({
         accessibilityRole="button"
         accessibilityLabel="Voltar"
       >
-        <Ionicons name="chevron-back" size={22} color={claro ? cores.branco : cores.ink} />
+        <Ionicons name="chevron-back" size={22} color={claro ? paleta().cores.branco : paleta().cores.ink} />
       </Pressable>
       <Text style={[styles.tituloTela, claro && styles.tituloClaro]}>{titulo}</Text>
       <View style={styles.botaoVoltar} />
@@ -370,6 +372,7 @@ function Cabecalho({
 }
 
 function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
+  const styles = estilos()
   return (
     <View style={styles.numero}>
       <Text style={styles.valorNumero}>{valor}</Text>
@@ -408,8 +411,9 @@ function atalhosDePeso(embalagem: number | null): number[] {
   return [...new Set(comEmbalagem)].filter(g => g > 0).sort((a, b) => a - b)
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -420,8 +424,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
-  tituloClaro: { color: cores.branco },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
+  tituloClaro: { color: t.cores.branco },
 
   sobreposto: { flex: 1, justifyContent: 'space-between' },
   miraArea: { alignItems: 'center', gap: 14 },
@@ -430,106 +434,106 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: cores.limao,
+    borderColor: t.cores.limao,
     backgroundColor: 'transparent',
   },
-  dica: { fontSize: 14, color: cores.branco, textAlign: 'center', paddingHorizontal: 32 },
+  dica: { fontSize: 14, color: t.cores.branco, textAlign: 'center', paddingHorizontal: 32 },
 
   consultando: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: veu,
+    backgroundColor: t.veu,
     marginHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 14,
   },
-  textoConsultando: { fontSize: 14, fontWeight: '700', color: cores.branco },
+  textoConsultando: { fontSize: 14, fontWeight: '700', color: t.cores.branco },
 
   erroCaixa: {
-    backgroundColor: veu,
+    backgroundColor: t.veu,
     marginHorizontal: 20,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 14,
   },
-  textoErro: { fontSize: 13.5, color: cores.branco, lineHeight: 20 },
+  textoErro: { fontSize: 13.5, color: t.cores.branco, lineHeight: 20 },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 14 },
   cartao: {
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     padding: 16,
     gap: 4,
   },
-  nomeProduto: { fontSize: 18, fontWeight: '800', color: cores.ink, letterSpacing: -0.3 },
-  marcaProduto: { fontSize: 13, color: inkSuave },
+  nomeProduto: { fontSize: 18, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
+  marcaProduto: { fontSize: 13, color: t.inkSuave },
 
   numeros: { flexDirection: 'row', gap: 10, marginTop: 12 },
   numero: { flex: 1, alignItems: 'center', gap: 2 },
-  valorNumero: { fontSize: 15, fontWeight: '800', color: cores.limao },
-  rotuloNumero: { fontSize: 10.5, color: inkSuave, textAlign: 'center' },
+  valorNumero: { fontSize: 15, fontWeight: '800', color: t.cores.limao },
+  rotuloNumero: { fontSize: 10.5, color: t.inkSuave, textAlign: 'center' },
 
-  origem: { fontSize: 11.5, color: inkFraco, marginTop: 12, lineHeight: 17 },
+  origem: { fontSize: 11.5, color: t.inkFraco, marginTop: 12, lineHeight: 17 },
 
-  rotuloQuantidade: { fontSize: 13, fontWeight: '700', color: inkMedio },
+  rotuloQuantidade: { fontSize: 13, fontWeight: '700', color: t.inkMedio },
   atalhos: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   atalho: {
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
   },
-  atalhoAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
-  textoAtalho: { fontSize: 14, fontWeight: '700', color: cores.ink },
-  textoAtalhoAtivo: { color: cores.sobreLimao },
+  atalhoAtivo: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
+  textoAtalho: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  textoAtalhoAtivo: { color: t.cores.sobreLimao },
 
   blocoFalta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    backgroundColor: cores.atencaoFundo,
+    backgroundColor: t.cores.atencaoFundo,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  textoFalta: { flex: 1, fontSize: 12.5, color: cores.ink, lineHeight: 18 },
+  textoFalta: { flex: 1, fontSize: 12.5, color: t.cores.ink, lineHeight: 18 },
 
   formulario: {
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     padding: 14,
     gap: 8,
   },
-  tituloFormulario: { fontSize: 13, fontWeight: '700', color: cores.ink, marginBottom: 2 },
+  tituloFormulario: { fontSize: 13, fontWeight: '700', color: t.cores.ink, marginBottom: 2 },
   linhaFormulario: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rotuloCampo: { flex: 1, fontSize: 13.5, color: inkMedio },
+  rotuloCampo: { flex: 1, fontSize: 13.5, color: t.inkMedio },
   campoFormulario: {
     width: 88,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
     fontWeight: '700',
-    color: cores.ink,
+    color: t.cores.ink,
     textAlign: 'right',
   },
-  unidadeCampo: { width: 34, fontSize: 12.5, color: inkSuave },
-  ajudaFormulario: { fontSize: 11.5, color: inkFraco, lineHeight: 17, marginTop: 2 },
+  unidadeCampo: { width: 34, fontSize: 12.5, color: t.inkSuave },
+  ajudaFormulario: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, marginTop: 2 },
 
   aviso: { paddingHorizontal: 28, paddingTop: 40, alignItems: 'center', gap: 10 },
-  tituloAviso: { fontSize: 18, fontWeight: '800', color: cores.ink, textAlign: 'center' },
-  textoAviso: { fontSize: 14, color: inkMedio, textAlign: 'center', lineHeight: 21 },
+  tituloAviso: { fontSize: 18, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
+  textoAviso: { fontSize: 14, color: t.inkMedio, textAlign: 'center', lineHeight: 21 },
 
   botao: {
     flexDirection: 'row',
@@ -539,12 +543,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 22,
     borderRadius: 13,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     marginTop: 8,
   },
-  textoBotao: { fontSize: 15, fontWeight: '800', color: cores.branco },
+  textoBotao: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
   pressionado: { opacity: 0.75 },
 
   linkOutro: { alignItems: 'center', paddingVertical: 10 },
-  textoLinkOutro: { fontSize: 13.5, fontWeight: '700', color: inkMedio },
-})
+  textoLinkOutro: { fontSize: 13.5, fontWeight: '700', color: t.inkMedio },
+  }),
+)

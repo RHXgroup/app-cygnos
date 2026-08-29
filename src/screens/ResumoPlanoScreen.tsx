@@ -23,7 +23,7 @@ import {
   type DiaSemana,
   type RefeicaoMontada,
 } from '../lib/plano'
-import { cores, coresMacro, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const LIMITE_NOME = 80
 
@@ -46,6 +46,7 @@ export function ResumoPlanoScreen({
   onVoltar: () => void
   onSalvo: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [nome, setNome] = useState(nomeSugerido)
   const [dias, setDias] = useState<DiaSemana[]>(DIAS_PADRAO)
@@ -105,7 +106,7 @@ export function ResumoPlanoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Resumo do plano</Text>
         <View style={styles.botaoVoltar} />
@@ -181,7 +182,7 @@ export function ResumoPlanoScreen({
           accessibilityRole="button"
         >
           {salvando ? (
-            <ActivityIndicator color={cores.branco} />
+            <ActivityIndicator color={paleta().cores.branco} />
           ) : (
             <Text style={styles.textoBotao}>Salvar plano</Text>
           )}
@@ -192,6 +193,7 @@ export function ResumoPlanoScreen({
 }
 
 function LinhaRefeicao({ refeicao }: { refeicao: RefeicaoMontada }) {
+  const styles = estilos()
   const t = totaisDe(refeicao.itens)
 
   return (
@@ -212,9 +214,9 @@ function LinhaRefeicao({ refeicao }: { refeicao: RefeicaoMontada }) {
         <Text style={styles.vazia}>Nenhum alimento nesta refeição</Text>
       ) : (
         <View style={styles.linhaMacrosRefeicao}>
-          <Macro rotulo="P" valor={t.proteinas} cor={coresMacro.proteinas} />
-          <Macro rotulo="C" valor={t.carboidratos} cor={coresMacro.carboidratos} />
-          <Macro rotulo="G" valor={t.gorduras} cor={coresMacro.gorduras} />
+          <Macro rotulo="P" valor={t.proteinas} cor={paleta().coresMacro.proteinas} />
+          <Macro rotulo="C" valor={t.carboidratos} cor={paleta().coresMacro.carboidratos} />
+          <Macro rotulo="G" valor={t.gorduras} cor={paleta().coresMacro.gorduras} />
         </View>
       )}
     </View>
@@ -222,6 +224,7 @@ function LinhaRefeicao({ refeicao }: { refeicao: RefeicaoMontada }) {
 }
 
 function Macro({ rotulo, valor, cor }: { rotulo: string; valor: number | null; cor: string }) {
+  const styles = estilos()
   return (
     <View style={styles.macroRefeicao}>
       <View style={[styles.ponto, { backgroundColor: cor }]} />
@@ -232,8 +235,9 @@ function Macro({ rotulo, valor, cor }: { rotulo: string; valor: number | null; c
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -243,37 +247,37 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 24, gap: 10 },
-  apoio: { fontSize: 13, color: inkSuave },
+  apoio: { fontSize: 13, color: t.inkSuave },
 
-  secao: { marginTop: 8, fontSize: 13, fontWeight: '800', color: inkMedio },
+  secao: { marginTop: 8, fontSize: 13, fontWeight: '800', color: t.inkMedio },
 
   refeicao: {
     gap: 8,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   cabecalhoRefeicao: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   hora: {
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoHora: { fontSize: 12.5, fontWeight: '800', color: cores.verdeEscuro },
-  nomeRefeicao: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
-  kcalRefeicao: { fontSize: 13, fontWeight: '800', color: cores.verde },
+  textoHora: { fontSize: 12.5, fontWeight: '800', color: t.cores.verdeEscuro },
+  nomeRefeicao: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  kcalRefeicao: { fontSize: 13, fontWeight: '800', color: t.cores.verde },
 
   linhaMacrosRefeicao: { flexDirection: 'row', gap: 14 },
   macroRefeicao: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   ponto: { width: 7, height: 7, borderRadius: 4 },
-  textoMacro: { fontSize: 12, fontWeight: '600', color: inkSuave },
-  vazia: { fontSize: 12, color: inkFraco },
+  textoMacro: { fontSize: 12, fontWeight: '600', color: t.inkSuave },
+  vazia: { fontSize: 12, color: t.inkFraco },
 
   blocoNome: { marginTop: 12 },
 
@@ -282,21 +286,22 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   rodape: { paddingHorizontal: 20, paddingTop: 10 },
   botao: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
   botaoDesativado: { opacity: 0.6 },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

@@ -29,7 +29,7 @@ import {
   type MetasPrescritas,
 } from '../lib/metasPrescritas'
 import { milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Onde a pessoa escreve o que ela está perseguindo.
  *
@@ -166,6 +166,7 @@ export function MetasScreen({
      precisa empurrar uma busca nova nelas. */
   onSalvo: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [textos, setTextos] = useState<Textos>(() =>
     textosDe(typeof alvo === 'string' ? METAS_VAZIAS : alvo),
@@ -300,7 +301,7 @@ export function MetasScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>{id ? 'Editar metas' : 'Novas metas'}</Text>
         <View style={styles.botaoVoltar} />
@@ -308,7 +309,7 @@ export function MetasScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <>
@@ -335,7 +336,7 @@ export function MetasScreen({
             {prescricao && (
               <View style={styles.blocoDela}>
                 <View style={styles.linhaTituloDela}>
-                  <Ionicons name="ribbon-outline" size={15} color={cores.verde} />
+                  <Ionicons name="ribbon-outline" size={15} color={paleta().cores.verde} />
                   <Text style={styles.tituloDela} numberOfLines={2}>
                     {prescricao.nome}
                   </Text>
@@ -371,7 +372,7 @@ export function MetasScreen({
                 value={nome}
                 onChangeText={setNome}
                 placeholder={nomeAutomatico()}
-                placeholderTextColor={inkFraco}
+                placeholderTextColor={paleta().inkFraco}
                 keyboardAppearance="dark"
                 maxLength={80}
                 style={styles.campoNome}
@@ -402,7 +403,7 @@ export function MetasScreen({
                   cabeça, e sem isto o desencontro passaria despercebido. */}
               {desencontro && (
                 <View style={styles.aviso}>
-                  <Ionicons name="information-circle-outline" size={16} color={cores.verde} />
+                  <Ionicons name="information-circle-outline" size={16} color={paleta().cores.verde} />
                   <Text style={styles.textoAviso}>
                     Seus macros somam {milhar(desencontro.kcalMacros)} kcal
                     {desencontro.diferenca > 0 ? ', acima' : ', abaixo'} da meta de{' '}
@@ -505,7 +506,7 @@ export function MetasScreen({
               accessibilityRole="button"
             >
               {salvando ? (
-                <ActivityIndicator color={cores.branco} />
+                <ActivityIndicator color={paleta().cores.branco} />
               ) : (
                 <Text style={styles.textoBotao}>
                   {quantasDefinidas === 0
@@ -530,10 +531,11 @@ function Secao({
   icone: keyof typeof Ionicons.glyphMap
   children: React.ReactNode
 }) {
+  const styles = estilos()
   return (
     <View style={styles.secao}>
       <View style={styles.tituloSecao}>
-        <Ionicons name={icone} size={16} color={cores.verde} />
+        <Ionicons name={icone} size={16} color={paleta().cores.verde} />
         <Text style={styles.textoTituloSecao}>{titulo}</Text>
       </View>
       {children}
@@ -559,6 +561,7 @@ function LinhaCampo({
   prescritos: CamposPrescritos
   onChange: (t: string) => void
 }) {
+  const styles = estilos()
   const { min, max } = LIMITES[campo.chave]
   const dela = prescritos.has(campo.chave)
   const semMedicao = SEM_MEDICAO.has(campo.chave)
@@ -566,7 +569,7 @@ function LinhaCampo({
   return (
     <View style={styles.linha}>
       <View style={styles.iconeLinha}>
-        <Ionicons name={campo.icone} size={17} color={cores.verde} />
+        <Ionicons name={campo.icone} size={17} color={paleta().cores.verde} />
       </View>
 
       <View style={styles.textoLinha}>
@@ -602,7 +605,7 @@ function LinhaCampo({
              convite a digitar "10.000" e não entender por que sumiu. */
           keyboardType={ehDecimal(campo.chave) ? 'decimal-pad' : 'number-pad'}
           placeholder={campo.exemplo}
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           keyboardAppearance="dark"
           maxLength={6}
           style={[styles.campo, invalido && styles.campoComErro]}
@@ -618,8 +621,9 @@ function LinhaCampo({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -630,42 +634,42 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24, gap: 14 },
-  chamada: { fontSize: 13, lineHeight: 19, color: inkSuave },
+  chamada: { fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   blocoErro: {
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   secao: {
     padding: 16,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 10,
   },
   tituloSecao: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  textoTituloSecao: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  notaSecao: { fontSize: 11.5, lineHeight: 16, color: inkFraco },
+  textoTituloSecao: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  notaSecao: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
 
   campoNome: {
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: cores.ink,
+    color: t.cores.ink,
   },
 
   linha: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -673,31 +677,31 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
   textoLinha: { flex: 1 },
-  rotuloLinha: { fontSize: 14, fontWeight: '700', color: cores.ink },
+  rotuloLinha: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
   /* O mesmo lugar diz o período e, quando o número não serve, o intervalo
      aceito: são a mesma informação — "o que cabe aqui" — e duas linhas de apoio
      por campo em onze campos viraria uma parede de texto miúdo. */
-  periodoLinha: { marginTop: 1, fontSize: 11.5, color: inkSuave },
-  periodoDela: { color: cores.verde, fontWeight: '700' },
-  periodoSemMedicao: { color: cores.gold },
+  periodoLinha: { marginTop: 1, fontSize: 11.5, color: t.inkSuave },
+  periodoDela: { color: t.cores.verde, fontWeight: '700' },
+  periodoSemMedicao: { color: t.cores.gold },
 
   blocoDela: {
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.verde,
-    backgroundColor: cores.verdeMenta,
+    borderColor: t.cores.verde,
+    backgroundColor: t.cores.verdeMenta,
     gap: 7,
   },
   linhaTituloDela: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  tituloDela: { flex: 1, fontSize: 14, fontWeight: '800', color: cores.ink },
-  textoDela: { fontSize: 12.5, lineHeight: 18, color: inkMedio },
-  objetivoDela: { fontSize: 12.5, lineHeight: 18, color: inkSuave, fontStyle: 'italic' },
+  tituloDela: { flex: 1, fontSize: 14, fontWeight: '800', color: t.cores.ink },
+  textoDela: { fontSize: 12.5, lineHeight: 18, color: t.inkMedio },
+  objetivoDela: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave, fontStyle: 'italic' },
 
   blocoCampo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   campo: {
@@ -705,16 +709,16 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 10,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
     textAlign: 'right',
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  campoComErro: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
-  unidadeLinha: { width: 38, fontSize: 11.5, fontWeight: '600', color: inkMedio },
+  campoComErro: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
+  unidadeLinha: { width: 38, fontSize: 11.5, fontWeight: '600', color: t.inkMedio },
 
   aviso: {
     flexDirection: 'row',
@@ -722,27 +726,28 @@ const styles = StyleSheet.create({
     gap: 7,
     padding: 11,
     borderRadius: 14,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
   },
-  textoAviso: { flex: 1, fontSize: 12.5, lineHeight: 17, color: cores.verdeEscuro },
+  textoAviso: { flex: 1, fontSize: 12.5, lineHeight: 17, color: t.cores.verdeEscuro },
 
   rodape: {
     paddingHorizontal: 20,
     paddingTop: 10,
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: cores.borda,
-    backgroundColor: cores.fundo,
+    borderTopColor: t.cores.borda,
+    backgroundColor: t.cores.fundo,
   },
-  avisoRodape: { fontSize: 12, color: cores.erroTexto, textAlign: 'center' },
+  avisoRodape: { fontSize: 12, color: t.cores.erroTexto, textAlign: 'center' },
   botao: {
     height: 54,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoPressionado: { backgroundColor: cores.verdeEscuro },
-  botaoDesligado: { backgroundColor: cores.trilho },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
+  botaoDesligado: { backgroundColor: t.cores.trilho },
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

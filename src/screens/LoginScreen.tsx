@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 function saudacaoDoDia() {
   const h = new Date().getHours()
@@ -47,6 +47,7 @@ export function LoginScreen({
   onIrParaCadastro: () => void
   onIrParaRecuperar: () => void
 }) {
+  const styles = estilos()
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
   const [mostrarSenha, setMostrarSenha] = useState(false)
@@ -143,7 +144,7 @@ export function LoginScreen({
                 if (aviso) onLimparAviso()
               }}
               placeholder="voce@email.com ou maria.silva"
-              placeholderTextColor={inkFraco}
+              placeholderTextColor={paleta().inkFraco}
               keyboardAppearance="dark"
               /* Teclado de e-mail mesmo aceitando usuário: deixa o "@" à mão
                  para a maioria e não atrapalha quem digita o apelido. */
@@ -167,7 +168,7 @@ export function LoginScreen({
                 value={senha}
                 onChangeText={setSenha}
                 placeholder="••••••••"
-                placeholderTextColor={inkFraco}
+                placeholderTextColor={paleta().inkFraco}
                 keyboardAppearance="dark"
                 secureTextEntry={!mostrarSenha}
                 autoCapitalize="none"
@@ -225,7 +226,7 @@ export function LoginScreen({
             ]}
           >
             {carregando ? (
-              <ActivityIndicator color={cores.branco} />
+              <ActivityIndicator color={paleta().cores.branco} />
             ) : (
               <Text style={styles.textoBotaoPrimario}>Entrar</Text>
             )}
@@ -264,7 +265,8 @@ export function LoginScreen({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   flex: { flex: 1 },
   scroll: {
     flexGrow: 1,
@@ -278,7 +280,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 13,
     fontWeight: '600',
-    color: cores.deep,
+    color: t.cores.deep,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
@@ -286,14 +288,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 28,
     fontWeight: '700',
-    color: cores.deep,
+    color: t.cores.deep,
     textAlign: 'center',
   },
   subtitulo: {
     marginTop: 10,
     fontSize: 15,
     lineHeight: 22,
-    color: inkSuave,
+    color: t.inkSuave,
     textAlign: 'center',
     maxWidth: 300,
   },
@@ -302,75 +304,76 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontSize: 13,
     fontWeight: '600',
-    color: inkMedio,
+    color: t.inkMedio,
   },
   campo: {
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.line,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.line,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 16,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
-    color: cores.ink,
+    color: t.cores.ink,
   },
   campoComBotao: { position: 'relative', justifyContent: 'center' },
   campoSenha: { paddingRight: 92 },
   botaoOlho: { position: 'absolute', right: 14, paddingVertical: 6, paddingHorizontal: 4 },
-  textoOlho: { fontSize: 13, fontWeight: '600', color: cores.deep },
+  textoOlho: { fontSize: 13, fontWeight: '600', color: t.cores.deep },
   caixaErro: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  textoErro: { fontSize: 13, lineHeight: 19, color: cores.erroTexto },
+  textoErro: { fontSize: 13, lineHeight: 19, color: t.cores.erroTexto },
   botaoPrimario: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
-  botaoPrimarioPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoPrimarioPressionado: { backgroundColor: t.cores.verdeEscuro },
   botaoDesabilitado: { opacity: 0.45 },
-  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: cores.branco },
+  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: t.cores.branco },
   caixaAviso: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.verdeClaro,
-    backgroundColor: cores.verdeMenta,
+    borderColor: t.cores.verdeClaro,
+    backgroundColor: t.cores.verdeMenta,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  textoAviso: { fontSize: 13.5, lineHeight: 20, color: cores.ink },
+  textoAviso: { fontSize: 13.5, lineHeight: 20, color: t.cores.ink },
 
   linkEsqueci: { alignSelf: 'flex-end', marginTop: -6 },
-  textoEsqueci: { fontSize: 13.5, fontWeight: '600', color: cores.deep },
+  textoEsqueci: { fontSize: 13.5, fontWeight: '600', color: t.cores.deep },
   linkCriarConta: { alignItems: 'center', paddingVertical: 6 },
-  textoLinkSuave: { fontSize: 14, color: inkSuave },
-  textoLinkForte: { fontWeight: '700', color: cores.deep },
+  textoLinkSuave: { fontSize: 14, color: t.inkSuave },
+  textoLinkForte: { fontWeight: '700', color: t.cores.deep },
   divisor: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
-  linhaDivisor: { flex: 1, height: 1, backgroundColor: cores.line },
-  textoDivisor: { fontSize: 12, color: inkFraco },
+  linhaDivisor: { flex: 1, height: 1, backgroundColor: t.cores.line },
+  textoDivisor: { fontSize: 12, color: t.inkFraco },
   botaoSecundario: {
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.deep,
+    borderColor: t.cores.deep,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoSecundarioPressionado: { backgroundColor: cores.moss },
-  textoBotaoSecundario: { fontSize: 15, fontWeight: '600', color: cores.deep },
+  botaoSecundarioPressionado: { backgroundColor: t.cores.moss },
+  textoBotaoSecundario: { fontSize: 15, fontWeight: '600', color: t.cores.deep },
   rodape: {
     marginTop: 32,
     textAlign: 'center',
     fontSize: 12,
-    color: inkFraco,
+    color: t.inkFraco,
   },
-})
+  }),
+)

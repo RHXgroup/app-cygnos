@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
 import type { Coluna } from '../lib/relatorio'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const ALTURA = 92
 
@@ -15,8 +15,8 @@ const ALTURA = 92
 export function BarrasPeriodo({
   colunas,
   meta,
-  cor = cores.verde,
-  corNaMeta = cores.verde,
+  cor = paleta().cores.verde,
+  corNaMeta = paleta().cores.verde,
   /* Como o valor da meta se lê ao lado da linha. Sem isso a linha atravessa o
      gráfico sem dizer contra o que está comparando. */
   rotuloMeta,
@@ -27,6 +27,7 @@ export function BarrasPeriodo({
   corNaMeta?: string
   rotuloMeta?: string
 }) {
+  const styles = estilos()
   const valores = colunas.map(c => c.valor).filter((v): v is number => v !== null)
 
   /* Teto medido contra a MAIOR das duas — a meta ou o maior valor. Contra a
@@ -79,14 +80,15 @@ export function BarrasPeriodo({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   grafico: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 6 },
   linhaMeta: {
     position: 'absolute',
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
     /* O `bottom` é medido a partir do pé do gráfico, e o rótulo do dia ocupa a
        faixa de baixo — daí o deslocamento, que é a altura dele mais o respiro
        (6 + 12). Sem isto a linha da meta desce para dentro dos rótulos. */
@@ -99,11 +101,12 @@ const styles = StyleSheet.create({
     top: -12,
     fontSize: 9.5,
     fontWeight: '600',
-    color: inkFraco,
+    color: t.inkFraco,
   },
   coluna: { flex: 1, alignItems: 'center' },
   trilho: { height: ALTURA, width: '100%', justifyContent: 'flex-end' },
   barra: { width: '100%', borderRadius: 5, minHeight: 3 },
-  semRegistro: { height: 3, width: '100%', borderRadius: 2, backgroundColor: cores.trilho },
-  rotulo: { marginTop: 6, height: 12, fontSize: 9.5, color: inkSuave },
-})
+  semRegistro: { height: 3, width: '100%', borderRadius: 2, backgroundColor: t.cores.trilho },
+  rotulo: { marginTop: 6, height: 12, fontSize: 9.5, color: t.inkSuave },
+  }),
+)

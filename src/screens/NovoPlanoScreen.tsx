@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CampoTexto } from '../components/CampoTexto'
 import { supabase } from '../lib/supabase'
-import { cores } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 import type { Plano } from './PlanosScreen'
 
 const LIMITE_NOME = 80
@@ -29,6 +29,7 @@ export function NovoPlanoScreen({
   onCriado: (plano: Plano) => void
   onCancelar: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [nome, setNome] = useState('')
   const [observacao, setObservacao] = useState('')
@@ -82,7 +83,7 @@ export function NovoPlanoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Novo plano</Text>
         <View style={styles.botaoVoltar} />
@@ -134,7 +135,7 @@ export function NovoPlanoScreen({
           accessibilityRole="button"
         >
           {salvando ? (
-            <ActivityIndicator color={cores.branco} />
+            <ActivityIndicator color={paleta().cores.branco} />
           ) : (
             <Text style={styles.textoBotaoSalvar}>Salvar plano</Text>
           )}
@@ -144,8 +145,9 @@ export function NovoPlanoScreen({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -155,7 +157,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, gap: 18 },
   campoObservacao: {
@@ -170,11 +172,12 @@ const styles = StyleSheet.create({
   botaoSalvar: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoSalvarPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoSalvarPressionado: { backgroundColor: t.cores.verdeEscuro },
   botaoSalvarDesativado: { opacity: 0.6 },
-  textoBotaoSalvar: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  textoBotaoSalvar: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

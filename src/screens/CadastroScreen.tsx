@@ -26,7 +26,7 @@ import {
   validarTelefone,
   validarUsername,
 } from '../lib/formulario'
-import { cores, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 type Campo = 'nome' | 'email' | 'username' | 'cpf' | 'telefone' | 'nascimento' | 'senha' | 'genero'
 type Erros = Partial<Record<Campo, string>>
@@ -38,6 +38,7 @@ const GENEROS = [
 ] as const
 
 export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
+  const styles = estilos()
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -354,7 +355,7 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
             ]}
           >
             {carregando ? (
-              <ActivityIndicator color={cores.branco} />
+              <ActivityIndicator color={paleta().cores.branco} />
             ) : (
               <Text style={styles.textoBotaoPrimario}>Criar conta</Text>
             )}
@@ -388,14 +389,15 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   flex: { flex: 1 },
   scroll: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 48 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
-  titulo: { fontSize: 26, fontWeight: '700', color: cores.deep },
-  subtitulo: { marginTop: 8, marginBottom: 24, fontSize: 14.5, lineHeight: 21, color: inkSuave },
+  titulo: { fontSize: 26, fontWeight: '700', color: t.cores.deep },
+  subtitulo: { marginTop: 8, marginBottom: 24, fontSize: 14.5, lineHeight: 21, color: t.inkSuave },
   formulario: { gap: 16 },
-  rotulo: { marginBottom: 6, fontSize: 13, fontWeight: '600', color: inkMedio },
+  rotulo: { marginBottom: 6, fontSize: 13, fontWeight: '600', color: t.inkMedio },
 
   linhaGenero: { flexDirection: 'row', gap: 8 },
   opcaoGenero: {
@@ -403,56 +405,57 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.line,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.line,
+    backgroundColor: t.cores.superficie,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  opcaoGeneroAtiva: { borderColor: cores.deep, backgroundColor: cores.moss },
-  textoGenero: { fontSize: 14, color: inkMedio },
-  textoGeneroAtivo: { fontWeight: '700', color: cores.deep },
-  erroGenero: { marginTop: 5, fontSize: 12.5, color: cores.erroTexto },
+  opcaoGeneroAtiva: { borderColor: t.cores.deep, backgroundColor: t.cores.moss },
+  textoGenero: { fontSize: 14, color: t.inkMedio },
+  textoGeneroAtivo: { fontWeight: '700', color: t.cores.deep },
+  erroGenero: { marginTop: 5, fontSize: 12.5, color: t.cores.erroTexto },
 
   campoSenhaEnvolucro: { position: 'relative' },
   campoSenha: { paddingRight: 92 },
   /* 28 = altura do rótulo + respiro; alinha o botão com o campo, não com o bloco. */
   botaoOlho: { position: 'absolute', right: 14, top: 40, paddingVertical: 6, paddingHorizontal: 4 },
-  textoOlho: { fontSize: 13, fontWeight: '600', color: cores.deep },
+  textoOlho: { fontSize: 13, fontWeight: '600', color: t.cores.deep },
 
   caixaErro: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  textoErro: { fontSize: 13, lineHeight: 19, color: cores.erroTexto },
+  textoErro: { fontSize: 13, lineHeight: 19, color: t.cores.erroTexto },
 
   botaoPrimario: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
     paddingHorizontal: 24,
   },
-  botaoPrimarioPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoPrimarioPressionado: { backgroundColor: t.cores.verdeEscuro },
   botaoDesabilitado: { opacity: 0.6 },
-  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: cores.branco },
-  aceite: { fontSize: 12, lineHeight: 18, color: inkSuave, textAlign: 'center' },
-  linkAceite: { fontWeight: '700', color: cores.deep, textDecorationLine: 'underline' },
+  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: t.cores.branco },
+  aceite: { fontSize: 12, lineHeight: 18, color: t.inkSuave, textAlign: 'center' },
+  linkAceite: { fontWeight: '700', color: t.cores.deep, textDecorationLine: 'underline' },
   linkVoltar: { alignItems: 'center', paddingVertical: 8 },
-  textoLinkSuave: { fontSize: 14, color: inkSuave },
-  textoLinkForte: { fontWeight: '700', color: cores.deep },
+  textoLinkSuave: { fontSize: 14, color: t.inkSuave },
+  textoLinkForte: { fontWeight: '700', color: t.cores.deep },
 
-  tituloConfirmacao: { fontSize: 22, fontWeight: '700', color: cores.deep, textAlign: 'center' },
+  tituloConfirmacao: { fontSize: 22, fontWeight: '700', color: t.cores.deep, textAlign: 'center' },
   textoConfirmacao: {
     fontSize: 15,
     lineHeight: 22,
-    color: inkSuave,
+    color: t.inkSuave,
     textAlign: 'center',
     marginBottom: 8,
   },
-})
+  }),
+)

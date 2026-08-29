@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { listaDeCompras, type ItemDeCompra, type PlanoCompleto } from '../lib/plano'
 import { milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* A lista de compras do plano.
  *
@@ -30,6 +30,7 @@ export function ListaDeComprasScreen({
   plano: PlanoCompleto
   onFechar: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [pegos, setPegos] = useState<Set<string>>(new Set())
 
@@ -67,7 +68,7 @@ export function ListaDeComprasScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Lista de compras</Text>
         <View style={styles.botaoVoltar} />
@@ -149,6 +150,7 @@ function LinhaDeCompra({
   pego: boolean
   onAlternar: () => void
 }) {
+  const styles = estilos()
   /* Peso quando há; a forma como foi dita quando não há. "2 unidades" é mais
      útil na prateleira do que um peso que ninguém informou. */
   const quantidade =
@@ -165,7 +167,7 @@ function LinhaDeCompra({
       accessibilityLabel={`${item.nome}, ${quantidade}`}
     >
       <View style={[styles.caixa, pego && styles.caixaMarcada]}>
-        {pego && <Ionicons name="checkmark" size={15} color={cores.sobreLimao} />}
+        {pego && <Ionicons name="checkmark" size={15} color={paleta().cores.sobreLimao} />}
       </View>
 
       <View style={styles.textoLinha}>
@@ -182,8 +184,9 @@ function LinhaDeCompra({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -193,31 +196,31 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 8 },
-  subtitulo: { fontSize: 13, color: inkSuave, marginBottom: 6 },
+  subtitulo: { fontSize: 13, color: t.inkSuave, marginBottom: 6 },
 
   placar: {
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 6,
   },
-  numeroPlacar: { fontSize: 30, fontWeight: '800', color: cores.limao, letterSpacing: -0.8 },
-  rotuloPlacar: { fontSize: 13, color: inkMedio, marginTop: 2 },
+  numeroPlacar: { fontSize: 30, fontWeight: '800', color: t.cores.limao, letterSpacing: -0.8 },
+  rotuloPlacar: { fontSize: 13, color: t.inkMedio, marginTop: 2 },
 
   linha: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
@@ -228,29 +231,30 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: cores.trilho,
+    borderColor: t.cores.trilho,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  caixaMarcada: { backgroundColor: cores.limao, borderColor: cores.limao },
+  caixaMarcada: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
 
   textoLinha: { flex: 1 },
-  nome: { fontSize: 15, fontWeight: '700', color: cores.ink },
-  detalhe: { fontSize: 12.5, color: inkSuave, marginTop: 1 },
+  nome: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+  detalhe: { fontSize: 12.5, color: t.inkSuave, marginTop: 1 },
   /* Riscado e apagado: some do caminho sem sumir da lista, para quem quiser
      conferir o que já pegou. */
-  textoPego: { textDecorationLine: 'line-through', color: inkFraco },
+  textoPego: { textDecorationLine: 'line-through', color: t.inkFraco },
 
   tituloSecao: {
     fontSize: 12,
     fontWeight: '700',
-    color: inkFraco,
+    color: t.inkFraco,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
     marginTop: 18,
   },
-  explicacaoSecao: { fontSize: 12.5, color: inkSuave, marginBottom: 4 },
+  explicacaoSecao: { fontSize: 12.5, color: t.inkSuave, marginBottom: 4 },
 
-  vazio: { fontSize: 14, color: inkSuave, lineHeight: 21, paddingVertical: 12 },
-  rodape: { fontSize: 12.5, color: inkFraco, lineHeight: 19, marginTop: 16 },
-})
+  vazio: { fontSize: 14, color: t.inkSuave, lineHeight: 21, paddingVertical: 12 },
+  rodape: { fontSize: 12.5, color: t.inkFraco, lineHeight: 19, marginTop: 16 },
+  }),
+)

@@ -19,7 +19,7 @@ import { descricaoDe, gramasDe, lerRefeicao, type ItemLido } from '../lib/interp
 import { Ditado } from '../components/Ditado'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Escrever a refeição inteira de uma vez.
  *
@@ -57,6 +57,7 @@ export function EscreverRefeicaoScreen({
   onAdicionar: (itens: AlimentoEscolhido[]) => void
   onFechar: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [texto, setTexto] = useState('')
   const [linhas, setLinhas] = useState<Linha[]>([])
@@ -202,7 +203,7 @@ export function EscreverRefeicaoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela} numberOfLines={1}>
           Falar ou escrever
@@ -245,7 +246,7 @@ export function EscreverRefeicaoScreen({
             setConferido(false)
           }}
           placeholder={'2 fatias de pão integral\n1 xícara de café\n200g de mamão'}
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           multiline
           keyboardAppearance="dark"
           style={styles.campo}
@@ -263,10 +264,10 @@ export function EscreverRefeicaoScreen({
           accessibilityRole="button"
         >
           {procurando ? (
-            <ActivityIndicator size="small" color={cores.branco} />
+            <ActivityIndicator size="small" color={paleta().cores.branco} />
           ) : (
             <>
-              <Ionicons name="sparkles-outline" size={17} color={cores.branco} />
+              <Ionicons name="sparkles-outline" size={17} color={paleta().cores.branco} />
               <Text style={styles.textoBotaoConferir}>Ver o que eu entendi</Text>
             </>
           )}
@@ -312,7 +313,7 @@ export function EscreverRefeicaoScreen({
                         <Ionicons
                           name={trocando === i ? 'chevron-up' : 'swap-horizontal'}
                           size={14}
-                          color={inkFraco}
+                          color={paleta().inkFraco}
                         />
                       )}
                     </View>
@@ -346,7 +347,7 @@ export function EscreverRefeicaoScreen({
                           style={({ pressed }) => [styles.alternativa, pressed && styles.pressionado]}
                           accessibilityRole="button"
                         >
-                          <Ionicons name="return-down-forward" size={13} color={inkFraco} />
+                          <Ionicons name="return-down-forward" size={13} color={paleta().inkFraco} />
                           <Text style={styles.textoAlternativa} numberOfLines={1}>
                             {a.nome}
                             {a.marca ? ` · ${a.marca}` : ''}
@@ -362,7 +363,7 @@ export function EscreverRefeicaoScreen({
                     accessibilityRole="button"
                     accessibilityLabel={`Remover ${l.lido.nome}`}
                   >
-                    <Ionicons name="close" size={16} color={inkFraco} />
+                    <Ionicons name="close" size={16} color={paleta().inkFraco} />
                   </Pressable>
                 </View>
               )
@@ -378,7 +379,7 @@ export function EscreverRefeicaoScreen({
               ]}
               accessibilityRole="button"
             >
-              <Ionicons name="add" size={18} color={cores.branco} />
+              <Ionicons name="add" size={18} color={paleta().cores.branco} />
               <Text style={styles.textoBotaoConferir}>
                 {encontrados === 0
                   ? 'Nenhum alimento encontrado'
@@ -416,8 +417,9 @@ function ehMesmaMedida(daBase: string, doTexto: string): boolean {
   return a === b || a.startsWith(b) || b.startsWith(a)
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -427,24 +429,24 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 12 },
-  explicacao: { fontSize: 13.5, color: inkSuave, lineHeight: 20 },
+  explicacao: { fontSize: 13.5, color: t.inkSuave, lineHeight: 20 },
 
   campo: {
     minHeight: 120,
     maxHeight: 200,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 12,
     fontSize: 15,
     lineHeight: 22,
-    color: cores.ink,
+    color: t.cores.ink,
     textAlignVertical: 'top',
   },
 
@@ -452,10 +454,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  textoErro: { fontSize: 13, lineHeight: 18, color: cores.erroTexto },
+  textoErro: { fontSize: 13, lineHeight: 18, color: t.cores.erroTexto },
 
   botaoConferir: {
     flexDirection: 'row',
@@ -464,7 +466,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 13,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
   botaoAdicionar: {
     flexDirection: 'row',
@@ -473,17 +475,17 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 13,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     marginTop: 6,
   },
   botaoDesligado: { opacity: 0.4 },
   pressionado: { opacity: 0.75 },
-  textoBotaoConferir: { fontSize: 15, fontWeight: '800', color: cores.branco },
+  textoBotaoConferir: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
 
   tituloSecao: {
     fontSize: 12,
     fontWeight: '700',
-    color: inkFraco,
+    color: t.inkFraco,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
     marginTop: 6,
@@ -493,10 +495,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 11,
     paddingHorizontal: 13,
   },
@@ -509,13 +511,14 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingLeft: 2,
   },
-  textoAlternativa: { flex: 1, fontSize: 13, color: inkMedio },
-  nomeLinha: { fontSize: 15, fontWeight: '700', color: cores.ink },
-  detalheLinha: { fontSize: 12.5, color: inkMedio },
-  naoAchei: { fontSize: 12, color: cores.gold },
-  semPeso: { fontSize: 12, color: inkSuave },
+  textoAlternativa: { flex: 1, fontSize: 13, color: t.inkMedio },
+  nomeLinha: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+  detalheLinha: { fontSize: 12.5, color: t.inkMedio },
+  naoAchei: { fontSize: 12, color: t.cores.gold },
+  semPeso: { fontSize: 12, color: t.inkSuave },
   remover: { padding: 4 },
 
-  vazio: { fontSize: 13.5, color: inkSuave, lineHeight: 20 },
-  rodape: { fontSize: 12.5, color: inkFraco, lineHeight: 18 },
-})
+  vazio: { fontSize: 13.5, color: t.inkSuave, lineHeight: 20 },
+  rodape: { fontSize: 12.5, color: t.inkFraco, lineHeight: 18 },
+  }),
+)

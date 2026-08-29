@@ -6,7 +6,7 @@ import type { Session } from '@supabase/supabase-js'
 import { NovoPlanoScreen } from './NovoPlanoScreen'
 import { supabase } from '../lib/supabase'
 import { dataNumerica } from '../lib/formatar'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 export type Plano = {
   id: string
@@ -21,6 +21,7 @@ export type Plano = {
  * de outra tabela e merece uma seção separada aqui — de quem é cada plano é a
  * informação mais importante da tela, e uma lista só apagaria isso. */
 export function PlanosScreen({ sessao, onFechar }: { sessao: Session; onFechar: () => void }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [planos, setPlanos] = useState<Plano[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -72,7 +73,7 @@ export function PlanosScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Planejamento alimentar</Text>
         <View style={styles.botaoVoltar} />
@@ -80,7 +81,7 @@ export function PlanosScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <ScrollView
@@ -94,7 +95,7 @@ export function PlanosScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
           {planos.length === 0 && !erro ? (
             <View style={styles.vazio}>
               <View style={styles.circulo}>
-                <Ionicons name="nutrition-outline" size={28} color={cores.verde} />
+                <Ionicons name="nutrition-outline" size={28} color={paleta().cores.verde} />
               </View>
               <Text style={styles.tituloVazio}>Nenhum plano por aqui</Text>
               <Text style={styles.textoVazio}>
@@ -115,7 +116,7 @@ export function PlanosScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
           style={({ pressed }) => [styles.botaoCriar, pressed && styles.botaoCriarPressionado]}
           accessibilityRole="button"
         >
-          <Ionicons name="add" size={20} color={cores.branco} />
+          <Ionicons name="add" size={20} color={paleta().cores.branco} />
           <Text style={styles.textoBotaoCriar}>Criar plano alimentar</Text>
         </Pressable>
       </View>
@@ -124,10 +125,11 @@ export function PlanosScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
 }
 
 function CartaoPlano({ plano }: { plano: Plano }) {
+  const styles = estilos()
   return (
     <View style={styles.cartao}>
       <View style={styles.icone}>
-        <Ionicons name="restaurant-outline" size={18} color={cores.verde} />
+        <Ionicons name="restaurant-outline" size={18} color={paleta().cores.verde} />
       </View>
 
       <View style={styles.textoCartao}>
@@ -145,8 +147,9 @@ function CartaoPlano({ plano }: { plano: Plano }) {
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -157,31 +160,31 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, gap: 12 },
   /* Lista vazia: o bloco de convite ocupa o espaço todo e fica no meio, em vez
      de grudado no topo. */
   conteudoVazio: { flexGrow: 1, justifyContent: 'center' },
 
-  erro: { fontSize: 13.5, lineHeight: 20, color: cores.erroTexto, textAlign: 'center' },
+  erro: { fontSize: 13.5, lineHeight: 20, color: t.cores.erroTexto, textAlign: 'center' },
 
   vazio: { alignItems: 'center', paddingHorizontal: 12 },
   circulo: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
   },
-  tituloVazio: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloVazio: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
   textoVazio: {
     marginTop: 6,
     fontSize: 13.5,
     lineHeight: 20,
-    color: inkSuave,
+    color: t.inkSuave,
     textAlign: 'center',
   },
 
@@ -191,22 +194,22 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: 18,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   icone: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
   textoCartao: { flex: 1 },
-  nome: { fontSize: 15, fontWeight: '700', color: cores.ink },
-  observacao: { marginTop: 3, fontSize: 13, lineHeight: 18, color: inkSuave },
-  data: { marginTop: 4, fontSize: 11.5, color: inkFraco },
+  nome: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+  observacao: { marginTop: 3, fontSize: 13, lineHeight: 18, color: t.inkSuave },
+  data: { marginTop: 4, fontSize: 11.5, color: t.inkFraco },
 
   rodape: { paddingHorizontal: 20, paddingTop: 10 },
   botaoCriar: {
@@ -216,8 +219,9 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoCriarPressionado: { backgroundColor: cores.verdeEscuro },
-  textoBotaoCriar: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  botaoCriarPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoBotaoCriar: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

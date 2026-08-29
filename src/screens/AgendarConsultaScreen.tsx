@@ -26,7 +26,7 @@ import {
   type MinhaConsulta,
   type Vaga,
 } from '../lib/agenda'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Pedir consulta.
  *
@@ -42,6 +42,7 @@ import { cores, inkFraco, inkSuave } from '../theme'
  * nutricionista, aceitando. Escrever "agendado" numa tela que só cria pedido
  * seria a mentira mais cara possível, porque a pessoa apareceria no consultório. */
 export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
 
   const [dias, setDias] = useState<DiaComVagas[] | null>(null)
@@ -117,7 +118,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
     <RefreshControl
       refreshing={atualizando}
       onRefresh={puxarParaAtualizar}
-      tintColor={cores.limao}
+      tintColor={paleta().cores.limao}
     />
   )
 
@@ -213,7 +214,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Agendar consulta</Text>
         <View style={styles.botaoVoltar} />
@@ -221,7 +222,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
 
       {!dias ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : /* Pedido em aberto ocupa a tela inteira sozinho: o banco recusa um
              segundo pedido enquanto este não for respondido, e mostrar a lista
@@ -311,6 +312,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
  * cartões grandes explicando cada um. A data, a hora e a etiqueta do estado
  * bastam — o cartão de cima já disse por extenso o que cada estado significa. */
 function ListaDeConsultas({ consultas }: { consultas: MinhaConsulta[] }) {
+  const styles = estilos()
   if (consultas.length === 0) return null
 
   return (
@@ -337,6 +339,7 @@ function CartaoDaConsulta({
   cancelando: boolean
   onDesistir?: () => void
 }) {
+  const styles = estilos()
   const estado = estadoDaConsulta(consulta.status)
   const marcada = consulta.status !== 'solicitada'
 
@@ -344,7 +347,7 @@ function CartaoDaConsulta({
     <>
       <View style={[styles.cartaoDestaque, marcada && styles.cartaoMarcada]}>
         <View style={styles.circulo}>
-          <Ionicons name={estado.icone} size={22} color={cores.verde} />
+          <Ionicons name={estado.icone} size={22} color={paleta().cores.verde} />
         </View>
         <Text style={styles.rotuloDestaque}>{estado.titulo}</Text>
         <Text style={styles.horarioPedido}>{consultaLegivel(consulta.dataHora)}</Text>
@@ -361,10 +364,10 @@ function CartaoDaConsulta({
           accessibilityLabel="Desistir deste pedido"
         >
           {cancelando ? (
-            <ActivityIndicator size="small" color={cores.erroTexto} />
+            <ActivityIndicator size="small" color={paleta().cores.erroTexto} />
           ) : (
             <>
-              <Ionicons name="close-circle-outline" size={16} color={cores.erroTexto} />
+              <Ionicons name="close-circle-outline" size={16} color={paleta().cores.erroTexto} />
               <Text style={styles.textoDesistir}>Desistir deste pedido</Text>
             </>
           )}
@@ -392,6 +395,7 @@ function LinhaHorario({
   enviando: string | null
   onPedir: (inicio: string) => void
 }) {
+  const styles = estilos()
   const indo = enviando === vaga.inicio
 
   return (
@@ -410,11 +414,11 @@ function LinhaHorario({
     >
       <Text style={styles.hora}>{vaga.hora}</Text>
       {indo ? (
-        <ActivityIndicator size="small" color={cores.verdeEscuro} />
+        <ActivityIndicator size="small" color={paleta().cores.verdeEscuro} />
       ) : (
         <View style={styles.pedir}>
           <Text style={styles.textoPedir}>Pedir</Text>
-          <Ionicons name="chevron-forward" size={15} color={cores.verde} />
+          <Ionicons name="chevron-forward" size={15} color={paleta().cores.verde} />
         </View>
       )}
     </Pressable>
@@ -422,6 +426,7 @@ function LinhaHorario({
 }
 
 function Aviso({ texto }: { texto: string }) {
+  const styles = estilos()
   return (
     <View style={styles.aviso}>
       <Text style={styles.textoAviso}>{texto}</Text>
@@ -429,8 +434,9 @@ function Aviso({ texto }: { texto: string }) {
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   cabecalho: {
     flexDirection: 'row',
@@ -440,12 +446,12 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32 },
 
-  chamada: { marginTop: 6, fontSize: 18, fontWeight: '800', color: cores.ink },
-  explicacao: { marginTop: 8, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+  chamada: { marginTop: 6, fontSize: 18, fontWeight: '800', color: t.cores.ink },
+  explicacao: { marginTop: 8, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
 
   /* Fundo opaco e não transparente: o cabeçalho fica grudado no topo enquanto a
      lista rola por baixo dele, e sem fundo as horas passariam por trás do nome
@@ -454,12 +460,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
-    backgroundColor: cores.fundo,
+    backgroundColor: t.cores.fundo,
     paddingTop: 20,
     paddingBottom: 8,
   },
-  tituloDia: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  contaDia: { fontSize: 12, color: inkFraco },
+  tituloDia: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  contaDia: { fontSize: 12, color: t.inkFraco },
 
   linha: {
     flexDirection: 'row',
@@ -469,17 +475,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
     borderRadius: 14,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
   },
-  linhaPressionada: { backgroundColor: cores.verdeMenta },
+  linhaPressionada: { backgroundColor: t.cores.verdeMenta },
   linhaApagada: { opacity: 0.4 },
-  hora: { fontSize: 16, fontWeight: '700', color: cores.ink },
+  hora: { fontSize: 16, fontWeight: '700', color: t.cores.ink },
   pedir: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  textoPedir: { fontSize: 13, fontWeight: '700', color: cores.verde },
+  textoPedir: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
 
   cartaoDestaque: {
     borderRadius: 20,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     padding: 20,
     marginTop: 16,
     alignItems: 'center',
@@ -488,7 +494,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
@@ -496,13 +502,13 @@ const styles = StyleSheet.create({
   /* Verde cheio quando a consulta está de pé, menta quando ainda é pedido: a
      diferença entre "pedi" e "está marcado" precisa aparecer antes de a pessoa
      ler qualquer palavra. */
-  cartaoMarcada: { backgroundColor: cores.verdeClaro },
-  rotuloDestaque: { fontSize: 12.5, fontWeight: '700', color: cores.verde },
+  cartaoMarcada: { backgroundColor: t.cores.verdeClaro },
+  rotuloDestaque: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
   horarioPedido: {
     marginTop: 6,
     fontSize: 17,
     fontWeight: '800',
-    color: cores.ink,
+    color: t.cores.ink,
     textAlign: 'center',
   },
 
@@ -512,7 +518,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    color: cores.verde,
+    color: t.cores.verde,
     marginBottom: 8,
   },
   linhaConsulta: {
@@ -523,16 +529,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 6,
     borderRadius: 13,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
   },
-  dataConsulta: { fontSize: 13.5, fontWeight: '600', color: cores.ink },
+  dataConsulta: { fontSize: 13.5, fontWeight: '600', color: t.cores.ink },
   etiqueta: {
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
   },
-  textoEtiqueta: { fontSize: 11, fontWeight: '700', color: cores.verdeEscuro },
+  textoEtiqueta: { fontSize: 11, fontWeight: '700', color: t.cores.verdeEscuro },
 
   botaoDesistir: {
     flexDirection: 'row',
@@ -543,22 +549,23 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  botaoDesistirPressionado: { backgroundColor: cores.erroBorda },
-  textoDesistir: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
+  botaoDesistirPressionado: { backgroundColor: t.cores.erroBorda },
+  textoDesistir: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
 
-  aviso: { marginTop: 16, borderRadius: 16, backgroundColor: cores.cartao, padding: 18 },
-  textoAviso: { fontSize: 13.5, lineHeight: 20, color: inkSuave, textAlign: 'center' },
+  aviso: { marginTop: 16, borderRadius: 16, backgroundColor: t.cores.cartao, padding: 18 },
+  textoAviso: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
 
   erro: {
     marginTop: 16,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
     padding: 14,
   },
-  textoErro: { fontSize: 13, color: cores.erroTexto },
-})
+  textoErro: { fontSize: 13, color: t.cores.erroTexto },
+  }),
+)

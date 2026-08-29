@@ -21,7 +21,7 @@ import {
   salvarObjetivoPeso,
   type ObjetivoPeso,
 } from '../lib/metas'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 type Conta = {
   nome_completo: string
@@ -68,6 +68,7 @@ export function PerfilScreen({
      precisam reler quando ele muda aqui. */
   onObjetivoMudou: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [conta, setConta] = useState<Conta | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -217,7 +218,7 @@ export function PerfilScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Meu perfil</Text>
         {/* Espaço da mesma largura do botão para o título ficar centralizado
@@ -227,7 +228,7 @@ export function PerfilScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <ScrollView
@@ -257,13 +258,13 @@ export function PerfilScreen({
 
                 {enviandoFoto && (
                   <View style={styles.veuAvatar}>
-                    <ActivityIndicator color={cores.branco} />
+                    <ActivityIndicator color={paleta().cores.branco} />
                   </View>
                 )}
               </View>
 
               <View style={styles.selinhoCamera}>
-                <Ionicons name="camera" size={14} color={cores.branco} />
+                <Ionicons name="camera" size={14} color={paleta().cores.branco} />
               </View>
             </Pressable>
 
@@ -326,7 +327,7 @@ export function PerfilScreen({
                       chave === 'perda' ? 'trending-down' : chave === 'ganho' ? 'trending-up' : 'remove'
                     }
                     size={19}
-                    color={objetivo === chave ? cores.branco : cores.verde}
+                    color={objetivo === chave ? paleta().cores.branco : paleta().cores.verde}
                   />
                   <Text
                     style={[
@@ -359,7 +360,7 @@ export function PerfilScreen({
             style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
             accessibilityRole="button"
           >
-            <Ionicons name="log-out-outline" size={18} color={cores.erroTexto} />
+            <Ionicons name="log-out-outline" size={18} color={paleta().cores.erroTexto} />
             <Text style={styles.textoBotaoSair}>Sair da conta</Text>
           </Pressable>
         </ScrollView>
@@ -405,7 +406,8 @@ function OpcaoFolha({
   perigo?: boolean
   onPress: () => void
 }) {
-  const cor = perigo ? cores.erroTexto : cores.ink
+  const styles = estilos()
+  const cor = perigo ? paleta().cores.erroTexto : paleta().cores.ink
   return (
     <Pressable
       onPress={onPress}
@@ -419,6 +421,7 @@ function OpcaoFolha({
 }
 
 function Linha({ rotulo, valor, ultima }: { rotulo: string; valor: string; ultima?: boolean }) {
+  const styles = estilos()
   return (
     <View style={[styles.linha, !ultima && styles.linhaComDivisor]}>
       <Text style={styles.rotuloLinha}>{rotulo}</Text>
@@ -431,8 +434,9 @@ function Linha({ rotulo, valor, ultima }: { rotulo: string; valor: string; ultim
 
 const TAMANHO_AVATAR = 96
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -443,7 +447,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32 },
 
@@ -453,7 +457,7 @@ const styles = StyleSheet.create({
     width: TAMANHO_AVATAR,
     height: TAMANHO_AVATAR,
     borderRadius: TAMANHO_AVATAR / 2,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
     /* Recorta a foto no círculo em vez de confiar no borderRadius da Image,
@@ -461,7 +465,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   foto: { width: '100%', height: '100%' },
-  textoAvatar: { fontSize: 32, fontWeight: '800', color: cores.verdeEscuro },
+  textoAvatar: { fontSize: 32, fontWeight: '800', color: t.cores.verdeEscuro },
   veuAvatar: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.70)',
@@ -475,23 +479,23 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: cores.fundo,
+    borderColor: t.cores.fundo,
   },
-  nome: { fontSize: 20, fontWeight: '800', color: cores.ink, textAlign: 'center' },
-  username: { fontSize: 13.5, color: inkFraco },
+  nome: { fontSize: 20, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
+  username: { fontSize: 13.5, color: t.inkFraco },
   erroFoto: {
     marginTop: 8,
     fontSize: 12.5,
     lineHeight: 18,
-    color: cores.erroTexto,
+    color: t.cores.erroTexto,
     textAlign: 'center',
   },
 
-  cartao: { borderRadius: 20, backgroundColor: cores.cartao, paddingHorizontal: 16 },
+  cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, paddingHorizontal: 16 },
   linha: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -499,19 +503,19 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingVertical: 14,
   },
-  linhaComDivisor: { borderBottomWidth: 1, borderBottomColor: cores.borda },
-  rotuloLinha: { fontSize: 13.5, color: inkSuave },
-  valorLinha: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: inkMedio },
+  linhaComDivisor: { borderBottomWidth: 1, borderBottomColor: t.cores.borda },
+  rotuloLinha: { fontSize: 13.5, color: t.inkSuave },
+  valorLinha: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: t.inkMedio },
 
   blocoObjetivo: {
     marginTop: 14,
     padding: 16,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     gap: 10,
   },
-  tituloObjetivo: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  ajudaObjetivo: { fontSize: 12.5, lineHeight: 18, color: inkSuave },
+  tituloObjetivo: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  ajudaObjetivo: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
   opcoesObjetivo: { flexDirection: 'row', gap: 8 },
   opcaoObjetivo: {
     flex: 1,
@@ -519,22 +523,22 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   /* Preenchido de verde quando marcado, e não só com a borda: numa fileira de
      três a diferença tem de ser visível de relance, e uma borda de um pixel não
      é. */
-  opcaoObjetivoAtiva: { backgroundColor: cores.verde, borderColor: cores.verde },
-  opcaoObjetivoPressionada: { backgroundColor: cores.verdeClaro, borderColor: cores.verdeClaro },
-  textoOpcaoObjetivo: { fontSize: 13, fontWeight: '700', color: cores.ink },
-  textoOpcaoObjetivoAtiva: { color: cores.branco },
-  dicaObjetivo: { fontSize: 11.5, lineHeight: 16, color: inkFraco },
-  erroObjetivo: { fontSize: 11.5, lineHeight: 16, color: cores.erroTexto },
+  opcaoObjetivoAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  opcaoObjetivoPressionada: { backgroundColor: t.cores.verdeClaro, borderColor: t.cores.verdeClaro },
+  textoOpcaoObjetivo: { fontSize: 13, fontWeight: '700', color: t.cores.ink },
+  textoOpcaoObjetivoAtiva: { color: t.cores.branco },
+  dicaObjetivo: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+  erroObjetivo: { fontSize: 11.5, lineHeight: 16, color: t.cores.erroTexto },
 
   semCadastro: { paddingVertical: 18 },
-  textoSemCadastro: { fontSize: 13.5, lineHeight: 20, color: inkSuave, textAlign: 'center' },
+  textoSemCadastro: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
 
   botaoSair: {
     flexDirection: 'row',
@@ -545,11 +549,11 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
   botaoSairPressionado: { opacity: 0.75 },
-  textoBotaoSair: { fontSize: 15, fontWeight: '700', color: cores.erroTexto },
+  textoBotaoSair: { fontSize: 15, fontWeight: '700', color: t.cores.erroTexto },
 
   fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
@@ -557,7 +561,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: cores.fundo,
+    backgroundColor: t.cores.fundo,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 10,
@@ -568,7 +572,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
     marginBottom: 10,
   },
   opcao: {
@@ -579,6 +583,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
   },
-  opcaoPressionada: { backgroundColor: cores.cartao },
+  opcaoPressionada: { backgroundColor: t.cores.cartao },
   rotuloOpcao: { fontSize: 15.5, fontWeight: '600' },
-})
+  }),
+)

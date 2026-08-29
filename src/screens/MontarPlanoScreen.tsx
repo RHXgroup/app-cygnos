@@ -7,7 +7,7 @@ import { EscreverRefeicaoScreen } from './EscreverRefeicaoScreen'
 import { ResumoPlanoScreen } from './ResumoPlanoScreen'
 import { milhar } from '../lib/formatar'
 import { detalheDoItem, totaisDe, type ItemAlimento, type RefeicaoMontada } from '../lib/plano'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 import type { RefeicaoEscolhida } from './RefeicoesDoDiaScreen'
 
 /* O dia montado: cada refeição definida na primeira etapa, com os alimentos
@@ -44,6 +44,7 @@ export function MontarPlanoScreen({
   onVoltar: () => void
   onSalvo: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [itens, setItens] = useState<Record<string, ItemAlimento[]>>(iniciais ?? {})
   const [buscandoPara, setBuscandoPara] = useState<RefeicaoEscolhida | null>(null)
@@ -153,7 +154,7 @@ export function MontarPlanoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Seu plano</Text>
         <View style={styles.botaoVoltar} />
@@ -168,7 +169,7 @@ export function MontarPlanoScreen({
         {avisoDaAurora && (
           <View style={styles.blocoAurora}>
             <View style={styles.linhaTituloAurora}>
-              <Ionicons name="sparkles-outline" size={15} color={cores.verde} />
+              <Ionicons name="sparkles-outline" size={15} color={paleta().cores.verde} />
               <Text style={styles.tituloAurora}>Sugestão da Aurora</Text>
             </View>
 
@@ -234,7 +235,7 @@ export function MontarPlanoScreen({
                     accessibilityRole="button"
                     accessibilityLabel={`Remover ${item.nome}`}
                   >
-                    <Ionicons name="close" size={16} color={inkFraco} />
+                    <Ionicons name="close" size={16} color={paleta().inkFraco} />
                   </Pressable>
                 </View>
               ))}
@@ -252,7 +253,7 @@ export function MontarPlanoScreen({
                 style={({ pressed }) => [styles.botaoAdicionar, pressed && styles.botaoPressionado]}
                 accessibilityRole="button"
               >
-                <Ionicons name="add" size={17} color={cores.verde} />
+                <Ionicons name="add" size={17} color={paleta().cores.verde} />
                 <Text style={styles.textoBotaoAdicionar}>Adicionar alimentos</Text>
               </Pressable>
 
@@ -266,7 +267,7 @@ export function MontarPlanoScreen({
                 accessibilityRole="button"
                 accessibilityLabel={`Escrever ${r.rotulo} de uma vez`}
               >
-                <Ionicons name="create-outline" size={16} color={inkMedio} />
+                <Ionicons name="create-outline" size={16} color={paleta().inkMedio} />
                 <Text style={styles.textoBotaoEscrever}>Escrever tudo de uma vez</Text>
               </Pressable>
             </View>
@@ -303,24 +304,25 @@ export function MontarPlanoScreen({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   blocoAurora: {
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.verde,
-    backgroundColor: cores.verdeMenta,
+    borderColor: t.cores.verde,
+    backgroundColor: t.cores.verdeMenta,
     gap: 7,
     marginBottom: 14,
   },
   linhaTituloAurora: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  tituloAurora: { fontSize: 14, fontWeight: '800', color: cores.ink },
-  textoAurora: { fontSize: 12.5, lineHeight: 18, color: inkMedio },
-  estimadosAurora: { fontSize: 12.5, lineHeight: 18, color: inkSuave },
+  tituloAurora: { fontSize: 14, fontWeight: '800', color: t.cores.ink },
+  textoAurora: { fontSize: 12.5, lineHeight: 18, color: t.inkMedio },
+  estimadosAurora: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
   alertaAurora: {
     fontSize: 12.5,
     lineHeight: 18,
-    color: cores.erroTexto,
+    color: t.cores.erroTexto,
   },
 
   cabecalho: {
@@ -331,7 +333,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28, gap: 18 },
 
@@ -341,11 +343,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoHora: { fontSize: 12.5, fontWeight: '800', color: cores.verdeEscuro },
-  nomeRefeicao: { flex: 1, fontSize: 16, fontWeight: '800', color: cores.ink },
-  kcalRefeicao: { fontSize: 12.5, fontWeight: '700', color: inkMedio },
+  textoHora: { fontSize: 12.5, fontWeight: '800', color: t.cores.verdeEscuro },
+  nomeRefeicao: { flex: 1, fontSize: 16, fontWeight: '800', color: t.cores.ink },
+  kcalRefeicao: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
 
   item: {
     flexDirection: 'row',
@@ -354,16 +356,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 14,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   textoItem: { flex: 1 },
-  nomeItem: { fontSize: 14, fontWeight: '600', color: cores.ink, lineHeight: 19 },
-  detalheItem: { marginTop: 2, fontSize: 12, color: inkSuave },
+  nomeItem: { fontSize: 14, fontWeight: '600', color: t.cores.ink, lineHeight: 19 },
+  detalheItem: { marginTop: 2, fontSize: 12, color: t.inkSuave },
   botaoRemover: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
 
-  semPeso: { marginTop: 2, fontSize: 11.5, color: inkFraco },
+  semPeso: { marginTop: 2, fontSize: 11.5, color: t.inkFraco },
 
   botaoEscrever: {
     flexDirection: 'row',
@@ -374,9 +376,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  textoBotaoEscrever: { fontSize: 13, fontWeight: '700', color: inkMedio },
+  textoBotaoEscrever: { fontSize: 13, fontWeight: '700', color: t.inkMedio },
   botaoAdicionar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -386,10 +388,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: cores.verdeClaro,
+    borderColor: t.cores.verdeClaro,
   },
-  botaoPressionado: { backgroundColor: cores.verdeMenta },
-  textoBotaoAdicionar: { fontSize: 14, fontWeight: '700', color: cores.verde },
+  botaoPressionado: { backgroundColor: t.cores.verdeMenta },
+  textoBotaoAdicionar: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
 
   totalDia: {
     flexDirection: 'row',
@@ -398,22 +400,23 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderRadius: 18,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
   },
-  rotuloTotal: { fontSize: 14, fontWeight: '700', color: inkMedio },
-  valorTotal: { fontSize: 18, fontWeight: '800', color: cores.verdeEscuro, letterSpacing: -0.4 },
+  rotuloTotal: { fontSize: 14, fontWeight: '700', color: t.inkMedio },
+  valorTotal: { fontSize: 18, fontWeight: '800', color: t.cores.verdeEscuro, letterSpacing: -0.4 },
 
-  erro: { fontSize: 13, color: cores.erroTexto, textAlign: 'center' },
+  erro: { fontSize: 13, color: t.cores.erroTexto, textAlign: 'center' },
 
   rodape: { paddingHorizontal: 20, paddingTop: 10, gap: 10 },
-  contagem: { fontSize: 12.5, color: inkFraco, textAlign: 'center' },
+  contagem: { fontSize: 12.5, color: t.inkFraco, textAlign: 'center' },
   botao: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoContinuarPressionado: { backgroundColor: cores.verdeEscuro },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  botaoContinuarPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

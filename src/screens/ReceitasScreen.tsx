@@ -27,7 +27,7 @@ import {
 } from '../lib/receitas'
 import { detalheDoItem, novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* As receitas do paciente: o que ele come junto e repete.
  *
@@ -53,6 +53,7 @@ export function ReceitasScreen({
   onUsar?: (itens: AlimentoEscolhido[], nomeDaReceita: string) => void
   onFechar: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [receitas, setReceitas] = useState<Receita[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -138,7 +139,7 @@ export function ReceitasScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Minhas receitas</Text>
         <View style={styles.botaoVoltar} />
@@ -149,7 +150,7 @@ export function ReceitasScreen({
         showsVerticalScrollIndicator={false}
       >
         {carregando ? (
-          <ActivityIndicator color={cores.verde} style={styles.girando} />
+          <ActivityIndicator color={paleta().cores.verde} style={styles.girando} />
         ) : (
           <>
             {!!erro && <Text style={styles.erro}>{erro}</Text>}
@@ -189,7 +190,7 @@ export function ReceitasScreen({
                     <Ionicons
                       name={onUsar ? 'add-circle-outline' : 'chevron-forward'}
                       size={22}
-                      color={onUsar ? cores.verde : inkFraco}
+                      color={onUsar ? paleta().cores.verde : paleta().inkFraco}
                     />
                   </Pressable>
 
@@ -201,7 +202,7 @@ export function ReceitasScreen({
                       accessibilityRole="button"
                       accessibilityLabel={`Editar ${r.nome}`}
                     >
-                      <Ionicons name="create-outline" size={15} color={inkMedio} />
+                      <Ionicons name="create-outline" size={15} color={paleta().inkMedio} />
                       <Text style={styles.textoAcao}>Editar</Text>
                     </Pressable>
 
@@ -212,7 +213,7 @@ export function ReceitasScreen({
                       accessibilityRole="button"
                       accessibilityLabel={`Apagar ${r.nome}`}
                     >
-                      <Ionicons name="trash-outline" size={15} color={inkFraco} />
+                      <Ionicons name="trash-outline" size={15} color={paleta().inkFraco} />
                       <Text style={styles.textoAcaoFraca}>Apagar</Text>
                     </Pressable>
                   </View>
@@ -227,7 +228,7 @@ export function ReceitasScreen({
               style={({ pressed }) => [styles.botaoNova, pressed && styles.pressionado]}
               accessibilityRole="button"
             >
-              <Ionicons name="add" size={18} color={cores.verde} />
+              <Ionicons name="add" size={18} color={paleta().cores.verde} />
               <Text style={styles.textoBotaoNova}>Nova receita</Text>
             </Pressable>
           </>
@@ -289,6 +290,7 @@ function EditorDeReceita({
   onFechar: () => void
   onSalvo: (r: Receita) => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [nome, setNome] = useState(receita.nome)
   const [porcoes, setPorcoes] = useState(receita.porcoes)
@@ -401,7 +403,7 @@ function EditorDeReceita({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>{receita.id ? 'Editar receita' : 'Nova receita'}</Text>
         <View style={styles.botaoVoltar} />
@@ -419,7 +421,7 @@ function EditorDeReceita({
             setErro('')
           }}
           placeholder="Vitamina da manhã"
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           keyboardAppearance="dark"
           maxLength={60}
           style={styles.campoNome}
@@ -464,7 +466,7 @@ function EditorDeReceita({
               accessibilityRole="button"
               accessibilityLabel={`Remover ${i.nome}`}
             >
-              <Ionicons name="close" size={16} color={inkFraco} />
+              <Ionicons name="close" size={16} color={paleta().inkFraco} />
             </Pressable>
           </View>
         ))}
@@ -474,7 +476,7 @@ function EditorDeReceita({
           style={({ pressed }) => [styles.botaoNova, pressed && styles.pressionado]}
           accessibilityRole="button"
         >
-          <Ionicons name="add" size={17} color={cores.verde} />
+          <Ionicons name="add" size={17} color={paleta().cores.verde} />
           <Text style={styles.textoBotaoNova}>Adicionar alimento</Text>
         </Pressable>
 
@@ -483,7 +485,7 @@ function EditorDeReceita({
           style={({ pressed }) => [styles.botaoEscrever, pressed && styles.pressionado]}
           accessibilityRole="button"
         >
-          <Ionicons name="create-outline" size={15} color={inkMedio} />
+          <Ionicons name="create-outline" size={15} color={paleta().inkMedio} />
           <Text style={styles.textoBotaoEscrever}>Escrever tudo de uma vez</Text>
         </Pressable>
 
@@ -500,7 +502,7 @@ function EditorDeReceita({
           accessibilityRole="button"
         >
           {salvando ? (
-            <ActivityIndicator size="small" color={cores.branco} />
+            <ActivityIndicator size="small" color={paleta().cores.branco} />
           ) : (
             <Text style={styles.textoBotaoSalvar}>Salvar receita</Text>
           )}
@@ -510,8 +512,9 @@ function EditorDeReceita({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -521,18 +524,18 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 10 },
   girando: { marginTop: 40 },
-  vazio: { fontSize: 14, color: inkSuave, lineHeight: 21, paddingVertical: 10 },
-  erro: { fontSize: 13, color: cores.erroTexto, lineHeight: 19 },
+  vazio: { fontSize: 14, color: t.inkSuave, lineHeight: 21, paddingVertical: 10 },
+  erro: { fontSize: 13, color: t.cores.erroTexto, lineHeight: 19 },
 
   cartao: {
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     overflow: 'hidden',
   },
   corpoCartao: {
@@ -543,13 +546,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   textoCartao: { flex: 1, gap: 2 },
-  nomeReceita: { fontSize: 15.5, fontWeight: '700', color: cores.ink },
-  detalheReceita: { fontSize: 12.5, color: inkSuave },
+  nomeReceita: { fontSize: 15.5, fontWeight: '700', color: t.cores.ink },
+  detalheReceita: { fontSize: 12.5, color: t.inkSuave },
 
   acoes: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: cores.borda,
+    borderTopColor: t.cores.borda,
   },
   acao: {
     flex: 1,
@@ -559,8 +562,8 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
   },
-  textoAcao: { fontSize: 12.5, fontWeight: '700', color: inkMedio },
-  textoAcaoFraca: { fontSize: 12.5, fontWeight: '700', color: inkFraco },
+  textoAcao: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
+  textoAcaoFraca: { fontSize: 12.5, fontWeight: '700', color: t.inkFraco },
 
   botaoNova: {
     flexDirection: 'row',
@@ -571,10 +574,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: cores.trilho,
+    borderColor: t.cores.trilho,
     marginTop: 4,
   },
-  textoBotaoNova: { fontSize: 14, fontWeight: '700', color: cores.verde },
+  textoBotaoNova: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
 
   botaoEscrever: {
     flexDirection: 'row',
@@ -584,23 +587,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  textoBotaoEscrever: { fontSize: 12.5, fontWeight: '700', color: inkMedio },
+  textoBotaoEscrever: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
 
   campoNome: {
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 16,
     fontWeight: '700',
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  rotulo: { fontSize: 12.5, fontWeight: '700', color: inkMedio, marginTop: 6 },
-  ajuda: { fontSize: 12, color: inkFraco, lineHeight: 18 },
+  rotulo: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio, marginTop: 6 },
+  ajuda: { fontSize: 12, color: t.inkFraco, lineHeight: 18 },
 
   porcoes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chipPorcao: {
@@ -610,37 +613,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
   },
-  chipPorcaoAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
-  textoChip: { fontSize: 14, fontWeight: '700', color: cores.ink },
-  textoChipAtivo: { color: cores.sobreLimao },
+  chipPorcaoAtivo: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
+  textoChip: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  textoChipAtivo: { color: t.cores.sobreLimao },
 
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 11,
     paddingHorizontal: 13,
   },
   textoItem: { flex: 1, gap: 1 },
-  nomeItem: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
-  detalheItem: { fontSize: 12, color: inkSuave },
+  nomeItem: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  detalheItem: { fontSize: 12, color: t.inkSuave },
 
   botaoSalvar: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 13,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     marginTop: 8,
   },
-  textoBotaoSalvar: { fontSize: 15, fontWeight: '800', color: cores.branco },
+  textoBotaoSalvar: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
 
   pressionado: { opacity: 0.75 },
 
@@ -650,7 +653,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     paddingHorizontal: 20,
@@ -662,18 +665,19 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
     marginBottom: 8,
   },
-  tituloFolha: { fontSize: 17, fontWeight: '800', color: cores.ink },
-  subFolha: { fontSize: 13, color: inkSuave, marginBottom: 6 },
+  tituloFolha: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
+  subFolha: { fontSize: 13, color: t.inkSuave, marginBottom: 6 },
   botaoPorcao: {
     paddingVertical: 12,
     paddingHorizontal: 18,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  textoPorcao: { fontSize: 14, fontWeight: '700', color: cores.ink },
-})
+  textoPorcao: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  }),
+)

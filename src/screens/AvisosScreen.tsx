@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { carregarAvisos, guardarMarca, type Aviso } from '../lib/avisos'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* O que aconteceu do lado da nutricionista.
  *
@@ -33,6 +33,7 @@ export function AvisosScreen({
   onFechar: () => void
   onAbrirNutricionistas: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
 
   const [lista, setLista] = useState<Aviso[] | null>(null)
@@ -78,7 +79,7 @@ export function AvisosScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Avisos</Text>
         <View style={styles.botaoVoltar} />
@@ -86,7 +87,7 @@ export function AvisosScreen({
 
       {!lista ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <ScrollView
@@ -99,7 +100,7 @@ export function AvisosScreen({
                 setAtualizando(true)
                 setVersao(v => v + 1)
               }}
-              tintColor={cores.limao}
+              tintColor={paleta().cores.limao}
             />
           }
         >
@@ -129,10 +130,11 @@ export function AvisosScreen({
 /* Sem destino, o cartão não afunda ao toque e não mostra a seta: um alvo que
    não responde ensina a pessoa a não tocar em nenhum. */
 function Linha({ aviso, onIr }: { aviso: Aviso; onIr?: () => void }) {
+  const styles = estilos()
   const miolo = (
     <>
       <View style={styles.circulo}>
-        <Ionicons name={aviso.icone} size={18} color={cores.verde} />
+        <Ionicons name={aviso.icone} size={18} color={paleta().cores.verde} />
       </View>
 
       <View style={styles.texto}>
@@ -147,7 +149,7 @@ function Linha({ aviso, onIr }: { aviso: Aviso; onIr?: () => void }) {
         <Text style={styles.corpo}>{aviso.texto}</Text>
       </View>
 
-      {!!onIr && <Ionicons name="chevron-forward" size={16} color={inkFraco} />}
+      {!!onIr && <Ionicons name="chevron-forward" size={16} color={paleta().inkFraco} />}
     </>
   )
 
@@ -171,10 +173,11 @@ function Linha({ aviso, onIr }: { aviso: Aviso; onIr?: () => void }) {
 
 /* Vazio é a resposta certa quase sempre, então ele não pode parecer defeito. */
 function Vazio() {
+  const styles = estilos()
   return (
     <View style={styles.vazio}>
       <View style={styles.circuloVazio}>
-        <Ionicons name="notifications-outline" size={26} color={cores.verde} />
+        <Ionicons name="notifications-outline" size={26} color={paleta().cores.verde} />
       </View>
       <Text style={styles.tituloVazio}>Nada de novo por aqui</Text>
       <Text style={styles.textoVazio}>
@@ -185,8 +188,9 @@ function Vazio() {
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -197,7 +201,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32, paddingTop: 8, gap: 10 },
   /* Só o vazio cresce para centralizar; a lista fica no topo, como lista. */
@@ -209,45 +213,46 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
   },
   /* O que é novidade ganha o menta, e não um ponto: a diferença precisa
      aparecer com a tela inteira à vista, não item por item. */
-  cartaoNovo: { backgroundColor: cores.verdeMenta },
-  cartaoPressionado: { backgroundColor: cores.superficie },
+  cartaoNovo: { backgroundColor: t.cores.verdeMenta },
+  cartaoPressionado: { backgroundColor: t.cores.superficie },
 
   circulo: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   texto: { flex: 1, gap: 3 },
   linhaTitulo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  titulo: { flexShrink: 1, fontSize: 14.5, fontWeight: '700', color: cores.ink },
-  corpo: { fontSize: 13, lineHeight: 19, color: inkSuave },
+  titulo: { flexShrink: 1, fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  corpo: { fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   etiqueta: {
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 7,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoEtiqueta: { fontSize: 10.5, fontWeight: '800', color: cores.limao, letterSpacing: 0.3 },
+  textoEtiqueta: { fontSize: 10.5, fontWeight: '800', color: t.cores.limao, letterSpacing: 0.3 },
 
   vazio: { alignItems: 'center', paddingHorizontal: 24, gap: 10 },
   circuloVazio: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
-  tituloVazio: { fontSize: 17, fontWeight: '800', color: cores.ink, textAlign: 'center' },
-  textoVazio: { fontSize: 13.5, lineHeight: 20, color: inkFraco, textAlign: 'center' },
-})
+  tituloVazio: { fontSize: 17, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
+  textoVazio: { fontSize: 13.5, lineHeight: 20, color: t.inkFraco, textAlign: 'center' },
+  }),
+)

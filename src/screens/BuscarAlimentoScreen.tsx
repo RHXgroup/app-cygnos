@@ -18,7 +18,7 @@ import { NOME_NOVA, buscarAlimentos, porcao, type Alimento } from '../lib/alimen
 import { mascaraQuantidade, numeroDigitado, soDigitos } from '../lib/formulario'
 import { decimal, milhar } from '../lib/formatar'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 type Modo = 'gramas' | 'medida'
 
@@ -124,6 +124,7 @@ export function BuscarAlimentoScreen({
   onAdicionar: (item: AlimentoEscolhido) => void
   onFechar: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [termo, setTermo] = useState('')
   const [resultados, setResultados] = useState<Alimento[]>([])
@@ -283,7 +284,7 @@ export function BuscarAlimentoScreen({
             accessibilityRole="button"
             accessibilityLabel="Voltar"
           >
-            <Ionicons name="chevron-back" size={22} color={cores.ink} />
+            <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
           </Pressable>
           <Text style={styles.tituloTela} numberOfLines={1}>
             {refeicao}
@@ -292,13 +293,13 @@ export function BuscarAlimentoScreen({
         </View>
 
         <View style={styles.caixaBusca}>
-          <Ionicons name="search" size={17} color={inkFraco} />
+          <Ionicons name="search" size={17} color={paleta().inkFraco} />
           <TextInput
             ref={busca}
             value={termo}
             onChangeText={setTermo}
             placeholder="Buscar alimento"
-            placeholderTextColor={inkFraco}
+            placeholderTextColor={paleta().inkFraco}
             keyboardAppearance="dark"
             autoCapitalize="none"
             autoCorrect={false}
@@ -308,7 +309,7 @@ export function BuscarAlimentoScreen({
           />
           {!!termo && (
             <Pressable onPress={() => setTermo('')} hitSlop={8} accessibilityLabel="Limpar busca">
-              <Ionicons name="close-circle" size={17} color={inkFraco} />
+              <Ionicons name="close-circle" size={17} color={paleta().inkFraco} />
             </Pressable>
           )}
         </View>
@@ -326,7 +327,7 @@ export function BuscarAlimentoScreen({
               Digite ao menos duas letras para procurar na tabela de alimentos.
             </Text>
           ) : buscando ? (
-            <ActivityIndicator color={cores.verde} style={styles.carregando} />
+            <ActivityIndicator color={paleta().cores.verde} style={styles.carregando} />
           ) : erro ? (
             /* A mensagem crua do banco junto: sem ela, "não achei" e "a consulta
                falhou" ficam iguais na tela e não há como saber qual foi. */
@@ -394,7 +395,7 @@ export function BuscarAlimentoScreen({
                     {a.calorias === null ? 'sem dado' : `${Math.round(a.calorias)} kcal`} por 100 g
                   </Text>
                 </View>
-                <Ionicons name="add-circle-outline" size={22} color={cores.verde} />
+                <Ionicons name="add-circle-outline" size={22} color={paleta().cores.verde} />
               </Pressable>
             ))
           )}
@@ -402,7 +403,7 @@ export function BuscarAlimentoScreen({
 
         {adicionados > 0 && !selecionado && (
           <View style={[styles.rodapeContagem, { paddingBottom: Math.max(bottom, 16) }]}>
-            <Ionicons name="checkmark-circle" size={17} color={cores.verde} />
+            <Ionicons name="checkmark-circle" size={17} color={paleta().cores.verde} />
             <Text style={styles.textoContagem}>
               {adicionados} {adicionados === 1 ? 'alimento adicionado' : 'alimentos adicionados'}
             </Text>
@@ -510,7 +511,7 @@ export function BuscarAlimentoScreen({
                         value={medida}
                         onChangeText={setMedida}
                         placeholder="unidade"
-                        placeholderTextColor={inkFraco}
+                        placeholderTextColor={paleta().inkFraco}
                         keyboardAppearance="dark"
                         maxLength={24}
                         autoCapitalize="none"
@@ -555,7 +556,7 @@ export function BuscarAlimentoScreen({
                         value={pesoUnidade}
                         onChangeText={t => setPesoUnidade(soDigitos(t).slice(0, 4))}
                         placeholder="—"
-                        placeholderTextColor={inkFraco}
+                        placeholderTextColor={paleta().inkFraco}
                         keyboardAppearance="dark"
                         keyboardType="number-pad"
                         selectTextOnFocus
@@ -623,6 +624,7 @@ function resumoMacros(a: Alimento, gramas: number): string {
  * propósito: aqui a pessoa ainda está escolhendo o alimento, e comparar dois
  * rótulos exige a mesma base — que é como o rótulo do mundo real também fala. */
 function DetalheDoAlimento({ alimento }: { alimento: Alimento }) {
+  const styles = estilos()
   /* Fechado por padrão: quem está registrando o almoço quer o peso e o botão,
      não a tabela de minerais. Quem procura ferro sabe que procura. */
   const [abertos, setAbertos] = useState(false)
@@ -722,31 +724,32 @@ function DetalheDoAlimento({ alimento }: { alimento: Alimento }) {
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   detalhe: {
     marginTop: 10,
     gap: 4,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
   linhaDetalhe: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rotuloDetalhe: { fontSize: 12.5, color: inkSuave },
-  valorDetalhe: { fontSize: 12.5, fontWeight: '700', color: cores.ink },
-  valorAlerta: { color: cores.gold },
-  baseDetalhe: { fontSize: 11, color: inkFraco },
+  rotuloDetalhe: { fontSize: 12.5, color: t.inkSuave },
+  valorDetalhe: { fontSize: 12.5, fontWeight: '700', color: t.cores.ink },
+  valorAlerta: { color: t.cores.gold },
+  baseDetalhe: { fontSize: 11, color: t.inkFraco },
   rodapeDetalhe: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 4,
   },
-  verMais: { fontSize: 11.5, fontWeight: '700', color: cores.verde },
+  verMais: { fontSize: 11.5, fontWeight: '700', color: t.cores.verde },
 
-  tela: { flex: 1, backgroundColor: cores.fundo },
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   corpo: { flex: 1 },
 
   cabecalho: {
@@ -757,7 +760,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   caixaBusca: {
     flexDirection: 'row',
@@ -768,12 +771,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 48,
     borderRadius: 14,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
-  campoBusca: { flex: 1, fontSize: 16, color: cores.ink },
+  campoBusca: { flex: 1, fontSize: 16, color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 24, gap: 8 },
   carregando: { marginTop: 28 },
@@ -781,7 +784,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
     fontSize: 13.5,
     lineHeight: 20,
-    color: inkSuave,
+    color: t.inkSuave,
     textAlign: 'center',
   },
 
@@ -790,11 +793,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 14, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 6, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 14, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 6, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   resultado: {
     flexDirection: 'row',
@@ -802,14 +805,14 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  resultadoPressionado: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
+  resultadoPressionado: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
   textoResultado: { flex: 1 },
-  nomeResultado: { fontSize: 14.5, fontWeight: '700', color: cores.ink, lineHeight: 19 },
-  detalheResultado: { marginTop: 3, fontSize: 12, color: inkSuave },
+  nomeResultado: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink, lineHeight: 19 },
+  detalheResultado: { marginTop: 3, fontSize: 12, color: t.inkSuave },
 
   rodapeContagem: {
     flexDirection: 'row',
@@ -819,7 +822,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingHorizontal: 20,
   },
-  textoContagem: { fontSize: 13, fontWeight: '600', color: inkMedio },
+  textoContagem: { fontSize: 13, fontWeight: '600', color: t.inkMedio },
 
   fundoPainel: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   painel: {
@@ -827,7 +830,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: cores.fundo,
+    backgroundColor: t.cores.fundo,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 10,
@@ -838,11 +841,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
     marginBottom: 14,
   },
-  nomePainel: { fontSize: 17, fontWeight: '800', color: cores.ink, lineHeight: 23 },
-  marcaPainel: { marginTop: 2, fontSize: 13, color: inkSuave },
+  nomePainel: { fontSize: 17, fontWeight: '800', color: t.cores.ink, lineHeight: 23 },
+  marcaPainel: { marginTop: 2, fontSize: 13, color: t.inkSuave },
 
   seletor: {
     flexDirection: 'row',
@@ -850,19 +853,19 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 4,
     borderRadius: 14,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
   },
   opcaoSeletor: { flex: 1, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  opcaoSeletorAtiva: { backgroundColor: cores.superficie },
-  textoSeletor: { fontSize: 13.5, fontWeight: '600', color: inkSuave },
-  textoSeletorAtivo: { fontWeight: '800', color: cores.ink },
+  opcaoSeletorAtiva: { backgroundColor: t.cores.superficie },
+  textoSeletor: { fontSize: 13.5, fontWeight: '600', color: t.inkSuave },
+  textoSeletorAtivo: { fontWeight: '800', color: t.cores.ink },
 
   linhaQuantidade: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginTop: 16 },
   blocoCampo: { width: 130 },
   blocoQuantas: { width: 96 },
   blocoMedida: { flex: 1 },
   blocoTotal: { flex: 1 },
-  rotuloCampo: { marginBottom: 6, fontSize: 12.5, fontWeight: '600', color: inkSuave },
+  rotuloCampo: { marginBottom: 6, fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
   campoComUnidade: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -870,11 +873,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  entradaNumero: { flex: 1, fontSize: 18, fontWeight: '700', color: cores.ink },
-  entradaTexto: { flex: 1, fontSize: 16, fontWeight: '600', color: cores.ink },
+  entradaNumero: { flex: 1, fontSize: 18, fontWeight: '700', color: t.cores.ink },
+  entradaTexto: { flex: 1, fontSize: 16, fontWeight: '600', color: t.cores.ink },
 
   fitas: { gap: 8, paddingTop: 10, paddingRight: 20 },
   fita: {
@@ -882,25 +885,26 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  fitaAtiva: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
-  textoFita: { fontSize: 12.5, fontWeight: '600', color: inkMedio },
-  textoFitaAtivo: { color: cores.verdeEscuro, fontWeight: '700' },
-  unidade: { fontSize: 14, fontWeight: '600', color: inkSuave },
-  total: { fontSize: 22, fontWeight: '800', color: cores.verde, letterSpacing: -0.4 },
-  macros: { marginTop: 3, fontSize: 12, color: inkSuave },
+  fitaAtiva: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  textoFita: { fontSize: 12.5, fontWeight: '600', color: t.inkMedio },
+  textoFitaAtivo: { color: t.cores.verdeEscuro, fontWeight: '700' },
+  unidade: { fontSize: 14, fontWeight: '600', color: t.inkSuave },
+  total: { fontSize: 22, fontWeight: '800', color: t.cores.verde, letterSpacing: -0.4 },
+  macros: { marginTop: 3, fontSize: 12, color: t.inkSuave },
 
   botaoAdicionar: {
     marginTop: 20,
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoAdicionarPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoAdicionarPressionado: { backgroundColor: t.cores.verdeEscuro },
   botaoDesativado: { opacity: 0.5 },
-  textoBotaoAdicionar: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  textoBotaoAdicionar: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

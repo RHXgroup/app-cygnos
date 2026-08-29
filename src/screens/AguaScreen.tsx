@@ -37,7 +37,7 @@ import {
    Postgres recusava toda gravação com 42P10 e a meta nunca salvava. */
 import { salvarMetaAgua } from '../lib/metas'
 import { DIAS_CURTOS, horaCurta, milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Água: registrar, desfazer, ver o dia e a semana.
  *
@@ -56,6 +56,7 @@ export function AguaScreen({
      isso a cada toque seria uma consulta por copo sem ninguém olhando. */
   onMudou: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [agua, setAgua] = useState<Agua | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -198,7 +199,7 @@ export function AguaScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Água</Text>
         <View style={styles.botaoVoltar} />
@@ -206,7 +207,7 @@ export function AguaScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : !agua ? (
         <View style={styles.conteudoErro}>
@@ -299,6 +300,7 @@ function CartaoDoDia({
   metaMl: number
   copoMl: number
 }) {
+  const styles = estilos()
   const fracao = metaMl > 0 ? Math.min(bebido / metaMl, 1) : 0
   const faltam = Math.max(metaMl - bebido, 0)
   const copos = coposDe(bebido, copoMl)
@@ -307,7 +309,7 @@ function CartaoDoDia({
   return (
     <View style={styles.cartaoDia}>
       <View style={styles.linhaTituloDia}>
-        <Ionicons name="water" size={16} color={cores.branco} />
+        <Ionicons name="water" size={16} color={paleta().cores.branco} />
         <Text style={styles.tituloDia}>Hoje</Text>
         <Text style={styles.percentualDia}>{Math.round(fracao * 100)}%</Text>
       </View>
@@ -357,6 +359,7 @@ function BotaoRegistrar({
   onPress: () => void
   ativo?: boolean
 }) {
+  const styles = estilos()
   return (
     <Pressable
       onPress={onPress}
@@ -368,7 +371,7 @@ function BotaoRegistrar({
       accessibilityRole="button"
       accessibilityLabel={ml ? `Registrar ${rotulo}, ${ml} mililitros` : rotulo}
     >
-      <Ionicons name={icone} size={20} color={cores.verde} />
+      <Ionicons name={icone} size={20} color={paleta().cores.verde} />
       <Text style={styles.rotuloBotao}>{rotulo}</Text>
       {/* Sempre visível, e não só no rótulo: "1 copo" muda de tamanho conforme
           a meta da pessoa, e o número é o que diz quanto vai entrar. */}
@@ -380,6 +383,7 @@ function BotaoRegistrar({
 /* A quantidade avulsa. Vive num estado próprio para o texto sendo digitado não
    fazer a tela inteira renderizar a cada tecla. */
 function CampoOutro({ onRegistrar }: { onRegistrar: (ml: number) => void }) {
+  const styles = estilos()
   const [texto, setTexto] = useState('')
   const ml = Number(texto)
   const valido = Number.isFinite(ml) && ml >= 1 && ml <= 5000
@@ -391,7 +395,7 @@ function CampoOutro({ onRegistrar }: { onRegistrar: (ml: number) => void }) {
         onChangeText={t => setTexto(t.replace(/[^0-9]/g, ''))}
         keyboardType="number-pad"
         placeholder="Quantos ml?"
-        placeholderTextColor={inkFraco}
+        placeholderTextColor={paleta().inkFraco}
         keyboardAppearance="dark"
         autoFocus
         maxLength={4}
@@ -411,7 +415,7 @@ function CampoOutro({ onRegistrar }: { onRegistrar: (ml: number) => void }) {
         accessibilityRole="button"
         accessibilityLabel="Registrar"
       >
-        <Ionicons name="checkmark" size={20} color={cores.branco} />
+        <Ionicons name="checkmark" size={20} color={paleta().cores.branco} />
       </Pressable>
     </View>
   )
@@ -431,6 +435,7 @@ function CampoOutro({ onRegistrar }: { onRegistrar: (ml: number) => void }) {
  * A altura é relativa à MAIOR hora do dia, e não à meta: a pergunta aqui é
  * "quando", não "quanto" — o quanto já está no cartão de cima. */
 function AoLongoDoDia({ registros }: { registros: RegistroAgua[] }) {
+  const styles = estilos()
   const horas = porHoraDoDia(registros)
   const pico = Math.max(...horas)
 
@@ -510,6 +515,7 @@ function ListaDeHoje({
   registros: RegistroAgua[]
   onApagar: (r: RegistroAgua) => void
 }) {
+  const styles = estilos()
   return (
     <View style={styles.bloco}>
       <View style={styles.linhaTituloBloco}>
@@ -529,7 +535,7 @@ function ListaDeHoje({
         registros.map(r => (
           <View key={r.id} style={styles.linhaRegistro}>
             <View style={styles.gotaRegistro}>
-              <Ionicons name="water" size={14} color={cores.verde} />
+              <Ionicons name="water" size={14} color={paleta().cores.verde} />
             </View>
             <Text style={styles.mlRegistro}>{milhar(r.ml)} ml</Text>
             <Text style={styles.horaRegistro}>{horaCurta(new Date(r.bebidoEm))}</Text>
@@ -542,7 +548,7 @@ function ListaDeHoje({
               accessibilityRole="button"
               accessibilityLabel={`Apagar o registro de ${r.ml} mililitros`}
             >
-              <Ionicons name="close" size={16} color={inkFraco} />
+              <Ionicons name="close" size={16} color={paleta().inkFraco} />
             </Pressable>
           </View>
         ))
@@ -555,6 +561,7 @@ function ListaDeHoje({
    dia —, e não contra a meta sozinha: num dia de 3 L com meta de 2 L, a barra
    estouraria o topo e três dias diferentes ficariam do mesmo tamanho. */
 function Semana({ dias, metaMl }: { dias: DiaAgua[]; metaMl: number }) {
+  const styles = estilos()
   const teto = Math.max(metaMl, ...dias.map(d => d.ml), 1)
   const bateram = dias.filter(d => d.ml >= metaMl).length
   const seguidos = sequenciaNaMeta(dias, metaMl)
@@ -639,6 +646,7 @@ function BlocoMeta({
   onAbrir: () => void
   onSalvar: (metaMl: number, copoMl: number) => void
 }) {
+  const styles = estilos()
   const [meta, setMeta] = useState(String(metaMl))
   const [copo, setCopo] = useState(String(copoMl))
 
@@ -682,7 +690,7 @@ function BlocoMeta({
             accessibilityRole="button"
             accessibilityLabel="Ajustar a meta de água"
           >
-            <Ionicons name="create-outline" size={17} color={cores.verde} />
+            <Ionicons name="create-outline" size={17} color={paleta().cores.verde} />
             <Text style={styles.textoBotaoAjustar}>Ajustar meta</Text>
           </Pressable>
         </>
@@ -761,8 +769,9 @@ const ALTURA_GRAFICO = 96
    mesma altura viraria um paredão. */
 const ALTURA_HORAS = 56
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -773,7 +782,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 8, gap: 14 },
   conteudoErro: { paddingHorizontal: 20, paddingTop: 8 },
@@ -782,20 +791,20 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   /* ── Cartão do dia ── */
-  cartaoDia: { borderRadius: 20, backgroundColor: cores.verde, padding: 18 },
+  cartaoDia: { borderRadius: 20, backgroundColor: t.cores.verde, padding: 18 },
   linhaTituloDia: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  tituloDia: { flex: 1, fontSize: 15, fontWeight: '700', color: cores.branco },
+  tituloDia: { flex: 1, fontSize: 15, fontWeight: '700', color: t.cores.branco },
   percentualDia: { fontSize: 15, fontWeight: '800', color: 'rgba(255,255,255,0.9)' },
   linhaValorDia: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 10 },
-  valorDia: { fontSize: 40, fontWeight: '800', color: cores.branco, letterSpacing: -1.4 },
-  unidadeDia: { fontSize: 15, fontWeight: '700', color: cores.branco },
+  valorDia: { fontSize: 40, fontWeight: '800', color: t.cores.branco, letterSpacing: -1.4 },
+  unidadeDia: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
   metaDia: { marginLeft: 4, fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.8)' },
   trilhoDia: {
     height: 8,
@@ -804,9 +813,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: 12,
   },
-  preenchimentoDia: { height: '100%', borderRadius: 4, backgroundColor: cores.branco },
+  preenchimentoDia: { height: '100%', borderRadius: 4, backgroundColor: t.cores.branco },
   copos: { flexDirection: 'row', gap: 4, marginTop: 10 },
-  copo: { flex: 1, height: 18, borderRadius: 4, backgroundColor: cores.branco },
+  copo: { flex: 1, height: 18, borderRadius: 4, backgroundColor: t.cores.branco },
   copoVazio: { backgroundColor: 'rgba(255,255,255,0.32)' },
   rodapeDia: { marginTop: 12, fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.92)' },
 
@@ -818,14 +827,14 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  botaoRegistrarAtivo: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
-  botaoRegistrarPressionado: { backgroundColor: cores.verdeClaro, borderColor: cores.verdeClaro },
-  rotuloBotao: { fontSize: 13.5, fontWeight: '800', color: cores.ink },
-  mlBotao: { fontSize: 11.5, color: inkSuave },
+  botaoRegistrarAtivo: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  botaoRegistrarPressionado: { backgroundColor: t.cores.verdeClaro, borderColor: t.cores.verdeClaro },
+  rotuloBotao: { fontSize: 13.5, fontWeight: '800', color: t.cores.ink },
+  mlBotao: { fontSize: 11.5, color: t.inkSuave },
 
   blocoOutro: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   campoOutro: {
@@ -833,12 +842,12 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
     paddingHorizontal: 16,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
-    color: cores.ink,
+    color: t.cores.ink,
   },
   confirmarOutro: {
     width: 52,
@@ -846,47 +855,47 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  confirmarPressionado: { backgroundColor: cores.verdeEscuro },
-  confirmarDesligado: { backgroundColor: cores.trilho },
+  confirmarPressionado: { backgroundColor: t.cores.verdeEscuro },
+  confirmarDesligado: { backgroundColor: t.cores.trilho },
 
   /* ── Blocos ── */
   bloco: {
     padding: 16,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 8,
   },
   linhaTituloBloco: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
-  contagemBloco: { fontSize: 11.5, fontWeight: '600', color: inkSuave },
-  vazio: { fontSize: 12.5, lineHeight: 18, color: inkSuave },
+  tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  contagemBloco: { fontSize: 11.5, fontWeight: '600', color: t.inkSuave },
+  vazio: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
 
   linhaRegistro: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   gotaRegistro: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mlRegistro: { flex: 1, fontSize: 14, fontWeight: '700', color: cores.ink },
-  horaRegistro: { fontSize: 12.5, color: inkMedio },
+  mlRegistro: { flex: 1, fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  horaRegistro: { fontSize: 12.5, color: t.inkMedio },
   apagar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  apagarPressionado: { backgroundColor: cores.trilho },
+  apagarPressionado: { backgroundColor: t.cores.trilho },
 
   /* ── Gráfico da semana ── */
   grafico: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 6 },
 
   linhaResumo: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
   resumo: { flex: 1, alignItems: 'center', gap: 2 },
-  numeroResumo: { fontSize: 20, fontWeight: '800', color: cores.limao },
-  rotuloResumo: { fontSize: 11.5, color: inkFraco, textAlign: 'center' },
-  divisorResumo: { width: 1, alignSelf: 'stretch', backgroundColor: cores.borda },
+  numeroResumo: { fontSize: 20, fontWeight: '800', color: t.cores.limao },
+  rotuloResumo: { fontSize: 11.5, color: t.inkFraco, textAlign: 'center' },
+  divisorResumo: { width: 1, alignSelf: 'stretch', backgroundColor: t.cores.borda },
 
   faixaHoras: {
     flexDirection: 'row',
@@ -896,11 +905,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   colunaHora: { flex: 1, height: '100%', justifyContent: 'flex-end' },
-  barraHora: { height: 2, borderRadius: 2, backgroundColor: cores.trilho },
-  barraHoraCheia: { backgroundColor: cores.limao },
+  barraHora: { height: 2, borderRadius: 2, backgroundColor: t.cores.trilho },
+  barraHoraCheia: { backgroundColor: t.cores.limao },
   eixoHoras: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  marcaHora: { fontSize: 10.5, color: inkFraco },
-  vazioBloco: { marginTop: 8, fontSize: 13, lineHeight: 19, color: inkFraco },
+  marcaHora: { fontSize: 10.5, color: t.inkFraco },
+  vazioBloco: { marginTop: 8, fontSize: 13, lineHeight: 19, color: t.inkFraco },
   linhaMeta: {
     position: 'absolute',
     left: 0,
@@ -909,33 +918,33 @@ const styles = StyleSheet.create({
        partir do pé das barras — daí o deslocamento. */
     marginBottom: 20,
     height: 1,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
   colunaDia: { flex: 1, alignItems: 'center', gap: 5 },
   trilhoBarra: { height: ALTURA_GRAFICO, width: '100%', justifyContent: 'flex-end' },
-  barra: { width: '100%', borderRadius: 6, backgroundColor: cores.verdeClaro },
-  barraNaMeta: { backgroundColor: cores.verde },
-  barraVazia: { backgroundColor: cores.trilho },
-  rotuloDia: { fontSize: 11, fontWeight: '600', color: inkFraco },
-  rotuloHoje: { color: cores.verde, fontWeight: '800' },
+  barra: { width: '100%', borderRadius: 6, backgroundColor: t.cores.verdeClaro },
+  barraNaMeta: { backgroundColor: t.cores.verde },
+  barraVazia: { backgroundColor: t.cores.trilho },
+  rotuloDia: { fontSize: 11, fontWeight: '600', color: t.inkFraco },
+  rotuloHoje: { color: t.cores.verde, fontWeight: '800' },
 
   /* ── Meta ── */
   linhaCampos: { flexDirection: 'row', gap: 10, marginTop: 4 },
   campoMeta: { flex: 1 },
-  rotuloCampo: { marginBottom: 6, fontSize: 12.5, fontWeight: '600', color: inkMedio },
+  rotuloCampo: { marginBottom: 6, fontSize: 12.5, fontWeight: '600', color: t.inkMedio },
   campo: {
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  campoComErro: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
-  ajudaCampo: { marginTop: 4, fontSize: 11, color: inkFraco },
-  previaMeta: { fontSize: 12.5, fontWeight: '600', color: cores.verde },
+  campoComErro: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
+  ajudaCampo: { marginTop: 4, fontSize: 11, color: t.inkFraco },
+  previaMeta: { fontSize: 12.5, fontWeight: '600', color: t.cores.verde },
 
   /* Contornado e não preenchido: ajustar a meta é o que se faz uma vez, e um
      botão verde cheio aqui competiria com os de registrar copo lá em cima, que
@@ -948,12 +957,12 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.verdeClaro,
-    backgroundColor: cores.verdeMenta,
+    borderColor: t.cores.verdeClaro,
+    backgroundColor: t.cores.verdeMenta,
     marginTop: 4,
   },
-  botaoAjustarPressionado: { backgroundColor: cores.verdeClaro },
-  textoBotaoAjustar: { fontSize: 14.5, fontWeight: '700', color: cores.verde },
+  botaoAjustarPressionado: { backgroundColor: t.cores.verdeClaro },
+  textoBotaoAjustar: { fontSize: 14.5, fontWeight: '700', color: t.cores.verde },
 
   linhaBotoes: { flexDirection: 'row', gap: 10, marginTop: 4 },
   botaoCancelar: {
@@ -964,21 +973,22 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  botaoCancelarPressionado: { backgroundColor: cores.trilho },
-  textoBotaoCancelar: { fontSize: 14.5, fontWeight: '700', color: inkMedio },
+  botaoCancelarPressionado: { backgroundColor: t.cores.trilho },
+  textoBotaoCancelar: { fontSize: 14.5, fontWeight: '700', color: t.inkMedio },
   botaoSalvar: {
     flex: 1,
     height: 48,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoSalvarPressionado: { backgroundColor: cores.verdeEscuro },
-  botaoDesligado: { backgroundColor: cores.trilho },
-  textoBotaoSalvar: { fontSize: 15, fontWeight: '700', color: cores.branco },
-})
+  botaoSalvarPressionado: { backgroundColor: t.cores.verdeEscuro },
+  botaoDesligado: { backgroundColor: t.cores.trilho },
+  textoBotaoSalvar: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
+  }),
+)

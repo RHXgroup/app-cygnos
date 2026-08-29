@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { cores } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Apagar com volta.
  *
@@ -130,6 +130,7 @@ export function BarraDesfazer({
      por baixo; isto aqui não tem como saber. */
   bottom: number
 }) {
+  const styles = estilos()
   return (
     <View style={[styles.barra, { bottom }]}>
       <Text style={styles.texto} numberOfLines={1}>
@@ -142,14 +143,15 @@ export function BarraDesfazer({
         accessibilityRole="button"
         accessibilityLabel="Desfazer"
       >
-        <Ionicons name="arrow-undo-outline" size={15} color={cores.sobreLimao} />
+        <Ionicons name="arrow-undo-outline" size={15} color={paleta().cores.sobreLimao} />
         <Text style={styles.textoBotao}>Desfazer</Text>
       </Pressable>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   barra: {
     position: 'absolute',
     left: 16,
@@ -161,11 +163,11 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  texto: { flex: 1, fontSize: 13.5, color: cores.ink },
+  texto: { flex: 1, fontSize: 13.5, color: t.cores.ink },
   botao: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -173,8 +175,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: cores.limao,
+    backgroundColor: t.cores.limao,
   },
   pressionado: { opacity: 0.75 },
-  textoBotao: { fontSize: 13.5, fontWeight: '800', color: cores.sobreLimao },
-})
+  textoBotao: { fontSize: 13.5, fontWeight: '800', color: t.cores.sobreLimao },
+  }),
+)

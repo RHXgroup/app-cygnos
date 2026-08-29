@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const LETRAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -18,6 +18,7 @@ export function FaixaDeDias({
   selecionado: Date
   onSelecionar: (dia: Date) => void
 }) {
+  const styles = estilos()
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
@@ -79,23 +80,25 @@ const mesmoDia = (a: Date, b: Date) =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate()
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   faixa: { flexDirection: 'row', justifyContent: 'space-between' },
   coluna: { alignItems: 'center', gap: 7, flex: 1 },
-  letra: { fontSize: 11.5, fontWeight: '600', color: inkSuave },
+  letra: { fontSize: 11.5, fontWeight: '600', color: t.inkSuave },
   bolha: {
     width: 38,
     height: 38,
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  bolhaHoje: { borderColor: cores.limao },
-  bolhaEscolhida: { backgroundColor: cores.limao, borderColor: cores.limao },
-  numero: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
-  numeroEscolhido: { color: cores.sobreLimao, fontWeight: '800' },
-  textoFuturo: { color: inkFraco },
-})
+  bolhaHoje: { borderColor: t.cores.limao },
+  bolhaEscolhida: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
+  numero: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  numeroEscolhido: { color: t.cores.sobreLimao, fontWeight: '800' },
+  textoFuturo: { color: t.inkFraco },
+  }),
+)

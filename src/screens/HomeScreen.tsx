@@ -83,7 +83,7 @@ import {
   type Sessao,
 } from '../lib/treino'
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
-import { cores, coresMacro, degrades, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
 
@@ -153,6 +153,7 @@ export function HomeScreen({
   onAbrirSono: () => void
   onAbrirTreino: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const { width: larguraTela } = useWindowDimensions()
   const [nome, setNome] = useState('')
@@ -431,7 +432,7 @@ export function HomeScreen({
   if (carregando) {
     return (
       <View style={styles.centro}>
-        <ActivityIndicator color={cores.verde} />
+        <ActivityIndicator color={paleta().cores.verde} />
       </View>
     )
   }
@@ -488,7 +489,7 @@ export function HomeScreen({
           accessibilityRole="button"
           accessibilityLabel="Menu"
         >
-          <Ionicons name="menu" size={21} color={cores.ink} />
+          <Ionicons name="menu" size={21} color={paleta().cores.ink} />
         </Pressable>
         {/* O ponto só acende quando há o que dizer, e o toque leva a quem tem a
             resposta. Antes ele não fazia nem uma coisa nem outra: acendia
@@ -501,7 +502,7 @@ export function HomeScreen({
             temAviso ? 'Avisos. Você tem avisos novos.' : 'Avisos'
           }
         >
-          <Ionicons name="notifications-outline" size={20} color={cores.ink} />
+          <Ionicons name="notifications-outline" size={20} color={paleta().cores.ink} />
           {temAviso && <View style={styles.pontoAviso} />}
         </Pressable>
       </View>
@@ -635,10 +636,11 @@ function BlocoPlano({
   onEditarPlano: (plano: PlanoCompleto) => void
   onAbrirCompras: (plano: PlanoCompleto) => void
 }) {
+  const styles = estilos()
   if (carregando) {
     return (
       <View style={[styles.cartao, styles.cartaoPlanoCarregando]}>
-        <ActivityIndicator color={cores.verde} />
+        <ActivityIndicator color={paleta().cores.verde} />
       </View>
     )
   }
@@ -647,7 +649,7 @@ function BlocoPlano({
     return (
       <View style={styles.cartao}>
         <View style={styles.linhaTituloPlano}>
-          <Ionicons name="nutrition-outline" size={16} color={cores.verde} />
+          <Ionicons name="nutrition-outline" size={16} color={paleta().cores.verde} />
           <Text style={styles.tituloCartao}>Plano alimentar</Text>
         </View>
 
@@ -664,7 +666,7 @@ function BlocoPlano({
           style={({ pressed }) => [styles.botaoPlano, pressed && styles.botaoPlanoPressionado]}
           accessibilityRole="button"
         >
-          <Ionicons name="add" size={18} color={cores.branco} />
+          <Ionicons name="add" size={18} color={paleta().cores.branco} />
           <Text style={styles.textoBotaoPlano}>Cadastrar plano alimentar</Text>
         </Pressable>
       </View>
@@ -677,11 +679,11 @@ function BlocoPlano({
   const miolo = (
     <>
       <View style={styles.linhaTituloPlano}>
-        <Ionicons name="nutrition-outline" size={16} color={cores.verde} />
+        <Ionicons name="nutrition-outline" size={16} color={paleta().cores.verde} />
         <Text style={[styles.tituloCartao, styles.tituloPlano]}>
           {daNutri ? 'Plano da sua nutricionista' : 'Plano alimentar'}
         </Text>
-        {!daNutri && <Ionicons name="create-outline" size={17} color={inkFraco} />}
+        {!daNutri && <Ionicons name="create-outline" size={17} color={paleta().inkFraco} />}
       </View>
 
       <Text style={styles.nomePlano} numberOfLines={2}>
@@ -699,7 +701,7 @@ function BlocoPlano({
               segunda parte, quem abre o app num dia de folga lê o plano como se
               fosse o de hoje. */}
           <View style={styles.linhaRepeticao}>
-            <Ionicons name="repeat-outline" size={14} color={cores.verde} />
+            <Ionicons name="repeat-outline" size={14} color={paleta().cores.verde} />
             <Text style={styles.textoRepeticao}>{resumoDosDias(plano.diasSemana)}</Text>
             <View style={[styles.seloDia, !valeHoje(plano.diasSemana) && styles.seloFolga]}>
               <Text style={[styles.textoSeloDia, !valeHoje(plano.diasSemana) && styles.textoSeloFolga]}>
@@ -749,7 +751,7 @@ function BlocoPlano({
             accessibilityRole="button"
             accessibilityLabel="Ver a lista de compras deste plano"
           >
-            <Ionicons name="cart-outline" size={16} color={cores.verde} />
+            <Ionicons name="cart-outline" size={16} color={paleta().cores.verde} />
             <Text style={styles.textoBotaoCompras}>Lista de compras</Text>
           </Pressable>
         </>
@@ -807,6 +809,7 @@ function CartaoCalorias({
   onAbrirMetas: () => void
   onAbrirContador: () => void
 }) {
+  const styles = estilos()
   const comido: TotaisConsumo = totaisConsumidos(consumo)
   const meta = metas.calorias
   const doPlano = plano ? totaisDe(itensDoPlano(plano.refeicoes)).calorias : null
@@ -814,9 +817,9 @@ function CartaoCalorias({
 
   const cabecalho = (
     <View style={styles.linhaTituloPlano}>
-      <Ionicons name="flame-outline" size={16} color={cores.verde} />
+      <Ionicons name="flame-outline" size={16} color={paleta().cores.verde} />
       <Text style={[styles.tituloCartao, styles.tituloPlano]}>Calorias</Text>
-      <Ionicons name="chevron-forward" size={17} color={inkFraco} />
+      <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
     </View>
   )
 
@@ -839,7 +842,7 @@ function CartaoCalorias({
         </Text>
 
         <View style={styles.botaoPlano}>
-          <Ionicons name="flag-outline" size={17} color={cores.branco} />
+          <Ionicons name="flag-outline" size={17} color={paleta().cores.branco} />
           <Text style={styles.textoBotaoPlano}>Definir metas</Text>
         </View>
       </Pressable>
@@ -874,7 +877,7 @@ function CartaoCalorias({
         >
           <Text style={styles.rotuloAnelDia}>{rotuloDoDia}</Text>
           <View style={styles.linhaValorAnel}>
-            <Ionicons name="flame" size={17} color={cores.limao} />
+            <Ionicons name="flame" size={17} color={paleta().cores.limao} />
             <Text style={styles.valorAnel}>{milhar(kcal)}</Text>
           </View>
           <Text style={styles.metaAnel}>{milhar(meta)} kcal</Text>
@@ -888,19 +891,19 @@ function CartaoCalorias({
             rotulo="Carboidratos"
             comido={comido.carboidratos}
             meta={metas.carboidratos}
-            cor={coresMacro.carboidratos}
+            cor={paleta().coresMacro.carboidratos}
           />
           <LinhaMacro
             rotulo="Proteínas"
             comido={comido.proteinas}
             meta={metas.proteinas}
-            cor={coresMacro.proteinas}
+            cor={paleta().coresMacro.proteinas}
           />
           <LinhaMacro
             rotulo="Gorduras"
             comido={comido.gorduras}
             meta={metas.gorduras}
-            cor={coresMacro.gorduras}
+            cor={paleta().coresMacro.gorduras}
           />
         </View>
       </View>
@@ -911,7 +914,7 @@ function CartaoCalorias({
       <View style={styles.barraConferir}>
         <Text style={styles.textoConferir}>Conferir calorias</Text>
         <View style={styles.botaoCamera}>
-          <Ionicons name="camera-outline" size={17} color={cores.sobreLimao} />
+          <Ionicons name="camera-outline" size={17} color={paleta().cores.sobreLimao} />
         </View>
       </View>
 
@@ -919,7 +922,7 @@ function CartaoCalorias({
           abaixo, e o que interessa aqui é o número, para comparar de relance. */}
       {doPlano !== null && (
         <View style={styles.linhaPlanoRef}>
-          <Ionicons name="nutrition-outline" size={13} color={inkFraco} />
+          <Ionicons name="nutrition-outline" size={13} color={paleta().inkFraco} />
           <Text style={styles.textoPlanoRef}>
             Seu plano prevê {milhar(doPlano)} kcal por dia
           </Text>
@@ -961,10 +964,11 @@ function CartaoAgua({
   onAbrir: () => void
   onRegistrar: () => void
 }) {
+  const styles = estilos()
   if (!agua) {
     return (
       <View style={[styles.cartaoAgua, styles.cartaoAguaCarregando]}>
-        <ActivityIndicator color={cores.branco} />
+        <ActivityIndicator color={paleta().cores.branco} />
       </View>
     )
   }
@@ -985,7 +989,7 @@ function CartaoAgua({
           contêiner em volta: assim o Pressable continua sendo quem mede o
           cartão, e o estado pressionado não precisa recalcular o degradê. */}
       <LinearGradient
-        colors={degrades.destaque}
+        colors={paleta().degrades.destaque}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -993,7 +997,7 @@ function CartaoAgua({
       />
 
       <View style={styles.linhaTituloAgua}>
-        <Ionicons name="water-outline" size={15} color={cores.branco} />
+        <Ionicons name="water-outline" size={15} color={paleta().cores.branco} />
         <Text style={styles.tituloAgua}>Água</Text>
       </View>
 
@@ -1022,7 +1026,7 @@ function CartaoAgua({
         accessibilityRole="button"
         accessibilityLabel={`Registrar um copo de ${agua.copoMl} mililitros`}
       >
-        <Ionicons name="add" size={15} color={cores.branco} />
+        <Ionicons name="add" size={15} color={paleta().cores.branco} />
         <Text style={styles.textoRegistrar}>Registrar</Text>
       </Pressable>
     </Pressable>
@@ -1048,6 +1052,7 @@ function CartaoProgresso({
   largura: number
   onAbrir: () => void
 }) {
+  const styles = estilos()
   const evolucao = evolucaoDe(pesos)
   const seguindo =
     evolucao && evolucao.quantos > 1 ? seguindoOFoco(objetivo, evolucao.sentido) : null
@@ -1061,7 +1066,7 @@ function CartaoProgresso({
         accessibilityLabel="Registrar seu peso"
       >
         <View style={styles.linhaTituloProgresso}>
-          <Ionicons name="trending-up" size={16} color={cores.verde} />
+          <Ionicons name="trending-up" size={16} color={paleta().cores.verde} />
           <Text style={styles.tituloCartao}>Seu progresso</Text>
         </View>
 
@@ -1072,7 +1077,7 @@ function CartaoProgresso({
         </Text>
 
         <View style={styles.botaoPlano}>
-          <Ionicons name="add" size={18} color={cores.branco} />
+          <Ionicons name="add" size={18} color={paleta().cores.branco} />
           <Text style={styles.textoBotaoPlano}>Registrar peso</Text>
         </View>
       </Pressable>
@@ -1090,9 +1095,9 @@ function CartaoProgresso({
           construção, e dizer "fora do seu foco" para quem acabou de se pesar
           pela primeira vez seria uma bronca por nada. */}
       <View style={styles.linhaTituloProgresso}>
-        <Ionicons name="trending-up" size={16} color={cores.verde} />
+        <Ionicons name="trending-up" size={16} color={paleta().cores.verde} />
         <Text style={[styles.tituloCartao, styles.tituloPlano]}>Seu progresso</Text>
-        <Ionicons name="chevron-forward" size={17} color={inkFraco} />
+        <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
       </View>
 
       <View style={styles.linhaProgresso}>
@@ -1146,6 +1151,7 @@ function CartaoProgresso({
  * assim tem de poder ser aberto. Sem isto, "63%" seria uma opinião do app sobre
  * o dia da pessoa — com isto, é uma conta que ela confere. */
 function FolhaDoDia({ doDia, onFechar }: { doDia: MetaDoDia; onFechar: () => void }) {
+  const styles = estilos()
   const { bottom } = useSafeAreaInsets()
 
   return (
@@ -1180,12 +1186,13 @@ function FolhaDoDia({ doDia, onFechar }: { doDia: MetaDoDia; onFechar: () => voi
 }
 
 function LinhaPilar({ pilar }: { pilar: Pilar }) {
+  const styles = estilos()
   const pct = Math.round(pilar.fracao * 100)
 
   return (
     <View style={styles.linhaPilar}>
       <View style={styles.iconePilar}>
-        <Ionicons name={pilar.icone} size={17} color={cores.verde} />
+        <Ionicons name={pilar.icone} size={17} color={paleta().cores.verde} />
       </View>
 
       <View style={styles.textoPilar}>
@@ -1227,11 +1234,12 @@ function CartaoTreino({
   metaSemana: number | null
   onAbrir: () => void
 }) {
+  const styles = estilos()
   const cabecalho = (
     <View style={styles.linhaTituloProgresso}>
-      <Ionicons name="barbell-outline" size={16} color={cores.verde} />
+      <Ionicons name="barbell-outline" size={16} color={paleta().cores.verde} />
       <Text style={[styles.tituloCartao, styles.tituloPlano]}>Seu treino</Text>
-      <Ionicons name="chevron-forward" size={17} color={inkFraco} />
+      <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
     </View>
   )
 
@@ -1251,7 +1259,7 @@ function CartaoTreino({
         </Text>
 
         <View style={styles.botaoPlano}>
-          <Ionicons name="add" size={18} color={cores.branco} />
+          <Ionicons name="add" size={18} color={paleta().cores.branco} />
           <Text style={styles.textoBotaoPlano}>Registrar o treino</Text>
         </View>
       </Pressable>
@@ -1319,11 +1327,12 @@ function CartaoSono({
   largura: number
   onAbrir: () => void
 }) {
+  const styles = estilos()
   const cabecalho = (
     <View style={styles.linhaTituloProgresso}>
-      <Ionicons name="moon-outline" size={16} color={cores.verde} />
+      <Ionicons name="moon-outline" size={16} color={paleta().cores.verde} />
       <Text style={[styles.tituloCartao, styles.tituloPlano]}>Seu sono</Text>
-      <Ionicons name="chevron-forward" size={17} color={inkFraco} />
+      <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
     </View>
   )
 
@@ -1343,7 +1352,7 @@ function CartaoSono({
         </Text>
 
         <View style={styles.botaoPlano}>
-          <Ionicons name="add" size={18} color={cores.branco} />
+          <Ionicons name="add" size={18} color={paleta().cores.branco} />
           <Text style={styles.textoBotaoPlano}>Registrar o sono</Text>
         </View>
       </Pressable>
@@ -1456,6 +1465,7 @@ function CartaoProximaRefeicao({
   plano: PlanoCompleto | null
   onAbrir: (refeicao: RefeicaoSalva, quando: string) => void
 }) {
+  const styles = estilos()
   const agora = useAgora()
   const proxima = plano ? proximaRefeicaoDe(plano, agora) : null
 
@@ -1494,7 +1504,7 @@ function CartaoProximaRefeicao({
       </Text>
 
       <View style={styles.linhaHorario}>
-        <Ionicons name="time-outline" size={14} color={inkSuave} />
+        <Ionicons name="time-outline" size={14} color={paleta().inkSuave} />
         <Text style={styles.horario}>{proxima.refeicao.hora}</Text>
         {/* "Hoje" também aparece: sem ele, um horário já passado e um de amanhã
             ficam com a mesma cara. */}
@@ -1508,13 +1518,14 @@ function CartaoProximaRefeicao({
       {/* Sem banco de fotos de prato no projeto: um bloco resolvido lê melhor
           que um retângulo cinza esperando imagem. */}
       <View style={styles.fotoRefeicao}>
-        <Ionicons name="restaurant" size={26} color={cores.verde} />
+        <Ionicons name="restaurant" size={26} color={paleta().cores.verde} />
       </View>
     </Pressable>
   )
 }
 
 function RefeicaoDoPlano({ refeicao }: { refeicao: RefeicaoSalva }) {
+  const styles = estilos()
   const t = totaisDe(refeicao.itens)
 
   return (
@@ -1597,6 +1608,7 @@ function LinhaMacro({
   meta: number | null
   cor: string
 }) {
+  const styles = estilos()
   const fracao = meta !== null && meta > 0 && comido !== null ? Math.min(comido / meta, 1) : 0
   /* Quatro barras de altura crescente, preenchidas conforme a fração. Um
       progresso que cabe em 14 pontos de largura, onde uma barra deitada não
@@ -1611,7 +1623,7 @@ function LinhaMacro({
             key={i}
             style={[
               styles.barrinha,
-              { height: 18 * altura, backgroundColor: i / barras.length < fracao ? cor : cores.trilho },
+              { height: 18 * altura, backgroundColor: i / barras.length < fracao ? cor : paleta().cores.trilho },
             ]}
           />
         ))}
@@ -1632,17 +1644,18 @@ function LinhaMacro({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: MARGEM, paddingBottom: 24, gap: 14 },
-  centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.fundo },
+  centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.cores.fundo },
 
   barraTopo: { flexDirection: 'row', justifyContent: 'space-between' },
   botaoTopo: {
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1653,34 +1666,34 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     borderWidth: 1.5,
-    borderColor: cores.cartao,
+    borderColor: t.cores.cartao,
   },
 
   saudacao: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
   textoSaudacao: { flex: 1 },
-  ola: { fontSize: 27, fontWeight: '800', color: cores.ink, letterSpacing: -0.6 },
-  frase: { marginTop: 6, fontSize: 14.5, lineHeight: 21, color: inkSuave },
-  fraseDestaque: { color: cores.verde, fontWeight: '700' },
+  ola: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
+  frase: { marginTop: 6, fontSize: 14.5, lineHeight: 21, color: t.inkSuave },
+  fraseDestaque: { color: t.cores.verde, fontWeight: '700' },
   blocoAnel: { alignItems: 'center', gap: 5 },
-  rotuloAnel: { fontSize: 11.5, color: inkSuave },
+  rotuloAnel: { fontSize: 11.5, color: t.inkSuave },
 
   cartao: {
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     padding: PADDING_CARTAO,
   },
-  tituloCartao: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloCartao: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
   /* flex só aqui, e não no tituloCartao: nos outros cartões ele está dentro de
      uma coluna, e ali flex faria o texto esticar na vertical. */
   tituloPlano: { flex: 1 },
 
   linhaCalorias: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14 },
   linhaValorGrande: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  avisoSemPeso: { marginTop: 10, fontSize: 11.5, lineHeight: 16, color: inkFraco },
+  avisoSemPeso: { marginTop: 10, fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
   linhaPlanoRef: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
-  textoPlanoRef: { flexShrink: 1, fontSize: 11.5, color: inkFraco },
+  textoPlanoRef: { flexShrink: 1, fontSize: 11.5, color: t.inkFraco },
 
 
 
@@ -1693,16 +1706,16 @@ const styles = StyleSheet.create({
   barrinha: { width: 3, borderRadius: 2 },
   textoMacro: { flex: 1 },
   rotuloMacro: { fontSize: 12, fontWeight: '700' },
-  valorMacro: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  metaMacro: { fontSize: 12, fontWeight: '600', color: inkSuave },
+  valorMacro: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  metaMacro: { fontSize: 12, fontWeight: '600', color: t.inkSuave },
 
   /* Miolo do anel. Quatro linhas curtas, centralizadas, com o número comendo
      quase toda a largura interna. */
-  rotuloAnelDia: { fontSize: 11.5, fontWeight: '700', color: inkSuave },
+  rotuloAnelDia: { fontSize: 11.5, fontWeight: '700', color: t.inkSuave },
   linhaValorAnel: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  valorAnel: { fontSize: 34, fontWeight: '800', color: cores.ink, letterSpacing: -1.2 },
-  metaAnel: { fontSize: 12.5, fontWeight: '600', color: inkSuave },
-  restantesAnel: { marginTop: 3, fontSize: 11.5, fontWeight: '700', color: cores.limao },
+  valorAnel: { fontSize: 34, fontWeight: '800', color: t.cores.ink, letterSpacing: -1.2 },
+  metaAnel: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
+  restantesAnel: { marginTop: 3, fontSize: 11.5, fontWeight: '700', color: t.cores.limao },
 
   /* Faixa de ação no rodapé do cartão, no formato de campo: é o convite para
      lançar o que comeu, e o botão da câmera é o atalho de dentro dele. */
@@ -1715,33 +1728,33 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  textoConferir: { flex: 1, fontSize: 14, fontWeight: '600', color: inkMedio },
+  textoConferir: { flex: 1, fontSize: 14, fontWeight: '600', color: t.inkMedio },
   botaoCamera: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: cores.limao,
+    backgroundColor: t.cores.limao,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   cartaoPlanoCarregando: { alignItems: 'center', justifyContent: 'center', height: 120 },
 
-  cartaoPressionado: { backgroundColor: cores.verdeMenta },
+  cartaoPressionado: { backgroundColor: t.cores.verdeMenta },
   /* O lápis fica na ponta: o título cresce e empurra o ícone para a direita. */
   linhaTituloPlano: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   chamadaVazio: {
     marginTop: 10,
     fontSize: 18,
     fontWeight: '800',
-    color: cores.ink,
+    color: t.cores.ink,
     letterSpacing: -0.3,
   },
-  planoVazio: { marginTop: 4, fontSize: 13, lineHeight: 19, color: inkSuave },
+  planoVazio: { marginTop: 4, fontSize: 13, lineHeight: 19, color: t.inkSuave },
   botaoPlano: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1750,25 +1763,25 @@ const styles = StyleSheet.create({
     marginTop: 14,
     height: 48,
     borderRadius: 14,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoPlanoPressionado: { backgroundColor: cores.verdeEscuro },
-  textoBotaoPlano: { fontSize: 14.5, fontWeight: '700', color: cores.branco },
-  nomePlano: { marginTop: 10, fontSize: 18, fontWeight: '800', color: cores.ink, letterSpacing: -0.3 },
+  botaoPlanoPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoBotaoPlano: { fontSize: 14.5, fontWeight: '700', color: t.cores.branco },
+  nomePlano: { marginTop: 10, fontSize: 18, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
   linhaRepeticao: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  textoRepeticao: { flexShrink: 1, fontSize: 12.5, fontWeight: '700', color: cores.verde },
+  textoRepeticao: { flexShrink: 1, fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
   seloDia: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoSeloDia: { fontSize: 10.5, fontWeight: '800', color: cores.verdeEscuro },
-  seloFolga: { backgroundColor: cores.trilho },
-  textoSeloFolga: { color: inkMedio },
+  textoSeloDia: { fontSize: 10.5, fontWeight: '800', color: t.cores.verdeEscuro },
+  seloFolga: { backgroundColor: t.cores.trilho },
+  textoSeloFolga: { color: t.inkMedio },
 
-  dataPlano: { marginTop: 6, fontSize: 11.5, color: inkFraco },
-  observacaoPlano: { marginTop: 6, fontSize: 13, lineHeight: 19, color: inkSuave },
+  dataPlano: { marginTop: 6, fontSize: 11.5, color: t.inkFraco },
+  observacaoPlano: { marginTop: 6, fontSize: 13, lineHeight: 19, color: t.inkSuave },
   /* O totalizador vem com cartão próprio: aqui ele só ganha o respiro em volta. */
   /* Discreto de proposito: e um atalho util, nao o assunto do cartao. */
   botaoCompras: {
@@ -1780,11 +1793,11 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
   },
   botaoComprasPressionado: { opacity: 0.7 },
-  textoBotaoCompras: { fontSize: 14, fontWeight: '700', color: cores.verde },
+  textoBotaoCompras: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
   totaisPlano: { marginTop: 14 },
 
   /* Cada refeição num painel próprio, um degrau mais claro que o cartão. Sem
@@ -1795,60 +1808,60 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
     borderRadius: 16,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   cabecalhoRefeicaoPlano: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   horaPlano: {
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 9,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoHoraPlano: { fontSize: 12, fontWeight: '800', color: cores.limao },
-  nomeRefeicaoPlano: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
-  kcalRefeicaoPlano: { fontSize: 12.5, fontWeight: '700', color: inkMedio },
+  textoHoraPlano: { fontSize: 12, fontWeight: '800', color: t.cores.limao },
+  nomeRefeicaoPlano: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  kcalRefeicaoPlano: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
 
   listaItensPlano: { marginTop: 2 },
   /* Duas colunas: texto à esquerda, caloria à direita. O respiro vertical vem
      do padding de cada linha, e não de um gap na lista, para o fio separador
      nascer no meio do vão e não colado no texto de cima. */
   itemPlano: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 9 },
-  itemPlanoComLinha: { borderTopWidth: 1, borderTopColor: cores.borda },
+  itemPlanoComLinha: { borderTopWidth: 1, borderTopColor: t.cores.borda },
   textoItemPlano: { flex: 1 },
-  nomeItemPlano: { fontSize: 14, fontWeight: '600', color: cores.ink, lineHeight: 19 },
-  medidaItemPlano: { marginTop: 3, fontSize: 12, lineHeight: 16, color: inkSuave },
+  nomeItemPlano: { fontSize: 14, fontWeight: '600', color: t.cores.ink, lineHeight: 19 },
+  medidaItemPlano: { marginTop: 3, fontSize: 12, lineHeight: 16, color: t.inkSuave },
   kcalItemPlano: {
     minWidth: 66,
     textAlign: 'right',
     fontSize: 13.5,
     fontWeight: '700',
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  unidadeKcalItem: { fontSize: 11.5, fontWeight: '600', color: inkSuave },
-  refeicaoVazia: { fontSize: 12, color: inkFraco },
+  unidadeKcalItem: { fontSize: 11.5, fontWeight: '600', color: t.inkSuave },
+  refeicaoVazia: { fontSize: 12, color: t.inkFraco },
 
   linhaDupla: { flexDirection: 'row', gap: 12 },
   cartaoAgua: {
     flex: 1,
     borderRadius: 20,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     padding: PADDING_CARTAO,
     /* Sem isto o degradê de dentro vaza pelos cantos arredondados. */
     overflow: 'hidden',
   },
   cartaoAguaCarregando: { alignItems: 'center', justifyContent: 'center', minHeight: 150 },
-  cartaoAguaPressionado: { backgroundColor: cores.verdeEscuro },
+  cartaoAguaPressionado: { backgroundColor: t.cores.verdeEscuro },
   linhaTituloAgua: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tituloAgua: { fontSize: 14.5, fontWeight: '700', color: cores.branco },
+  tituloAgua: { fontSize: 14.5, fontWeight: '700', color: t.cores.branco },
   linhaValorAgua: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 8 },
-  valorAgua: { fontSize: 28, fontWeight: '800', color: cores.branco, letterSpacing: -0.8 },
+  valorAgua: { fontSize: 28, fontWeight: '800', color: t.cores.branco, letterSpacing: -0.8 },
   metaAgua: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
   copos: { flexDirection: 'row', gap: 4, marginTop: 10 },
   /* Copo desenhado com View em vez de ícone: a forma é simples e assim a
      largura acompanha o espaço disponível sem estourar em tela estreita. */
-  copo: { flex: 1, height: 20, borderRadius: 4, backgroundColor: cores.branco },
+  copo: { flex: 1, height: 20, borderRadius: 4, backgroundColor: t.cores.branco },
   copoVazio: { backgroundColor: 'rgba(255,255,255,0.32)' },
   /* A altura é a mesma dos copos: com a barra ou com eles, o cartão de água tem
      o mesmo tamanho — e a linha não muda de altura conforme a meta da pessoa. */
@@ -1859,7 +1872,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: 10,
   },
-  preenchimentoAgua: { height: '100%', borderRadius: 4, backgroundColor: cores.branco },
+  preenchimentoAgua: { height: '100%', borderRadius: 4, backgroundColor: t.cores.branco },
   botaoRegistrar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1873,17 +1886,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.24)',
   },
   botaoRegistrarPress: { backgroundColor: 'rgba(255,255,255,0.38)' },
-  textoRegistrar: { fontSize: 12.5, fontWeight: '700', color: cores.branco },
+  textoRegistrar: { fontSize: 12.5, fontWeight: '700', color: t.cores.branco },
 
   cartaoRefeicao: { flex: 1, overflow: 'hidden' },
-  cartaoRefeicaoPressionado: { backgroundColor: cores.verdeMenta },
-  rotuloProxima: { fontSize: 12.5, fontWeight: '700', color: cores.verde },
-  nomeRefeicao: { marginTop: 6, fontSize: 20, fontWeight: '800', color: cores.ink },
+  cartaoRefeicaoPressionado: { backgroundColor: t.cores.verdeMenta },
+  rotuloProxima: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
+  nomeRefeicao: { marginTop: 6, fontSize: 20, fontWeight: '800', color: t.cores.ink },
   linhaHorario: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  horario: { fontSize: 13.5, fontWeight: '600', color: inkSuave },
-  quandoProxima: { fontSize: 13.5, fontWeight: '600', color: inkFraco },
-  kcalProxima: { marginTop: 4, fontSize: 12.5, fontWeight: '700', color: inkMedio },
-  semProxima: { marginTop: 8, fontSize: 13, lineHeight: 19, color: inkSuave },
+  horario: { fontSize: 13.5, fontWeight: '600', color: t.inkSuave },
+  quandoProxima: { fontSize: 13.5, fontWeight: '600', color: t.inkFraco },
+  kcalProxima: { marginTop: 4, fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
+  semProxima: { marginTop: 8, fontSize: 13, lineHeight: 19, color: t.inkSuave },
   fotoRefeicao: {
     alignSelf: 'flex-end',
     marginTop: 10,
@@ -1892,7 +1905,7 @@ const styles = StyleSheet.create({
     width: 84,
     height: 62,
     borderTopLeftRadius: 18,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1906,59 +1919,60 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   colunaPeso: { width: 96 },
-  rotuloPeso: { fontSize: 12.5, color: inkSuave },
-  valorPeso: { fontSize: 26, fontWeight: '800', color: cores.ink, letterSpacing: -0.8 },
-  unidadePeso: { fontSize: 12.5, fontWeight: '600', color: inkMedio },
+  rotuloPeso: { fontSize: 12.5, color: t.inkSuave },
+  valorPeso: { fontSize: 26, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.8 },
+  unidadePeso: { fontSize: 12.5, fontWeight: '600', color: t.inkMedio },
   colunaVariacao: { width: 84, alignItems: 'center', gap: 4 },
   selo: {
     borderRadius: 999,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  textoSelo: { fontSize: 12.5, fontWeight: '800', color: cores.verdeEscuro },
-  seloNoFoco: { backgroundColor: cores.verde },
-  textoSeloNoFoco: { color: cores.branco },
-  seloForaDoFoco: { backgroundColor: cores.trilho },
-  desdeInicio: { fontSize: 11, color: inkFraco, textAlign: 'center' },
-  rodapeSono: { marginTop: 10, fontSize: 11.5, color: inkFraco },
+  textoSelo: { fontSize: 12.5, fontWeight: '800', color: t.cores.verdeEscuro },
+  seloNoFoco: { backgroundColor: t.cores.verde },
+  textoSeloNoFoco: { color: t.cores.branco },
+  seloForaDoFoco: { backgroundColor: t.cores.trilho },
+  desdeInicio: { fontSize: 11, color: t.inkFraco, textAlign: 'center' },
+  rodapeSono: { marginTop: 10, fontSize: 11.5, color: t.inkFraco },
 
   /* ── Folha da meta do dia ── */
   centroFolha: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: MARGEM },
   fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
     width: '100%',
-    backgroundColor: cores.fundo,
+    backgroundColor: t.cores.fundo,
     borderRadius: 24,
     padding: 20,
     gap: 14,
   },
   topoFolha: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   textoTopoFolha: { flex: 1 },
-  tituloFolha: { fontSize: 19, fontWeight: '800', color: cores.ink, letterSpacing: -0.3 },
-  fraseFolha: { marginTop: 3, fontSize: 13, color: inkSuave },
+  tituloFolha: { fontSize: 19, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
+  fraseFolha: { marginTop: 3, fontSize: 13, color: t.inkSuave },
 
   linhaPilar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconePilar: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
   textoPilar: { flex: 1 },
   linhaNomePilar: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  nomePilar: { fontSize: 14, fontWeight: '700', color: cores.ink },
-  pctPilar: { fontSize: 13, fontWeight: '800', color: cores.verde },
+  nomePilar: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  pctPilar: { fontSize: 13, fontWeight: '800', color: t.cores.verde },
   trilhoPilar: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
     overflow: 'hidden',
     marginTop: 5,
   },
-  preenchimentoPilar: { height: '100%', borderRadius: 3, backgroundColor: cores.verde },
-  detalhePilar: { marginTop: 4, fontSize: 11.5, color: inkFraco },
-  notaFolha: { fontSize: 11.5, lineHeight: 16, color: inkFraco },
-})
+  preenchimentoPilar: { height: '100%', borderRadius: 3, backgroundColor: t.cores.verde },
+  detalhePilar: { marginTop: 4, fontSize: 11.5, color: t.inkFraco },
+  notaFolha: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+  }),
+)

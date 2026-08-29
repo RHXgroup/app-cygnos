@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { milhar } from '../lib/formatar'
-import { cores, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Medidas fechadas para o arco caber na coluna estreita do cartão de metas num
    iPhone SE. Mexer aqui sem olhar a tela pequena estoura o layout. */
@@ -27,6 +27,7 @@ export function ArcoMeta({
   unidade: string
   cor: string
 }) {
+  const styles = estilos()
   /* Passar da meta não estica o arco além do fim: o número acima já conta a
      história, e um arco transbordando viraria ilusão de ótica. */
   const fracao = meta > 0 ? Math.min(atual / meta, 1) : 0
@@ -37,7 +38,7 @@ export function ArcoMeta({
       <Svg width={LARGURA} height={CENTRO_Y + ESPESSURA / 2}>
         <Path
           d={CAMINHO}
-          stroke={cores.moss}
+          stroke={paleta().cores.moss}
           strokeWidth={ESPESSURA}
           strokeLinecap="round"
           fill="none"
@@ -66,14 +67,16 @@ export function ArcoMeta({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   bloco: { alignItems: 'center' },
   centro: {
     position: 'absolute',
     top: 22,
     alignItems: 'center',
   },
-  valor: { fontSize: 22, fontWeight: '800', color: cores.ink, letterSpacing: -0.5 },
-  meta: { marginTop: 1, fontSize: 11.5, color: inkSuave },
+  valor: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.5 },
+  meta: { marginTop: 1, fontSize: 11.5, color: t.inkSuave },
   porcentagem: { marginTop: 3, fontSize: 12, fontWeight: '700' },
-})
+  }),
+)

@@ -19,7 +19,7 @@ import {
   telefoneFormatado,
   type Nutricionista,
 } from '../lib/nutricionista'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* A aba Mensagens, enquanto a conversa dentro do app não existe.
  *
@@ -41,6 +41,7 @@ export function MensagensScreen({
 }: {
   onAbrirNutricionistas: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -86,7 +87,7 @@ export function MensagensScreen({
             await buscar()
             setAtualizando(false)
           }}
-          tintColor={cores.limao}
+          tintColor={paleta().cores.limao}
         />
       }
     >
@@ -94,7 +95,7 @@ export function MensagensScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : nutri ? (
         <>
@@ -118,7 +119,7 @@ export function MensagensScreen({
                 accessibilityRole="button"
                 accessibilityLabel={`Abrir conversa com ${nutri.nome} no WhatsApp`}
               >
-                <Ionicons name="logo-whatsapp" size={18} color={cores.branco} />
+                <Ionicons name="logo-whatsapp" size={18} color={paleta().cores.branco} />
                 <Text style={styles.textoZap}>Conversar no WhatsApp</Text>
               </Pressable>
             ) : (
@@ -138,7 +139,7 @@ export function MensagensScreen({
       ) : (
         <View style={styles.vazio}>
           <View style={styles.circulo}>
-            <Ionicons name="chatbubble-ellipses-outline" size={26} color={cores.verde} />
+            <Ionicons name="chatbubble-ellipses-outline" size={26} color={paleta().cores.verde} />
           </View>
           <Text style={styles.tituloVazio}>Ainda não há com quem conversar</Text>
           <Text style={styles.textoVazio}>
@@ -152,7 +153,7 @@ export function MensagensScreen({
             accessibilityLabel="Ver as nutricionistas do Cygnos"
           >
             <Text style={styles.textoVer}>Ver nutricionistas</Text>
-            <Ionicons name="chevron-forward" size={16} color={cores.verde} />
+            <Ionicons name="chevron-forward" size={16} color={paleta().cores.verde} />
           </Pressable>
         </View>
       )}
@@ -160,18 +161,19 @@ export function MensagensScreen({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: 20, paddingBottom: 28, gap: 14 },
   centro: { paddingTop: 60, alignItems: 'center' },
 
-  titulo: { fontSize: 27, fontWeight: '800', color: cores.ink, letterSpacing: -0.6 },
+  titulo: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
 
-  cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: 16, gap: 14 },
+  cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: 16, gap: 14 },
   linhaNutri: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   textoNutri: { flex: 1, gap: 2 },
-  nome: { fontSize: 16, fontWeight: '800', color: cores.ink },
-  telefone: { fontSize: 13, color: inkSuave },
+  nome: { fontSize: 16, fontWeight: '800', color: t.cores.ink },
+  telefone: { fontSize: 13, color: t.inkSuave },
 
   botaoZap: {
     flexDirection: 'row',
@@ -180,30 +182,30 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 48,
     borderRadius: 14,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoZapPressionado: { backgroundColor: cores.verdeEscuro },
-  textoZap: { fontSize: 14.5, fontWeight: '700', color: cores.branco },
+  botaoZapPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoZap: { fontSize: 14.5, fontWeight: '700', color: t.cores.branco },
 
-  semTelefone: { fontSize: 13, lineHeight: 19, color: inkFraco, textAlign: 'center' },
+  semTelefone: { fontSize: 13, lineHeight: 19, color: t.inkFraco, textAlign: 'center' },
 
-  rodape: { fontSize: 12.5, lineHeight: 18, color: inkFraco, textAlign: 'center', paddingHorizontal: 8 },
+  rodape: { fontSize: 12.5, lineHeight: 18, color: t.inkFraco, textAlign: 'center', paddingHorizontal: 8 },
 
   vazio: { alignItems: 'center', paddingTop: 40, gap: 10 },
   circulo: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
-  tituloVazio: { fontSize: 17, fontWeight: '800', color: cores.ink, textAlign: 'center' },
+  tituloVazio: { fontSize: 17, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
   textoVazio: {
     fontSize: 13.5,
     lineHeight: 20,
-    color: inkFraco,
+    color: t.inkFraco,
     textAlign: 'center',
     paddingHorizontal: 16,
   },
@@ -215,8 +217,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 13,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  botaoVerPressionado: { backgroundColor: cores.verdeMenta },
-  textoVer: { fontSize: 14, fontWeight: '700', color: cores.verde },
-})
+  botaoVerPressionado: { backgroundColor: t.cores.verdeMenta },
+  textoVer: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
+  }),
+)

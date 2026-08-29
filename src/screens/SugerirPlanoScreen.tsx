@@ -19,7 +19,7 @@ import { carregarMetas } from '../lib/metas'
 import { carregarPeso } from '../lib/peso'
 import { sugerirPlano, type PlanoSugerido } from '../lib/planoIA'
 import { milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 import type { RefeicaoEscolhida } from './RefeicoesDoDiaScreen'
 
 /* O que a IA precisa saber antes de montar.
@@ -58,6 +58,7 @@ export function SugerirPlanoScreen({
      a tela oferece o caminho para definir. */
   onDefinirMetas: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [estado, setEstado] = useState<Estado>('carregando')
   const [erro, setErro] = useState('')
@@ -192,7 +193,7 @@ export function SugerirPlanoScreen({
         accessibilityRole="button"
         accessibilityLabel="Voltar"
       >
-        <Ionicons name="chevron-back" size={22} color={cores.ink} />
+        <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
       </Pressable>
       <Text style={styles.tituloTela}>Ajuda da Aurora</Text>
       <View style={styles.botaoVoltar} />
@@ -204,7 +205,7 @@ export function SugerirPlanoScreen({
       <View style={styles.tela}>
         {cabecalho}
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       </View>
     )
@@ -215,7 +216,7 @@ export function SugerirPlanoScreen({
       <View style={styles.tela}>
         {cabecalho}
         <View style={styles.centro}>
-          <Ionicons name="flag-outline" size={30} color={inkFraco} />
+          <Ionicons name="flag-outline" size={30} color={paleta().inkFraco} />
           <Text style={styles.tituloVazio}>Falta a sua meta de calorias</Text>
           <Text style={styles.textoVazio}>
             É a partir dela que a Aurora decide o tamanho das porções. Sem esse número, o plano
@@ -238,7 +239,7 @@ export function SugerirPlanoScreen({
       <View style={styles.tela}>
         {cabecalho}
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
           <Text style={styles.tituloVazio}>Montando o seu dia…</Text>
           <Text style={styles.textoVazio}>
             Leva alguns segundos. Depois você confere item por item antes de virar plano.
@@ -321,7 +322,7 @@ export function SugerirPlanoScreen({
           style={({ pressed }) => [styles.botaoPrincipal, pressed && styles.pressionado]}
           accessibilityRole="button"
         >
-          <Ionicons name="sparkles-outline" size={17} color={cores.branco} />
+          <Ionicons name="sparkles-outline" size={17} color={paleta().cores.branco} />
           <Text style={styles.textoBotaoPrincipal}>Montar meu plano</Text>
         </Pressable>
 
@@ -349,6 +350,7 @@ function Campo({
   aviso?: string
   alto?: boolean
 }) {
+  const styles = estilos()
   return (
     <View style={styles.campo}>
       <Text style={styles.rotuloCampo}>{rotulo}</Text>
@@ -356,7 +358,7 @@ function Campo({
         value={valor}
         onChangeText={onChange}
         placeholder={exemplo}
-        placeholderTextColor={inkFraco}
+        placeholderTextColor={paleta().inkFraco}
         keyboardAppearance="dark"
         multiline={alto}
         style={[styles.entrada, alto && styles.entradaAlta]}
@@ -367,8 +369,9 @@ function Campo({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -377,49 +380,49 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   botaoVoltar: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '800', color: cores.ink },
+  tituloTela: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '800', color: t.cores.ink },
 
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
-  tituloVazio: { marginTop: 4, fontSize: 16, fontWeight: '800', color: cores.ink, textAlign: 'center' },
-  textoVazio: { fontSize: 13.5, lineHeight: 20, color: inkSuave, textAlign: 'center' },
+  tituloVazio: { marginTop: 4, fontSize: 16, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
+  textoVazio: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 16 },
-  chamada: { fontSize: 13.5, lineHeight: 20, color: inkMedio },
+  chamada: { fontSize: 13.5, lineHeight: 20, color: t.inkMedio },
 
   blocoSabido: {
     padding: 13,
     borderRadius: 14,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 3,
   },
-  rotuloSabido: { fontSize: 11.5, fontWeight: '800', color: cores.verde, letterSpacing: 0.3 },
-  textoSabido: { fontSize: 13.5, fontWeight: '600', color: cores.ink },
+  rotuloSabido: { fontSize: 11.5, fontWeight: '800', color: t.cores.verde, letterSpacing: 0.3 },
+  textoSabido: { fontSize: 13.5, fontWeight: '600', color: t.cores.ink },
 
   campo: { gap: 6 },
-  rotuloCampo: { fontSize: 13.5, fontWeight: '700', color: cores.ink },
+  rotuloCampo: { fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
   entrada: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14.5,
-    color: cores.ink,
+    color: t.cores.ink,
   },
   entradaAlta: { minHeight: 78, textAlignVertical: 'top' },
-  avisoCampo: { fontSize: 11.5, lineHeight: 16, color: inkSuave },
+  avisoCampo: { fontSize: 11.5, lineHeight: 16, color: t.inkSuave },
 
   blocoErro: {
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  textoErro: { fontSize: 13, lineHeight: 18, color: cores.erroTexto },
+  textoErro: { fontSize: 13, lineHeight: 18, color: t.cores.erroTexto },
 
   botaoPrincipal: {
     flexDirection: 'row',
@@ -428,10 +431,11 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 50,
     borderRadius: 15,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
   pressionado: { opacity: 0.8 },
-  textoBotaoPrincipal: { fontSize: 15, fontWeight: '800', color: cores.branco },
+  textoBotaoPrincipal: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
 
-  rodape: { fontSize: 11.5, lineHeight: 17, color: inkFraco, textAlign: 'center' },
-})
+  rodape: { fontSize: 11.5, lineHeight: 17, color: t.inkFraco, textAlign: 'center' },
+  }),
+)

@@ -131,6 +131,11 @@ export async function transcrever(
       return { tipo: 'erro', mensagem: 'Não consegui entender o áudio agora. Verifique a conexão.' }
     }
 
+    /* O que o servidor mediu, quando não veio texto. Vai para o terminal do
+       Metro porque é lá que se lê enquanto se conserta — a tela continua
+       dizendo só a frase de gente. Temporário. */
+    if (data?.diagnostico) console.log('[cygnos] ditado vazio:', JSON.stringify(data.diagnostico))
+
     const texto = String(data?.texto ?? '').trim()
     /* Silêncio não é erro: é o que sai de quem apertou e não falou, ou falou
        longe demais do aparelho. Merece uma frase própria, porque a saída é

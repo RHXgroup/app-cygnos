@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PALAVRA_CONFIRMACAO, excluirConta } from '../lib/conta'
 import { supabase } from '../lib/supabase'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Exclusão da conta, exigida pela Play Store para todo app que deixa criar uma.
  *
@@ -32,6 +32,7 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
  * Mesma escolha das outras telas de menu: View sobreposta lá no App, não
  * Modal. */
 export function ExcluirContaScreen({ email, onFechar }: { email: string; onFechar: () => void }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [palavra, setPalavra] = useState('')
   const [excluindo, setExcluindo] = useState(false)
@@ -75,7 +76,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Excluir conta</Text>
         <View style={styles.botaoVoltar} />
@@ -91,7 +92,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.circulo}>
-            <Ionicons name="trash-outline" size={26} color={cores.erroTexto} />
+            <Ionicons name="trash-outline" size={26} color={paleta().cores.erroTexto} />
           </View>
 
           <Text style={styles.chamada}>Isto não tem volta</Text>
@@ -109,7 +110,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
               'O vínculo com a sua nutricionista',
             ].map(item => (
               <View key={item} style={styles.linhaItem}>
-                <Ionicons name="close-circle" size={16} color={cores.erroTexto} />
+                <Ionicons name="close-circle" size={16} color={paleta().cores.erroTexto} />
                 <Text style={styles.textoItem}>{item}</Text>
               </View>
             ))}
@@ -118,7 +119,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
           <View style={styles.bloco}>
             <Text style={styles.tituloBloco}>O que permanece</Text>
             <View style={styles.linhaItem}>
-              <Ionicons name="information-circle" size={16} color={inkFraco} />
+              <Ionicons name="information-circle" size={16} color={paleta().inkFraco} />
               <Text style={styles.textoItem}>
                 Se você já foi atendido por uma nutricionista, o prontuário daquele atendimento
                 continua com ela — consultas, medidas, exames e fotos tiradas no consultório. São
@@ -138,7 +139,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
             autoCapitalize="characters"
             autoCorrect={false}
             placeholder={PALAVRA_CONFIRMACAO}
-            placeholderTextColor={inkFraco}
+            placeholderTextColor={paleta().inkFraco}
             keyboardAppearance="dark"
             style={[styles.campo, confirmada && styles.campoConfirmado]}
             accessibilityLabel={`Digite ${PALAVRA_CONFIRMACAO} para confirmar`}
@@ -159,7 +160,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
             accessibilityLabel="Excluir minha conta definitivamente"
           >
             {excluindo ? (
-              <ActivityIndicator color={cores.branco} />
+              <ActivityIndicator color={paleta().cores.branco} />
             ) : (
               <Text style={styles.textoBotaoExcluir}>Excluir minha conta</Text>
             )}
@@ -180,8 +181,9 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   flex: { flex: 1 },
 
   cabecalho: {
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 40, alignItems: 'center' },
 
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: cores.erroFundo,
+    backgroundColor: t.cores.erroFundo,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
   chamada: {
     fontSize: 18,
     fontWeight: '800',
-    color: cores.ink,
+    color: t.cores.ink,
     textAlign: 'center',
     letterSpacing: -0.3,
   },
@@ -217,27 +219,27 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13.5,
     lineHeight: 20,
-    color: inkSuave,
+    color: t.inkSuave,
     textAlign: 'center',
   },
-  email: { fontWeight: '700', color: inkMedio },
+  email: { fontWeight: '700', color: t.inkMedio },
 
   bloco: {
     alignSelf: 'stretch',
     marginTop: 20,
     padding: 16,
     borderRadius: 18,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 10,
   },
-  tituloBloco: { fontSize: 13, fontWeight: '800', color: cores.ink },
+  tituloBloco: { fontSize: 13, fontWeight: '800', color: t.cores.ink },
   /* alignItems no topo, e não centralizado: os itens quebram em duas e três
      linhas, e um ícone centralizado verticalmente flutuaria longe da primeira
      palavra que ele marca. */
   linhaItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  textoItem: { flex: 1, fontSize: 13, lineHeight: 19, color: inkMedio },
+  textoItem: { flex: 1, fontSize: 13, lineHeight: 19, color: t.inkMedio },
 
   rotuloCampo: {
     alignSelf: 'stretch',
@@ -245,29 +247,29 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 13,
     fontWeight: '600',
-    color: inkMedio,
+    color: t.inkMedio,
   },
-  palavra: { fontWeight: '800', color: cores.erroTexto, letterSpacing: 1 },
+  palavra: { fontWeight: '800', color: t.cores.erroTexto, letterSpacing: 1 },
   campo: {
     alignSelf: 'stretch',
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.line,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.line,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 16,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
     letterSpacing: 2,
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  campoConfirmado: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
+  campoConfirmado: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
   erro: {
     alignSelf: 'stretch',
     marginTop: 10,
     fontSize: 12.5,
     lineHeight: 17,
-    color: cores.erroTexto,
+    color: t.cores.erroTexto,
   },
 
   botaoExcluir: {
@@ -277,14 +279,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.erroTexto,
+    backgroundColor: t.cores.erroTexto,
   },
   botaoPressionado: { opacity: 0.85 },
   /* Apagado enquanto a palavra não bate: o botão continua visível para a pessoa
      saber onde ele vai estar, mas não parece pronto para ser tocado. */
-  botaoDesligado: { backgroundColor: cores.trilho },
-  textoBotaoExcluir: { fontSize: 15, fontWeight: '700', color: cores.branco },
+  botaoDesligado: { backgroundColor: t.cores.trilho },
+  textoBotaoExcluir: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
 
   botaoCancelar: { marginTop: 14, paddingVertical: 10 },
-  textoBotaoCancelar: { fontSize: 14.5, fontWeight: '600', color: inkMedio },
-})
+  textoBotaoCancelar: { fontSize: 14.5, fontWeight: '600', color: t.inkMedio },
+  }),
+)

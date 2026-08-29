@@ -43,7 +43,7 @@ import {
 } from '../lib/metas'
 import { carregarPeso } from '../lib/peso'
 import { decimal, milhar } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Cálculo energético para quem não sabe o que é cálculo energético.
  *
@@ -65,6 +65,7 @@ export function CalculoEnergeticoScreen({
   /* Salvar mexe no cálculo ativo e, se a pessoa quiser, nas metas. */
   onSalvo: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [etapa, setEtapa] = useState(1)
   const [carregando, setCarregando] = useState(true)
@@ -273,7 +274,7 @@ export function CalculoEnergeticoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Cálculo energético</Text>
         <View style={styles.botaoVoltar} />
@@ -289,7 +290,7 @@ export function CalculoEnergeticoScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <>
@@ -367,7 +368,7 @@ export function CalculoEnergeticoScreen({
               accessibilityRole="button"
             >
               {salvando ? (
-                <ActivityIndicator color={cores.branco} />
+                <ActivityIndicator color={paleta().cores.branco} />
               ) : (
                 <Text style={styles.textoBotao}>
                   {etapa < 3 ? 'Continuar' : usarComoMeta ? 'Salvar e usar como meta' : 'Salvar cálculo'}
@@ -411,6 +412,7 @@ function EtapaDados({
   sexo: Sexo | null
   setSexo: (s: Sexo) => void
 }) {
+  const styles = estilos()
   /* Conta criada direto no painel do Supabase não tem linha em app_contas, então
      não tem data de nascimento — e sem idade nenhuma equação fecha. Dizer isso é
      melhor que deixar o "Continuar" apagado sem explicação, que é o que
@@ -420,7 +422,7 @@ function EtapaDados({
       <>
         <Text style={styles.tituloEtapa}>Seus dados</Text>
         <View style={styles.aviso}>
-          <Ionicons name="alert-circle-outline" size={16} color={cores.erroTexto} />
+          <Ionicons name="alert-circle-outline" size={16} color={paleta().cores.erroTexto} />
           <Text style={styles.textoAvisoForte}>
             Esta conta não tem cadastro completo — ela foi criada fora do app, então não temos sua
             data de nascimento. Sem a idade não é possível calcular o gasto energético.
@@ -527,6 +529,7 @@ function CampoNumero({
   invalido: boolean
   ajuda: string
 }) {
+  const styles = estilos()
   return (
     <View>
       <View style={styles.linhaCampo}>
@@ -557,6 +560,7 @@ function EtapaAtividade({
   escolhida: ChaveAtividade | null
   onEscolher: (c: ChaveAtividade) => void
 }) {
+  const styles = estilos()
   return (
     <>
       <Text style={styles.tituloEtapa}>Seu nível de atividade</Text>
@@ -581,7 +585,7 @@ function EtapaAtividade({
             accessibilityLabel={`${a.rotulo}. ${a.descricao}`}
           >
             <View style={[styles.marca, escolhida === a.chave && styles.marcaAtiva]}>
-              {escolhida === a.chave && <Ionicons name="checkmark" size={14} color={cores.branco} />}
+              {escolhida === a.chave && <Ionicons name="checkmark" size={14} color={paleta().cores.branco} />}
             </View>
 
             <View style={styles.textoAtividade}>
@@ -648,6 +652,7 @@ function EtapaResultado({
   setUsarComoMeta: (b: boolean) => void
   podeUsarComoMeta: boolean
 }) {
+  const styles = estilos()
   const ritmo = ritmoSemanal(get, alvo)
   const sugerido = AJUSTE_SUGERIDO[foco ?? 'manter']
 
@@ -687,7 +692,7 @@ function EtapaResultado({
 
       {!!sobreAFormula.ressalva && (
         <View style={styles.aviso}>
-          <Ionicons name="warning-outline" size={16} color={cores.erroTexto} />
+          <Ionicons name="warning-outline" size={16} color={paleta().cores.erroTexto} />
           <Text style={styles.textoAvisoForte}>{sobreAFormula.ressalva}</Text>
         </View>
       )}
@@ -751,7 +756,7 @@ function EtapaResultado({
             app parou de obedecer ao percentual dela. */}
         {travou && (
           <View style={styles.aviso}>
-            <Ionicons name="lock-closed-outline" size={16} color={cores.erroTexto} />
+            <Ionicons name="lock-closed-outline" size={16} color={paleta().cores.erroTexto} />
             <Text style={styles.textoAvisoForte}>
               Esse déficit levaria você abaixo das {milhar(tmb)} kcal que seu corpo gasta parado.
               O alvo travou aí. Descer disso é assunto para uma nutricionista, não para um campo de
@@ -770,7 +775,7 @@ function EtapaResultado({
           accessibilityLabel="Ajustar os macronutrientes"
         >
           <Text style={styles.tituloBloco}>Macronutrientes</Text>
-          <Ionicons name={macrosAbertos ? 'chevron-up' : 'chevron-down'} size={18} color={inkFraco} />
+          <Ionicons name={macrosAbertos ? 'chevron-up' : 'chevron-down'} size={18} color={paleta().inkFraco} />
         </Pressable>
 
         <View style={styles.linhaMacros}>
@@ -781,7 +786,7 @@ function EtapaResultado({
 
         {!macros.possivel && (
           <View style={styles.aviso}>
-            <Ionicons name="warning-outline" size={16} color={cores.erroTexto} />
+            <Ionicons name="warning-outline" size={16} color={paleta().cores.erroTexto} />
             <Text style={styles.textoAvisoForte}>
               Com essa proteína e esse carboidrato sobra pouca gordura ({Math.round(macros.gorduraPct)}%
               da energia). Abaixo de 15% a absorção de vitaminas e a produção de hormônios começam a
@@ -824,7 +829,7 @@ function EtapaResultado({
           value={nome}
           onChangeText={setNome}
           placeholder={nomeAutomatico()}
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           keyboardAppearance="dark"
           maxLength={80}
           style={styles.campoNome}
@@ -842,7 +847,7 @@ function EtapaResultado({
             accessibilityState={{ checked: usarComoMeta }}
           >
             <View style={[styles.check, usarComoMeta && styles.checkAtivo]}>
-              {usarComoMeta && <Ionicons name="checkmark" size={14} color={cores.branco} />}
+              {usarComoMeta && <Ionicons name="checkmark" size={14} color={paleta().cores.branco} />}
             </View>
             <View style={styles.textoCheck}>
               <Text style={styles.rotuloCheck}>Usar como minhas metas</Text>
@@ -864,6 +869,7 @@ function EtapaResultado({
 }
 
 function Macro({ rotulo, gramas }: { rotulo: string; gramas: number }) {
+  const styles = estilos()
   return (
     <View style={styles.macro}>
       <Text style={styles.rotuloMacro}>{rotulo}</Text>
@@ -883,6 +889,7 @@ function Passo({
   desligado?: boolean
   rotulo: string
 }) {
+  const styles = estilos()
   return (
     <Pressable
       onPress={onPress}
@@ -895,7 +902,7 @@ function Passo({
       accessibilityRole="button"
       accessibilityLabel={rotulo}
     >
-      <Ionicons name={icone} size={20} color={desligado ? inkFraco : cores.verde} />
+      <Ionicons name={icone} size={20} color={desligado ? paleta().inkFraco : paleta().cores.verde} />
     </Pressable>
   )
 }
@@ -911,6 +918,7 @@ function LinhaPasso({
   onMenos: () => void
   onMais: () => void
 }) {
+  const styles = estilos()
   return (
     <View style={styles.linhaPasso}>
       <View style={styles.textoLinhaPasso}>
@@ -923,8 +931,9 @@ function LinhaPasso({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -935,53 +944,53 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   passos: { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingBottom: 14 },
-  passo: { flex: 1, height: 4, borderRadius: 2, backgroundColor: cores.trilho },
-  passoFeito: { backgroundColor: cores.verde },
+  passo: { flex: 1, height: 4, borderRadius: 2, backgroundColor: t.cores.trilho },
+  passoFeito: { backgroundColor: t.cores.verde },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 24, gap: 14 },
-  tituloEtapa: { fontSize: 22, fontWeight: '800', color: cores.ink, letterSpacing: -0.5 },
-  chamada: { marginTop: -6, fontSize: 13, lineHeight: 19, color: inkSuave },
+  tituloEtapa: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.5 },
+  chamada: { marginTop: -6, fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   bloco: {
     padding: 16,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 10,
   },
   linhaTituloBloco: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
-  ajudaBloco: { fontSize: 11.5, lineHeight: 16, color: inkFraco },
-  divisor: { height: 1, backgroundColor: cores.borda },
+  tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  ajudaBloco: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+  divisor: { height: 1, backgroundColor: t.cores.borda },
 
   linhaCampo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rotuloCampo: { flex: 1, fontSize: 15, fontWeight: '700', color: cores.ink },
+  rotuloCampo: { flex: 1, fontSize: 15, fontWeight: '700', color: t.cores.ink },
   campo: {
     width: 96,
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 12,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'right',
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  campoComErro: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
-  unidadeCampo: { width: 26, fontSize: 12.5, fontWeight: '700', color: inkMedio },
-  ajudaCampo: { marginTop: 5, fontSize: 11.5, lineHeight: 16, color: inkFraco },
-  ajudaComErro: { color: cores.erroTexto },
+  campoComErro: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
+  unidadeCampo: { width: 26, fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
+  ajudaCampo: { marginTop: 5, fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+  ajudaComErro: { color: t.cores.erroTexto },
 
   linhaLida: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rotuloLido: { fontSize: 15, fontWeight: '700', color: cores.ink },
-  valorLido: { fontSize: 15, fontWeight: '800', color: cores.verde },
+  rotuloLido: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+  valorLido: { fontSize: 15, fontWeight: '800', color: t.cores.verde },
 
   opcoesLado: { flexDirection: 'row', gap: 10 },
   opcaoLado: {
@@ -989,41 +998,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  opcaoLadoPressionada: { backgroundColor: cores.verdeClaro, borderColor: cores.verdeClaro },
-  textoOpcaoLado: { fontSize: 14, fontWeight: '700', color: cores.ink },
+  opcaoLadoPressionada: { backgroundColor: t.cores.verdeClaro, borderColor: t.cores.verdeClaro },
+  textoOpcaoLado: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
 
   opcaoAtividade: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  opcaoComDivisor: { borderTopWidth: 1, borderTopColor: cores.borda },
-  opcaoPressionada: { backgroundColor: cores.verdeMenta },
+  opcaoComDivisor: { borderTopWidth: 1, borderTopColor: t.cores.borda },
+  opcaoPressionada: { backgroundColor: t.cores.verdeMenta },
   marca: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: cores.trilho,
+    borderColor: t.cores.trilho,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  marcaAtiva: { backgroundColor: cores.verde, borderColor: cores.verde },
+  marcaAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
   textoAtividade: { flex: 1 },
-  rotuloAtividade: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
-  descricaoAtividade: { marginTop: 2, fontSize: 12, color: inkSuave },
-  fatorAtividade: { fontSize: 12, fontWeight: '700', color: inkFraco },
+  rotuloAtividade: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  descricaoAtividade: { marginTop: 2, fontSize: 12, color: t.inkSuave },
+  fatorAtividade: { fontSize: 12, fontWeight: '700', color: t.inkFraco },
 
-  cartaoResultado: { borderRadius: 20, backgroundColor: cores.verde, padding: 18 },
+  cartaoResultado: { borderRadius: 20, backgroundColor: t.cores.verde, padding: 18 },
   rotuloResultado: { fontSize: 12.5, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
   linhaValorResultado: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 },
-  valorResultado: { fontSize: 38, fontWeight: '800', color: cores.branco, letterSpacing: -1.2 },
-  valorResultadoMenor: { fontSize: 28, fontWeight: '800', color: cores.branco, letterSpacing: -0.8 },
+  valorResultado: { fontSize: 38, fontWeight: '800', color: t.cores.branco, letterSpacing: -1.2 },
+  valorResultadoMenor: { fontSize: 28, fontWeight: '800', color: t.cores.branco, letterSpacing: -0.8 },
   unidadeResultado: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
   explicaResultado: { marginTop: 6, fontSize: 12.5, lineHeight: 18, color: 'rgba(255,255,255,0.9)' },
   divisorClaro: { height: 1, backgroundColor: 'rgba(255,255,255,0.28)', marginVertical: 14 },
 
-  notaFormula: { marginTop: -4, fontSize: 11.5, lineHeight: 16, color: inkFraco },
+  notaFormula: { marginTop: -4, fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
 
   aviso: {
     flexDirection: 'row',
@@ -1032,34 +1041,34 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  textoAvisoForte: { flex: 1, fontSize: 12, lineHeight: 17, color: cores.erroTexto },
+  textoAvisoForte: { flex: 1, fontSize: 12, lineHeight: 17, color: t.cores.erroTexto },
 
   controleAjuste: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   centroAjuste: { flex: 1, alignItems: 'center' },
-  valorAjuste: { fontSize: 26, fontWeight: '800', color: cores.ink, letterSpacing: -0.6 },
-  rotuloAjuste: { fontSize: 11.5, color: inkSuave },
+  valorAjuste: { fontSize: 26, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
+  rotuloAjuste: { fontSize: 11.5, color: t.inkSuave },
   passoBotao: {
     width: 44,
     height: 44,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     borderWidth: 1,
-    borderColor: cores.verdeClaro,
+    borderColor: t.cores.verdeClaro,
   },
-  passoPressionado: { backgroundColor: cores.verdeClaro },
-  passoDesligado: { backgroundColor: cores.cartao, borderColor: cores.borda },
-  voltarSugerido: { fontSize: 12, fontWeight: '700', color: cores.verde, textAlign: 'center' },
+  passoPressionado: { backgroundColor: t.cores.verdeClaro },
+  passoDesligado: { backgroundColor: t.cores.cartao, borderColor: t.cores.borda },
+  voltarSugerido: { fontSize: 12, fontWeight: '700', color: t.cores.verde, textAlign: 'center' },
 
-  cartaoAlvo: { padding: 14, borderRadius: 16, backgroundColor: cores.verdeMenta },
-  rotuloAlvo: { fontSize: 12.5, fontWeight: '700', color: cores.verdeEscuro },
-  valorAlvo: { fontSize: 32, fontWeight: '800', color: cores.verdeEscuro, letterSpacing: -1 },
-  unidadeAlvo: { fontSize: 13, fontWeight: '700', color: cores.verdeEscuro },
-  ritmoAlvo: { marginTop: 4, fontSize: 12, lineHeight: 17, color: cores.verdeEscuro },
+  cartaoAlvo: { padding: 14, borderRadius: 16, backgroundColor: t.cores.verdeMenta },
+  rotuloAlvo: { fontSize: 12.5, fontWeight: '700', color: t.cores.verdeEscuro },
+  valorAlvo: { fontSize: 32, fontWeight: '800', color: t.cores.verdeEscuro, letterSpacing: -1 },
+  unidadeAlvo: { fontSize: 13, fontWeight: '700', color: t.cores.verdeEscuro },
+  ritmoAlvo: { marginTop: 4, fontSize: 12, lineHeight: 17, color: t.cores.verdeEscuro },
 
   linhaMacros: { flexDirection: 'row', gap: 8 },
   macro: {
@@ -1067,27 +1076,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  rotuloMacro: { fontSize: 11.5, color: inkSuave },
-  valorMacro: { marginTop: 3, fontSize: 16, fontWeight: '800', color: cores.ink },
+  rotuloMacro: { fontSize: 11.5, color: t.inkSuave },
+  valorMacro: { marginTop: 3, fontSize: 16, fontWeight: '800', color: t.cores.ink },
 
   linhaPasso: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   textoLinhaPasso: { flex: 1 },
-  rotuloLinhaPasso: { fontSize: 14, fontWeight: '700', color: cores.ink },
-  valorLinhaPasso: { marginTop: 1, fontSize: 12.5, color: inkSuave },
+  rotuloLinhaPasso: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  valorLinhaPasso: { marginTop: 1, fontSize: 12.5, color: t.inkSuave },
 
   campoNome: {
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: cores.ink,
+    color: t.cores.ink,
   },
 
   linhaCheck: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4 },
@@ -1096,40 +1105,41 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: cores.trilho,
+    borderColor: t.cores.trilho,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkAtivo: { backgroundColor: cores.verde, borderColor: cores.verde },
+  checkAtivo: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
   textoCheck: { flex: 1 },
-  rotuloCheck: { fontSize: 14, fontWeight: '700', color: cores.ink },
-  ajudaCheck: { marginTop: 2, fontSize: 11.5, lineHeight: 16, color: inkFraco },
+  rotuloCheck: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  ajudaCheck: { marginTop: 2, fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
 
   blocoErro: {
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   rodape: {
     paddingHorizontal: 20,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: cores.borda,
-    backgroundColor: cores.fundo,
+    borderTopColor: t.cores.borda,
+    backgroundColor: t.cores.fundo,
   },
   botao: {
     height: 54,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoPressionado: { backgroundColor: cores.verdeEscuro },
-  botaoDesligado: { backgroundColor: cores.trilho },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
+  botaoDesligado: { backgroundColor: t.cores.trilho },
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

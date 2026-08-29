@@ -31,7 +31,7 @@ import { carregarExames, ehImagem, tamanhoLegivel, type Exame } from '../lib/exa
 import { ComparativoFotos } from '../components/ComparativoFotos'
 import { decimal, milhar } from '../lib/formatar'
 import { abrirLink } from '../lib/links'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* O conteúdo de um item do painel "Meu nutricionista".
  *
@@ -79,6 +79,7 @@ export function ConteudoNutriScreen({
   chave: ChaveConteudo
   onFechar: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -144,7 +145,7 @@ export function ConteudoNutriScreen({
     <RefreshControl
       refreshing={atualizando}
       onRefresh={puxarParaAtualizar}
-      tintColor={cores.limao}
+      tintColor={paleta().cores.limao}
     />
   )
 
@@ -158,7 +159,7 @@ export function ConteudoNutriScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>{TITULOS[chave]}</Text>
         <View style={styles.botaoVoltar} />
@@ -174,7 +175,7 @@ export function ConteudoNutriScreen({
         </ScrollView>
       ) : !dados ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <ScrollView
@@ -217,6 +218,7 @@ async function carregar(chave: ChaveConteudo): Promise<Dados> {
  * é jsonb de formato desconhecido daqui, e dizer que existe é informação —
  * fingir que se sabe o que é seria invenção. Ver lib/exames.ts. */
 function CartaoExame({ exame }: { exame: Exame }) {
+  const styles = estilos()
   const quando = exame.dataExame
     ? dataLegivel(exame.dataExame)
     : dataLegivel(exame.criadoEm.slice(0, 10))
@@ -235,7 +237,7 @@ function CartaoExame({ exame }: { exame: Exame }) {
           <Ionicons
             name={ehImagem(exame.tipoArquivo) ? 'image-outline' : 'document-text-outline'}
             size={20}
-            color={cores.verde}
+            color={paleta().cores.verde}
           />
         </View>
 
@@ -246,14 +248,14 @@ function CartaoExame({ exame }: { exame: Exame }) {
           {!!apoio && <Text style={styles.apoioExame}>{apoio}</Text>}
         </View>
 
-        <Ionicons name="open-outline" size={16} color={inkFraco} />
+        <Ionicons name="open-outline" size={16} color={paleta().inkFraco} />
       </View>
 
       {!!exame.observacoes && <Text style={styles.observacaoExame}>{exame.observacoes}</Text>}
 
       {exame.temAnalise && (
         <View style={styles.seloAnalise}>
-          <Ionicons name="sparkles-outline" size={13} color={cores.verde} />
+          <Ionicons name="sparkles-outline" size={13} color={paleta().cores.verde} />
           <Text style={styles.textoSeloAnalise}>Analisado pela sua nutricionista</Text>
         </View>
       )}
@@ -324,6 +326,7 @@ function Miolo({ dados }: { dados: Dados }) {
 /* ── Anamnese ──────────────────────────────────────────────────────────────*/
 
 function CartaoAnamnese({ anamnese }: { anamnese: Anamnese }) {
+  const styles = estilos()
   const quando = dataLegivel(anamnese.data)
 
   return (
@@ -350,6 +353,7 @@ function CartaoAnamnese({ anamnese }: { anamnese: Anamnese }) {
 }
 
 function CampoLido({ campo }: { campo: CampoAnamnese }) {
+  const styles = estilos()
   /* O valor vem de jsonb preenchido por outro sistema: pode ser texto, booleano
      ou uma lista de linhas (o "grupo repetível" do web, como a tabela de
      exercícios praticados). Qualquer outra coisa vira texto — melhor mostrar o
@@ -394,6 +398,7 @@ const textoDe = (v: unknown): string => {
 /* ── Antropometria ─────────────────────────────────────────────────────────*/
 
 function CartaoAvaliacao({ avaliacao: a }: { avaliacao: Avaliacao }) {
+  const styles = estilos()
   /* Só o que foi medido. Uma grade com doze "—" faria a avaliação parecer
      malfeita, quando na verdade ninguém mede tudo em toda consulta. */
   const medidas: { rotulo: string; valor: string }[] = []
@@ -449,6 +454,7 @@ function CartaoAvaliacao({ avaliacao: a }: { avaliacao: Avaliacao }) {
  * em cima, cardápio do dia escolhido embaixo. E, quando o plano tem um dia só,
  * fita nenhuma — um seletor com um botão não seleciona coisa alguma. */
 function CorpoPlano({ plano }: { plano: PlanoDaNutri }) {
+  const styles = estilos()
   /* Abre no dia de hoje, que é a pergunta que traz a pessoa aqui ("o que eu como
      hoje?"). Se o plano não cobre hoje — rotina de segunda a sábado aberta num
      domingo —, abre no primeiro dia que existe, em vez de numa tela vazia. */
@@ -548,6 +554,7 @@ function apoioDoItem(
 /* ── Cálculo energético ────────────────────────────────────────────────────*/
 
 function CartaoEnergetico({ energetico: e }: { energetico: Energetico }) {
+  const styles = estilos()
   const linhas: { rotulo: string; valor: string }[] = []
   if (e.tmb != null) linhas.push({ rotulo: 'Metabolismo basal', valor: `${milhar(e.tmb)} kcal` })
   if (e.fatorAtividade != null) linhas.push({ rotulo: 'Fator de atividade', valor: decimal(e.fatorAtividade, 2) })
@@ -596,6 +603,7 @@ function CartaoEnergetico({ energetico: e }: { energetico: Energetico }) {
 /* ── Peças ─────────────────────────────────────────────────────────────────*/
 
 function Aviso({ texto }: { texto: string }) {
+  const styles = estilos()
   return (
     <View style={styles.aviso}>
       <Text style={styles.textoAviso}>{texto}</Text>
@@ -603,8 +611,9 @@ function Aviso({ texto }: { texto: string }) {
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   cabecalho: {
     flexDirection: 'row',
@@ -614,27 +623,27 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32 },
 
-  chamada: { marginTop: 6, fontSize: 18, fontWeight: '800', color: cores.ink },
-  explicacao: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+  chamada: { marginTop: 6, fontSize: 18, fontWeight: '800', color: t.cores.ink },
+  explicacao: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
 
-cartaoPressionado: { backgroundColor: cores.superficie },
+cartaoPressionado: { backgroundColor: t.cores.superficie },
   linhaExame: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconeExame: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
   },
   textoExame: { flex: 1, gap: 2 },
-  nomeExame: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
-  apoioExame: { fontSize: 12, color: inkFraco },
-  observacaoExame: { marginTop: 10, fontSize: 13, lineHeight: 19, color: inkSuave },
+  nomeExame: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  apoioExame: { fontSize: 12, color: t.inkFraco },
+  observacaoExame: { marginTop: 10, fontSize: 13, lineHeight: 19, color: t.inkSuave },
   seloAnalise: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -644,13 +653,13 @@ cartaoPressionado: { backgroundColor: cores.superficie },
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoSeloAnalise: { fontSize: 11.5, fontWeight: '700', color: cores.verde },
-    cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: 16, marginTop: 12 },
-  tituloCartao: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  subtituloCartao: { marginTop: 2, fontSize: 12.5, color: inkSuave },
-  vazioInterno: { marginTop: 10, fontSize: 13, color: inkFraco },
+  textoSeloAnalise: { fontSize: 11.5, fontWeight: '700', color: t.cores.verde },
+    cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: 16, marginTop: 12 },
+  tituloCartao: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  subtituloCartao: { marginTop: 2, fontSize: 12.5, color: t.inkSuave },
+  vazioInterno: { marginTop: 10, fontSize: 13, color: t.inkFraco },
 
   secao: { marginTop: 16 },
   tituloSecao: {
@@ -658,26 +667,26 @@ cartaoPressionado: { backgroundColor: cores.superficie },
     fontWeight: '800',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    color: cores.verde,
+    color: t.cores.verde,
     marginBottom: 6,
   },
 
   campo: { marginTop: 8 },
-  rotuloCampo: { fontSize: 12, color: inkSuave },
-  valorCampo: { marginTop: 1, fontSize: 14, lineHeight: 20, color: cores.ink },
+  rotuloCampo: { fontSize: 12, color: t.inkSuave },
+  valorCampo: { marginTop: 1, fontSize: 14, lineHeight: 20, color: t.cores.ink },
   linhaGrupo: {
     marginTop: 6,
     paddingLeft: 10,
     borderLeftWidth: 2,
-    borderLeftColor: cores.trilho,
+    borderLeftColor: t.cores.trilho,
   },
 
   grade: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 },
   celula: { width: '33.33%', paddingVertical: 7, paddingRight: 8 },
-  rotuloCelula: { fontSize: 11.5, color: inkSuave },
-  valorCelula: { marginTop: 2, fontSize: 15, fontWeight: '700', color: cores.ink },
+  rotuloCelula: { fontSize: 11.5, color: t.inkSuave },
+  valorCelula: { marginTop: 2, fontSize: 15, fontWeight: '700', color: t.cores.ink },
 
-  observacao: { marginTop: 12, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+  observacao: { marginTop: 12, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
 
   /* Sete fitas numa linha só, com wrap: em tela estreita a última desce em vez
      de espremer as sete até o texto sumir. Mesma medida do SeletorDias, que é a
@@ -691,34 +700,35 @@ cartaoPressionado: { backgroundColor: cores.superficie },
     justifyContent: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  fitaAberta: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
-  textoFita: { fontSize: 12.5, fontWeight: '600', color: inkSuave },
-  textoFitaAberto: { fontWeight: '800', color: cores.verdeEscuro },
+  fitaAberta: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  textoFita: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
+  textoFitaAberto: { fontWeight: '800', color: t.cores.verdeEscuro },
   /* O nome por extenso embaixo da fita: "Seg" sozinho é abreviação de fita, e
      quem abre o plano quer ler o dia inteiro em algum lugar. */
-  tituloDia: { marginTop: 16, fontSize: 15, fontWeight: '800', color: cores.ink },
+  tituloDia: { marginTop: 16, fontSize: 15, fontWeight: '800', color: t.cores.ink },
 
   linhaRefeicao: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  horario: { fontSize: 13, fontWeight: '700', color: cores.verde },
+  horario: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
   item: { marginTop: 10 },
-  rotuloItem: { fontSize: 14.5, color: cores.ink },
-  apoioItem: { marginTop: 1, fontSize: 12.5, color: inkSuave },
+  rotuloItem: { fontSize: 14.5, color: t.cores.ink },
+  apoioItem: { marginTop: 1, fontSize: 12.5, color: t.inkSuave },
 
   cartaoDestaque: {
     borderRadius: 20,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     padding: 20,
     marginTop: 12,
     alignItems: 'center',
   },
-  rotuloDestaque: { fontSize: 12.5, fontWeight: '700', color: cores.verde },
-  numeroDestaque: { marginTop: 6, fontSize: 34, fontWeight: '800', color: cores.ink },
-  unidadeDestaque: { fontSize: 15, fontWeight: '600', color: inkSuave },
-  dataDestaque: { marginTop: 4, fontSize: 12, color: inkSuave },
+  rotuloDestaque: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
+  numeroDestaque: { marginTop: 6, fontSize: 34, fontWeight: '800', color: t.cores.ink },
+  unidadeDestaque: { fontSize: 15, fontWeight: '600', color: t.inkSuave },
+  dataDestaque: { marginTop: 4, fontSize: 12, color: t.inkSuave },
 
-  aviso: { marginTop: 16, borderRadius: 16, backgroundColor: cores.cartao, padding: 18 },
-  textoAviso: { fontSize: 13.5, lineHeight: 20, color: inkSuave, textAlign: 'center' },
-})
+  aviso: { marginTop: 16, borderRadius: 16, backgroundColor: t.cores.cartao, padding: 18 },
+  textoAviso: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
+  }),
+)

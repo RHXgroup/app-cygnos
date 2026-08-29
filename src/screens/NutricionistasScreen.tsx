@@ -37,7 +37,7 @@ import {
 } from '../lib/agenda'
 import { ConteudoNutriScreen, type ChaveConteudo } from './ConteudoNutriScreen'
 import { AgendarConsultaScreen } from './AgendarConsultaScreen'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* O catálogo de nutricionistas Cygnos, em tela cheia.
  *
@@ -47,6 +47,7 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
  *
  * Mesma escolha das outras telas do menu: View sobreposta no App, não Modal. */
 export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
   const [conteudo, setConteudo] = useState<ConteudoNutri | null>(null)
@@ -182,7 +183,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
         setAtualizando(true)
         setVersao(v => v + 1)
       }}
-      tintColor={cores.limao}
+      tintColor={paleta().cores.limao}
     />
   )
 
@@ -210,7 +211,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>
           {vinculada ? 'Meu nutricionista' : 'Nutricionistas Cygnos'}
@@ -220,7 +221,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : erro ? (
         /* Rola, e não é uma View parada: é aqui que puxar para tentar de novo é
@@ -276,6 +277,7 @@ function Ficha({
   onAbrir: (chave: ChaveConteudo) => void
   onAgendar: () => void
 }) {
+  const styles = estilos()
   /* Uma consulta em destaque e a contagem do resto. A ficha não é a agenda: ela
      responde "e agora?" numa linha, e quem quiser a lista inteira toca e abre a
      tela de agendamento — onde todas aparecem. */
@@ -290,7 +292,7 @@ function Ficha({
         {!!lugarDe(nutri) && <Text style={styles.lugarFicha}>{lugarDe(nutri)}</Text>}
 
         <View style={styles.selo}>
-          <Ionicons name="checkmark-circle" size={14} color={cores.verde} />
+          <Ionicons name="checkmark-circle" size={14} color={paleta().cores.verde} />
           <Text style={styles.textoSelo}>Acompanha você</Text>
         </View>
       </View>
@@ -310,7 +312,7 @@ function Ficha({
           }`}
         >
           <View style={styles.iconeProxima}>
-            <Ionicons name={estadoDaConsulta(destaque.status).icone} size={17} color={cores.verde} />
+            <Ionicons name={estadoDaConsulta(destaque.status).icone} size={17} color={paleta().cores.verde} />
           </View>
           <View style={styles.textoProxima}>
             <Text style={styles.rotuloProxima}>{estadoDaConsulta(destaque.status).titulo}</Text>
@@ -324,7 +326,7 @@ function Ficha({
               </Text>
             )}
           </View>
-          <Ionicons name="chevron-forward" size={16} color={inkFraco} />
+          <Ionicons name="chevron-forward" size={16} color={paleta().inkFraco} />
         </Pressable>
       )}
 
@@ -337,7 +339,7 @@ function Ficha({
         accessibilityRole="button"
         accessibilityLabel={destaque ? 'Marcar outro horário' : 'Agendar consulta'}
       >
-        <Ionicons name="calendar-outline" size={17} color={cores.branco} />
+        <Ionicons name="calendar-outline" size={17} color={paleta().cores.branco} />
         <Text style={styles.textoAgendar}>
           {destaque ? 'Marcar outro horário' : 'Agendar consulta'}
         </Text>
@@ -379,6 +381,7 @@ function Acompanhamento({
   erro: string | null
   onAbrir: (chave: ChaveConteudo) => void
 }) {
+  const styles = estilos()
   /* Três estados, e nenhum deles é a lista sumir sem explicação:
      - deu erro ao buscar;
      - o vínculo existe mas ainda não aponta para uma ficha (é possível: o selo
@@ -455,14 +458,14 @@ function Acompanhamento({
           const miolo = (
             <>
               <View style={styles.iconeItem}>
-                <Ionicons name={item.icone} size={17} color={cores.verde} />
+                <Ionicons name={item.icone} size={17} color={paleta().cores.verde} />
               </View>
               <View style={styles.textoItem}>
                 <Text style={styles.rotuloItem}>{item.rotulo}</Text>
                 <Text style={styles.apoioItem}>{item.apoio}</Text>
               </View>
               {!!item.chave && (
-                <Ionicons name="chevron-forward" size={16} color={inkFraco} />
+                <Ionicons name="chevron-forward" size={16} color={paleta().inkFraco} />
               )}
             </>
           )
@@ -494,11 +497,12 @@ function Acompanhamento({
 /* ── Sem vínculo ───────────────────────────────────────────────────────────*/
 
 function Lista({ nutris }: { nutris: Nutricionista[] }) {
+  const styles = estilos()
   if (nutris.length === 0) {
     return (
       <View style={styles.vazio}>
         <View style={styles.circuloVazio}>
-          <Ionicons name="people-outline" size={26} color={cores.verde} />
+          <Ionicons name="people-outline" size={26} color={paleta().cores.verde} />
         </View>
         <Text style={styles.tituloVazio}>Nenhuma nutricionista por aqui ainda</Text>
         <Text style={styles.textoVazio}>
@@ -528,6 +532,7 @@ function Lista({ nutris }: { nutris: Nutricionista[] }) {
 }
 
 function CartaoDaLista({ nutri }: { nutri: Nutricionista }) {
+  const styles = estilos()
   return (
     <View style={styles.cartao}>
       <View style={styles.linhaCartao}>
@@ -554,6 +559,7 @@ const lugarDe = (n: Nutricionista) =>
   n.cidade && n.uf ? `${n.cidade} · ${n.uf}` : n.cidade ?? n.uf ?? ''
 
 function Chips({ itens, limite }: { itens: string[]; limite?: number }) {
+  const styles = estilos()
   const mostrar = limite ? itens.slice(0, limite) : itens
   const sobra = itens.length - mostrar.length
 
@@ -576,6 +582,7 @@ function Chips({ itens, limite }: { itens: string[]; limite?: number }) {
 /* O telefone é um botão, e o toque é da PESSOA: o app não manda mensagem
    nenhuma — abre a conversa e sai da frente. */
 function Contato({ telefone, compacto = false }: { telefone: string; compacto?: boolean }) {
+  const styles = estilos()
   const whatsapp = linkDoWhatsapp(telefone)
 
   return (
@@ -586,7 +593,7 @@ function Contato({ telefone, compacto = false }: { telefone: string; compacto?: 
         accessibilityRole="button"
         accessibilityLabel={`Ligar para ${telefoneFormatado(telefone)}`}
       >
-        <Ionicons name="call-outline" size={15} color={cores.ink} />
+        <Ionicons name="call-outline" size={15} color={paleta().cores.ink} />
         <Text style={styles.textoContato}>{telefoneFormatado(telefone)}</Text>
       </Pressable>
 
@@ -597,7 +604,7 @@ function Contato({ telefone, compacto = false }: { telefone: string; compacto?: 
           accessibilityRole="button"
           accessibilityLabel="Abrir conversa no WhatsApp"
         >
-          <Ionicons name="logo-whatsapp" size={16} color={cores.branco} />
+          <Ionicons name="logo-whatsapp" size={16} color={paleta().cores.branco} />
           <Text style={styles.textoZap}>WhatsApp</Text>
         </Pressable>
       )}
@@ -605,8 +612,9 @@ function Contato({ telefone, compacto = false }: { telefone: string; compacto?: 
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -617,7 +625,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32 },
 
@@ -627,12 +635,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 21,
     fontWeight: '800',
-    color: cores.ink,
+    color: t.cores.ink,
     textAlign: 'center',
     letterSpacing: -0.4,
   },
-  crnFicha: { marginTop: 4, fontSize: 13, color: inkSuave },
-  lugarFicha: { marginTop: 2, fontSize: 12.5, color: inkFraco },
+  crnFicha: { marginTop: 4, fontSize: 13, color: t.inkSuave },
+  lugarFicha: { marginTop: 2, fontSize: 12.5, color: t.inkFraco },
   selo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -641,9 +649,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 12,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
   },
-  textoSelo: { fontSize: 12.5, fontWeight: '700', color: cores.verde },
+  textoSelo: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
 
   cartaoProxima: {
     flexDirection: 'row',
@@ -654,22 +662,22 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.verdeClaro,
-    backgroundColor: cores.verdeMenta,
+    borderColor: t.cores.verdeClaro,
+    backgroundColor: t.cores.verdeMenta,
   },
-  cartaoProximaPressionado: { backgroundColor: cores.verdeClaro },
+  cartaoProximaPressionado: { backgroundColor: t.cores.verdeClaro },
   iconeProxima: {
     width: 36,
     height: 36,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
   },
   textoProxima: { flex: 1 },
-  rotuloProxima: { fontSize: 12, fontWeight: '700', color: cores.verde },
-  dataProxima: { marginTop: 2, fontSize: 13.5, fontWeight: '700', color: cores.ink },
-  outrasProxima: { marginTop: 3, fontSize: 11.5, color: inkSuave },
+  rotuloProxima: { fontSize: 12, fontWeight: '700', color: t.cores.verde },
+  dataProxima: { marginTop: 2, fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+  outrasProxima: { marginTop: 3, fontSize: 11.5, color: t.inkSuave },
 
   botaoAgendar: {
     flexDirection: 'row',
@@ -679,10 +687,10 @@ const styles = StyleSheet.create({
     height: 50,
     marginTop: 4,
     borderRadius: 15,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoAgendarPressionado: { backgroundColor: cores.verdeEscuro },
-  textoAgendar: { fontSize: 14.5, fontWeight: '800', color: cores.branco },
+  botaoAgendarPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoAgendar: { fontSize: 14.5, fontWeight: '800', color: t.cores.branco },
 
   /* ── Acompanhamento ── */
   listaItens: { gap: 2 },
@@ -695,40 +703,40 @@ const styles = StyleSheet.create({
     marginHorizontal: -6,
     borderRadius: 12,
   },
-  itemPressionado: { backgroundColor: cores.superficie },
+  itemPressionado: { backgroundColor: t.cores.superficie },
   iconeItem: {
     width: 36,
     height: 36,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
   },
   textoItem: { flex: 1 },
-  rotuloItem: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
-  apoioItem: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: inkSuave },
+  rotuloItem: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  apoioItem: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: t.inkSuave },
 
   /* ── Lista ── */
-  chamadaLista: { marginTop: 6, fontSize: 18, fontWeight: '800', color: cores.ink },
-  explicacaoLista: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+  chamadaLista: { marginTop: 6, fontSize: 18, fontWeight: '800', color: t.cores.ink },
+  explicacaoLista: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
   listaCartoes: { marginTop: 16, gap: 12 },
 
-  cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: 16, marginTop: 12 },
-  tituloCartao: { fontSize: 15, fontWeight: '800', color: cores.ink, marginBottom: 10 },
+  cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: 16, marginTop: 12 },
+  tituloCartao: { fontSize: 15, fontWeight: '800', color: t.cores.ink, marginBottom: 10 },
   linhaCartao: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   textoCartao: { flex: 1 },
-  nomeCartao: { fontSize: 15.5, fontWeight: '700', color: cores.ink, lineHeight: 21 },
-  crnCartao: { marginTop: 2, fontSize: 12, color: inkSuave },
-  lugarCartao: { marginTop: 1, fontSize: 11.5, color: inkFraco },
+  nomeCartao: { fontSize: 15.5, fontWeight: '700', color: t.cores.ink, lineHeight: 21 },
+  crnCartao: { marginTop: 2, fontSize: 12, color: t.inkSuave },
+  lugarCartao: { marginTop: 1, fontSize: 11.5, color: t.inkFraco },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
   },
-  textoChip: { fontSize: 11.5, color: inkMedio },
+  textoChip: { fontSize: 11.5, color: t.inkMedio },
 
   contato: { flexDirection: 'row', gap: 8, marginTop: 14 },
   contatoCompacto: { marginTop: 12 },
@@ -740,10 +748,10 @@ const styles = StyleSheet.create({
     gap: 7,
     height: 42,
     borderRadius: 13,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
   },
-  botaoContatoPressionado: { backgroundColor: cores.trilho },
-  textoContato: { fontSize: 13, fontWeight: '600', color: cores.ink },
+  botaoContatoPressionado: { backgroundColor: t.cores.trilho },
+  textoContato: { fontSize: 13, fontWeight: '600', color: t.cores.ink },
   botaoZap: {
     flex: 1,
     flexDirection: 'row',
@@ -752,10 +760,10 @@ const styles = StyleSheet.create({
     gap: 7,
     height: 42,
     borderRadius: 13,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoZapPressionado: { backgroundColor: cores.verdeEscuro },
-  textoZap: { fontSize: 13, fontWeight: '700', color: cores.branco },
+  botaoZapPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoZap: { fontSize: 13, fontWeight: '700', color: t.cores.branco },
 
   /* ── Vazios ── */
   vazio: { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 12, gap: 8 },
@@ -763,21 +771,22 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
-  tituloVazio: { fontSize: 17, fontWeight: '700', color: cores.ink, textAlign: 'center' },
-  textoVazio: { fontSize: 13.5, lineHeight: 20, color: inkSuave, textAlign: 'center' },
+  tituloVazio: { fontSize: 17, fontWeight: '700', color: t.cores.ink, textAlign: 'center' },
+  textoVazio: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
 
   erro: {
     marginTop: 16,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
     padding: 14,
   },
-  textoErro: { fontSize: 13, color: cores.erroTexto },
-})
+  textoErro: { fontSize: 13, color: t.cores.erroTexto },
+  }),
+)

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Image, StyleSheet, Text, View } from 'react-native'
 import { iniciais, type Nutricionista } from '../lib/nutricionista'
-import { cores } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* O rosto do cartão de nutricionista.
  *
@@ -30,6 +30,7 @@ export function AvatarNutri({
   nutri: Pick<Nutricionista, 'nome' | 'imagemUrl' | 'imagemELogo'>
   tamanho?: number
 }) {
+  const styles = estilos()
   /* Guarda QUAL endereço falhou, e não um sim/não: assim uma imagem nova entra
      tentando de novo, em vez de herdar a desistência da anterior. */
   const [falhou, setFalhou] = useState<string | null>(null)
@@ -56,11 +57,13 @@ export function AvatarNutri({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   /* Fundo branco atrás da logo, e este é o único lugar do app escuro em que o
      branco continua: as logos são PNG com transparência, desenhadas em traço
      escuro para papel. Sobre o fundo do app elas sumiriam por completo. */
-  imagem: { backgroundColor: cores.branco },
-  vazio: { backgroundColor: cores.verdeClaro, alignItems: 'center', justifyContent: 'center' },
-  iniciais: { fontWeight: '800', color: cores.verde },
-})
+  imagem: { backgroundColor: t.cores.branco },
+  vazio: { backgroundColor: t.cores.verdeClaro, alignItems: 'center', justifyContent: 'center' },
+  iniciais: { fontWeight: '800', color: t.cores.verde },
+  }),
+)

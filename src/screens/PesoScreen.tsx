@@ -37,7 +37,7 @@ import {
   type ObjetivoPeso,
 } from '../lib/metas'
 import { dataISO, dataNumerica } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const MARGEM = 20
 const PADDING_CARTAO = 16
@@ -59,6 +59,7 @@ export function PesoScreen({
      registro, para não refazer a busca da Home a cada tecla. */
   onMudou: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const { width: larguraTela } = useWindowDimensions()
   const [registros, setRegistros] = useState<RegistroPeso[] | null>(null)
@@ -188,7 +189,7 @@ export function PesoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Peso</Text>
         <View style={styles.botaoVoltar} />
@@ -196,7 +197,7 @@ export function PesoScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : !registros ? (
         <View style={styles.conteudoErro}>
@@ -232,7 +233,7 @@ export function PesoScreen({
                 onChangeText={t => setTexto(t.replace(/[^0-9.,]/g, ''))}
                 keyboardType="decimal-pad"
                 placeholder="72,4"
-                placeholderTextColor={inkFraco}
+                placeholderTextColor={paleta().inkFraco}
                 keyboardAppearance="dark"
                 maxLength={6}
                 style={[styles.campo, texto.trim() !== '' && !valido && styles.campoComErro]}
@@ -252,9 +253,9 @@ export function PesoScreen({
                 accessibilityLabel={deHoje ? 'Atualizar o peso de hoje' : 'Registrar o peso de hoje'}
               >
                 {salvando ? (
-                  <ActivityIndicator color={cores.branco} size="small" />
+                  <ActivityIndicator color={paleta().cores.branco} size="small" />
                 ) : (
-                  <Ionicons name={deHoje ? 'refresh' : 'add'} size={20} color={cores.branco} />
+                  <Ionicons name={deHoje ? 'refresh' : 'add'} size={20} color={paleta().cores.branco} />
                 )}
               </Pressable>
             </View>
@@ -303,7 +304,7 @@ export function PesoScreen({
                           : 'trending-down-outline'
                     }
                     size={15}
-                    color={cores.limao}
+                    color={paleta().cores.limao}
                   />
                   <Text style={styles.textoRitmo}>
                     {Math.abs(ritmo) < 0.05
@@ -343,11 +344,12 @@ function CartaoEvolucao({
   evolucao: Evolucao | null
   objetivo: ObjetivoPeso
 }) {
+  const styles = estilos()
   if (!evolucao) {
     return (
       <View style={styles.cartaoVazio}>
         <View style={styles.iconeVazio}>
-          <Ionicons name="speedometer-outline" size={24} color={cores.verde} />
+          <Ionicons name="speedometer-outline" size={24} color={paleta().cores.verde} />
         </View>
         <Text style={styles.chamadaVazio}>Seu primeiro peso</Text>
         <Text style={styles.textoVazio}>
@@ -364,7 +366,7 @@ function CartaoEvolucao({
   return (
     <View style={styles.cartaoDia}>
       <View style={styles.linhaTituloDia}>
-        <Ionicons name="speedometer-outline" size={16} color={cores.branco} />
+        <Ionicons name="speedometer-outline" size={16} color={paleta().cores.branco} />
         <Text style={styles.tituloDia}>Peso atual</Text>
       </View>
 
@@ -389,7 +391,7 @@ function CartaoEvolucao({
                     : 'arrow-down'
               }
               size={14}
-              color={cores.branco}
+              color={paleta().cores.branco}
             />
             <Text style={styles.textoSelo}>
               {evolucao.sentido === 'manteve'
@@ -416,7 +418,7 @@ function CartaoEvolucao({
                   seguindoOFoco(objetivo, evolucao.sentido) ? 'checkmark-circle' : 'information-circle'
                 }
                 size={15}
-                color={cores.branco}
+                color={paleta().cores.branco}
               />
               <Text style={styles.textoFoco}>
                 {seguindoOFoco(objetivo, evolucao.sentido)
@@ -438,6 +440,7 @@ function Historico({
   registros: RegistroPeso[]
   onApagar: (r: RegistroPeso) => void
 }) {
+  const styles = estilos()
   if (registros.length === 0) return null
 
   /* Qual linha é a régua. Calculado aqui e não presumido como a última da lista:
@@ -480,7 +483,7 @@ function Historico({
               accessibilityRole="button"
               accessibilityLabel={`Apagar o registro de ${kg(r.kg)} quilos`}
             >
-              <Ionicons name="close" size={16} color={inkFraco} />
+              <Ionicons name="close" size={16} color={paleta().inkFraco} />
             </Pressable>
           </View>
         )
@@ -496,8 +499,9 @@ function Historico({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -508,7 +512,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: MARGEM, paddingTop: 8, gap: 14 },
   conteudoErro: { paddingHorizontal: MARGEM, paddingTop: 8 },
@@ -517,19 +521,19 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   /* ── Resumo ── */
-  cartaoDia: { borderRadius: 20, backgroundColor: cores.verde, padding: 18 },
+  cartaoDia: { borderRadius: 20, backgroundColor: t.cores.verde, padding: 18 },
   linhaTituloDia: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  tituloDia: { flex: 1, fontSize: 15, fontWeight: '700', color: cores.branco },
+  tituloDia: { flex: 1, fontSize: 15, fontWeight: '700', color: t.cores.branco },
   linhaValorDia: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 8 },
-  valorDia: { fontSize: 40, fontWeight: '800', color: cores.branco, letterSpacing: -1.4 },
-  unidadeDia: { fontSize: 15, fontWeight: '700', color: cores.branco },
+  valorDia: { fontSize: 40, fontWeight: '800', color: t.cores.branco, letterSpacing: -1.4 },
+  unidadeDia: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
   /* Branco translúcido, e não uma cor de "bom" ou "ruim": ganhar peso é o
      objetivo de parte de quem usa isto, e verde para perda e vermelho para ganho
      transformaria a meta de metade das pessoas em alarme. */
@@ -544,23 +548,23 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.24)',
   },
-  textoSelo: { fontSize: 13, fontWeight: '800', color: cores.branco },
+  textoSelo: { fontSize: 13, fontWeight: '800', color: t.cores.branco },
   rodapeDia: { marginTop: 10, fontSize: 12.5, lineHeight: 18, color: 'rgba(255,255,255,0.9)' },
   linhaFoco: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  textoFoco: { flex: 1, fontSize: 12.5, fontWeight: '700', color: cores.branco },
+  textoFoco: { flex: 1, fontSize: 12.5, fontWeight: '700', color: t.cores.branco },
 
   cartaoVazio: {
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     padding: 18,
   },
   iconeVazio: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -568,18 +572,18 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 18,
     fontWeight: '800',
-    color: cores.ink,
+    color: t.cores.ink,
     letterSpacing: -0.3,
   },
-  textoVazio: { marginTop: 5, fontSize: 13, lineHeight: 19, color: inkSuave },
+  textoVazio: { marginTop: 5, fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   /* ── Blocos ── */
   bloco: {
     padding: PADDING_CARTAO,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 10,
   },
   linhaTituloBloco: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -590,12 +594,12 @@ linhaRitmo: {
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: cores.borda,
+    borderTopColor: t.cores.borda,
   },
-  textoRitmo: { fontSize: 13, fontWeight: '600', color: cores.ink },
-    tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
-  contagemBloco: { fontSize: 11.5, fontWeight: '600', color: inkSuave },
-  ajuda: { fontSize: 11.5, lineHeight: 16, color: inkFraco },
+  textoRitmo: { fontSize: 13, fontWeight: '600', color: t.cores.ink },
+    tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  contagemBloco: { fontSize: 11.5, fontWeight: '600', color: t.inkSuave },
+  ajuda: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
 
   linhaCampo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   campo: {
@@ -603,37 +607,38 @@ linhaRitmo: {
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 16,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 19,
     fontWeight: '700',
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  campoComErro: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
-  unidadeCampo: { fontSize: 13, fontWeight: '700', color: inkMedio },
+  campoComErro: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
+  unidadeCampo: { fontSize: 13, fontWeight: '700', color: t.inkMedio },
   botaoRegistrar: {
     width: 52,
     height: 52,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoRegistrarPressionado: { backgroundColor: cores.verdeEscuro },
-  botaoDesligado: { backgroundColor: cores.trilho },
+  botaoRegistrarPressionado: { backgroundColor: t.cores.verdeEscuro },
+  botaoDesligado: { backgroundColor: t.cores.trilho },
 
   linhaRegistro: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dataRegistro: { fontSize: 13.5, color: inkMedio },
+  dataRegistro: { fontSize: 13.5, color: t.inkMedio },
   seloInicial: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoSeloInicial: { fontSize: 10.5, fontWeight: '800', color: cores.verdeEscuro },
-  kgRegistro: { flex: 1, textAlign: 'right', fontSize: 14.5, fontWeight: '800', color: cores.ink },
+  textoSeloInicial: { fontSize: 10.5, fontWeight: '800', color: t.cores.verdeEscuro },
+  kgRegistro: { flex: 1, textAlign: 'right', fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
   apagar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  apagarPressionado: { backgroundColor: cores.trilho },
-})
+  apagarPressionado: { backgroundColor: t.cores.trilho },
+  }),
+)

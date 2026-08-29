@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Depois de definir as refeições do dia, como preenchê-las.
  *
@@ -20,6 +20,7 @@ export function ModoPlanoScreen({
   onAurora: () => void
   onVoltar: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
 
   return (
@@ -32,7 +33,7 @@ export function ModoPlanoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Planejamento alimentar</Text>
         <View style={styles.botaoVoltar} />
@@ -57,7 +58,7 @@ export function ModoPlanoScreen({
           accessibilityRole="button"
         >
           <View style={styles.icone}>
-            <Ionicons name="create-outline" size={22} color={cores.verde} />
+            <Ionicons name="create-outline" size={22} color={paleta().cores.verde} />
           </View>
           <View style={styles.textoCartao}>
             <Text style={styles.tituloCartao}>Manual</Text>
@@ -65,7 +66,7 @@ export function ModoPlanoScreen({
               Você escolhe os alimentos de cada refeição e informa a quantidade.
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={inkFraco} />
+          <Ionicons name="chevron-forward" size={20} color={paleta().inkFraco} />
         </Pressable>
 
         <Pressable
@@ -74,7 +75,7 @@ export function ModoPlanoScreen({
           accessibilityRole="button"
         >
           <View style={styles.icone}>
-            <Ionicons name="sparkles-outline" size={22} color={cores.verde} />
+            <Ionicons name="sparkles-outline" size={22} color={paleta().cores.verde} />
           </View>
           <View style={styles.textoCartao}>
             <Text style={styles.tituloCartao}>Ajuda da Aurora</Text>
@@ -83,14 +84,15 @@ export function ModoPlanoScreen({
               de salvar.
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={inkFraco} />
+          <Ionicons name="chevron-forward" size={20} color={paleta().inkFraco} />
         </Pressable>
       </ScrollView>
     </>
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   cabecalho: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -99,11 +101,11 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24, gap: 12 },
-  pergunta: { fontSize: 20, fontWeight: '800', color: cores.ink, letterSpacing: -0.4 },
-  apoio: { marginTop: -4, marginBottom: 10, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+  pergunta: { fontSize: 20, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.4 },
+  apoio: { marginTop: -4, marginBottom: 10, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
 
   cartao: {
     flexDirection: 'row',
@@ -111,11 +113,11 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 16,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  cartaoPressionado: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
+  cartaoPressionado: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
   /* Sem Pressable em volta: um botão que responde ao toque e não faz nada é
      pior que um botão visivelmente desligado. */
   cartaoDesligado: { opacity: 0.7 },
@@ -124,23 +126,24 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconeDesligado: { backgroundColor: cores.trilho },
+  iconeDesligado: { backgroundColor: t.cores.trilho },
 
   textoCartao: { flex: 1 },
   linhaTitulo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tituloCartao: { fontSize: 16, fontWeight: '800', color: cores.ink },
-  tituloDesligado: { color: inkMedio },
-  descricaoCartao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: inkSuave },
+  tituloCartao: { fontSize: 16, fontWeight: '800', color: t.cores.ink },
+  tituloDesligado: { color: t.inkMedio },
+  descricaoCartao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   selo: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
   },
-  textoSelo: { fontSize: 10.5, fontWeight: '800', color: inkMedio, letterSpacing: 0.2 },
-})
+  textoSelo: { fontSize: 10.5, fontWeight: '800', color: t.inkMedio, letterSpacing: 0.2 },
+  }),
+)

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
-import { cores, coresMacro } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const DIAMETRO = 170
 const ESPESSURA = 14
@@ -38,6 +38,7 @@ export function AnelCalorias({
   meta: number | null
   children: ReactNode
 }) {
+  const styles = estilos()
   const kcal = {
     proteinas: (fatias.proteinas ?? 0) * KCAL_POR_GRAMA.proteinas,
     carboidratos: (fatias.carboidratos ?? 0) * KCAL_POR_GRAMA.carboidratos,
@@ -68,7 +69,7 @@ export function AnelCalorias({
           cx={DIAMETRO / 2}
           cy={DIAMETRO / 2}
           r={RAIO}
-          stroke={cores.trilho}
+          stroke={paleta().cores.trilho}
           strokeWidth={ESPESSURA}
           fill="none"
         />
@@ -79,7 +80,7 @@ export function AnelCalorias({
             cx={DIAMETRO / 2}
             cy={DIAMETRO / 2}
             r={RAIO}
-            stroke={coresMacro[a.macro]}
+            stroke={paleta().coresMacro[a.macro]}
             strokeWidth={ESPESSURA}
             strokeLinecap="round"
             fill="none"
@@ -101,7 +102,9 @@ export function AnelCalorias({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   bloco: { width: DIAMETRO, height: DIAMETRO, alignItems: 'center', justifyContent: 'center' },
   centro: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-})
+  }),
+)

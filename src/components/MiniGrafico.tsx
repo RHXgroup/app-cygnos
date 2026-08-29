@@ -1,6 +1,6 @@
 import { View } from 'react-native'
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg'
-import { cores } from '../theme'
+import { paleta } from '../lib/tema'
 
 /* Curva suave a partir dos pontos: cada trecho vira uma quadrática que passa
    pelo meio de dois vizinhos. É o jeito mais barato de tirar o aspecto de
@@ -49,15 +49,15 @@ export function MiniGrafico({
     <Svg width={largura} height={altura}>
       <Defs>
         <LinearGradient id="grad-mini" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={cores.verde} stopOpacity="0.22" />
-          <Stop offset="1" stopColor={cores.verde} stopOpacity="0" />
+          <Stop offset="0" stopColor={paleta().cores.verde} stopOpacity="0.22" />
+          <Stop offset="1" stopColor={paleta().cores.verde} stopOpacity="0" />
         </LinearGradient>
       </Defs>
 
       <Path d={area} fill="url(#grad-mini)" />
       <Path
         d={linha}
-        stroke={cores.verde}
+        stroke={paleta().cores.verde}
         strokeWidth={2.5}
         strokeLinecap="round"
         strokeLinejoin="round"

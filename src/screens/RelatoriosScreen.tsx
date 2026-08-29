@@ -27,7 +27,7 @@ import {
   type Periodo,
   type Relatorio,
 } from '../lib/relatorio'
-import { cores, coresMacro, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const MARGEM = 20
 const PADDING_CARTAO = 16
@@ -59,6 +59,7 @@ export function RelatoriosScreen({
   versao: number
   onAbrirMetas: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [periodo, setPeriodo] = useState<Periodo>(7)
   const [relatorio, setRelatorio] = useState<Relatorio | null>(null)
@@ -106,7 +107,7 @@ export function RelatoriosScreen({
       contentContainerStyle={[styles.conteudo, { paddingTop: top + 8 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={atualizando} onRefresh={puxarParaAtualizar} tintColor={cores.limao} />
+        <RefreshControl refreshing={atualizando} onRefresh={puxarParaAtualizar} tintColor={paleta().cores.limao} />
       }
     >
       <View>
@@ -120,7 +121,7 @@ export function RelatoriosScreen({
 
       {carregando && (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       )}
 
@@ -144,6 +145,7 @@ function Conteudo({
   relatorio: Relatorio
   onAbrirMetas: () => void
 }) {
+  const styles = estilos()
   if (relatorio.diasComRegistro < MINIMO_DE_DIAS) {
     return <AindaSemDados dias={relatorio.diasComRegistro} />
   }
@@ -173,6 +175,7 @@ function SeletorDePeriodo({
   atual: Periodo
   onTrocar: (p: Periodo) => void
 }) {
+  const styles = estilos()
   return (
     <View style={styles.seletor}>
       {PERIODOS.map(p => {
@@ -198,6 +201,7 @@ function SeletorDePeriodo({
 /* ── Cartões ───────────────────────────────────────────────────────────────*/
 
 function CartaoAnel({ relatorio }: { relatorio: Relatorio }) {
+  const styles = estilos()
   const { percentualMedio, pilares, diasComRegistro, periodo } = relatorio
 
   return (
@@ -238,6 +242,7 @@ function CartaoCalorias({
   relatorio: Relatorio
   onAbrirMetas: () => void
 }) {
+  const styles = estilos()
   const { calorias, metas, dias, macros } = relatorio
 
   if (!calorias) {
@@ -275,7 +280,7 @@ function CartaoCalorias({
         </Text>
       ) : (
         <Pressable onPress={onAbrirMetas} style={styles.linhaSemMeta}>
-          <Ionicons name="flag-outline" size={13} color={cores.verde} />
+          <Ionicons name="flag-outline" size={13} color={paleta().cores.verde} />
           <Text style={styles.textoSemMeta}>Defina uma meta de calorias para comparar</Text>
         </Pressable>
       )}
@@ -283,8 +288,8 @@ function CartaoCalorias({
       <BarrasPeriodo
         colunas={colunas}
         meta={metas.calorias}
-        cor={cores.verdeClaro}
-        corNaMeta={cores.verde}
+        cor={paleta().cores.verdeClaro}
+        corNaMeta={paleta().cores.verde}
         rotuloMeta={semMeta ? undefined : 'meta'}
       />
 
@@ -302,6 +307,7 @@ function BarraDeMacros({
 }: {
   macros: { proteinas: number | null; carboidratos: number | null; gorduras: number | null; fibras: number | null }
 }) {
+  const styles = estilos()
   const kcal = {
     proteinas: (macros.proteinas ?? 0) * 4,
     carboidratos: (macros.carboidratos ?? 0) * 4,
@@ -326,7 +332,7 @@ function BarraDeMacros({
             key={p.chave}
             style={{
               flex: kcal[p.chave],
-              backgroundColor: coresMacro[p.chave],
+              backgroundColor: paleta().coresMacro[p.chave],
             }}
           />
         ))}
@@ -335,7 +341,7 @@ function BarraDeMacros({
       <View style={styles.legendaMacros}>
         {partes.map(p => (
           <View key={p.chave} style={styles.itemLegenda}>
-            <View style={[styles.pontoLegenda, { backgroundColor: coresMacro[p.chave] }]} />
+            <View style={[styles.pontoLegenda, { backgroundColor: paleta().coresMacro[p.chave] }]} />
             <Text style={styles.textoLegenda}>
               {p.rotulo} {p.gramas === null ? '—' : `${Math.round(p.gramas)} g`}
             </Text>
@@ -343,7 +349,7 @@ function BarraDeMacros({
         ))}
         {macros.fibras !== null && (
           <View style={styles.itemLegenda}>
-            <View style={[styles.pontoLegenda, { backgroundColor: cores.trilho }]} />
+            <View style={[styles.pontoLegenda, { backgroundColor: paleta().cores.trilho }]} />
             <Text style={styles.textoLegenda}>Fibras {Math.round(macros.fibras)} g</Text>
           </View>
         )}
@@ -353,6 +359,7 @@ function BarraDeMacros({
 }
 
 function CartaoAgua({ relatorio }: { relatorio: Relatorio }) {
+  const styles = estilos()
   const { agua, metas, dias } = relatorio
 
   if (!agua) {
@@ -382,8 +389,8 @@ function CartaoAgua({ relatorio }: { relatorio: Relatorio }) {
       <BarrasPeriodo
         colunas={colunasDe(dias, d => d.aguaMl)}
         meta={metas.aguaMl}
-        cor={cores.verdeClaro}
-        corNaMeta={cores.verde}
+        cor={paleta().cores.verdeClaro}
+        corNaMeta={paleta().cores.verde}
         rotuloMeta="meta"
       />
     </View>
@@ -391,6 +398,7 @@ function CartaoAgua({ relatorio }: { relatorio: Relatorio }) {
 }
 
 function CartaoPeso({ relatorio }: { relatorio: Relatorio }) {
+  const styles = estilos()
   const { peso } = relatorio
   if (!peso) return null
 
@@ -440,6 +448,7 @@ function CartaoPeso({ relatorio }: { relatorio: Relatorio }) {
 }
 
 function CartaoSono({ relatorio }: { relatorio: Relatorio }) {
+  const styles = estilos()
   const { sono, metas, dias } = relatorio
 
   if (!sono) {
@@ -493,8 +502,8 @@ function CartaoSono({ relatorio }: { relatorio: Relatorio }) {
       <BarrasPeriodo
         colunas={colunasDe(dias, d => (d.noite ? tempoDormindo(d.noite) : null))}
         meta={metas.sonoHoras !== null ? metas.sonoHoras * 60 : null}
-        cor={cores.verdeClaro}
-        corNaMeta={cores.verde}
+        cor={paleta().cores.verdeClaro}
+        corNaMeta={paleta().cores.verde}
         rotuloMeta={metas.sonoHoras !== null ? 'meta' : undefined}
       />
 
@@ -517,6 +526,7 @@ function CartaoSono({ relatorio }: { relatorio: Relatorio }) {
 }
 
 function Metrica({ rotulo, valor, bom }: { rotulo: string; valor: string; bom: boolean }) {
+  const styles = estilos()
   return (
     <View style={styles.metrica}>
       <Text style={[styles.valorMetrica, bom && styles.valorMetricaBom]}>{valor}</Text>
@@ -526,6 +536,7 @@ function Metrica({ rotulo, valor, bom }: { rotulo: string; valor: string; bom: b
 }
 
 function CartaoPlano({ relatorio }: { relatorio: Relatorio }) {
+  const styles = estilos()
   const { aderencia, plano } = relatorio
   if (!aderencia || !plano) return null
 
@@ -564,6 +575,7 @@ function CartaoPlano({ relatorio }: { relatorio: Relatorio }) {
 /* ── Padrões ───────────────────────────────────────────────────────────────*/
 
 function Padroes({ padroes }: { padroes: Padrao[] }) {
+  const styles = estilos()
   if (padroes.length === 0) {
     return (
       <View style={styles.cartao}>
@@ -602,7 +614,7 @@ function Padroes({ padroes }: { padroes: Padrao[] }) {
               <Ionicons
                 name={p.icone}
                 size={16}
-                color={p.tom === 'atencao' ? cores.gold : cores.verde}
+                color={p.tom === 'atencao' ? paleta().cores.gold : paleta().cores.verde}
               />
             </View>
             <View style={styles.textoPadrao}>
@@ -617,10 +629,11 @@ function Padroes({ padroes }: { padroes: Padrao[] }) {
 }
 
 function AindaSemDados({ dias }: { dias: number }) {
+  const styles = estilos()
   return (
     <View style={styles.vazio}>
       <View style={styles.circuloVazio}>
-        <Ionicons name="stats-chart-outline" size={26} color={cores.verde} />
+        <Ionicons name="stats-chart-outline" size={26} color={paleta().cores.verde} />
       </View>
       <Text style={styles.tituloVazio}>Ainda não dá para comparar</Text>
       <Text style={styles.textoVazio}>
@@ -632,27 +645,28 @@ function AindaSemDados({ dias }: { dias: number }) {
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: MARGEM, paddingBottom: 28, gap: 14 },
   centro: { paddingVertical: 60, alignItems: 'center' },
 
-  titulo: { fontSize: 27, fontWeight: '800', color: cores.ink, letterSpacing: -0.6 },
-  subtitulo: { marginTop: 4, fontSize: 13.5, color: inkSuave },
+  titulo: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
+  subtitulo: { marginTop: 4, fontSize: 13.5, color: t.inkSuave },
 
   seletor: {
     flexDirection: 'row',
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 14,
     padding: 4,
     gap: 4,
   },
   opcaoPeriodo: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11 },
-  opcaoEscolhida: { backgroundColor: cores.superficie },
-  textoPeriodo: { fontSize: 13, fontWeight: '600', color: inkSuave },
-  textoPeriodoEscolhido: { color: cores.verde, fontWeight: '800' },
+  opcaoEscolhida: { backgroundColor: t.cores.superficie },
+  textoPeriodo: { fontSize: 13, fontWeight: '600', color: t.inkSuave },
+  textoPeriodoEscolhido: { color: t.cores.verde, fontWeight: '800' },
 
-  cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: PADDING_CARTAO },
+  cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: PADDING_CARTAO },
   cabecalhoCartao: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -660,45 +674,45 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 6,
   },
-  tituloCartao: { fontSize: 17, fontWeight: '800', color: cores.ink },
-  legenda: { fontSize: 12.5, color: inkSuave },
-  legendaFraca: { marginTop: 8, fontSize: 11.5, lineHeight: 16, color: inkFraco },
-  vazioCartao: { marginTop: 6, fontSize: 13, lineHeight: 19, color: inkSuave },
+  tituloCartao: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
+  legenda: { fontSize: 12.5, color: t.inkSuave },
+  legendaFraca: { marginTop: 8, fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+  vazioCartao: { marginTop: 6, fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   linhaValorGrande: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  valorGrande: { fontSize: 30, fontWeight: '800', color: cores.verde, letterSpacing: -0.8 },
-  unidadeGrande: { fontSize: 12.5, fontWeight: '600', color: inkMedio },
+  valorGrande: { fontSize: 30, fontWeight: '800', color: t.cores.verde, letterSpacing: -0.8 },
+  unidadeGrande: { fontSize: 12.5, fontWeight: '600', color: t.inkMedio },
 
   /* ── Anel ── */
   linhaAnel: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   textoAnel: { flex: 1 },
   listaPilares: { marginTop: 14, gap: 9 },
   pilar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rotuloPilar: { width: 84, fontSize: 12.5, color: inkMedio },
+  rotuloPilar: { width: 84, fontSize: 12.5, color: t.inkMedio },
   trilhoPilar: {
     flex: 1,
     height: 7,
     borderRadius: 4,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
     overflow: 'hidden',
   },
   /* A mesma barra, mas sozinha numa linha do cartão do plano — daí o respiro
      acima, que na lista de pilares seria espaço a mais entre as linhas. */
   trilhoPlano: { marginTop: 12 },
-  preenchimentoPilar: { height: '100%', borderRadius: 4, backgroundColor: cores.verde },
-  valorPilar: { width: 36, textAlign: 'right', fontSize: 12, fontWeight: '700', color: cores.ink },
+  preenchimentoPilar: { height: '100%', borderRadius: 4, backgroundColor: t.cores.verde },
+  valorPilar: { width: 36, textAlign: 'right', fontSize: 12, fontWeight: '700', color: t.cores.ink },
 
   linhaSemMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  textoSemMeta: { fontSize: 12.5, fontWeight: '600', color: cores.verde },
+  textoSemMeta: { fontSize: 12.5, fontWeight: '600', color: t.cores.verde },
 
   /* ── Macros ── */
   blocoMacros: { marginTop: 16 },
-  subtituloBloco: { fontSize: 12, fontWeight: '700', color: inkMedio, marginBottom: 7 },
+  subtituloBloco: { fontSize: 12, fontWeight: '700', color: t.inkMedio, marginBottom: 7 },
   barraEmpilhada: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden' },
   legendaMacros: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 9 },
   itemLegenda: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   pontoLegenda: { width: 8, height: 8, borderRadius: 4 },
-  textoLegenda: { fontSize: 11.5, color: inkSuave },
+  textoLegenda: { fontSize: 11.5, color: t.inkSuave },
 
   /* ── Peso ── */
   linhaPeso: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -711,46 +725,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 9,
     borderRadius: 12,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
   },
-  valorMetrica: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  valorMetricaBom: { color: cores.verde },
-  rotuloMetrica: { marginTop: 2, fontSize: 10.5, color: inkFraco },
+  valorMetrica: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  valorMetricaBom: { color: t.cores.verde },
+  rotuloMetrica: { marginTop: 2, fontSize: 10.5, color: t.inkFraco },
   blocoFatores: { marginTop: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
   },
-  textoChip: { fontSize: 11.5, color: inkMedio },
+  textoChip: { fontSize: 11.5, color: t.inkMedio },
 
   /* ── Padrões ── */
-  tituloSecao: { marginTop: 8, fontSize: 19, fontWeight: '800', color: cores.ink },
-  subtituloSecao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: inkSuave },
+  tituloSecao: { marginTop: 8, fontSize: 19, fontWeight: '800', color: t.cores.ink },
+  subtituloSecao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: t.inkSuave },
   listaPadroes: { marginTop: 12, gap: 10 },
   padrao: {
     flexDirection: 'row',
     gap: 11,
     padding: PADDING_CARTAO,
     borderRadius: 18,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
   },
-  padraoAtencao: { backgroundColor: cores.atencaoFundo },
-  padraoBom: { backgroundColor: cores.verdeMenta },
+  padraoAtencao: { backgroundColor: t.cores.atencaoFundo },
+  padraoBom: { backgroundColor: t.cores.verdeMenta },
   iconePadrao: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconePadraoAtencao: { backgroundColor: cores.superficie },
+  iconePadraoAtencao: { backgroundColor: t.cores.superficie },
   textoPadrao: { flex: 1 },
-  tituloPadrao: { fontSize: 14, fontWeight: '700', color: cores.ink, lineHeight: 19 },
-  corpoPadrao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: inkMedio },
+  tituloPadrao: { fontSize: 14, fontWeight: '700', color: t.cores.ink, lineHeight: 19 },
+  corpoPadrao: { marginTop: 4, fontSize: 13, lineHeight: 19, color: t.inkMedio },
 
   /* ── Vazios ── */
   vazio: { alignItems: 'center', paddingVertical: 44, paddingHorizontal: 12, gap: 8 },
@@ -758,22 +772,23 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
-  tituloVazio: { fontSize: 17, fontWeight: '700', color: cores.ink },
-  textoVazio: { fontSize: 13.5, lineHeight: 20, color: inkSuave, textAlign: 'center' },
+  tituloVazio: { fontSize: 17, fontWeight: '700', color: t.cores.ink },
+  textoVazio: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
 
   erro: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
     padding: 14,
   },
-  textoErro: { fontSize: 13, color: cores.erroTexto },
+  textoErro: { fontSize: 13, color: t.cores.erroTexto },
 
-  rodape: { marginTop: 4, fontSize: 11.5, lineHeight: 17, color: inkFraco },
-})
+  rodape: { marginTop: 4, fontSize: 11.5, lineHeight: 17, color: t.inkFraco },
+  }),
+)

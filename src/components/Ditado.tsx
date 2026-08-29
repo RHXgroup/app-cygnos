@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { useAudioRecorder, useAudioRecorderState } from 'expo-audio'
+import { createAudioPlayer, useAudioRecorder, useAudioRecorderState } from 'expo-audio'
 import {
   LIMITE_SEGUNDOS,
   OPCOES_DITADO,
@@ -9,7 +9,7 @@ import {
   relogio,
   transcrever,
 } from '../lib/voz'
-import { cores, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* O botão de falar em vez de digitar.
  *
@@ -36,9 +36,20 @@ export function Ditado({
   onTexto: (texto: string) => void
   onErro: (mensagem: string) => void
 }) {
+  const styles = estilos()
   const gravador = useAudioRecorder(OPCOES_DITADO)
   const estadoDoGravador = useAudioRecorderState(gravador, 250)
   const [estado, setEstado] = useState<Estado>('parado')
+  /* A última gravação que não virou texto.
+   *
+   * Quando o servidor não ouve nada, sobram duas explicações opostas — o
+   * microfone gravou silêncio, ou o detector de voz descartou o que veio — e a
+   * pessoa não tem como saber qual. Ouvir resolve em três segundos: se a voz
+   * está lá, o problema não é dela.
+   *
+   * É diagnóstico, mas é também o que qualquer um faria com um gravador que
+   * "não ouviu": apertar o play. */
+  const [gravacaoMuda, setGravacaoMuda] = useState<string | null>(null)
 
   /* O `estado` de dentro do efeito de limpeza seria o da primeira renderização,
      e a limpeza só roda no fim. Sem a referência, sair da tela gravando deixaria
@@ -71,6 +82,8 @@ export function Ditado({
       onErro(permissao.mensagem)
       return
     }
+
+    setGravacaoMuda(null)
 
     try {
       await gravador.prepareToRecordAsync()
@@ -117,7 +130,8 @@ export function Ditado({
       return
     }
     if (r.tipo === 'nada_ouvido') {
-      onErro('Não ouvi nada. Fale mais perto do aparelho e tente de novo.')
+      setGravacaoMuda(uri)
+      onErro('Não ouvi nada. Toque em "ouvir a gravação" para conferir se a sua voz foi captada.')
       return
     }
     onErro(r.mensagem)
@@ -126,7 +140,7 @@ export function Ditado({
   if (estado === 'enviando') {
     return (
       <View style={[styles.botao, styles.pensando]}>
-        <ActivityIndicator size="small" color={cores.verde} />
+        <ActivityIndicator size="small" color={paleta().cores.verde} />
         <Text style={styles.textoPensando}>Entendendo o que você falou…</Text>
       </View>
     )
@@ -148,19 +162,39 @@ export function Ditado({
   }
 
   return (
-    <Pressable
-      onPress={comecar}
-      style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
-      accessibilityRole="button"
-      accessibilityLabel="Falar o que você comeu"
-    >
-      <Ionicons name="mic-outline" size={18} color={cores.verde} />
-      <Text style={styles.texto}>Falar em vez de digitar</Text>
-    </Pressable>
+    <>
+      <Pressable
+        onPress={comecar}
+        style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
+        accessibilityRole="button"
+        accessibilityLabel="Falar o que você comeu"
+      >
+        <Ionicons name="mic-outline" size={18} color={paleta().cores.verde} />
+        <Text style={styles.texto}>Falar em vez de digitar</Text>
+      </Pressable>
+
+      {gravacaoMuda && (
+        <Pressable
+          onPress={() => {
+            /* Toca e se descarta. Um player por gravação, sem estado guardado:
+               isto existe para conferir uma vez, não para virar tocador. */
+            const p = createAudioPlayer({ uri: gravacaoMuda })
+            p.play()
+          }}
+          style={({ pressed }) => [styles.botaoOuvir, pressed && styles.pressionado]}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvir a gravação"
+        >
+          <Ionicons name="play-circle-outline" size={17} color={paleta().inkMedio} />
+          <Text style={styles.textoOuvir}>Ouvir a gravação</Text>
+        </Pressable>
+      )}
+    </>
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   botao: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -169,17 +203,31 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
   pressionado: { opacity: 0.7 },
-  texto: { fontSize: 15, fontWeight: '700', color: cores.verde },
+  texto: { fontSize: 15, fontWeight: '700', color: t.cores.verde },
 
-  gravando: { borderColor: cores.verde, backgroundColor: cores.verdeMenta },
-  ponto: { width: 9, height: 9, borderRadius: 5, backgroundColor: cores.erroTexto },
-  textoGravando: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  toqueParaParar: { fontSize: 12, color: inkMedio },
+  botaoOuvir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 40,
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  textoOuvir: { fontSize: 13.5, fontWeight: '600', color: t.inkMedio },
 
-  pensando: { borderColor: cores.borda },
-  textoPensando: { fontSize: 14, fontWeight: '600', color: inkSuave },
-})
+  gravando: { borderColor: t.cores.verde, backgroundColor: t.cores.verdeMenta },
+  ponto: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.cores.erroTexto },
+  textoGravando: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  toqueParaParar: { fontSize: 12, color: t.inkMedio },
+
+  pensando: { borderColor: t.cores.borda },
+  textoPensando: { fontSize: 14, fontWeight: '600', color: t.inkSuave },
+  }),
+)

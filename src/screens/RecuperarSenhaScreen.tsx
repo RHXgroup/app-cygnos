@@ -16,7 +16,7 @@ import { ForcaSenha } from '../components/ForcaSenha'
 import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from '../lib/conta'
 import { validarSenha } from '../lib/formulario'
 import { supabase } from '../lib/supabase'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Recuperação de senha em três etapas, por código de seis dígitos.
  *
@@ -64,6 +64,7 @@ export function RecuperarSenhaScreen({
      leva para dentro do app é o App, não esta tela. */
   onConcluido: () => void
 }) {
+  const styles = estilos()
   const [etapa, setEtapa] = useState<Etapa>('pedir')
   const [identificador, setIdentificador] = useState('')
   /* O e-mail que recebeu o código. Fica null quando o login informado não
@@ -346,7 +347,7 @@ export function RecuperarSenhaScreen({
                       if (erro) setErro('')
                     }}
                     placeholder="••••••••"
-                    placeholderTextColor={inkFraco}
+                    placeholderTextColor={paleta().inkFraco}
                     keyboardAppearance="dark"
                     secureTextEntry={!mostrarSenha}
                     autoCapitalize="none"
@@ -406,7 +407,7 @@ export function RecuperarSenhaScreen({
             accessibilityRole="button"
           >
             {carregando ? (
-              <ActivityIndicator color={cores.branco} />
+              <ActivityIndicator color={paleta().cores.branco} />
             ) : (
               <Text style={styles.textoBotaoPrimario}>
                 {etapa === 'pedir' ? 'Enviar código' : etapa === 'codigo' ? 'Continuar' : 'Salvar e entrar'}
@@ -483,32 +484,33 @@ function podeAvancar(
   return senha.length > 0 && confirmacao.length > 0
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },
 
   cabecalho: { alignItems: 'center', marginBottom: 28 },
   logo: { width: 88, height: 88, marginBottom: 8 },
-  titulo: { fontSize: 26, fontWeight: '700', color: cores.deep, textAlign: 'center' },
+  titulo: { fontSize: 26, fontWeight: '700', color: t.cores.deep, textAlign: 'center' },
   subtitulo: {
     marginTop: 8,
     fontSize: 14.5,
     lineHeight: 21,
-    color: inkSuave,
+    color: t.inkSuave,
     textAlign: 'center',
   },
 
   formulario: { gap: 16 },
-  rotulo: { marginBottom: 6, fontSize: 13, fontWeight: '600', color: inkMedio },
+  rotulo: { marginBottom: 6, fontSize: 13, fontWeight: '600', color: t.inkMedio },
   campo: {
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.line,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.line,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: cores.ink,
+    color: t.cores.ink,
   },
   /* Dígito grande e espaçado: seis caracteres num campo de texto comum são
      difíceis de conferir contra o que está na tela do e-mail. */
@@ -516,34 +518,35 @@ const styles = StyleSheet.create({
   campoComBotao: { justifyContent: 'center' },
   campoSenha: { paddingRight: 86 },
   botaoOlho: { position: 'absolute', right: 14, paddingVertical: 6, paddingHorizontal: 4 },
-  textoOlho: { fontSize: 13, fontWeight: '600', color: cores.deep },
+  textoOlho: { fontSize: 13, fontWeight: '600', color: t.cores.deep },
 
   linkReenviar: { alignSelf: 'center', paddingVertical: 4 },
-  textoReenviar: { fontSize: 13.5, fontWeight: '700', color: cores.deep },
-  textoReenviarInativo: { color: inkFraco, fontWeight: '600' },
+  textoReenviar: { fontSize: 13.5, fontWeight: '700', color: t.cores.deep },
+  textoReenviarInativo: { color: t.inkFraco, fontWeight: '600' },
 
   caixaErro: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  textoErro: { fontSize: 13.5, lineHeight: 19, color: cores.erroTexto },
+  textoErro: { fontSize: 13.5, lineHeight: 19, color: t.cores.erroTexto },
 
   botaoPrimario: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoPrimarioPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoPrimarioPressionado: { backgroundColor: t.cores.verdeEscuro },
   botaoDesabilitado: { opacity: 0.5 },
-  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: cores.branco },
+  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: t.cores.branco },
 
   linkVoltar: { alignSelf: 'center', paddingVertical: 6 },
-  textoLinkSuave: { fontSize: 14, color: inkSuave },
-  textoLinkForte: { fontWeight: '700', color: cores.deep },
-})
+  textoLinkSuave: { fontSize: 14, color: t.inkSuave },
+  textoLinkForte: { fontWeight: '700', color: t.cores.deep },
+  }),
+)

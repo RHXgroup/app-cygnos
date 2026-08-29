@@ -19,7 +19,7 @@ import { MontarPlanoScreen } from './MontarPlanoScreen'
 import { SugerirPlanoScreen } from './SugerirPlanoScreen'
 import type { ItemAlimento } from '../lib/plano'
 import { mascaraHora, validarHora } from '../lib/formulario'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 type Item = {
   id: string
@@ -97,6 +97,7 @@ export function RefeicoesDoDiaScreen({
      inicial, onde o plano agora aparece. */
   onSalvo: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [itens, setItens] = useState<Item[]>(inicial)
   const [erroGeral, setErroGeral] = useState('')
@@ -386,7 +387,7 @@ export function RefeicoesDoDiaScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Planejamento alimentar</Text>
         <View style={styles.botaoVoltar} />
@@ -434,7 +435,7 @@ export function RefeicoesDoDiaScreen({
           style={({ pressed }) => [styles.botaoAdicionar, pressed && styles.botaoAdicionarPressionado]}
           accessibilityRole="button"
         >
-          <Ionicons name="add" size={18} color={cores.verde} />
+          <Ionicons name="add" size={18} color={paleta().cores.verde} />
           <Text style={styles.textoBotaoAdicionar}>Adicionar outra refeição</Text>
         </Pressable>
 
@@ -482,6 +483,7 @@ function Linha({
   onArrastar: (dy: number) => void
   onSoltar: () => void
 }) {
+  const styles = estilos()
   /* Um PanResponder por linha, criado uma vez: é ele que sabe qual refeição o
      dedo pegou. Fica só no punho, e não na linha toda, para não disputar o
      toque com a caixa de marcar nem com os campos de texto. */
@@ -524,7 +526,7 @@ function Linha({
           accessibilityLabel={item.rotulo}
         >
           <View style={[styles.caixa, item.marcada && styles.caixaMarcada]}>
-            {item.marcada && <Ionicons name="checkmark" size={15} color={cores.branco} />}
+            {item.marcada && <Ionicons name="checkmark" size={15} color={paleta().cores.branco} />}
           </View>
           <Text style={[styles.rotulo, item.marcada && styles.rotuloMarcado]} numberOfLines={1}>
             {item.rotulo}
@@ -540,13 +542,13 @@ function Linha({
             accessibilityRole="button"
             accessibilityLabel="Remover refeição"
           >
-            <Ionicons name="close" size={17} color={inkFraco} />
+            <Ionicons name="close" size={17} color={paleta().inkFraco} />
           </Pressable>
           <TextInput
             value={item.rotulo}
             onChangeText={onNome}
             placeholder="Nome da refeição"
-            placeholderTextColor={inkFraco}
+            placeholderTextColor={paleta().inkFraco}
             keyboardAppearance="dark"
             maxLength={40}
             autoCapitalize="sentences"
@@ -561,7 +563,7 @@ function Linha({
           value={item.hora}
           onChangeText={onHora}
           placeholder="00:00"
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           keyboardAppearance="dark"
           keyboardType="number-pad"
           maxLength={5}
@@ -576,14 +578,15 @@ function Linha({
         accessibilityRole="adjustable"
         accessibilityLabel={`Mudar a posição de ${item.rotulo || 'refeição'}`}
       >
-        <Ionicons name="reorder-two-outline" size={20} color={inkFraco} />
+        <Ionicons name="reorder-two-outline" size={20} color={paleta().inkFraco} />
       </View>
     </Animated.View>
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -593,11 +596,11 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
-  pergunta: { fontSize: 20, fontWeight: '800', color: cores.ink, letterSpacing: -0.4 },
-  apoio: { marginTop: 6, marginBottom: 16, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+  pergunta: { fontSize: 20, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.4 },
+  apoio: { marginTop: 6, marginBottom: 16, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
 
   lista: { gap: VAO_LINHA },
   cartao: {
@@ -610,12 +613,12 @@ const styles = StyleSheet.create({
     height: ALTURA_LINHA,
     paddingHorizontal: 12,
     borderRadius: 16,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  cartaoAtivo: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
-  cartaoComErro: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
+  cartaoAtivo: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  cartaoComErro: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
   cartaoArrastando: {
     /* zIndex resolve no iOS, elevation no Android — sem os dois a linha some
        por baixo da vizinha no meio do arraste. */
@@ -633,14 +636,14 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: cores.trilho,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.trilho,
+    backgroundColor: t.cores.superficie,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  caixaMarcada: { backgroundColor: cores.verde, borderColor: cores.verde },
-  rotulo: { flexShrink: 1, fontSize: 15, color: inkMedio },
-  rotuloMarcado: { fontWeight: '700', color: cores.ink },
+  caixaMarcada: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  rotulo: { flexShrink: 1, fontSize: 15, color: t.inkMedio },
+  rotuloMarcado: { fontWeight: '700', color: t.cores.ink },
 
   botaoRemover: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   campoNome: {
@@ -648,24 +651,24 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 10,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
-    color: cores.ink,
+    color: t.cores.ink,
   },
   campoHora: {
     width: 76,
     height: 40,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
-    color: cores.ink,
+    color: t.cores.ink,
   },
   punho: { width: 26, alignItems: 'center', justifyContent: 'center', height: '100%' },
 
@@ -679,22 +682,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: cores.verdeClaro,
+    borderColor: t.cores.verdeClaro,
   },
-  botaoAdicionarPressionado: { backgroundColor: cores.verdeMenta },
-  textoBotaoAdicionar: { fontSize: 14.5, fontWeight: '700', color: cores.verde },
+  botaoAdicionarPressionado: { backgroundColor: t.cores.verdeMenta },
+  textoBotaoAdicionar: { fontSize: 14.5, fontWeight: '700', color: t.cores.verde },
 
-  erroGeral: { marginTop: 14, fontSize: 13, color: cores.erroTexto, textAlign: 'center' },
+  erroGeral: { marginTop: 14, fontSize: 13, color: t.cores.erroTexto, textAlign: 'center' },
 
   rodape: { paddingHorizontal: 20, paddingTop: 10, gap: 10 },
-  contagem: { fontSize: 12.5, color: inkFraco, textAlign: 'center' },
+  contagem: { fontSize: 12.5, color: t.inkFraco, textAlign: 'center' },
   botao: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoPressionado: { backgroundColor: cores.verdeEscuro },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

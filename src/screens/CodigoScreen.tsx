@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
 import { carregarCatalogo, jaVinculado } from '../lib/nutricionista'
 import { supabase } from '../lib/supabase'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* De quanto em quanto tempo a tela pergunta se o vínculo já aconteceu.
  *
@@ -49,6 +49,7 @@ export function CodigoScreen({
      esta tela. */
   onVinculou: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [codigo, setCodigo] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -163,7 +164,7 @@ export function CodigoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Meu código</Text>
         <View style={styles.botaoVoltar} />
@@ -171,7 +172,7 @@ export function CodigoScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <ScrollView
@@ -184,7 +185,7 @@ export function CodigoScreen({
             <Ionicons
               name={vinculada ? 'checkmark' : 'link-outline'}
               size={26}
-              color={vinculada ? cores.sobreLimao : cores.verde}
+              color={vinculada ? paleta().cores.sobreLimao : paleta().cores.verde}
             />
           </View>
 
@@ -217,7 +218,7 @@ export function CodigoScreen({
                 <Ionicons
                   name={copiado ? 'checkmark' : 'copy-outline'}
                   size={18}
-                  color={cores.branco}
+                  color={paleta().cores.branco}
                 />
                 <Text style={styles.textoBotaoCopiar}>{copiado ? 'Copiado!' : 'Copiar código'}</Text>
               </Pressable>
@@ -249,8 +250,9 @@ export function CodigoScreen({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -261,16 +263,16 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32, alignItems: 'center' },
 
-  circuloPronto: { backgroundColor: cores.limao },
+  circuloPronto: { backgroundColor: t.cores.limao },
   circulo: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
@@ -279,7 +281,7 @@ const styles = StyleSheet.create({
   chamada: {
     fontSize: 18,
     fontWeight: '800',
-    color: cores.ink,
+    color: t.cores.ink,
     textAlign: 'center',
     letterSpacing: -0.3,
   },
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13.5,
     lineHeight: 20,
-    color: inkSuave,
+    color: t.inkSuave,
     textAlign: 'center',
   },
 
@@ -302,14 +304,14 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingVertical: 22,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   codigo: {
     fontSize: 30,
     fontWeight: '800',
-    color: cores.ink,
+    color: t.cores.ink,
     /* Espaçado letra a letra porque o código é copiado à mão da tela. */
     letterSpacing: 4,
   },
@@ -323,16 +325,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
     height: 52,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoCopiarPressionado: { backgroundColor: cores.verdeEscuro },
-  textoBotaoCopiar: { fontSize: 15, fontWeight: '700', color: cores.branco },
+  botaoCopiarPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoBotaoCopiar: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
 
   aviso: {
     marginTop: 18,
     fontSize: 12.5,
     lineHeight: 18,
-    color: inkFraco,
+    color: t.inkFraco,
     textAlign: 'center',
   },
 
@@ -340,8 +342,9 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     marginTop: 24,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     padding: 18,
   },
-  textoSemCodigo: { fontSize: 13.5, lineHeight: 20, color: inkMedio, textAlign: 'center' },
-})
+  textoSemCodigo: { fontSize: 13.5, lineHeight: 20, color: t.inkMedio, textAlign: 'center' },
+  }),
+)

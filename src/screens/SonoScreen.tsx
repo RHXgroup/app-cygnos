@@ -38,7 +38,7 @@ import {
 import { METAS_VAZIAS, carregarMetas, type Metas } from '../lib/metas'
 import { mascaraHora, validarHora } from '../lib/formulario'
 import { DIAS_CURTOS, dataISO } from '../lib/formatar'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* O sono, uma noite por vez.
  *
@@ -90,6 +90,7 @@ export function SonoScreen({
   onFechar: () => void
   onMudou: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [noites, setNoites] = useState<Noite[]>([])
   const [metas, setMetas] = useState<Metas>(METAS_VAZIAS)
@@ -221,7 +222,7 @@ export function SonoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Sono</Text>
         <View style={styles.botaoVoltar} />
@@ -229,7 +230,7 @@ export function SonoScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <>
@@ -249,7 +250,7 @@ export function SonoScreen({
                 accessibilityRole="button"
                 accessibilityLabel="Noite anterior"
               >
-                <Ionicons name="chevron-back" size={20} color={cores.verde} />
+                <Ionicons name="chevron-back" size={20} color={paleta().cores.verde} />
               </Pressable>
 
               <View style={styles.centroNavegacao}>
@@ -271,7 +272,7 @@ export function SonoScreen({
                 <Ionicons
                   name="chevron-forward"
                   size={20}
-                  color={dia >= ultimaRegistravel ? inkFraco : cores.verde}
+                  color={dia >= ultimaRegistravel ? paleta().inkFraco : paleta().cores.verde}
                 />
               </Pressable>
             </View>
@@ -279,7 +280,7 @@ export function SonoScreen({
             {/* ── O resultado da noite ── */}
             <View style={styles.cartaoNoite}>
               <View style={styles.linhaTituloNoite}>
-                <Ionicons name="moon" size={16} color={cores.branco} />
+                <Ionicons name="moon" size={16} color={paleta().cores.branco} />
                 <Text style={styles.tituloNoite}>Você dormiu</Text>
               </View>
 
@@ -442,7 +443,7 @@ export function SonoScreen({
                 value={observacao}
                 onChangeText={setObservacao}
                 placeholder="Alguma outra coisa? (opcional)"
-                placeholderTextColor={inkFraco}
+                placeholderTextColor={paleta().inkFraco}
                 keyboardAppearance="dark"
                 multiline
                 maxLength={300}
@@ -519,7 +520,7 @@ export function SonoScreen({
                       accessibilityRole="button"
                       accessibilityLabel={`Apagar a noite de ${rotuloDoDia(n.data)}`}
                     >
-                      <Ionicons name="close" size={15} color={inkFraco} />
+                      <Ionicons name="close" size={15} color={paleta().inkFraco} />
                     </Pressable>
                   </Pressable>
                 ))}
@@ -539,7 +540,7 @@ export function SonoScreen({
               accessibilityRole="button"
             >
               {salvando ? (
-                <ActivityIndicator color={cores.branco} />
+                <ActivityIndicator color={paleta().cores.branco} />
               ) : (
                 <Text style={styles.textoBotao}>
                   {salva ? 'Atualizar esta noite' : 'Salvar esta noite'}
@@ -572,6 +573,7 @@ export function SonoScreen({
  * A lista chega do mais novo para o mais velho; aqui ela é invertida, porque um
  * gráfico que anda para trás no tempo mostra a evolução ao contrário. */
 function FaixaDasNoites({ noites }: { noites: Noite[] }) {
+  const styles = estilos()
   const ultimas = [...noites].sort((a, b) => a.data.localeCompare(b.data)).slice(-7)
   if (ultimas.length === 0) return null
 
@@ -626,10 +628,11 @@ function Bloco({
   icone: keyof typeof Ionicons.glyphMap
   children: React.ReactNode
 }) {
+  const styles = estilos()
   return (
     <View style={styles.bloco}>
       <View style={styles.tituloBloco}>
-        <Ionicons name={icone} size={16} color={cores.verde} />
+        <Ionicons name={icone} size={16} color={paleta().cores.verde} />
         <Text style={styles.textoTituloBloco}>{titulo}</Text>
       </View>
       {children}
@@ -646,6 +649,7 @@ function CampoHora({
   valor: string
   onChange: (v: string) => void
 }) {
+  const styles = estilos()
   const invalido = validarHora(valor) !== null
 
   return (
@@ -683,6 +687,7 @@ function Passo({
   max: number
   onMudar: (v: number | null) => void
 }) {
+  const styles = estilos()
   return (
     <View style={styles.linhaPasso}>
       <View style={styles.textoPasso}>
@@ -705,7 +710,7 @@ function Passo({
         accessibilityRole="button"
         accessibilityLabel={`Diminuir ${rotulo}`}
       >
-        <Ionicons name="remove" size={19} color={valor === 0 ? inkFraco : cores.verde} />
+        <Ionicons name="remove" size={19} color={valor === 0 ? paleta().inkFraco : paleta().cores.verde} />
       </Pressable>
 
       <Pressable
@@ -714,14 +719,15 @@ function Passo({
         accessibilityRole="button"
         accessibilityLabel={`Aumentar ${rotulo}`}
       >
-        <Ionicons name="add" size={19} color={cores.verde} />
+        <Ionicons name="add" size={19} color={paleta().cores.verde} />
       </Pressable>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -732,7 +738,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24, gap: 14 },
 
@@ -743,22 +749,22 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     borderWidth: 1,
-    borderColor: cores.verdeClaro,
+    borderColor: t.cores.verdeClaro,
   },
-  setaPressionada: { backgroundColor: cores.verdeClaro },
-  setaDesligada: { backgroundColor: cores.cartao, borderColor: cores.borda },
+  setaPressionada: { backgroundColor: t.cores.verdeClaro },
+  setaDesligada: { backgroundColor: t.cores.cartao, borderColor: t.cores.borda },
   centroNavegacao: { flex: 1, alignItems: 'center' },
-  rotuloNoite: { fontSize: 16, fontWeight: '800', color: cores.ink },
-  jaRegistrada: { marginTop: 2, fontSize: 11, fontWeight: '700', color: cores.verde },
+  rotuloNoite: { fontSize: 16, fontWeight: '800', color: t.cores.ink },
+  jaRegistrada: { marginTop: 2, fontSize: 11, fontWeight: '700', color: t.cores.verde },
 
   /* ── Cartão da noite ── */
-  cartaoNoite: { borderRadius: 20, backgroundColor: cores.verde, padding: 18 },
+  cartaoNoite: { borderRadius: 20, backgroundColor: t.cores.verde, padding: 18 },
   linhaTituloNoite: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  tituloNoite: { flex: 1, fontSize: 15, fontWeight: '700', color: cores.branco },
+  tituloNoite: { flex: 1, fontSize: 15, fontWeight: '700', color: t.cores.branco },
   linhaValorNoite: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 },
-  valorNoite: { fontSize: 38, fontWeight: '800', color: cores.branco, letterSpacing: -1.2 },
+  valorNoite: { fontSize: 38, fontWeight: '800', color: t.cores.branco, letterSpacing: -1.2 },
   metaNoite: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.8)' },
   detalheNoite: { marginTop: 4, fontSize: 12.5, lineHeight: 18, color: 'rgba(255,255,255,0.9)' },
   linhaEficiencia: { marginTop: 12 },
@@ -768,23 +774,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.28)',
     overflow: 'hidden',
   },
-  preenchimentoEficiencia: { height: '100%', borderRadius: 3, backgroundColor: cores.superficie },
+  preenchimentoEficiencia: { height: '100%', borderRadius: 3, backgroundColor: t.cores.superficie },
   textoEficiencia: { marginTop: 6, fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.9)' },
 
   /* ── Blocos ── */
   bloco: {
     padding: 16,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 10,
   },
   tituloBloco: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  textoTituloBloco: { fontSize: 15, fontWeight: '800', color: cores.ink },
-  rotuloCampo: { marginTop: 4, fontSize: 12.5, fontWeight: '700', color: inkMedio },
-  ajudaCampo: { fontSize: 11, lineHeight: 15, color: inkFraco },
-  ajudaErro: { fontSize: 11.5, color: cores.erroTexto },
+  textoTituloBloco: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  rotuloCampo: { marginTop: 4, fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
+  ajudaCampo: { fontSize: 11, lineHeight: 15, color: t.inkFraco },
+  ajudaErro: { fontSize: 11.5, color: t.cores.erroTexto },
 
   linhaHoras: { flexDirection: 'row', gap: 12 },
   blocoHora: { flex: 1 },
@@ -793,33 +799,33 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 16,
     /* 16 é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 19,
     fontWeight: '700',
     textAlign: 'center',
-    color: cores.ink,
+    color: t.cores.ink,
   },
-  campoComErro: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
+  campoComErro: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
 
   linhaPasso: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   textoPasso: { flex: 1 },
-  rotuloPasso: { fontSize: 13.5, fontWeight: '700', color: cores.ink },
-  valorPasso: { marginTop: 1, fontSize: 12, color: inkSuave },
+  rotuloPasso: { fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+  valorPasso: { marginTop: 1, fontSize: 12, color: t.inkSuave },
   botaoPasso: {
     width: 40,
     height: 40,
     borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
     borderWidth: 1,
-    borderColor: cores.verdeClaro,
+    borderColor: t.cores.verdeClaro,
   },
-  botaoPassoPressionado: { backgroundColor: cores.verdeClaro },
-  botaoPassoDesligado: { backgroundColor: cores.superficie, borderColor: cores.borda },
+  botaoPassoPressionado: { backgroundColor: t.cores.verdeClaro },
+  botaoPassoDesligado: { backgroundColor: t.cores.superficie, borderColor: t.cores.borda },
 
   notas: { flexDirection: 'row', gap: 8 },
   nota: {
@@ -828,40 +834,40 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  notaAtiva: { backgroundColor: cores.verde, borderColor: cores.verde },
-  textoNota: { fontSize: 16, fontWeight: '800', color: cores.ink },
-  textoNotaAtiva: { color: cores.branco },
+  notaAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  textoNota: { fontSize: 16, fontWeight: '800', color: t.cores.ink },
+  textoNotaAtiva: { color: t.cores.branco },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  chipAtivo: { backgroundColor: cores.verde, borderColor: cores.verde },
-  chipPressionado: { backgroundColor: cores.verdeClaro, borderColor: cores.verdeClaro },
-  textoChip: { fontSize: 12.5, fontWeight: '700', color: cores.ink },
-  textoChipAtivo: { color: cores.branco },
+  chipAtivo: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  chipPressionado: { backgroundColor: t.cores.verdeClaro, borderColor: t.cores.verdeClaro },
+  textoChip: { fontSize: 12.5, fontWeight: '700', color: t.cores.ink },
+  textoChipAtivo: { color: t.cores.branco },
 
   campoObservacao: {
     minHeight: 64,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 12,
     fontSize: 16,
     lineHeight: 21,
-    color: cores.ink,
+    color: t.cores.ink,
     textAlignVertical: 'top',
   },
 
@@ -870,19 +876,19 @@ const styles = StyleSheet.create({
 
   faixa: { marginTop: 14, gap: 5 },
   linhaFaixa: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  diaFaixa: { width: 26, fontSize: 10.5, color: inkFraco },
-  trilhoFaixa: { flex: 1, height: 10, borderRadius: 5, backgroundColor: cores.trilho },
-  tracoFaixa: { position: 'absolute', top: 0, height: 10, borderRadius: 5, backgroundColor: cores.limao },
+  diaFaixa: { width: 26, fontSize: 10.5, color: t.inkFraco },
+  trilhoFaixa: { flex: 1, height: 10, borderRadius: 5, backgroundColor: t.cores.trilho },
+  tracoFaixa: { position: 'absolute', top: 0, height: 10, borderRadius: 5, backgroundColor: t.cores.limao },
   /* Alinhado ao trilho, não ao bloco: as marcas precisam cair sobre o eixo, e o
      rótulo do dia ocupa a largura dele mais o espaço. */
   eixoFaixa: { flexDirection: 'row', justifyContent: 'space-between', marginLeft: 34, marginTop: 2 },
-  marcaFaixa: { fontSize: 10, color: inkFraco },
+  marcaFaixa: { fontSize: 10, color: t.inkFraco },
   numeroResumo: { flex: 1 },
-  rotuloNumero: { fontSize: 11.5, color: inkSuave },
-  valorNumero: { marginTop: 2, fontSize: 20, fontWeight: '800', color: cores.verde },
+  rotuloNumero: { fontSize: 11.5, color: t.inkSuave },
+  valorNumero: { marginTop: 2, fontSize: 20, fontWeight: '800', color: t.cores.verde },
   linhaFator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  nomeFator: { fontSize: 13, color: inkMedio },
-  vezesFator: { fontSize: 12, fontWeight: '700', color: inkFraco },
+  nomeFator: { fontSize: 13, color: t.inkMedio },
+  vezesFator: { fontSize: 12, fontWeight: '700', color: t.inkFraco },
 
   linhaNoite: {
     flexDirection: 'row',
@@ -891,47 +897,48 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  dataNoite: { flex: 1, fontSize: 13, color: inkMedio },
-  duracaoNoite: { fontSize: 13.5, fontWeight: '800', color: cores.ink },
+  dataNoite: { flex: 1, fontSize: 13, color: t.inkMedio },
+  duracaoNoite: { fontSize: 13.5, fontWeight: '800', color: t.cores.ink },
   seloQualidade: {
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 999,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoSeloQualidade: { fontSize: 10.5, fontWeight: '800', color: cores.verdeEscuro },
+  textoSeloQualidade: { fontSize: 10.5, fontWeight: '800', color: t.cores.verdeEscuro },
   apagar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  apagarPressionado: { backgroundColor: cores.trilho },
+  apagarPressionado: { backgroundColor: t.cores.trilho },
 
   blocoErro: {
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   rodape: {
     paddingHorizontal: 20,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: cores.borda,
-    backgroundColor: cores.fundo,
+    borderTopColor: t.cores.borda,
+    backgroundColor: t.cores.fundo,
   },
   botao: {
     height: 54,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoPressionado: { backgroundColor: cores.verdeEscuro },
-  botaoDesligado: { backgroundColor: cores.trilho },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
+  botaoDesligado: { backgroundColor: t.cores.trilho },
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)

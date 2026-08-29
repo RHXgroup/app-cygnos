@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { TotaisPlano } from '../components/TotaisPlano'
 import { detalheDoItem, totaisDe, type RefeicaoSalva } from '../lib/plano'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Uma refeição sozinha: o que tem nela e quanto ela soma.
  *
@@ -22,6 +22,7 @@ export function RefeicaoScreen({
   quando: string
   onFechar: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const totais = totaisDe(refeicao.itens)
 
@@ -35,7 +36,7 @@ export function RefeicaoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela} numberOfLines={1}>
           {refeicao.rotulo}
@@ -51,7 +52,7 @@ export function RefeicaoScreen({
       >
         <View style={styles.linhaQuando}>
           <View style={styles.hora}>
-            <Ionicons name="time-outline" size={14} color={cores.verdeEscuro} />
+            <Ionicons name="time-outline" size={14} color={paleta().cores.verdeEscuro} />
             <Text style={styles.textoHora}>{refeicao.hora}</Text>
           </View>
           <Text style={styles.quando}>{quando}</Text>
@@ -103,8 +104,9 @@ export function RefeicaoScreen({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -114,7 +116,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, gap: 12 },
 
@@ -126,39 +128,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  textoHora: { fontSize: 13, fontWeight: '800', color: cores.verdeEscuro },
-  quando: { fontSize: 13, color: inkSuave },
+  textoHora: { fontSize: 13, fontWeight: '800', color: t.cores.verdeEscuro },
+  quando: { fontSize: 13, color: t.inkSuave },
 
-  secao: { marginTop: 6, fontSize: 13, fontWeight: '800', color: inkSuave },
+  secao: { marginTop: 6, fontSize: 13, fontWeight: '800', color: t.inkSuave },
 
   item: {
     padding: 14,
     borderRadius: 16,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  nomeItem: { fontSize: 15, fontWeight: '700', color: cores.ink, lineHeight: 20 },
-  marcaItem: { marginTop: 2, fontSize: 12.5, color: inkFraco },
-  detalheItem: { marginTop: 4, fontSize: 12.5, color: inkSuave },
+  nomeItem: { fontSize: 15, fontWeight: '700', color: t.cores.ink, lineHeight: 20 },
+  marcaItem: { marginTop: 2, fontSize: 12.5, color: t.inkFraco },
+  detalheItem: { marginTop: 4, fontSize: 12.5, color: t.inkSuave },
 
-  vazia: { fontSize: 13, lineHeight: 19, color: inkFraco },
+  vazia: { fontSize: 13, lineHeight: 19, color: t.inkFraco },
 
   variacoes: {
     gap: 8,
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: cores.borda,
+    borderTopColor: t.cores.borda,
   },
-  tituloVariacoes: { fontSize: 11.5, fontWeight: '800', color: cores.verdeEscuro },
+  tituloVariacoes: { fontSize: 11.5, fontWeight: '800', color: t.cores.verdeEscuro },
   variacao: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   /* Um ponto em vez de bullet de texto: alinha com a linha do nome sem depender
      da altura da fonte do aparelho. */
-  marcador: { width: 6, height: 6, borderRadius: 3, backgroundColor: cores.verdeClaro },
+  marcador: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.cores.verdeClaro },
   textoVariacao: { flex: 1 },
-  nomeVariacao: { fontSize: 14, fontWeight: '600', color: cores.ink, lineHeight: 19 },
-  detalheVariacao: { marginTop: 1, fontSize: 12, color: inkSuave },
-})
+  nomeVariacao: { fontSize: 14, fontWeight: '600', color: t.cores.ink, lineHeight: 19 },
+  detalheVariacao: { marginTop: 1, fontSize: 12, color: t.inkSuave },
+  }),
+)

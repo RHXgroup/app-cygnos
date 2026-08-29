@@ -29,7 +29,7 @@ import {
 } from '../lib/treino'
 import { DIAS_CURTOS, dataNumerica } from '../lib/formatar'
 import type { DiaSemana } from '../lib/plano'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Treino.
  *
@@ -56,6 +56,7 @@ export function TreinoScreen({
   onFechar: () => void
   onMudou: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [aba, setAba] = useState<Aba>('hoje')
   const [sessoes, setSessoes] = useState<Sessao[]>([])
@@ -124,7 +125,7 @@ export function TreinoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Treino</Text>
         <View style={styles.botaoVoltar} />
@@ -152,7 +153,7 @@ export function TreinoScreen({
         keyboardShouldPersistTaps="handled"
       >
         {carregando ? (
-          <ActivityIndicator color={cores.verde} style={styles.girando} />
+          <ActivityIndicator color={paleta().cores.verde} style={styles.girando} />
         ) : aba === 'hoje' ? (
           <>
             {/* Constância antes do formulário: é o que responde "estou treinando
@@ -207,7 +208,7 @@ export function TreinoScreen({
                       accessibilityRole="button"
                       accessibilityLabel="Apagar este treino"
                     >
-                      <Ionicons name="close" size={16} color={inkFraco} />
+                      <Ionicons name="close" size={16} color={paleta().inkFraco} />
                     </Pressable>
                   </View>
                 ))}
@@ -255,6 +256,7 @@ function RegistrarTreino({
   onRegistrou: (s: Sessao) => void
   onErro: (m: string) => void
 }) {
+  const styles = estilos()
   const hoje = new Date().getDay() as DiaSemana
   const daRotina = rotina.filter(e => e.dia === hoje)
 
@@ -303,7 +305,7 @@ function RegistrarTreino({
             value={titulo}
             onChangeText={setTitulo}
             placeholder="Corrida, natação, academia…"
-            placeholderTextColor={inkFraco}
+            placeholderTextColor={paleta().inkFraco}
             keyboardAppearance="dark"
             maxLength={40}
             style={styles.campo}
@@ -361,10 +363,10 @@ function RegistrarTreino({
         accessibilityRole="button"
       >
         {salvando ? (
-          <ActivityIndicator size="small" color={cores.branco} />
+          <ActivityIndicator size="small" color={paleta().cores.branco} />
         ) : (
           <>
-            <Ionicons name="checkmark" size={18} color={cores.branco} />
+            <Ionicons name="checkmark" size={18} color={paleta().cores.branco} />
             <Text style={styles.textoBotao}>Registrar treino de hoje</Text>
           </>
         )}
@@ -396,6 +398,7 @@ function Rotina({
   onErro: (m: string) => void
   erro: string
 }) {
+  const styles = estilos()
   const [dia, setDia] = useState<DiaSemana>(() => new Date().getDay() as DiaSemana)
   const [nome, setNome] = useState('')
   const [series, setSeries] = useState('')
@@ -491,7 +494,7 @@ function Rotina({
               accessibilityRole="button"
               accessibilityLabel={`Remover ${e.nome}`}
             >
-              <Ionicons name="close" size={16} color={inkFraco} />
+              <Ionicons name="close" size={16} color={paleta().inkFraco} />
             </Pressable>
           </View>
         ))
@@ -504,7 +507,7 @@ function Rotina({
           value={nome}
           onChangeText={setNome}
           placeholder="Supino reto"
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           keyboardAppearance="dark"
           maxLength={60}
           style={styles.campo}
@@ -518,7 +521,7 @@ function Rotina({
               value={series}
               onChangeText={t => setSeries(t.replace(/[^0-9]/g, ''))}
               placeholder="4"
-              placeholderTextColor={inkFraco}
+              placeholderTextColor={paleta().inkFraco}
               keyboardType="number-pad"
               keyboardAppearance="dark"
               maxLength={2}
@@ -536,7 +539,7 @@ function Rotina({
               value={repeticoes}
               onChangeText={setRepeticoes}
               placeholder="8-12"
-              placeholderTextColor={inkFraco}
+              placeholderTextColor={paleta().inkFraco}
               keyboardAppearance="dark"
               maxLength={20}
               style={styles.campo}
@@ -550,7 +553,7 @@ function Rotina({
               value={carga}
               onChangeText={t => setCarga(t.replace(/[^0-9.,]/g, ''))}
               placeholder="40"
-              placeholderTextColor={inkFraco}
+              placeholderTextColor={paleta().inkFraco}
               keyboardType="decimal-pad"
               keyboardAppearance="dark"
               maxLength={6}
@@ -569,10 +572,10 @@ function Rotina({
           accessibilityRole="button"
         >
           {salvando ? (
-            <ActivityIndicator size="small" color={cores.branco} />
+            <ActivityIndicator size="small" color={paleta().cores.branco} />
           ) : (
             <>
-              <Ionicons name="add" size={18} color={cores.branco} />
+              <Ionicons name="add" size={18} color={paleta().cores.branco} />
               <Text style={styles.textoBotao}>Adicionar exercício</Text>
             </>
           )}
@@ -598,8 +601,9 @@ function comoData(iso: string): Date {
   return new Date(ano, mes - 1, dia)
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -609,7 +613,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   abas: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
   aba: {
@@ -618,12 +622,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  abaAtiva: { backgroundColor: cores.superficie, borderColor: cores.verde },
-  textoAba: { fontSize: 13.5, fontWeight: '700', color: inkSuave },
-  textoAbaAtivo: { color: cores.ink },
+  abaAtiva: { backgroundColor: t.cores.superficie, borderColor: t.cores.verde },
+  textoAba: { fontSize: 13.5, fontWeight: '700', color: t.inkSuave },
+  textoAbaAtivo: { color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, gap: 10 },
   girando: { marginTop: 40 },
@@ -631,44 +635,44 @@ const styles = StyleSheet.create({
   placar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 16,
   },
   numeroPlacar: { flex: 1, alignItems: 'center', gap: 2 },
-  valorPlacar: { fontSize: 30, fontWeight: '800', color: cores.limao, letterSpacing: -0.8 },
-  rotuloPlacar: { fontSize: 11.5, color: inkSuave, textAlign: 'center', lineHeight: 16 },
-  divisor: { width: 1, height: 40, backgroundColor: cores.borda },
+  valorPlacar: { fontSize: 30, fontWeight: '800', color: t.cores.limao, letterSpacing: -0.8 },
+  rotuloPlacar: { fontSize: 11.5, color: t.inkSuave, textAlign: 'center', lineHeight: 16 },
+  divisor: { width: 1, height: 40, backgroundColor: t.cores.borda },
 
   cartao: {
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     padding: 16,
     gap: 8,
   },
-  tituloCartao: { fontSize: 14.5, fontWeight: '800', color: cores.ink },
-  listaRotina: { fontSize: 13, color: inkMedio, lineHeight: 19 },
+  tituloCartao: { fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
+  listaRotina: { fontSize: 13, color: t.inkMedio, lineHeight: 19 },
 
-  rotulo: { fontSize: 12.5, fontWeight: '700', color: inkMedio, marginTop: 6 },
-  ajuda: { fontSize: 11.5, color: inkFraco, lineHeight: 17 },
+  rotulo: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio, marginTop: 6 },
+  ajuda: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17 },
 
   campo: {
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14.5,
-    color: cores.ink,
+    color: t.cores.ink,
   },
   linhaCampos: { flexDirection: 'row', gap: 8 },
   campoPequeno: { flex: 1, gap: 4 },
-  rotuloPequeno: { fontSize: 11.5, color: inkSuave },
+  rotuloPequeno: { fontSize: 11.5, color: t.inkSuave },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
@@ -676,8 +680,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
   },
   chipEsforco: {
     width: 46,
@@ -685,13 +689,13 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
   },
-  chipAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
-  textoChip: { fontSize: 13.5, fontWeight: '700', color: cores.ink },
-  textoChipAtivo: { color: cores.sobreLimao },
-  legendaEsforco: { fontSize: 12, color: inkSuave },
+  chipAtivo: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
+  textoChip: { fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+  textoChipAtivo: { color: t.cores.sobreLimao },
+  legendaEsforco: { fontSize: 12, color: t.inkSuave },
 
   botao: {
     flexDirection: 'row',
@@ -700,16 +704,16 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 13,
     borderRadius: 12,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     marginTop: 6,
   },
-  textoBotao: { fontSize: 14.5, fontWeight: '800', color: cores.branco },
+  textoBotao: { fontSize: 14.5, fontWeight: '800', color: t.cores.branco },
   pressionado: { opacity: 0.75 },
 
   tituloSecao: {
     fontSize: 12,
     fontWeight: '700',
-    color: inkFraco,
+    color: t.inkFraco,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
     marginTop: 12,
@@ -719,10 +723,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 11,
     paddingHorizontal: 13,
   },
@@ -730,16 +734,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingVertical: 11,
     paddingHorizontal: 13,
   },
   textoSessao: { flex: 1, gap: 1 },
-  nomeSessao: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
-  detalheSessao: { fontSize: 12, color: inkSuave },
+  nomeSessao: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  detalheSessao: { fontSize: 12, color: t.inkSuave },
 
   seletorDias: { flexDirection: 'row', gap: 6 },
   diaChip: {
@@ -749,15 +753,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  diaChipAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
-  textoDia: { fontSize: 12, fontWeight: '700', color: inkMedio },
-  textoDiaAtivo: { color: cores.sobreLimao },
-  pontoDia: { width: 4, height: 4, borderRadius: 2, backgroundColor: cores.verde },
-  pontoDiaAtivo: { backgroundColor: cores.sobreLimao },
+  diaChipAtivo: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
+  textoDia: { fontSize: 12, fontWeight: '700', color: t.inkMedio },
+  textoDiaAtivo: { color: t.cores.sobreLimao },
+  pontoDia: { width: 4, height: 4, borderRadius: 2, backgroundColor: t.cores.verde },
+  pontoDiaAtivo: { backgroundColor: t.cores.sobreLimao },
 
-  vazio: { fontSize: 13.5, color: inkSuave, lineHeight: 20, paddingVertical: 8 },
-  erro: { fontSize: 13, color: cores.erroTexto, lineHeight: 19 },
-})
+  vazio: { fontSize: 13.5, color: t.inkSuave, lineHeight: 20, paddingVertical: 8 },
+  erro: { fontSize: 13, color: t.cores.erroTexto, lineHeight: 19 },
+  }),
+)

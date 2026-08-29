@@ -1,5 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
-import { cores, inkMedio, veu } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* A pergunta antes de uma ação sem volta.
  *
@@ -33,6 +33,7 @@ export function Confirmacao({
   onConfirmar: () => void
   onCancelar: () => void
 }) {
+  const styles = estilos()
   return (
     <Modal
       visible={visivel}
@@ -79,10 +80,11 @@ export function Confirmacao({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   fundo: {
     flex: 1,
-    backgroundColor: veu,
+    backgroundColor: t.veu,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -90,17 +92,17 @@ const styles = StyleSheet.create({
   caixa: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     paddingHorizontal: 22,
     paddingTop: 22,
     paddingBottom: 18,
     gap: 8,
   },
-  titulo: { fontSize: 18, fontWeight: '800', color: cores.ink, letterSpacing: -0.3 },
-  mensagem: { fontSize: 14, color: inkMedio, lineHeight: 21 },
+  titulo: { fontSize: 18, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
+  mensagem: { fontSize: 14, color: t.inkMedio, lineHeight: 21 },
 
   botoes: { flexDirection: 'row', gap: 10, marginTop: 14 },
   botao: {
@@ -113,12 +115,13 @@ const styles = StyleSheet.create({
   },
   pressionado: { opacity: 0.75 },
 
-  botaoCancelar: { borderColor: cores.borda, backgroundColor: cores.cartao },
-  textoCancelar: { fontSize: 14.5, fontWeight: '700', color: cores.ink },
+  botaoCancelar: { borderColor: t.cores.borda, backgroundColor: t.cores.cartao },
+  textoCancelar: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
 
-  botaoConfirmar: { borderColor: cores.verde, backgroundColor: cores.verde },
-  textoConfirmar: { fontSize: 14.5, fontWeight: '800', color: cores.branco },
+  botaoConfirmar: { borderColor: t.cores.verde, backgroundColor: t.cores.verde },
+  textoConfirmar: { fontSize: 14.5, fontWeight: '800', color: t.cores.branco },
 
-  botaoPerigo: { borderColor: cores.erroBorda, backgroundColor: cores.erroFundo },
-  textoPerigo: { fontSize: 14.5, fontWeight: '800', color: cores.erroTexto },
-})
+  botaoPerigo: { borderColor: t.cores.erroBorda, backgroundColor: t.cores.erroFundo },
+  textoPerigo: { fontSize: 14.5, fontWeight: '800', color: t.cores.erroTexto },
+  }),
+)

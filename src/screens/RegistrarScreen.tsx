@@ -11,7 +11,7 @@ import { PesoScreen } from './PesoScreen'
 import { SonoScreen } from './SonoScreen'
 import { TreinoScreen } from './TreinoScreen'
 import { RefeicoesDoDiaScreen } from './RefeicoesDoDiaScreen'
-import { cores, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 type Opcao = {
   chave: string
@@ -67,6 +67,7 @@ export function RegistrarScreen({
   /* Treino mexe na constância que a tela inicial mostra. */
   onTreinoMudou: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [escolhida, setEscolhida] = useState<Opcao | null>(
     () => OPCOES.find(o => o.chave === inicial) ?? null,
@@ -156,7 +157,7 @@ export function RegistrarScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela} numberOfLines={1}>
           {escolhida ? escolhida.rotulo : 'Registrar'}
@@ -185,7 +186,7 @@ export function RegistrarScreen({
                 accessibilityLabel={o.rotulo}
               >
                 <View style={styles.circulo}>
-                  <Ionicons name={o.icone} size={22} color={cores.verde} />
+                  <Ionicons name={o.icone} size={22} color={paleta().cores.verde} />
                 </View>
                 <Text style={styles.rotulo} numberOfLines={2}>
                   {o.rotulo}
@@ -199,8 +200,9 @@ export function RegistrarScreen({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -210,10 +212,10 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32 },
-  chamada: { marginTop: 8, marginBottom: 18, fontSize: 14, color: inkSuave },
+  chamada: { marginTop: 8, marginBottom: 18, fontSize: 14, color: t.inkSuave },
 
   grade: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   cartao: {
@@ -233,18 +235,19 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  cartaoPressionado: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
+  cartaoPressionado: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
   circulo: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rotulo: { fontSize: 14, fontWeight: '700', color: cores.ink, lineHeight: 19 },
-})
+  rotulo: { fontSize: 14, fontWeight: '700', color: t.cores.ink, lineHeight: 19 },
+  }),
+)

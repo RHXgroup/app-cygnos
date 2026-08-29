@@ -1,16 +1,17 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { forcaSenha, requisitosSenha, type NivelSenha } from '../lib/formulario'
-import { cores, inkFraco, inkMedio } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const APARENCIA: Record<NivelSenha, { rotulo: string; cor: string; barras: number }> = {
-  fraca: { rotulo: 'Fraca', cor: cores.erroTexto, barras: 1 },
-  media: { rotulo: 'Média', cor: cores.gold, barras: 2 },
-  forte: { rotulo: 'Forte', cor: cores.deep, barras: 3 },
+  fraca: { rotulo: 'Fraca', cor: paleta().cores.erroTexto, barras: 1 },
+  media: { rotulo: 'Média', cor: paleta().cores.gold, barras: 2 },
+  forte: { rotulo: 'Forte', cor: paleta().cores.deep, barras: 3 },
 }
 
 /* Medidor + lista de requisitos. A lista é a parte útil: dizer "fraca" sem
    dizer o que falta deixa a pessoa tentando no escuro. */
 export function ForcaSenha({ senha }: { senha: string }) {
+  const styles = estilos()
   /* Antes de digitar não há o que avaliar, e um medidor vermelho na primeira
      vez que a pessoa olha o campo parece repreensão. */
   if (!senha) return null
@@ -47,7 +48,8 @@ export function ForcaSenha({ senha }: { senha: string }) {
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   bloco: { marginTop: 10, gap: 10 },
   linhaMedidor: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   barras: { flex: 1, flexDirection: 'row', gap: 5 },
@@ -55,7 +57,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 5,
     borderRadius: 3,
-    backgroundColor: cores.moss,
+    backgroundColor: t.cores.moss,
   },
   rotuloForca: { fontSize: 12.5, fontWeight: '700', minWidth: 44, textAlign: 'right' },
 
@@ -63,8 +65,9 @@ const styles = StyleSheet.create({
   linhaRequisito: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   /* Largura fixa para o "✓" e o "·" não empurrarem o texto de lugar quando o
      requisito é atendido. */
-  marcador: { width: 12, textAlign: 'center', fontSize: 12.5, color: inkFraco },
-  marcadorOk: { color: cores.deep, fontWeight: '700' },
-  textoRequisito: { fontSize: 12.5, color: inkFraco },
-  textoRequisitoOk: { color: inkMedio },
-})
+  marcador: { width: 12, textAlign: 'center', fontSize: 12.5, color: t.inkFraco },
+  marcadorOk: { color: t.cores.deep, fontWeight: '700' },
+  textoRequisito: { fontSize: 12.5, color: t.inkFraco },
+  textoRequisitoOk: { color: t.inkMedio },
+  }),
+)

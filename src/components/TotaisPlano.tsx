@@ -1,12 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { decimal, milhar } from '../lib/formatar'
 import { fracaoDosMacros, type Totais } from '../lib/plano'
-import { cores, coresMacro, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const MACROS = [
-  { chave: 'proteinas', rotulo: 'Proteínas', cor: coresMacro.proteinas },
-  { chave: 'carboidratos', rotulo: 'Carboidratos', cor: coresMacro.carboidratos },
-  { chave: 'gorduras', rotulo: 'Gorduras', cor: coresMacro.gorduras },
+  { chave: 'proteinas', rotulo: 'Proteínas', cor: paleta().coresMacro.proteinas },
+  { chave: 'carboidratos', rotulo: 'Carboidratos', cor: paleta().coresMacro.carboidratos },
+  { chave: 'gorduras', rotulo: 'Gorduras', cor: paleta().coresMacro.gorduras },
 ] as const
 
 /* O totalizador do plano: quanto o dia soma de energia e como essa energia se
@@ -16,6 +16,7 @@ const MACROS = [
  * de salvar, e na tela inicial, depois. Duas cópias divergiriam no primeiro
  * ajuste de estilo. */
 export function TotaisPlano({ totais, rotulo = 'Total do dia' }: { totais: Totais; rotulo?: string }) {
+  const styles = estilos()
   const fracao = fracaoDosMacros(totais)
   /* Sem macro nenhum não há o que repartir, e uma barra vazia com três legendas
      em zero só ocuparia espaço. */
@@ -87,13 +88,14 @@ export function TotaisPlano({ totais, rotulo = 'Total do dia' }: { totais: Totai
   )
 }
 
-const styles = StyleSheet.create({
-  cartao: { padding: 16, borderRadius: 20, backgroundColor: cores.verdeMenta },
-  rotulo: { fontSize: 13, fontWeight: '700', color: inkMedio },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  cartao: { padding: 16, borderRadius: 20, backgroundColor: t.cores.verdeMenta },
+  rotulo: { fontSize: 13, fontWeight: '700', color: t.inkMedio },
 
   linhaValor: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 2 },
-  valor: { fontSize: 34, fontWeight: '800', color: cores.verdeEscuro, letterSpacing: -1 },
-  unidade: { fontSize: 13, fontWeight: '600', color: inkMedio },
+  valor: { fontSize: 34, fontWeight: '800', color: t.cores.verdeEscuro, letterSpacing: -1 },
+  unidade: { fontSize: 13, fontWeight: '600', color: t.inkMedio },
 
   barra: {
     flexDirection: 'row',
@@ -103,18 +105,19 @@ const styles = StyleSheet.create({
     /* Recorta as pontas das fatias no arredondado da própria barra — sem isto
        a primeira e a última fatia vazam nos cantos. */
     overflow: 'hidden',
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
   },
 
   linhaMacros: { flexDirection: 'row', marginTop: 14 },
   macro: { flex: 1, paddingHorizontal: 8, gap: 3 },
-  macroComDivisor: { borderLeftWidth: 1, borderLeftColor: cores.borda },
+  macroComDivisor: { borderLeftWidth: 1, borderLeftColor: t.cores.borda },
   linhaRotuloMacro: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   ponto: { width: 7, height: 7, borderRadius: 4 },
-  rotuloMacro: { flexShrink: 1, fontSize: 11.5, fontWeight: '700', color: inkMedio },
-  valorMacro: { fontSize: 16, fontWeight: '800', color: cores.ink, letterSpacing: -0.3 },
-  percentualMacro: { fontSize: 10.5, color: inkSuave },
+  rotuloMacro: { flexShrink: 1, fontSize: 11.5, fontWeight: '700', color: t.inkMedio },
+  valorMacro: { fontSize: 16, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
+  percentualMacro: { fontSize: 10.5, color: t.inkSuave },
 
-  fibras: { marginTop: 14, fontSize: 12.5, fontWeight: '600', color: inkMedio },
-  aviso: { marginTop: 8, fontSize: 11.5, lineHeight: 16, color: inkFraco },
-})
+  fibras: { marginTop: 14, fontSize: 12.5, fontWeight: '600', color: t.inkMedio },
+  aviso: { marginTop: 8, fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+  }),
+)

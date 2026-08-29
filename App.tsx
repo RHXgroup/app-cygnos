@@ -45,7 +45,7 @@ import { RegistrarScreen } from './src/screens/RegistrarScreen'
 import { RelatoriosScreen } from './src/screens/RelatoriosScreen'
 import { SonoScreen } from './src/screens/SonoScreen'
 import type { PlanoCompleto, RefeicaoSalva } from './src/lib/plano'
-import { cores } from './src/theme'
+import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/tema'
 
 /* UM provider só, na raiz, e que nunca desmonta.
  *
@@ -57,11 +57,38 @@ import { cores } from './src/theme'
  * initialMetrics entrega os insets já no primeiro quadro, em vez de esperar
  * uma ida e volta de medição. */
 export default function App() {
+  /* A troca de tema acontece remontando a árvore inteira.
+   *
+   * `StyleSheet.create` congela as cores quando roda, e ele roda no topo de cada
+   * arquivo — então a única forma de um estilo já criado passar a usar outra cor
+   * é ele ser criado de novo. Subir esta chave joga fora a árvore e a refaz, e
+   * na volta cada arquivo pede os estilos outra vez, agora da paleta nova.
+   *
+   * Custa um piscar. Trocar de tema é coisa que se faz uma vez e esquece; pagar
+   * um quadro por isso é mais barato do que um hook e um useMemo em cento e
+   * setenta e nove componentes — e a metade deles são funções auxiliares, que
+   * não podem chamar hook nenhum.
+   *
+   * O tema é lido do aparelho antes do primeiro desenho; enquanto não veio, o
+   * padrão é o escuro, que é o que o app sempre foi. */
+  const [geracao, setGeracao] = useState(0)
+  const [lendoTema, setLendoTema] = useState(true)
+
+  useEffect(() => {
+    carregarTema().finally(() => setLendoTema(false))
+    escutarTema(() => setGeracao(g => g + 1))
+    return () => escutarTema(null)
+  }, [])
+
+  const styles = estilos()
+
+  if (lendoTema) return <View style={styles.raiz} />
+
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       {/* Cor de fundo na raiz: se algum dia sobrar um quadro sem conteúdo, ele
           aparece no fundo do app em vez de um branco estourado. */}
-      <View style={styles.raiz}>
+      <View key={geracao} style={styles.raiz}>
         <Raiz />
       </View>
     </SafeAreaProvider>
@@ -69,6 +96,7 @@ export default function App() {
 }
 
 function Raiz() {
+  const styles = estilos()
   const [sessao, setSessao] = useState<Session | null>(null)
   /* Três telas antes de entrar, e um estado ainda resolve: elas não empilham,
      não têm parâmetro de rota e sempre voltam para o login. Uma biblioteca de
@@ -143,9 +171,9 @@ function Raiz() {
   if (verificando) {
     return (
       <>
-        <StatusBar style="light" />
+        <StatusBar style={tema() === "claro" ? "dark" : "light"} />
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       </>
     )
@@ -162,9 +190,9 @@ function Raiz() {
     if (acesso === 'checando') {
       return (
         <>
-          <StatusBar style="light" />
+          <StatusBar style={tema() === "claro" ? "dark" : "light"} />
           <View style={styles.centro}>
-            <ActivityIndicator color={cores.verde} />
+            <ActivityIndicator color={paleta().cores.verde} />
           </View>
         </>
       )
@@ -174,7 +202,7 @@ function Raiz() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={tema() === "claro" ? "dark" : "light"} />
       <SafeAreaView style={styles.telaAuth}>
         {telaAberta === 'cadastro' ? (
           <CadastroScreen onVoltar={() => setTelaAberta('login')} />
@@ -211,6 +239,7 @@ function Raiz() {
  * tela: são nove telas com campo de texto, cada uma com três ou quatro saídas, e
  * uma esquecida traz o defeito de volta pelo caminho que ninguém lembrou. */
 function Sobreposta({ children }: { children: React.ReactNode }) {
+  const styles = estilos()
   useEffect(() => () => Keyboard.dismiss(), [])
   return <View style={styles.sobreposta}>{children}</View>
 }
@@ -220,6 +249,7 @@ function Sobreposta({ children }: { children: React.ReactNode }) {
    Sem SafeAreaView em volta, de propósito — a faixa do topo precisa sangrar até
    a borda, e quem cuida do respiro do notch é a própria Home. */
 function AreaLogada({ sessao }: { sessao: Session }) {
+  const styles = estilos()
   const { width } = useWindowDimensions()
   const [aba, setAba] = useState<Aba>('inicio')
   /* As telas do menu vivem aqui, e não dentro da Home, para poder cobrir também
@@ -408,7 +438,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   return (
     <>
       {/* Fundo escuro em todas as telas, então os ícones do sistema são claros. */}
-      <StatusBar style="light" />
+      <StatusBar style={tema() === "claro" ? "dark" : "light"} />
       <View style={styles.telaApp}>
         <ScrollView
           ref={carrossel}
@@ -789,8 +819,9 @@ function TelaDaAba({
   }
 }
 
-const styles = StyleSheet.create({
-  raiz: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  raiz: { flex: 1, backgroundColor: t.cores.fundo },
   /* Toda tela sobreposta pinta o próprio fundo.
    *
    * absoluteFill sozinho é transparente: bastava a tela de cima não cobrir cada
@@ -800,11 +831,12 @@ const styles = StyleSheet.create({
    *
    * O fundo aqui, e não em cada tela, porque o buraco é da moldura: quem esquecer
    * de pintar a sua continua coberto. */
-  sobreposta: { ...StyleSheet.absoluteFillObject, backgroundColor: cores.fundo },
+  sobreposta: { ...StyleSheet.absoluteFillObject, backgroundColor: t.cores.fundo },
   /* Login e cadastro ficam um degrau acima do fundo da área logada, para o
      cartão de formulário não sumir dentro da tela. */
-  telaAuth: { flex: 1, backgroundColor: cores.mist },
-  telaApp: { flex: 1, backgroundColor: cores.fundo },
+  telaAuth: { flex: 1, backgroundColor: t.cores.mist },
+  telaApp: { flex: 1, backgroundColor: t.cores.fundo },
   carrossel: { flex: 1 },
-  centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.fundo },
-})
+  centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.cores.fundo },
+  }),
+)

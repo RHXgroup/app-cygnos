@@ -34,7 +34,7 @@ import {
   type PlanoCompleto,
   type RefeicaoMontada,
 } from '../lib/plano'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 const LIMITE_NOME = 80
 
@@ -80,6 +80,7 @@ export function EditarPlanoScreen({
   onFechar: () => void
   onSalvo: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [nome, setNome] = useState(plano.nome)
   const [dias, setDias] = useState<DiaSemana[]>(plano.diasSemana)
@@ -246,7 +247,7 @@ export function EditarPlanoScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Editar plano</Text>
         <View style={styles.botaoVoltar} />
@@ -325,7 +326,7 @@ export function EditarPlanoScreen({
           style={({ pressed }) => [styles.botaoTracejado, pressed && styles.tracejadoPressionado]}
           accessibilityRole="button"
         >
-          <Ionicons name="add" size={18} color={cores.verde} />
+          <Ionicons name="add" size={18} color={paleta().cores.verde} />
           <Text style={styles.textoTracejado}>Adicionar refeição</Text>
         </Pressable>
 
@@ -351,7 +352,7 @@ export function EditarPlanoScreen({
           accessibilityState={{ disabled: !mudou || salvando }}
         >
           {salvando ? (
-            <ActivityIndicator color={cores.branco} />
+            <ActivityIndicator color={paleta().cores.branco} />
           ) : (
             <Text style={styles.textoBotao}>{mudou ? 'Salvar' : 'Nada para salvar'}</Text>
           )}
@@ -455,6 +456,7 @@ function BlocoRefeicao({
   onAcoes: (item: ItemAlimento) => void
   onRemoverVariacao: (item: string, variacao: string) => void
 }) {
+  const styles = estilos()
   const t = totaisDe(refeicao.itens)
 
   return (
@@ -464,7 +466,7 @@ function BlocoRefeicao({
           value={refeicao.rotulo}
           onChangeText={onRotulo}
           placeholder="Nome da refeição"
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           keyboardAppearance="dark"
           maxLength={40}
           editable={!desativado}
@@ -475,7 +477,7 @@ function BlocoRefeicao({
           value={refeicao.hora}
           onChangeText={onHora}
           placeholder="00:00"
-          placeholderTextColor={inkFraco}
+          placeholderTextColor={paleta().inkFraco}
           keyboardAppearance="dark"
           keyboardType="number-pad"
           maxLength={5}
@@ -491,7 +493,7 @@ function BlocoRefeicao({
           accessibilityRole="button"
           accessibilityLabel={`Remover ${refeicao.rotulo || 'refeição'}`}
         >
-          <Ionicons name="trash-outline" size={17} color={inkFraco} />
+          <Ionicons name="trash-outline" size={17} color={paleta().inkFraco} />
         </Pressable>
       </View>
 
@@ -514,7 +516,7 @@ function BlocoRefeicao({
               </Text>
               <Text style={styles.detalheItem}>{detalheDoItem(item)}</Text>
             </View>
-            <Ionicons name="ellipsis-vertical" size={16} color={inkFraco} />
+            <Ionicons name="ellipsis-vertical" size={16} color={paleta().inkFraco} />
           </Pressable>
 
           {/* As variações ficam presas ao alimento, recuadas: são o "ou" dele,
@@ -535,7 +537,7 @@ function BlocoRefeicao({
                 accessibilityRole="button"
                 accessibilityLabel={`Remover variação ${v.nome}`}
               >
-                <Ionicons name="close" size={15} color={inkFraco} />
+                <Ionicons name="close" size={15} color={paleta().inkFraco} />
               </Pressable>
             </View>
           ))}
@@ -548,7 +550,7 @@ function BlocoRefeicao({
         style={({ pressed }) => [styles.botaoTracejado, pressed && styles.tracejadoPressionado]}
         accessibilityRole="button"
       >
-        <Ionicons name="add" size={17} color={cores.verde} />
+        <Ionicons name="add" size={17} color={paleta().cores.verde} />
         <Text style={styles.textoTracejado}>Adicionar alimentos</Text>
       </Pressable>
 
@@ -561,7 +563,7 @@ function BlocoRefeicao({
         accessibilityRole="button"
         accessibilityLabel="Escrever a refeição de uma vez"
       >
-        <Ionicons name="create-outline" size={15} color={inkMedio} />
+        <Ionicons name="create-outline" size={15} color={paleta().inkMedio} />
         <Text style={styles.textoBotaoEscrever}>Escrever tudo de uma vez</Text>
       </Pressable>
     </View>
@@ -581,6 +583,7 @@ function AcaoMenu({
   perigo?: boolean
   onPress: () => void
 }) {
+  const styles = estilos()
   return (
     <Pressable
       onPress={onPress}
@@ -588,7 +591,7 @@ function AcaoMenu({
       accessibilityRole="button"
     >
       <View style={[styles.iconeAcao, perigo && styles.iconeAcaoPerigo]}>
-        <Ionicons name={icone} size={19} color={perigo ? cores.erroTexto : cores.verde} />
+        <Ionicons name={icone} size={19} color={perigo ? paleta().cores.erroTexto : paleta().cores.verde} />
       </View>
       <View style={styles.textoAcao}>
         <Text style={[styles.rotuloAcao, perigo && styles.rotuloAcaoPerigo]}>{rotulo}</Text>
@@ -598,7 +601,8 @@ function AcaoMenu({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   botaoEscrever: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,10 +612,10 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
-  textoBotaoEscrever: { fontSize: 12.5, fontWeight: '700', color: inkMedio },
-  tela: { flex: 1, backgroundColor: cores.fundo },
+  textoBotaoEscrever: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
 
   cabecalho: {
     flexDirection: 'row',
@@ -621,18 +625,18 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 24, gap: 12 },
-  secao: { marginTop: 6, fontSize: 13, fontWeight: '800', color: inkMedio },
+  secao: { marginTop: 6, fontSize: 13, fontWeight: '800', color: t.inkMedio },
 
   bloco: {
     gap: 8,
     padding: 14,
     borderRadius: 18,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   cabecalhoRefeicao: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   campoRotulo: {
@@ -641,27 +645,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     /* 16px é o mínimo que o iOS aceita sem dar zoom automático no campo. */
     fontSize: 16,
     fontWeight: '700',
-    color: cores.ink,
+    color: t.cores.ink,
   },
   campoHora: {
     width: 72,
     height: 44,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
-    color: cores.ink,
+    color: t.cores.ink,
   },
   botaoRemoverRefeicao: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  kcalRefeicao: { fontSize: 12, fontWeight: '700', color: inkMedio },
+  kcalRefeicao: { fontSize: 12, fontWeight: '700', color: t.inkMedio },
 
   item: { gap: 6 },
   linhaItem: {
@@ -671,13 +675,13 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   textoItem: { flex: 1 },
-  nomeItem: { fontSize: 14, fontWeight: '600', color: cores.ink, lineHeight: 19 },
-  detalheItem: { marginTop: 2, fontSize: 11.5, color: inkSuave },
+  nomeItem: { fontSize: 14, fontWeight: '600', color: t.cores.ink, lineHeight: 19 },
+  detalheItem: { marginTop: 2, fontSize: 11.5, color: t.inkSuave },
 
   variacao: {
     flexDirection: 'row',
@@ -687,10 +691,10 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
   },
-  ou: { fontSize: 11, fontWeight: '800', color: cores.verdeEscuro },
-  nomeVariacao: { fontSize: 13, fontWeight: '600', color: cores.ink, lineHeight: 18 },
+  ou: { fontSize: 11, fontWeight: '800', color: t.cores.verdeEscuro },
+  nomeVariacao: { fontSize: 13, fontWeight: '600', color: t.cores.ink, lineHeight: 18 },
 
   botaoTracejado: {
     flexDirection: 'row',
@@ -701,25 +705,25 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: cores.verdeClaro,
+    borderColor: t.cores.verdeClaro,
   },
-  tracejadoPressionado: { backgroundColor: cores.verdeMenta },
-  textoTracejado: { fontSize: 14, fontWeight: '700', color: cores.verde },
+  tracejadoPressionado: { backgroundColor: t.cores.verdeMenta },
+  textoTracejado: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
 
   totais: { marginTop: 6 },
-  erro: { fontSize: 13, color: cores.erroTexto, textAlign: 'center' },
+  erro: { fontSize: 13, color: t.cores.erroTexto, textAlign: 'center' },
 
   rodape: { paddingHorizontal: 20, paddingTop: 10 },
   botao: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botaoPressionado: { backgroundColor: cores.verdeEscuro },
+  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
   botaoDesativado: { opacity: 0.45 },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
 
   fundoMenu: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   menu: {
@@ -729,7 +733,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingTop: 10,
     paddingHorizontal: 20,
-    backgroundColor: cores.fundo,
+    backgroundColor: t.cores.fundo,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -738,11 +742,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: cores.trilho,
+    backgroundColor: t.cores.trilho,
     marginBottom: 14,
   },
-  nomeMenu: { fontSize: 17, fontWeight: '800', color: cores.ink, lineHeight: 23 },
-  detalheMenu: { marginTop: 2, marginBottom: 10, fontSize: 12.5, color: inkSuave },
+  nomeMenu: { fontSize: 17, fontWeight: '800', color: t.cores.ink, lineHeight: 23 },
+  detalheMenu: { marginTop: 2, marginBottom: 10, fontSize: 12.5, color: t.inkSuave },
 
   acao: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   acaoPressionada: { opacity: 0.6 },
@@ -752,11 +756,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
   },
-  iconeAcaoPerigo: { backgroundColor: cores.erroFundo },
+  iconeAcaoPerigo: { backgroundColor: t.cores.erroFundo },
   textoAcao: { flex: 1 },
-  rotuloAcao: { fontSize: 15, fontWeight: '700', color: cores.ink },
-  rotuloAcaoPerigo: { color: cores.erroTexto },
-  descricaoAcao: { marginTop: 2, fontSize: 12, lineHeight: 17, color: inkSuave },
-})
+  rotuloAcao: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+  rotuloAcaoPerigo: { color: t.cores.erroTexto },
+  descricaoAcao: { marginTop: 2, fontSize: 12, lineHeight: 17, color: t.inkSuave },
+  }),
+)

@@ -20,7 +20,7 @@ import {
   type AnguloFoto,
   type SessaoDeFotos,
 } from '../lib/fotos'
-import { cores, inkFraco, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* A comparação das fotos de evolução — montada pela PESSOA.
  *
@@ -34,6 +34,7 @@ import { cores, inkFraco, inkSuave } from '../theme'
  * melhorou, não põe seta para cima. Quem lê essas fotos é a pessoa, e quem
  * interpreta é a nutricionista dela. */
 export function ComparativoFotos({ sessoes }: { sessoes: SessaoDeFotos[] }) {
+  const styles = estilos()
   const angulos = useMemo(() => angulosComFoto(sessoes), [sessoes])
 
   const [angulo, setAngulo] = useState<AnguloFoto>(angulos[0] ?? 'frente')
@@ -104,7 +105,7 @@ export function ComparativoFotos({ sessoes }: { sessoes: SessaoDeFotos[] }) {
 
       {!!intervalo && (
         <View style={styles.intervalo}>
-          <Ionicons name="time-outline" size={13} color={cores.verde} />
+          <Ionicons name="time-outline" size={13} color={paleta().cores.verde} />
           <Text style={styles.textoIntervalo}>{intervalo}</Text>
         </View>
       )}
@@ -155,7 +156,7 @@ export function ComparativoFotos({ sessoes }: { sessoes: SessaoDeFotos[] }) {
             </>
           )}
           <View style={styles.fecharAmpliada}>
-            <Ionicons name="close" size={24} color={cores.branco} />
+            <Ionicons name="close" size={24} color={paleta().cores.branco} />
           </View>
         </Pressable>
       </Modal>
@@ -175,6 +176,7 @@ function Coluna({
   angulo: AnguloFoto
   onAmpliar: (f: { url: string; legenda: string }) => void
 }) {
+  const styles = estilos()
   /* Qual endereço não carregou. Guardado o endereço, e não um sim/não, para que
      uma URL nova — e elas são renovadas a cada abertura da tela — entre
      tentando de novo em vez de herdar a desistência da anterior. */
@@ -211,7 +213,7 @@ function Coluna({
            listada sem a foto daquele ângulo) e foto que existe mas não carregou.
            Diz o que houve em vez de mostrar um quadrado cinza sem explicação. */
         <View style={[styles.foto, styles.fotoVazia]}>
-          <Ionicons name={foto ? 'cloud-offline-outline' : 'image-outline'} size={22} color={inkFraco} />
+          <Ionicons name={foto ? 'cloud-offline-outline' : 'image-outline'} size={22} color={paleta().inkFraco} />
           <Text style={styles.textoFotoVazia}>
             {foto ? 'Não consegui carregar esta foto' : 'Sem foto deste ângulo'}
           </Text>
@@ -234,6 +236,7 @@ function FitaDeDatas({
   escolhida: number | null
   onEscolher: (id: number) => void
 }) {
+  const styles = estilos()
   return (
     <View style={styles.blocoDatas}>
       <Text style={styles.rotuloBloco}>{titulo}</Text>
@@ -266,14 +269,15 @@ function FitaDeDatas({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   rotuloBloco: {
     marginTop: 16,
     fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    color: cores.verde,
+    color: t.cores.verde,
     marginBottom: 6,
   },
 
@@ -287,12 +291,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  fitaAberta: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
-  textoFita: { fontSize: 12.5, fontWeight: '600', color: inkSuave },
-  textoFitaAberto: { fontWeight: '800', color: cores.verdeEscuro },
+  fitaAberta: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  textoFita: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
+  textoFitaAberto: { fontWeight: '800', color: t.cores.verdeEscuro },
 
   par: { flexDirection: 'row', gap: 10, marginTop: 16 },
   /* Sozinha ela não ocupa a largura toda: 3:4 em tela cheia fica mais alta que o
@@ -301,7 +305,7 @@ const styles = StyleSheet.create({
      automática ele não teria eixo principal para crescer. */
   solo: { flexDirection: 'row', marginTop: 16, alignSelf: 'center', width: '64%' },
   coluna: { flex: 1 },
-  tituloColuna: { fontSize: 12, fontWeight: '700', color: inkSuave, marginBottom: 6 },
+  tituloColuna: { fontSize: 12, fontWeight: '700', color: t.inkSuave, marginBottom: 6 },
   /* Retrato 3:4, que é como se fotografa corpo inteiro. Altura fixa pelo aspecto
      mantém as duas colunas do mesmo tamanho mesmo quando as fotos vêm com
      proporções diferentes — sem isso, uma foto deitada empurraria a outra. */
@@ -309,11 +313,11 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 3 / 4,
     borderRadius: 14,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
   },
   fotoVazia: { alignItems: 'center', justifyContent: 'center', gap: 6 },
-  textoFotoVazia: { fontSize: 11.5, color: inkFraco, textAlign: 'center', paddingHorizontal: 8 },
-  dataColuna: { marginTop: 6, fontSize: 12.5, fontWeight: '600', color: cores.ink },
+  textoFotoVazia: { fontSize: 11.5, color: t.inkFraco, textAlign: 'center', paddingHorizontal: 8 },
+  dataColuna: { marginTop: 6, fontSize: 12.5, fontWeight: '600', color: t.cores.ink },
 
   intervalo: {
     flexDirection: 'row',
@@ -323,11 +327,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: cores.verdeMenta,
+    backgroundColor: t.cores.verdeMenta,
   },
-  textoIntervalo: { fontSize: 12.5, fontWeight: '700', color: cores.verdeEscuro },
+  textoIntervalo: { fontSize: 12.5, fontWeight: '700', color: t.cores.verdeEscuro },
 
-  explicacao: { marginTop: 16, fontSize: 13, lineHeight: 19, color: inkSuave },
+  explicacao: { marginTop: 16, fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   blocoDatas: { marginTop: 4 },
   datas: { gap: 6, paddingRight: 20 },
@@ -337,12 +341,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  dataAberta: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
-  textoData: { fontSize: 12.5, fontWeight: '600', color: inkSuave },
-  textoDataAberta: { fontWeight: '800', color: cores.verdeEscuro },
+  dataAberta: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  textoData: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
+  textoDataAberta: { fontWeight: '800', color: t.cores.verdeEscuro },
 
   fundoAmpliada: {
     flex: 1,
@@ -352,6 +356,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   fotoAmpliada: { width: '100%', height: '82%' },
-  legendaAmpliada: { marginTop: 14, fontSize: 13, fontWeight: '600', color: cores.branco },
+  legendaAmpliada: { marginTop: 14, fontSize: 13, fontWeight: '600', color: t.cores.branco },
   fecharAmpliada: { position: 'absolute', top: 48, right: 20 },
-})
+  }),
+)

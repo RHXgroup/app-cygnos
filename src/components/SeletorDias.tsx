@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { DIAS_CURTOS } from '../lib/formatar'
 import { TODOS_OS_DIAS, resumoDosDias, type DiaSemana } from '../lib/plano'
-import { cores, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* Em que dias o plano se repete. Aparece ao criar e ao editar, então mora aqui:
    duas cópias divergiriam no primeiro ajuste. */
@@ -14,6 +14,7 @@ export function SeletorDias({
   onMudar: (dias: DiaSemana[]) => void
   desativado?: boolean
 }) {
+  const styles = estilos()
   return (
     <View style={styles.bloco}>
       <View style={styles.fitas}>
@@ -50,7 +51,8 @@ export function SeletorDias({
   )
 }
 
-const styles = StyleSheet.create({
+const estilos = estilosDe(t =>
+  StyleSheet.create({
   bloco: { gap: 10 },
   /* Sete fitas numa linha só: em tela estreita o flex-wrap manda a última para
      baixo em vez de espremer as sete até o texto sumir. */
@@ -63,11 +65,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.cartao,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  fitaMarcada: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
-  texto: { fontSize: 12.5, fontWeight: '600', color: inkSuave },
-  textoMarcado: { fontWeight: '800', color: cores.verdeEscuro },
-  explicacao: { fontSize: 12.5, lineHeight: 18, color: inkSuave },
-})
+  fitaMarcada: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  texto: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
+  textoMarcado: { fontWeight: '800', color: t.cores.verdeEscuro },
+  explicacao: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
+  }),
+)

@@ -25,7 +25,12 @@ import {
   ligarLembretes,
   ligarLembretesDeAgua,
 } from '../lib/lembretes'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta, tema, trocarTema, type Tema } from '../lib/tema'
+
+const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'sunny-outline' }[] = [
+  { chave: 'escuro', rotulo: 'Escuro', icone: 'moon-outline' },
+  { chave: 'claro', rotulo: 'Claro', icone: 'sunny-outline' },
+]
 
 const MARGEM = 20
 const PADDING_CARTAO = 16
@@ -53,6 +58,7 @@ export function MaisScreen({
   onAbrirCodigo: () => void
   onAbrirExcluirConta: () => void
 }) {
+  const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
   /* Os lembretes saem dos horários do plano, então ele precisa estar em mãos na
@@ -203,7 +209,7 @@ export function MaisScreen({
         <RefreshControl
           refreshing={atualizando}
           onRefresh={puxarParaAtualizar}
-          tintColor={cores.limao}
+          tintColor={paleta().cores.limao}
         />
       }
     >
@@ -242,7 +248,7 @@ export function MaisScreen({
           <Ionicons
             name={lembretes ? 'notifications' : 'notifications-off-outline'}
             size={17}
-            color={lembretes ? cores.sobreLimao : cores.verde}
+            color={lembretes ? paleta().cores.sobreLimao : paleta().cores.verde}
           />
           <Text style={[styles.textoBotaoSair, lembretes && styles.textoBotaoLembreteAtivo]}>
             {mexendoLembretes ? 'Um instante…' : lembretes ? 'Lembretes ligados' : 'Ligar lembretes'}
@@ -274,7 +280,7 @@ export function MaisScreen({
           <Ionicons
             name={agua ? 'water' : 'water-outline'}
             size={17}
-            color={agua ? cores.sobreLimao : cores.verde}
+            color={agua ? paleta().cores.sobreLimao : paleta().cores.verde}
           />
           <Text style={[styles.textoBotaoSair, agua && styles.textoBotaoLembreteAtivo]}>
             {mexendoAgua ? 'Um instante…' : agua ? 'Lembretes ligados' : 'Ligar lembretes'}
@@ -294,7 +300,7 @@ export function MaisScreen({
           accessibilityRole="button"
           accessibilityLabel="Sair da conta"
         >
-          <Ionicons name="log-out-outline" size={17} color={cores.verde} />
+          <Ionicons name="log-out-outline" size={17} color={paleta().cores.verde} />
           <Text style={styles.textoBotaoSair}>Sair da conta</Text>
         </Pressable>
 
@@ -310,6 +316,46 @@ export function MaisScreen({
         >
           <Text style={styles.textoLinkExcluir}>Excluir conta</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.cartao}>
+        <Text style={styles.tituloCartao}>Aparência</Text>
+        <Text style={styles.explicacaoLembrete}>
+          O claro segue as cores da marca; o escuro é o padrão do app.
+        </Text>
+
+        {/* Duas opções, e não um interruptor de "modo escuro".
+            Interruptor obriga a pessoa a saber qual é o estado atual para
+            entender o que o toque faz. Dois botões mostram os dois estados e
+            marcam onde ela está. */}
+        <View style={styles.linhaTema}>
+          {OPCOES_DE_TEMA.map(o => {
+            const escolhido = tema() === o.chave
+            return (
+              <Pressable
+                key={o.chave}
+                onPress={() => trocarTema(o.chave)}
+                style={({ pressed }) => [
+                  styles.botaoTema,
+                  escolhido && styles.botaoTemaEscolhido,
+                  pressed && styles.botaoSairPressionado,
+                ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: escolhido }}
+                accessibilityLabel={`Tema ${o.rotulo}`}
+              >
+                <Ionicons
+                  name={o.icone}
+                  size={17}
+                  color={escolhido ? paleta().cores.sobreLimao : paleta().cores.verde}
+                />
+                <Text style={[styles.textoBotaoSair, escolhido && styles.textoBotaoTemaEscolhido]}>
+                  {o.rotulo}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
       </View>
 
       <View style={styles.cartao}>
@@ -344,6 +390,7 @@ function LinhaLink({
   rotulo: string
   onPress: () => void
 }) {
+  const styles = estilos()
   return (
     <Pressable
       onPress={onPress}
@@ -351,9 +398,9 @@ function LinhaLink({
       accessibilityRole="link"
       accessibilityLabel={rotulo}
     >
-      <Ionicons name={icone} size={18} color={cores.verde} />
+      <Ionicons name={icone} size={18} color={paleta().cores.verde} />
       <Text style={styles.textoLink}>{rotulo}</Text>
-      <Ionicons name="open-outline" size={15} color={inkFraco} />
+      <Ionicons name="open-outline" size={15} color={paleta().inkFraco} />
     </Pressable>
   )
 }
@@ -378,10 +425,11 @@ function CartaoNutricionista({
   onAbrir: () => void
   onAbrirCodigo: () => void
 }) {
+  const styles = estilos()
   if (carregando) {
     return (
       <View style={[styles.cartao, styles.cartaoCarregando]}>
-        <ActivityIndicator color={cores.verde} />
+        <ActivityIndicator color={paleta().cores.verde} />
       </View>
     )
   }
@@ -408,7 +456,7 @@ function CartaoNutricionista({
       >
         <View style={styles.cabecalhoCartao}>
           <Text style={styles.tituloCartao}>Meu nutricionista</Text>
-          <Ionicons name="chevron-forward" size={18} color={inkFraco} />
+          <Ionicons name="chevron-forward" size={18} color={paleta().inkFraco} />
         </View>
 
         <View style={styles.linhaNutri}>
@@ -463,40 +511,41 @@ function CartaoNutricionista({
             ? `Ver ${lista.length} ${lista.length === 1 ? 'nutricionista' : 'nutricionistas'}`
             : 'Ver nutricionistas'}
         </Text>
-        <Ionicons name="chevron-forward" size={17} color={cores.verde} />
+        <Ionicons name="chevron-forward" size={17} color={paleta().cores.verde} />
       </Pressable>
 
       <Pressable onPress={onAbrirCodigo} style={styles.linhaCodigo} accessibilityRole="button">
-        <Ionicons name="link-outline" size={14} color={inkMedio} />
+        <Ionicons name="link-outline" size={14} color={paleta().inkMedio} />
         <Text style={styles.textoCodigo}>Ver o meu código de vínculo</Text>
       </Pressable>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: MARGEM, paddingBottom: 28, gap: 14 },
 
-  titulo: { fontSize: 27, fontWeight: '800', color: cores.ink, letterSpacing: -0.6 },
+  titulo: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
 
-  cartao: { borderRadius: 20, backgroundColor: cores.cartao, padding: PADDING_CARTAO },
-  cartaoPressionado: { backgroundColor: cores.trilho },
+  cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: PADDING_CARTAO },
+  cartaoPressionado: { backgroundColor: t.cores.trilho },
   cartaoCarregando: { alignItems: 'center', paddingVertical: 34 },
   cabecalhoCartao: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  tituloCartao: { fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloCartao: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   linhaNutri: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14 },
   textoNutri: { flex: 1 },
-  nomeNutri: { fontSize: 15.5, fontWeight: '700', color: cores.ink, lineHeight: 21 },
-  crnNutri: { marginTop: 2, fontSize: 12, color: inkSuave },
-  especialidades: { marginTop: 3, fontSize: 11.5, color: inkFraco },
+  nomeNutri: { fontSize: 15.5, fontWeight: '700', color: t.cores.ink, lineHeight: 21 },
+  crnNutri: { marginTop: 2, fontSize: 12, color: t.inkSuave },
+  especialidades: { marginTop: 3, fontSize: 11.5, color: t.inkFraco },
 
-  semVinculo: { marginTop: 8, fontSize: 13.5, lineHeight: 20, color: inkSuave },
+  semVinculo: { marginTop: 8, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
 
   convite: {
     flexDirection: 'row',
@@ -506,19 +555,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
   },
-  convitePressionado: { backgroundColor: cores.verdeMenta },
+  convitePressionado: { backgroundColor: t.cores.verdeMenta },
   pilha: { flexDirection: 'row' },
   /* Sobreposição para a esquerda: a pilha ocupa menos e diz "são várias" sem
      precisar de um número antes de o olho chegar nele. */
   empilhado: { marginLeft: -12 },
-  textoConvite: { flex: 1, fontSize: 14, fontWeight: '700', color: cores.verde },
+  textoConvite: { flex: 1, fontSize: 14, fontWeight: '700', color: t.cores.verde },
 
   linhaCodigo: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 14 },
-  textoCodigo: { fontSize: 12.5, fontWeight: '600', color: inkMedio },
+  textoCodigo: { fontSize: 12.5, fontWeight: '600', color: t.inkMedio },
 
-  email: { marginTop: 6, fontSize: 13, color: inkSuave },
+  email: { marginTop: 6, fontSize: 13, color: t.inkSuave },
   botaoSair: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -528,9 +577,9 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: cores.verde,
+    borderColor: t.cores.verde,
   },
-  explicacaoLembrete: { fontSize: 13, color: inkSuave, lineHeight: 19, marginBottom: 12 },
+  explicacaoLembrete: { fontSize: 13, color: t.inkSuave, lineHeight: 19, marginBottom: 12 },
   botaoLembrete: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -539,8 +588,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: cores.borda,
-    backgroundColor: cores.superficie,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
   },
   rotuloLembrete: {
     marginTop: 2,
@@ -548,26 +597,40 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    color: cores.verde,
+    color: t.cores.verde,
   },
   /* Separa os dois interruptores sem virar um segundo cartão: são o mesmo
      assunto, e dois cartões iguais lado a lado dariam a entender que um
      substitui o outro. */
-  divisor: { height: 1, backgroundColor: cores.borda, marginVertical: 16 },
-  botaoLembreteAtivo: { backgroundColor: cores.limao, borderColor: cores.limao },
+  divisor: { height: 1, backgroundColor: t.cores.borda, marginVertical: 16 },
+linhaTema: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  botaoTema: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  botaoTemaEscolhido: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
+  textoBotaoTemaEscolhido: { color: t.cores.sobreLimao },
+  botaoLembreteAtivo: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
   botaoLembreteDesligado: { opacity: 0.45 },
-  textoBotaoLembreteAtivo: { color: cores.sobreLimao },
-  avisoLembrete: { fontSize: 12.5, color: inkSuave, lineHeight: 18, marginTop: 10 },
-  botaoSairPressionado: { backgroundColor: cores.verdeMenta },
-  textoBotaoSair: { fontSize: 15, fontWeight: '600', color: cores.verde },
+  textoBotaoLembreteAtivo: { color: t.cores.sobreLimao },
+  avisoLembrete: { fontSize: 12.5, color: t.inkSuave, lineHeight: 18, marginTop: 10 },
+  botaoSairPressionado: { backgroundColor: t.cores.verdeMenta },
+  textoBotaoSair: { fontSize: 15, fontWeight: '600', color: t.cores.verde },
 
   /* Centralizado e sem moldura: a exclusão precisa estar sempre alcançável — é
      exigência da loja —, mas não competindo pelo olhar com o que se usa todo
      dia. */
   linkExcluir: { alignSelf: 'center', marginTop: 12, paddingVertical: 6 },
-  textoLinkExcluir: { fontSize: 13.5, fontWeight: '600', color: cores.erroTexto },
+  textoLinkExcluir: { fontSize: 13.5, fontWeight: '600', color: t.cores.erroTexto },
 
-  textoPrivacidade: { marginTop: 6, fontSize: 13, lineHeight: 19, color: inkSuave },
+  textoPrivacidade: { marginTop: 6, fontSize: 13, lineHeight: 19, color: t.inkSuave },
   linhaLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -576,10 +639,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
     borderRadius: 14,
-    backgroundColor: cores.superficie,
+    backgroundColor: t.cores.superficie,
   },
-  linhaLinkPressionada: { backgroundColor: cores.verdeMenta },
-  textoLink: { flex: 1, fontSize: 14, fontWeight: '600', color: cores.ink },
+  linhaLinkPressionada: { backgroundColor: t.cores.verdeMenta },
+  textoLink: { flex: 1, fontSize: 14, fontWeight: '600', color: t.cores.ink },
 
-  textoErro: { marginTop: 8, fontSize: 13, lineHeight: 19, color: inkSuave },
-})
+  textoErro: { marginTop: 8, fontSize: 13, lineHeight: 19, color: t.inkSuave },
+  }),
+)

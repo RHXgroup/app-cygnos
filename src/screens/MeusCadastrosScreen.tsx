@@ -36,7 +36,7 @@ import {
   type CalculoSalvo,
 } from '../lib/energia'
 import { Confirmacao } from '../components/Confirmacao'
-import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+import { estilosDe, paleta } from '../lib/tema'
 
 /* O que o paciente cadastrou no app, em dois degraus: primeiro QUAL cadastro
  * ele quer ver, depois o conteúdo.
@@ -86,6 +86,7 @@ export function MeusCadastrosScreen({
      recarrega pelas versões. Um caminho só para as duas telas. */
   onAtivou: () => void
 }) {
+  const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   /* null = o índice. */
   const [secao, setSecao] = useState<Secao | null>(null)
@@ -302,7 +303,7 @@ export function MeusCadastrosScreen({
           accessibilityRole="button"
           accessibilityLabel="Voltar"
         >
-          <Ionicons name="chevron-back" size={22} color={cores.ink} />
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela} numberOfLines={1}>
           {tituloDaSecao}
@@ -312,7 +313,7 @@ export function MeusCadastrosScreen({
 
       {carregando ? (
         <View style={styles.centro}>
-          <ActivityIndicator color={cores.verde} />
+          <ActivityIndicator color={paleta().cores.verde} />
         </View>
       ) : (
         <ScrollView
@@ -444,7 +445,7 @@ export function MeusCadastrosScreen({
             style={({ pressed }) => [styles.botao, pressed && styles.botaoPressionado]}
             accessibilityRole="button"
           >
-            <Ionicons name="add" size={19} color={cores.branco} />
+            <Ionicons name="add" size={19} color={paleta().cores.branco} />
             <Text style={styles.textoBotao}>
               {secao === 'planos'
                 ? 'Novo plano alimentar'
@@ -506,6 +507,7 @@ function CartaoMetas({
   onAtivar: () => void
   onApagar: () => void
 }) {
+  const styles = estilos()
   const quantas = quantasMetas(metas)
 
   const resumoNumeros = [
@@ -556,7 +558,7 @@ function CartaoMetas({
           accessibilityRole="button"
           accessibilityLabel={`Apagar as metas ${metas.nome}`}
         >
-          <Ionicons name="close" size={17} color={inkFraco} />
+          <Ionicons name="close" size={17} color={paleta().inkFraco} />
         </Pressable>
       </View>
 
@@ -571,10 +573,10 @@ function CartaoMetas({
           accessibilityLabel={`Ativar as metas ${metas.nome}`}
         >
           {ativando ? (
-            <ActivityIndicator size="small" color={cores.verde} />
+            <ActivityIndicator size="small" color={paleta().cores.verde} />
           ) : (
             <>
-              <Ionicons name="checkmark-circle-outline" size={16} color={cores.verde} />
+              <Ionicons name="checkmark-circle-outline" size={16} color={paleta().cores.verde} />
               <Text style={styles.textoAtivar}>Usar estas metas</Text>
             </>
           )}
@@ -600,6 +602,7 @@ function CartaoCalculo({
   onAtivar: () => void
   onApagar: () => void
 }) {
+  const styles = estilos()
   return (
     <View style={[styles.cartao, calculo.ativo && styles.cartaoAtivo]}>
       <View style={styles.corpoCartao}>
@@ -653,7 +656,7 @@ function CartaoCalculo({
           accessibilityRole="button"
           accessibilityLabel={`Apagar o cálculo ${calculo.nome}`}
         >
-          <Ionicons name="close" size={17} color={inkFraco} />
+          <Ionicons name="close" size={17} color={paleta().inkFraco} />
         </Pressable>
       </View>
 
@@ -668,10 +671,10 @@ function CartaoCalculo({
           accessibilityLabel={`Ativar o cálculo ${calculo.nome}`}
         >
           {ativando ? (
-            <ActivityIndicator size="small" color={cores.verde} />
+            <ActivityIndicator size="small" color={paleta().cores.verde} />
           ) : (
             <>
-              <Ionicons name="checkmark-circle-outline" size={16} color={cores.verde} />
+              <Ionicons name="checkmark-circle-outline" size={16} color={paleta().cores.verde} />
               <Text style={styles.textoAtivar}>Usar este cálculo</Text>
             </>
           )}
@@ -692,6 +695,7 @@ function Porta({
   resumo: string
   onPress: () => void
 }) {
+  const styles = estilos()
   return (
     <Pressable
       onPress={onPress}
@@ -700,13 +704,13 @@ function Porta({
       accessibilityLabel={titulo}
     >
       <View style={styles.icone}>
-        <Ionicons name={icone} size={22} color={cores.verde} />
+        <Ionicons name={icone} size={22} color={paleta().cores.verde} />
       </View>
       <View style={styles.textoCartao}>
         <Text style={styles.tituloPorta}>{titulo}</Text>
         <Text style={styles.resumoPorta}>{resumo}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={19} color={inkFraco} />
+      <Ionicons name="chevron-forward" size={19} color={paleta().inkFraco} />
     </Pressable>
   )
 }
@@ -727,6 +731,7 @@ function CartaoPlano({
   onAtivar: () => void
   onApagar: () => void
 }) {
+  const styles = estilos()
   const totais = totaisDe(itensDoPlano(plano.refeicoes))
   const quantasRefeicoes = plano.refeicoes.length
 
@@ -751,7 +756,7 @@ function CartaoPlano({
           </View>
 
           <View style={styles.linhaDias}>
-            <Ionicons name="repeat-outline" size={13} color={cores.verde} />
+            <Ionicons name="repeat-outline" size={13} color={paleta().cores.verde} />
             <Text style={styles.dias} numberOfLines={1}>
               {resumoDosDias(plano.diasSemana)}
             </Text>
@@ -764,7 +769,7 @@ function CartaoPlano({
           <Text style={styles.data}>Criado em {dataNumerica(new Date(plano.criadoEm))}</Text>
         </View>
 
-        <Ionicons name="chevron-forward" size={19} color={inkFraco} />
+        <Ionicons name="chevron-forward" size={19} color={paleta().inkFraco} />
       </Pressable>
 
       <Pressable
@@ -774,7 +779,7 @@ function CartaoPlano({
         accessibilityRole="button"
         accessibilityLabel={`Apagar o plano ${plano.nome}`}
       >
-        <Ionicons name="close" size={17} color={inkFraco} />
+        <Ionicons name="close" size={17} color={paleta().inkFraco} />
       </Pressable>
 
       {plano.ativo ? (
@@ -788,10 +793,10 @@ function CartaoPlano({
           accessibilityLabel={`Ativar o plano ${plano.nome}`}
         >
           {ativando ? (
-            <ActivityIndicator size="small" color={cores.verde} />
+            <ActivityIndicator size="small" color={paleta().cores.verde} />
           ) : (
             <>
-              <Ionicons name="checkmark-circle-outline" size={16} color={cores.verde} />
+              <Ionicons name="checkmark-circle-outline" size={16} color={paleta().cores.verde} />
               <Text style={styles.textoAtivar}>Ativar este plano</Text>
             </>
           )}
@@ -801,8 +806,9 @@ function CartaoPlano({
   )
 }
 
-const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+const estilos = estilosDe(t =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: t.cores.fundo },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -813,10 +819,10 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: cores.ink },
+  tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   conteudo: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24, gap: 10 },
-  chamada: { marginBottom: 4, fontSize: 14, color: inkSuave },
+  chamada: { marginBottom: 4, fontSize: 14, color: t.inkSuave },
 
   porta: {
     flexDirection: 'row',
@@ -824,61 +830,61 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 16,
     borderRadius: 20,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
   },
   icone: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: cores.verdeClaro,
+    backgroundColor: t.cores.verdeClaro,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tituloPorta: { fontSize: 16, fontWeight: '800', color: cores.ink },
-  resumoPorta: { marginTop: 3, fontSize: 12.5, color: inkSuave },
+  tituloPorta: { fontSize: 16, fontWeight: '800', color: t.cores.ink },
+  resumoPorta: { marginTop: 3, fontSize: 12.5, color: t.inkSuave },
 
-  vazio: { fontSize: 13, lineHeight: 19, color: inkSuave },
+  vazio: { fontSize: 13, lineHeight: 19, color: t.inkSuave },
 
   blocoErro: {
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: cores.erroBorda,
-    backgroundColor: cores.erroFundo,
+    borderColor: t.cores.erroBorda,
+    backgroundColor: t.cores.erroFundo,
   },
-  tituloErro: { fontSize: 13.5, fontWeight: '700', color: cores.erroTexto },
-  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: cores.erroTexto },
+  tituloErro: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
+  detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   cartao: {
     borderRadius: 18,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     /* Recorta o realce do toque no arredondado do cartão. */
     overflow: 'hidden',
   },
-  cartaoAtivo: { borderColor: cores.verdeClaro, backgroundColor: cores.verdeMenta },
+  cartaoAtivo: { borderColor: t.cores.verdeClaro, backgroundColor: t.cores.verdeMenta },
   corpoCartao: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
-  corpoPressionado: { backgroundColor: cores.verdeClaro },
-  cartaoPressionado: { backgroundColor: cores.verdeMenta, borderColor: cores.verdeClaro },
+  corpoPressionado: { backgroundColor: t.cores.verdeClaro },
+  cartaoPressionado: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
   textoCartao: { flex: 1 },
   linhaNome: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nome: { flexShrink: 1, fontSize: 15.5, fontWeight: '800', color: cores.ink },
+  nome: { flexShrink: 1, fontSize: 15.5, fontWeight: '800', color: t.cores.ink },
   selo: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  textoSelo: { fontSize: 10.5, fontWeight: '800', color: cores.branco },
+  textoSelo: { fontSize: 10.5, fontWeight: '800', color: t.cores.branco },
 
   avisoAtivo: {
     paddingHorizontal: 14,
     paddingBottom: 12,
     fontSize: 11.5,
-    color: inkSuave,
+    color: t.inkSuave,
   },
   botaoAtivar: {
     flexDirection: 'row',
@@ -887,39 +893,39 @@ const styles = StyleSheet.create({
     gap: 6,
     height: 44,
     borderTopWidth: 1,
-    borderTopColor: cores.borda,
+    borderTopColor: t.cores.borda,
   },
-  botaoAtivarPressionado: { backgroundColor: cores.verdeClaro },
-  textoAtivar: { fontSize: 13.5, fontWeight: '700', color: cores.verde },
+  botaoAtivarPressionado: { backgroundColor: t.cores.verdeClaro },
+  textoAtivar: { fontSize: 13.5, fontWeight: '700', color: t.cores.verde },
   linhaDias: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  dias: { flexShrink: 1, fontSize: 12.5, fontWeight: '700', color: cores.verde },
-  detalhe: { marginTop: 4, fontSize: 12.5, color: inkSuave },
-  data: { marginTop: 2, fontSize: 11.5, color: inkFraco },
-  retrato: { marginTop: 4, fontSize: 11, lineHeight: 15, color: inkFraco },
+  dias: { flexShrink: 1, fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
+  detalhe: { marginTop: 4, fontSize: 12.5, color: t.inkSuave },
+  data: { marginTop: 2, fontSize: 11.5, color: t.inkFraco },
+  retrato: { marginTop: 4, fontSize: 11, lineHeight: 15, color: t.inkFraco },
 
   linhaNumeros: { flexDirection: 'row', gap: 16, marginTop: 8 },
   numero: {},
-  rotuloNumero: { fontSize: 11, color: inkSuave },
-  valorNumero: { marginTop: 1, fontSize: 15, fontWeight: '800', color: cores.ink },
-  valorAlvo: { color: cores.verde },
+  rotuloNumero: { fontSize: 11, color: t.inkSuave },
+  valorNumero: { marginTop: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  valorAlvo: { color: t.cores.verde },
 
   apagar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  apagarPressionado: { backgroundColor: cores.trilho },
+  apagarPressionado: { backgroundColor: t.cores.trilho },
 
   blocoMetas: {
     padding: 16,
     borderRadius: 18,
-    backgroundColor: cores.cartao,
+    backgroundColor: t.cores.cartao,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: t.cores.borda,
     gap: 8,
   },
   tituloBlocoMetas: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  textoTituloBloco: { fontSize: 14.5, fontWeight: '800', color: cores.ink },
+  textoTituloBloco: { fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
   linhaMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  rotuloMeta: { fontSize: 13.5, color: inkSuave },
-  valorMeta: { flexShrink: 1, fontSize: 13.5, fontWeight: '700', color: inkMedio },
-  notaBloco: { fontSize: 11, color: inkFraco },
+  rotuloMeta: { fontSize: 13.5, color: t.inkSuave },
+  valorMeta: { flexShrink: 1, fontSize: 13.5, fontWeight: '700', color: t.inkMedio },
+  notaBloco: { fontSize: 11, color: t.inkFraco },
 
   rodape: { paddingHorizontal: 20, paddingTop: 10 },
   botao: {
@@ -929,8 +935,9 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 54,
     borderRadius: 16,
-    backgroundColor: cores.verde,
+    backgroundColor: t.cores.verde,
   },
-  botaoPressionado: { backgroundColor: cores.verdeEscuro },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: cores.branco },
-})
+  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
+  }),
+)
