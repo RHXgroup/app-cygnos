@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Platform } from 'react-native'
+import { LogBox, Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 import { falha } from './erros'
 
@@ -64,6 +64,24 @@ let modulo: Promise<ModuloNotificacoes> | null = null
 
 function notificacoes(): Promise<ModuloNotificacoes> {
   if (!modulo) {
+    /* Cala um aviso que não é sobre nós, e que aparece como TELA VERMELHA.
+     *
+     * `expo-notifications` registra um ouvinte de push assim que é importado —
+     * é efeito colateral de módulo, em DevicePushTokenAutoRegistration.fx, e o
+     * `index` reexporta esse arquivo, então não há import que escape. No Expo
+     * Go do Android o push foi removido no SDK 53, e esse registro vira um
+     * `console.error` que o LogBox transforma em tela vermelha por cima do app.
+     *
+     * Ela aparece exatamente quando a pessoa LIGA um lembrete, e diz que o push
+     * remoto não funciona — sobre um app que só usa lembrete LOCAL, agendado no
+     * próprio aparelho, que funciona. Quem está testando lê "erro" e conclui que
+     * o lembrete quebrou.
+     *
+     * Silenciar aqui, e não no App: fica ao lado da causa, e a ordem é garantida
+     * — o `ignoreLogs` roda antes do import que dispara o aviso. Some sozinho no
+     * dia do build de verdade, onde o push existe e o aviso não é emitido. */
+    LogBox.ignoreLogs([/expo-notifications: Android Push notifications/])
+
     modulo = import('expo-notifications').then(n => {
       /* Como a notificação se comporta com o app aberto. Sem isto o Android
          engole a que chega em primeiro plano, e quem está com o app na mão — o
