@@ -17,12 +17,15 @@ import {
  * auxiliares que também usam estilo não podem chamar hook nenhum.
  *
  * Aqui a paleta é uma variável de módulo, e cada arquivo declara os estilos uma
- * vez com `estilosDe`. Trocar de tema troca a variável e remonta a árvore pela
- * raiz (ver o `key` no App), e na remontagem os estilos são recalculados. Uma
- * linha por arquivo, nenhuma por componente, e funciona em qualquer função.
+ * vez com `estilosDe`. Trocar de tema troca a variável e manda a raiz redesenhar
+ * (ver `escutarTema` no App); como `estilos()` é chamado durante o render, cada
+ * componente pede os estilos de novo e recebe os da paleta nova. Uma linha por
+ * arquivo, nenhuma por componente, e funciona em qualquer função.
  *
- * O preço é a remontagem. Ela custa um piscar — e trocar de tema é uma ação que
- * a pessoa faz uma vez e esquece, não algo que aconteça durante o uso.
+ * REDESENHAR, e não remontar. A primeira versão remontava a árvore com uma
+ * `key`, e isso jogava para a tela inicial quem trocasse a cor estando em Mais —
+ * escolher três cores seguidas exigia navegar até lá três vezes. Re-render
+ * preserva o estado dos filhos; só desmontar destrói.
  *
  * ── O que NÃO é escolhível ─────────────────────────────────────────────────
  * O vermelho de erro e os três matizes dos macros. Erro que muda de cor deixa de

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -58,26 +58,29 @@ import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/te
  * initialMetrics entrega os insets já no primeiro quadro, em vez de esperar
  * uma ida e volta de medição. */
 export default function App() {
-  /* A troca de tema acontece remontando a árvore inteira.
+  /* A troca de tema redesenha a árvore. Redesenha, e não remonta.
    *
-   * `StyleSheet.create` congela as cores quando roda, e ele roda no topo de cada
-   * arquivo — então a única forma de um estilo já criado passar a usar outra cor
-   * é ele ser criado de novo. Subir esta chave joga fora a árvore e a refaz, e
-   * na volta cada arquivo pede os estilos outra vez, agora da paleta nova.
+   * A diferença é tudo. A primeira versão disto punha `geracao` como `key` da
+   * View da raiz, e isso REMONTAVA o app: quem trocasse a cor estando na aba
+   * Mais era jogado de volta para a tela inicial, com toda tela aberta fechada
+   * junto. Escolher três cores seguidas exigia navegar até Mais três vezes.
    *
-   * Custa um piscar. Trocar de tema é coisa que se faz uma vez e esquece; pagar
-   * um quadro por isso é mais barato do que um hook e um useMemo em cento e
-   * setenta e nove componentes — e a metade deles são funções auxiliares, que
-   * não podem chamar hook nenhum.
+   * E a remontagem nunca foi necessária. `estilos()` é chamado DURANTE o render
+   * de cada componente, não no topo do arquivo — então basta o app renderizar de
+   * novo para cada um pedir os estilos outra vez e receber os da paleta nova.
+   * Subir um estado na raiz faz exatamente isso, e re-render preserva o estado
+   * dos filhos; só desmontar destrói.
    *
    * O tema é lido do aparelho antes do primeiro desenho; enquanto não veio, o
-   * padrão é o escuro, que é o que o app sempre foi. */
-  const [geracao, setGeracao] = useState(0)
+   * padrão é o claro, que é a cara da marca. */
+  /* Só existe para provocar o novo desenho. O valor em si não é usado em lugar
+     nenhum — quem lê a paleta é cada `estilos()`, no render. */
+  const [, redesenhar] = useReducer((n: number) => n + 1, 0)
   const [lendoTema, setLendoTema] = useState(true)
 
   useEffect(() => {
     carregarTema().finally(() => setLendoTema(false))
-    escutarTema(() => setGeracao(g => g + 1))
+    escutarTema(redesenhar)
     return () => escutarTema(null)
   }, [])
 
@@ -89,7 +92,9 @@ export default function App() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       {/* Cor de fundo na raiz: se algum dia sobrar um quadro sem conteúdo, ele
           aparece no fundo do app em vez de um branco estourado. */}
-      <View key={geracao} style={styles.raiz}>
+      {/* Sem `key` aqui. Ver o comentário acima: uma chave que muda remonta a
+          árvore e leva junto a navegação de quem só queria trocar de cor. */}
+      <View style={styles.raiz}>
         <Raiz />
       </View>
     </SafeAreaProvider>
