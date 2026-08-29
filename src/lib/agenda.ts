@@ -1,3 +1,4 @@
+import { falha } from './erros'
 import { supabase } from './supabase'
 import { dataCurta, dataPorExtenso, horaCurta } from './formatar'
 
@@ -50,7 +51,7 @@ export type MinhaConsulta = {
 
 export async function carregarVagas(dias = 30): Promise<DiaComVagas[]> {
   const { data, error } = await supabase.rpc('app_horarios_livres', { p_dias: dias })
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui carregar os horários. Verifique a conexão.', error))
 
   /* A RPC já vem ordenada por instante, então empurrar na ordem de chegada
      preserva a ordem dos dias e a das horas dentro de cada dia. */
@@ -73,7 +74,7 @@ export async function carregarVagas(dias = 30): Promise<DiaComVagas[]> {
    própria agenda. */
 export async function carregarMinhasConsultas(): Promise<MinhaConsulta[]> {
   const { data, error } = await supabase.rpc('app_minhas_consultas')
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui carregar as suas consultas. Verifique a conexão.', error))
 
   return ((data ?? []) as any[]).map(l => ({
     id: l.id,
@@ -101,9 +102,16 @@ export async function solicitarConsulta(inicio: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/* Aqui NÃO se repassa o texto do banco, ao contrário do pedido logo acima.
+ *
+ * A diferença é quem escreveu a frase. `app_solicitar_consulta` levanta
+ * mensagem para gente ler — é ela que explica por que o toque não virou
+ * consulta. `app_cancelar_solicitacao` não levanta nada: é um update simples,
+ * então tudo que chega até aqui é falha de rede ou de permissão, e o que a
+ * pessoa leria seria "Network request failed" na hora de desistir de um pedido. */
 export async function cancelarSolicitacao(id: number): Promise<void> {
   const { error } = await supabase.rpc('app_cancelar_solicitacao', { p_id: id })
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui cancelar o pedido agora. Verifique a conexão.', error))
 }
 
 /* ── Apresentação ──────────────────────────────────────────────────────────*/

@@ -2,6 +2,20 @@ import { supabase } from './supabase'
 import { falha } from './erros'
 import { dataNumerica, milhar } from './formatar'
 
+/* ── Por que estas funções LANÇAM, e o que elas lançam ─────────────────────
+   Lançar é a forma daqui, e a tela que as consome já trata: ela junta as
+   quatro num Promise.all e tem um `.catch` só. Trocar por resultado tipado
+   mudaria a tela inteira para ganhar nada.
+
+   O que mudou foi o TEXTO. Antes ia `error.message`, e a tela o mostrava
+   direto: o paciente lia "permission denied for function" e "Network request
+   failed" — inglês, de programador, e sem dizer o que fazer. Agora vai uma
+   frase nossa, e o texto cru vai para o console pelo `falha()`.
+
+   A exceção continua sendo `agenda.ts`, e por um motivo que não vale aqui: lá
+   o banco escreve mensagem para gente ler ("Esse horário não está mais
+   disponível."), e repassar é melhor do que traduzir. */
+
 /* O que a nutricionista tem para este paciente.
  *
  * Ver a migração 20260803000003 no repo web. Uma chamada só, e é o BANCO que
@@ -199,7 +213,7 @@ const numero = (v: unknown): number | null =>
 
 export async function carregarAnamneses(): Promise<Anamnese[]> {
   const { data, error } = await supabase.rpc('app_anamnese_do_paciente')
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui carregar as suas anamneses. Verifique a conexão.', error))
 
   return ((data ?? []) as any[]).map(l => ({
     id: l.id,
@@ -221,7 +235,7 @@ export async function carregarAnamneses(): Promise<Anamnese[]> {
 
 export async function carregarAvaliacoes(): Promise<Avaliacao[]> {
   const { data, error } = await supabase.rpc('app_antropometria_do_paciente')
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui carregar as suas medidas. Verifique a conexão.', error))
 
   return ((data ?? []) as any[]).map(l => ({
     id: l.id,
@@ -254,7 +268,7 @@ export async function carregarAvaliacoes(): Promise<Avaliacao[]> {
    mostra um dia de cada vez, e para isso precisa deles separados. */
 export async function carregarPlano(): Promise<PlanoDaNutri | null> {
   const { data, error } = await supabase.rpc('app_plano_do_paciente')
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui carregar o plano da sua nutricionista. Verifique a conexão.', error))
 
   const linhas = (data ?? []) as any[]
   if (linhas.length === 0) return null
@@ -324,7 +338,7 @@ function descricaoDeVerdade(bruta: string | null): string | null {
 
 export async function carregarEnergetico(): Promise<Energetico | null> {
   const { data, error } = await supabase.rpc('app_energetico_do_paciente')
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui carregar o seu gasto energético. Verifique a conexão.', error))
 
   const l = ((data ?? []) as any[])[0]
   if (!l) return null

@@ -1,3 +1,4 @@
+import { falha } from './erros'
 import { supabase } from './supabase'
 import { dataNumerica } from './formatar'
 
@@ -52,7 +53,7 @@ const CONHECIDOS = new Set<string>(['frente', 'costas', 'lado_esquerdo', 'lado_d
 
 export async function carregarSessoes(): Promise<SessaoDeFotos[]> {
   const { data, error } = await supabase.functions.invoke('app-fotos')
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(falha('Não consegui carregar as suas fotos. Verifique a conexão.', error))
 
   /* A função responde `{ sessoes: [] }` quando a conta não está vinculada, e o
      erro dela vem no corpo com status próprio — o `error` acima já cobre isso. */
