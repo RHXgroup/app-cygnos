@@ -114,6 +114,8 @@ export function ContadorCaloriasScreen({
   /* Quantos registros estão esperando a rede voltar. Zero na maioria das
      vezes; quando não é, a tela precisa dizer — senão a pessoa acha que o
      item sumiu. */
+  /* As quatro formas menos usadas ficam recolhidas, como no "+". */
+  const [maisFormas, setMaisFormas] = useState(false)
   const [pendentes, setPendentes] = useState(0)
 
   useEffect(() => {
@@ -515,21 +517,29 @@ export function ContadorCaloriasScreen({
             </View>
           </View>
 
-          {/* ── As três portas ── */}
+          {/* ── As formas de registrar ──
+              Mesma hierarquia do "+" da barra, e de propósito: são a mesma
+              ação. Duas telas com as mesmas sete opções em desenhos diferentes
+              se leem como dois menus diferentes, e a pessoa passa a procurar em
+              qual dos dois estava o que ela quer.
+
+              O que muda entre os dois lugares é só a refeição de destino: o "+"
+              usa a do relógio, e aqui é a que a pessoa escolheu logo acima. É
+              por isso que este não pode simplesmente sumir. */}
           <View style={styles.portas}>
             <Porta
+              icone="mic-outline"
+              titulo="Falar"
+              detalhe="Tudo de uma vez"
+              onPress={() => setPorta('escrever')}
+            />
+            <Porta
               icone="camera-outline"
-              titulo="Fotografar"
+              titulo="Foto"
               detalhe="A IA estima"
               ocupada={analisando}
               onPress={() => fotografar('camera')}
               onLongPress={() => fotografar('galeria')}
-            />
-            <Porta
-              icone="search-outline"
-              titulo="Buscar"
-              detalhe="Tabela"
-              onPress={() => setPorta('busca')}
             />
             <Porta
               icone="nutrition-outline"
@@ -538,48 +548,48 @@ export function ContadorCaloriasScreen({
               desligada={!plano}
               onPress={() => setPorta('plano')}
             />
-            {/* A quarta porta resolve o caso mais frequente de todos: comer
-                hoje o mesmo que ontem. As outras três descrevem comida nova. */}
-            <Porta
-              icone="repeat-outline"
-              titulo="Repetir"
-              detalhe="O de sempre"
-              onPress={abrirRepetir}
-            />
-            {/* A refeição inteira de uma vez, falada ou escrita. É a porta que
-                dispensa buscar alimento por alimento, e o microfone lidera
-                porque falar é o gesto de quem está com o prato na frente.
-
-                Erra mais que as outras — por isso a tela mostra o que entendeu
-                antes de gravar, e por isso ela não vem primeiro aqui. */}
-            <Porta
-              icone="mic-outline"
-              titulo="Falar ou escrever"
-              detalhe="Tudo de uma vez"
-              onPress={() => setPorta('escrever')}
-            />
-            {/* O pacote na mão já diz qual produto é. Fica ao lado de
-                "Buscar" porque resolve o mesmo problema — achar o alimento —
-                sem a parte de digitar e escolher entre parecidos. */}
-            <Porta
-              icone="barcode-outline"
-              titulo="Código de barras"
-              detalhe="Produto embalado"
-              onPress={() => setPorta('codigo')}
-            />
-            {/* O que a pessoa come junto e repete. Última porque só serve
-                depois de existir uma receita — e a primeira precisa ser
-                montada pelas outras portas. */}
-            <Porta
-              icone="book-outline"
-              titulo="Minhas receitas"
-              detalhe="O de sempre, junto"
-              onPress={() => setPorta('receitas')}
-            />
           </View>
 
+          {maisFormas ? (
+            <View style={styles.listaFormas}>
+              <LinhaForma
+                icone="search-outline"
+                titulo="Buscar"
+                onPress={() => setPorta('busca')}
+                styles={styles}
+              />
+              <LinhaForma
+                icone="repeat-outline"
+                titulo="Repetir"
+                onPress={abrirRepetir}
+                styles={styles}
+              />
+              <LinhaForma
+                icone="barcode-outline"
+                titulo="Código de barras"
+                onPress={() => setPorta('codigo')}
+                styles={styles}
+              />
+              <LinhaForma
+                icone="book-outline"
+                titulo="Minhas receitas"
+                onPress={() => setPorta('receitas')}
+                styles={styles}
+              />
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setMaisFormas(true)}
+              style={({ pressed }) => [styles.maisFormas, pressed && styles.chipPressionado]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.textoMaisFormas}>Outras formas de registrar</Text>
+              <Ionicons name="chevron-down" size={16} color={paleta().inkSuave} />
+            </Pressable>
+          )}
+
           <Text style={styles.dicaPortas}>
-            Segure em "Fotografar" para escolher uma foto da galeria em vez de tirar na hora.
+            Segure em "Foto" para escolher uma imagem da galeria em vez de tirar na hora.
           </Text>
 
           {pendentes > 0 && (
@@ -889,6 +899,33 @@ function Porta({
       <Ionicons name={icone} size={22} color={desligada ? paleta().inkFraco : paleta().cores.verde} />
       <Text style={[styles.tituloPorta, desligada && styles.textoDesligado]}>{titulo}</Text>
       <Text style={styles.detalhePorta}>{detalhe}</Text>
+    </Pressable>
+  )
+}
+
+/* Uma forma de registrar, em lista. Irmã da `Linha` da tela do "+": mesma
+   forma, mesmo peso visual, porque é a mesma ação. */
+function LinhaForma({
+  icone,
+  titulo,
+  onPress,
+  styles,
+}: {
+  icone: keyof typeof Ionicons.glyphMap
+  titulo: string
+  onPress: () => void
+  styles: ReturnType<typeof estilos>
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.linhaForma, pressed && styles.chipPressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={titulo}
+    >
+      <Ionicons name={icone} size={19} color={paleta().cores.verde} />
+      <Text style={styles.rotuloForma}>{titulo}</Text>
+      <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
     </Pressable>
   )
 }
@@ -1480,6 +1517,35 @@ const estilos = estilosDe(t =>
   tituloPorta: { fontSize: 13, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
   textoDesligado: { color: t.inkFraco },
   detalhePorta: { fontSize: 10.5, color: t.inkSuave, textAlign: 'center' },
+  listaFormas: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  linhaForma: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  rotuloForma: { flex: 1, fontSize: 15, fontWeight: '600', color: t.cores.ink },
+  maisFormas: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  textoMaisFormas: { fontSize: 13.5, fontWeight: '600', color: t.inkSuave },
+
   dicaPortas: { marginTop: -6, fontSize: 11, lineHeight: 15, color: t.inkFraco },
 
   blocoErro: {
