@@ -74,6 +74,54 @@ export type ResultadoBusca =
 /* A busca passa por uma função no banco por causa do acento: comparar "maca"
    com "maçã" precisa do unaccent, que vive lá. A tabela é `app_alimentos`, do
    próprio app — ver a migração 20260730000006. */
+/* A linha crua do banco, em snake_case. */
+export type LinhaAlimento = Alimento & {
+  gordura_saturada_g: number | null
+  gordura_trans_g: number | null
+  acucares_totais_g: number | null
+  acucares_adicionados_g: number | null
+  sodio_mg: number | null
+  colesterol_mg: number | null
+  ferro_mg: number | null
+  calcio_mg: number | null
+  potassio_mg: number | null
+  magnesio_mg: number | null
+  zinco_mg: number | null
+  vitamina_c_mg: number | null
+  indice_glicemico: number | null
+  /* Opcionais: chegam com a migração 20260827180000 do sistema. Antes dela a
+     consulta simplesmente não traz as colunas. */
+  medida_caseira?: string | null
+  porcao_g?: number | null
+}
+
+/* Uma linha do banco vira um alimento do app.
+ *
+ * Exportada porque há mais de uma consulta que devolve alimento — a busca por
+ * nome e a busca por código de barras — e as duas precisam traduzir igual. Com
+ * a conversão embutida dentro de uma delas, a segunda copiaria; e duas cópias
+ * da mesma tradução divergem no dia em que uma coluna nova entra. */
+export const daLinha = (l: LinhaAlimento): Alimento => ({
+  ...l,
+  /* numeric volta como string do PostgREST quando não cabe em float sem
+     perda — o Number cobre os dois casos, e null continua null. */
+  gorduraSaturada: numero(l.gordura_saturada_g),
+  gorduraTrans: numero(l.gordura_trans_g),
+  acucaresTotais: numero(l.acucares_totais_g),
+  acucaresAdicionados: numero(l.acucares_adicionados_g),
+  sodio: numero(l.sodio_mg),
+  colesterol: numero(l.colesterol_mg),
+  ferro: numero(l.ferro_mg),
+  calcio: numero(l.calcio_mg),
+  potassio: numero(l.potassio_mg),
+  magnesio: numero(l.magnesio_mg),
+  zinco: numero(l.zinco_mg),
+  vitaminaC: numero(l.vitamina_c_mg),
+  indiceGlicemico: numero(l.indice_glicemico),
+  medidaCaseira: l.medida_caseira ?? null,
+  porcaoG: numero(l.porcao_g),
+})
+
 export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
   const { data, error } = await supabase.rpc('app_buscar_alimentos', { p_termo: termo })
 
@@ -88,47 +136,8 @@ export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
   }
 
   /* O banco devolve as colunas em snake_case; o app fala camelCase. A tradução
-     acontece aqui, na fronteira, e não espalhada pelas telas. */
-  type Linha = Alimento & {
-    gordura_saturada_g: number | null
-    gordura_trans_g: number | null
-    acucares_totais_g: number | null
-    acucares_adicionados_g: number | null
-    sodio_mg: number | null
-    colesterol_mg: number | null
-    ferro_mg: number | null
-    calcio_mg: number | null
-    potassio_mg: number | null
-    magnesio_mg: number | null
-    zinco_mg: number | null
-    vitamina_c_mg: number | null
-    indice_glicemico: number | null
-    /* Opcionais: chegam com a migração 20260827180000 do sistema. Antes dela a
-       consulta simplesmente não traz as colunas. */
-    medida_caseira?: string | null
-    porcao_g?: number | null
-  }
-
-  const alimentos = ((data ?? []) as Linha[]).map(l => ({
-    ...l,
-    /* numeric volta como string do PostgREST quando não cabe em float sem
-       perda — o Number cobre os dois casos, e null continua null. */
-    gorduraSaturada: numero(l.gordura_saturada_g),
-    gorduraTrans: numero(l.gordura_trans_g),
-    acucaresTotais: numero(l.acucares_totais_g),
-    acucaresAdicionados: numero(l.acucares_adicionados_g),
-    sodio: numero(l.sodio_mg),
-    colesterol: numero(l.colesterol_mg),
-    ferro: numero(l.ferro_mg),
-    calcio: numero(l.calcio_mg),
-    potassio: numero(l.potassio_mg),
-    magnesio: numero(l.magnesio_mg),
-    zinco: numero(l.zinco_mg),
-    vitaminaC: numero(l.vitamina_c_mg),
-    indiceGlicemico: numero(l.indice_glicemico),
-    medidaCaseira: l.medida_caseira ?? null,
-    porcaoG: numero(l.porcao_g),
-  }))
+     acontece em `daLinha`, na fronteira, e não espalhada pelas telas. */
+  const alimentos = ((data ?? []) as LinhaAlimento[]).map(daLinha)
 
   return { tipo: 'ok', alimentos }
 }

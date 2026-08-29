@@ -1,4 +1,5 @@
-import { buscarAlimentos, type Alimento } from './alimentos'
+import { daLinha, type Alimento, type LinhaAlimento } from './alimentos'
+import { supabase } from './supabase'
 
 /* Ler o código de barras de um produto embalado.
  *
@@ -91,14 +92,36 @@ function pesoDaEmbalagem(quantidade: unknown): number | null {
   return valor
 }
 
-export async function consultarCodigo(codigo: string): Promise<ResultadoCodigo> {
-  /* 1. A nossa base primeiro. Ela não guarda código de barras, então a busca é
-        pelo próprio número: produtos importados de fontes que o trazem no nome
-        aparecem, e o custo de tentar é uma consulta que já é rápida. */
-  const naBase = await buscarAlimentos(codigo)
-  if (naBase.tipo === 'ok' && naBase.alimentos.length > 0) {
-    return { tipo: 'ok', produto: daBase(naBase.alimentos[0], codigo) }
+/* Devolve `null` tanto para "não tem" quanto para "não deu para perguntar".
+ *
+ * A distinção não muda nada aqui: nos dois casos o caminho seguinte é o mesmo,
+ * consultar o Open Food Facts. Propagar o erro faria uma falha de rede na
+ * primeira consulta impedir a segunda, que talvez funcionasse. */
+async function porCodigo(codigo: string): Promise<Alimento | null> {
+  try {
+    const { data, error } = await supabase.rpc('app_alimento_por_codigo', {
+      p_codigo: codigo.trim(),
+    })
+    if (error || !data || (data as unknown[]).length === 0) return null
+    return daLinha((data as LinhaAlimento[])[0])
+  } catch {
+    return null
   }
+}
+
+export async function consultarCodigo(codigo: string): Promise<ResultadoCodigo> {
+  /* 1. A nossa base primeiro, e agora por CÓDIGO de verdade.
+   *
+   * Antes esta consulta procurava o número como se fosse o nome do alimento —
+   * `buscarAlimentos('7891000100103')`. O truque quase nunca acertava, e o
+   * efeito era que toda leitura de código ia parar na internet: espera no meio
+   * do supermercado, onde o sinal é pior justamente por estar dentro de um
+   * prédio de concreto.
+   *
+   * `app_alimento_por_codigo` é consulta exata sobre uma coluna indexada. Ou é
+   * aquele produto, ou não é. */
+  const naBase = await porCodigo(codigo)
+  if (naBase) return { tipo: 'ok', produto: daBase(naBase, codigo) }
 
   /* 2. O Open Food Facts. */
   try {
