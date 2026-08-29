@@ -116,17 +116,23 @@ function useAlturaTeclado(): number {
 export function BuscarAlimentoScreen({
   refeicao,
   motivo = 'adicionar',
+  termoInicial = '',
   onAdicionar,
   onFechar,
 }: {
   refeicao: string
   motivo?: MotivoBusca
+  /* Já começa procurando por isto. Serve para quem chegou de um alimento que a
+     base não encontrou: o termo que falhou é exatamente o ponto de partida da
+     procura à mão, e obrigar a pessoa a digitá-lo de novo seria cobrar duas
+     vezes pela mesma informação. */
+  termoInicial?: string
   onAdicionar: (item: AlimentoEscolhido) => void
   onFechar: () => void
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
-  const [termo, setTermo] = useState('')
+  const [termo, setTermo] = useState(termoInicial)
   const [resultados, setResultados] = useState<Alimento[]>([])
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState('')

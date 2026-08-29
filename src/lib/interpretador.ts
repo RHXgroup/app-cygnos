@@ -99,8 +99,20 @@ export function separarItens(texto: string): string[] {
    vírgula decimal, que é como se escreve em português. */
 const PADRAO_NUMERO = /^(\d+(?:[.,]\d+)?)\s*([a-zA-ZçáéíóúâêôãõÁÉÍÓÚÂÊÔÃÕÇ]*)/
 
+/* Pontuação de fim de frase, colada no nome.
+ *
+ * Quem DIGITA raramente escreve "um copo de iogurte." — quem DITA sempre, porque
+ * o transcritor pontua a frase. E aí a busca procura por `iogurte.` na base,
+ * não acha, e o item cai fora do registro com a mensagem "não achei iogurte. na
+ * base" — com o ponto à mostra, o que faz a pessoa achar que o app não sabe
+ * escrever.
+ *
+ * Só nas pontas: um ponto no MEIO pode ser separador de milhar, e tirá-lo ali
+ * mudaria a quantidade. */
+const semPontuacaoNasPontas = (s: string) => s.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, '')
+
 export function lerItem(pedaco: string): ItemLido | null {
-  const limpo = pedaco.trim().replace(/\s+/g, ' ')
+  const limpo = semPontuacaoNasPontas(pedaco.trim().replace(/\s+/g, ' '))
   if (!limpo) return null
 
   let resto = limpo
@@ -167,7 +179,9 @@ export function lerItem(pedaco: string): ItemLido | null {
   /* 5. O que sobrou, sem as palavras de ligação do começo, é o nome. */
   while (palavras.length > 0 && LIGACOES.has(semAcento(palavras[0]))) palavras.shift()
 
-  const nome = palavras.join(' ').trim()
+  /* De novo nas pontas: tirar a quantidade e a medida do começo pode deixar
+     pontuação exposta no fim do que sobrou. */
+  const nome = semPontuacaoNasPontas(palavras.join(' ').trim())
   if (!nome) return null
 
   const emPeso = medida === 'g' || medida === 'kg' || medida === 'ml' || medida === 'litro'

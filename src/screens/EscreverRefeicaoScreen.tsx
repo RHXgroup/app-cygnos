@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
 import { buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
 import { descricaoDe, gramasDe, lerRefeicao, type ItemLido } from '../lib/interpretador'
 import { Ditado } from '../components/Ditado'
@@ -45,6 +46,10 @@ type Linha = {
      alimento custava remover a linha e ir para a busca; com eles, custa dois
      toques. */
   alternativas?: Alimento[]
+  /* O peso que a pessoa informou ao procurar o alimento à mão. Vence tudo: ela
+     acabou de dizer, com precisão e olhando para o alimento certo, o que tinha
+     dito de improviso ao falar. */
+  gramasEscolhidos?: number | null
 }
 
 export function EscreverRefeicaoScreen({
@@ -68,6 +73,9 @@ export function EscreverRefeicaoScreen({
   /* O que deu errado no ditado. Vive aqui e não no componente porque a faixa
      aparece acima do campo, fora dele. */
   const [erroVoz, setErroVoz] = useState<string | null>(null)
+  /* A linha cujo alimento a base não achou e a pessoa foi procurar à mão.
+     Guarda o índice porque é a linha que vai receber o resultado. */
+  const [procurandoNaMao, setProcurandoNaMao] = useState<number | null>(null)
 
   /* Fecha o teclado ANTES de sair.
    *
@@ -132,6 +140,8 @@ export function EscreverRefeicaoScreen({
    * nada — que é honesto. Inventar o peso de uma fatia colocaria na soma do dia
    * um número que ninguém mediu. */
   function gramasDaLinha(l: Linha): number | null {
+    if (l.gramasEscolhidos !== undefined && l.gramasEscolhidos !== null) return l.gramasEscolhidos
+
     const escrito = gramasDe(l.lido)
     if (escrito !== null) return escrito
 
@@ -189,6 +199,50 @@ export function EscreverRefeicaoScreen({
 
   const encontrados = linhas.filter(l => l.alimento).length
   const perdidos = linhas.filter(l => l.alimento === null).length
+
+  /* A busca à mão, por cima desta tela. O resultado volta para a MESMA linha —
+     ela deixa de ser "não encontrado" e passa a contar na soma, sem a pessoa
+     ter de reescrever a refeição inteira. */
+  if (procurandoNaMao !== null) {
+    const linha = linhas[procurandoNaMao]
+    return (
+      <BuscarAlimentoScreen
+        refeicao={refeicao}
+        termoInicial={linha?.lido.nome ?? ''}
+        onFechar={() => setProcurandoNaMao(null)}
+        onAdicionar={(escolhido: AlimentoEscolhido) => {
+          const i = procurandoNaMao
+          setProcurandoNaMao(null)
+          setLinhas(atuais =>
+            atuais.map((l, j) =>
+              j === i
+                ? {
+                    ...l,
+                    /* O peso vem do que a pessoa informou na busca, e substitui
+                       a quantidade falada: ela acabou de dizer, com mais
+                       precisão, o que tinha dito antes de improviso. */
+                    alimento: {
+                      id: escolhido.alimentoId ?? 0,
+                      nome: escolhido.nome,
+                      marca: escolhido.marca,
+                      calorias: escolhido.caloriasPor100g,
+                      proteinas: escolhido.proteinasPor100g,
+                      carboidratos: escolhido.carboidratosPor100g,
+                      gorduras: escolhido.gordurasPor100g,
+                      fibras: escolhido.fibrasPor100g,
+                    } as Alimento,
+                    gramasEscolhidos: escolhido.gramasTotais,
+                    /* A descrição também: "1 copo (200 g)" que ela escolheu diz
+                       mais do que o "um copo" que ela falou. */
+                    lido: { ...l.lido, original: escolhido.descricao || l.lido.original },
+                  }
+                : l,
+            ),
+          )
+        }}
+      />
+    )
+  }
 
   return (
     <KeyboardAvoidingView
@@ -324,10 +378,23 @@ export function EscreverRefeicaoScreen({
                       {kcal !== null && ` · ${milhar(kcal)} kcal`}
                     </Text>
 
+                    {/* Não achar deixou de ser um beco.
+                        Antes isto era só um aviso, e o item sumia da conta: a
+                        pessoa lia "fica de fora" e a única saída era abandonar
+                        a tela e procurar o alimento à mão, do zero. Agora a
+                        própria linha leva à busca, já com o termo dentro. */}
                     {l.alimento === null && (
-                      <Text style={styles.naoAchei}>
-                        Não achei "{l.lido.nome}" na base. Ele fica de fora.
-                      </Text>
+                      <Pressable
+                        onPress={() => setProcurandoNaMao(i)}
+                        style={({ pressed }) => [styles.procurar, pressed && styles.pressionado]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Procurar ${l.lido.nome} na base`}
+                      >
+                        <Ionicons name="search-outline" size={14} color={paleta().cores.verde} />
+                        <Text style={styles.textoProcurar}>
+                          Não achei "{l.lido.nome}". Toque para procurar.
+                        </Text>
+                      </Pressable>
                     )}
                     {l.alimento && gramas === null && (
                       <Text style={styles.semPeso}>
@@ -515,6 +582,19 @@ const estilos = estilosDe(t =>
   nomeLinha: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
   detalheLinha: { fontSize: 12.5, color: t.inkMedio },
   naoAchei: { fontSize: 12, color: t.cores.gold },
+  procurar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  textoProcurar: { fontSize: 12, fontWeight: '600', color: t.cores.verde },
   semPeso: { fontSize: 12, color: t.inkSuave },
   remover: { padding: 4 },
 
