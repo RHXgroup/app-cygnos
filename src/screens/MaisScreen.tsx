@@ -25,7 +25,18 @@ import {
   ligarLembretes,
   ligarLembretesDeAgua,
 } from '../lib/lembretes'
-import { estilosDe, paleta, tema, trocarTema, type Tema } from '../lib/tema'
+import {
+  acento,
+  acentoEfetivo,
+  estilosDe,
+  limparAcento,
+  paleta,
+  tema,
+  trocarAcento,
+  trocarTema,
+  type Tema,
+} from '../lib/tema'
+import { hexDeHsl } from '../lib/cor'
 
 const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'sunny-outline' }[] = [
   { chave: 'escuro', rotulo: 'Escuro', icone: 'moon-outline' },
@@ -356,6 +367,15 @@ export function MaisScreen({
             )
           })}
         </View>
+
+        <View style={styles.divisor} />
+
+        <Text style={styles.rotuloLembrete}>Cor</Text>
+        <Text style={styles.explicacaoLembrete}>
+          Escolha a sua. O app ajusta o tom para ela funcionar no tema que você estiver usando.
+        </Text>
+
+        <SeletorDeCor />
       </View>
 
       <View style={styles.cartao}>
@@ -377,6 +397,105 @@ export function MaisScreen({
       </View>
     </ScrollView>
   )
+}
+
+/* A escolha da cor.
+ *
+ * Uma faixa de matizes em cima e os tons daquele matiz embaixo — que é como um
+ * seletor de cor funciona, e dá acesso a qualquer cor sem depender de gesto nem
+ * de biblioteca. Toque, e só.
+ *
+ * Nenhuma escolha é recusada. Amarelo-claro não vira "essa cor não pode": vira
+ * um amarelo que se lê, porque quem ajusta é o app — ver lib/cor.ts, onde a
+ * conta está verificada nos 360 matizes.
+ *
+ * O que a pessoa escolhe é o ACENTO. Fundo, cartão e texto continuam sendo os do
+ * tema, e é isso que faz o app continuar sendo o mesmo app de outra cor, em vez
+ * de virar um app diferente a cada toque. */
+const MATIZES = Array.from({ length: 24 }, (_, i) => i * 15)
+
+/* Do mais vivo ao mais fechado. O app corrige o que precisar depois; estes são
+   os pontos de partida que dão diferença visível entre um toque e o seguinte. */
+const TONS: { s: number; l: number }[] = [
+  { s: 85, l: 62 },
+  { s: 90, l: 48 },
+  { s: 75, l: 38 },
+  { s: 45, l: 45 },
+]
+
+function SeletorDeCor() {
+  const styles = estilos()
+  const atual = acentoEfetivo()
+  const [matiz, setMatiz] = useState(() => hslDoAtual(atual))
+
+  return (
+    <View style={styles.blocoCor}>
+      <View style={styles.faixaMatiz}>
+        {MATIZES.map(h => {
+          const escolhido = Math.abs(h - matiz) < 8
+          return (
+            <Pressable
+              key={h}
+              onPress={() => {
+                setMatiz(h)
+                trocarAcento(hexDeHsl({ h, s: TONS[1].s, l: TONS[1].l }))
+              }}
+              style={[
+                styles.matiz,
+                { backgroundColor: hexDeHsl({ h, s: 90, l: 50 }) },
+                escolhido && styles.matizEscolhido,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Matiz ${h} graus`}
+            />
+          )
+        })}
+      </View>
+
+      <View style={styles.linhaTons}>
+        {TONS.map(t => {
+          const cor = hexDeHsl({ h: matiz, ...t })
+          const escolhido = acento()?.toUpperCase() === cor.toUpperCase()
+          return (
+            <Pressable
+              key={`${t.s}-${t.l}`}
+              onPress={() => trocarAcento(cor)}
+              style={[styles.tom, { backgroundColor: cor }, escolhido && styles.tomEscolhido]}
+              accessibilityRole="button"
+              accessibilityLabel={`Tom ${t.l} por cento`}
+            >
+              {escolhido && <Ionicons name="checkmark" size={16} color={paleta().cores.branco} />}
+            </Pressable>
+          )
+        })}
+
+        <Pressable
+          onPress={limparAcento}
+          style={[styles.tom, styles.tomMarca, acento() === null && styles.tomEscolhido]}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar para a cor da marca"
+        >
+          <Ionicons
+            name="leaf-outline"
+            size={15}
+            color={acento() === null ? paleta().cores.sobreLimao : paleta().cores.verde}
+          />
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+/* O matiz da cor que está valendo, para a faixa abrir marcando onde a pessoa
+   está — e não sempre no vermelho. */
+function hslDoAtual(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  if (max === min) return 0
+  const d = max - min
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return Math.round((h * 60 + 360) % 360)
 }
 
 /* Linha de link para uma página do site. O chevron à direita é o que diz que o
@@ -604,6 +723,22 @@ const estilos = estilosDe(t =>
      substitui o outro. */
   divisor: { height: 1, backgroundColor: t.cores.borda, marginVertical: 16 },
 linhaTema: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  blocoCor: { marginTop: 12, gap: 10 },
+  /* Colados, sem vão: junto eles formam o arco-íris que se reconhece como
+     seletor de cor. Separados viravam vinte e quatro botões coloridos. */
+  faixaMatiz: { flexDirection: 'row', borderRadius: 10, overflow: 'hidden', height: 34 },
+  matiz: { flex: 1, height: '100%' },
+  matizEscolhido: { borderWidth: 3, borderColor: t.cores.ink },
+  linhaTons: { flexDirection: 'row', gap: 8 },
+  tom: {
+    flex: 1,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tomEscolhido: { borderWidth: 2, borderColor: t.cores.ink },
+  tomMarca: { backgroundColor: t.cores.verdeClaro },
   botaoTema: {
     flex: 1,
     flexDirection: 'row',
