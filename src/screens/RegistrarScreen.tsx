@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AguaScreen } from './AguaScreen'
 import { CalculoEnergeticoScreen } from './CalculoEnergeticoScreen'
-import { ContadorCaloriasScreen } from './ContadorCaloriasScreen'
+import { ContadorCaloriasScreen, type PortaDoDiario } from './ContadorCaloriasScreen'
 import { EmBreveScreen } from './EmBreveScreen'
 import { MetasScreen } from './MetasScreen'
 import { PesoScreen } from './PesoScreen'
@@ -19,18 +19,70 @@ type Opcao = {
   icone: keyof typeof Ionicons.glyphMap
 }
 
-/* A ordem é a pedida, não a alfabética nem a agrupada por tipo: registro do dia
-   a dia primeiro, ferramentas de cálculo no meio, treino e sono no fim. */
-const OPCOES: Opcao[] = [
-  { chave: 'plano', rotulo: 'Planejamento alimentar', icone: 'nutrition-outline' },
-  { chave: 'agua', rotulo: 'Água', icone: 'water-outline' },
-  { chave: 'metas', rotulo: 'Metas', icone: 'flag-outline' },
-  { chave: 'peso', rotulo: 'Peso', icone: 'speedometer-outline' },
-  { chave: 'energetico', rotulo: 'Cálculo energético', icone: 'flame-outline' },
-  { chave: 'calorias', rotulo: 'Contador de calorias', icone: 'calculator-outline' },
-  { chave: 'treino', rotulo: 'Treino', icone: 'barbell-outline' },
-  { chave: 'sono', rotulo: 'Sono', icone: 'moon-outline' },
+/* Três grupos, e a ordem deles é a ordem da frequência.
+ *
+ * Antes eram oito destinos no mesmo tamanho, na mesma grade, com a mesma cor —
+ * "Água" ao lado de "Cálculo energético" como se fossem a mesma classe de
+ * coisa. Não são: um se faz oito vezes por dia e o outro uma vez por trimestre.
+ * Quando tudo tem o mesmo destaque, nada tem, e a pessoa lê os oito toda vez.
+ *
+ * ── COMER vem primeiro, e leva DIRETO ────────────────────────────────────────
+ * Registrar o que se comeu é a ação mais repetida do app, e era a mais cara:
+ * "+" → "Contador de calorias" → escolher entre sete portas. Três toques e duas
+ * telas, sendo que o degrau do meio não decidia nada.
+ *
+ * Agora as formas de registrar são o primeiro grupo, e cada uma abre o diário
+ * já dentro dela. A referência é o Cal AI, que registra em 2,6 segundos — não
+ * dá para competir com isso passando por uma tela de menu no caminho.
+ *
+ * Três em cima e o resto atrás de "outras formas" porque escolher entre três
+ * custa menos que entre sete. Quais três é a única decisão aqui que devia sair
+ * de dado e não de palpite: o app grava a `origem` de cada item do diário, e
+ * uma semana de uso responde melhor. Até lá, estas são as que dispensam
+ * digitar. */
+const COMER: Opcao[] = [
+  { chave: 'falar', rotulo: 'Falar', icone: 'mic-outline' },
+  { chave: 'foto', rotulo: 'Foto', icone: 'camera-outline' },
+  { chave: 'doPlano', rotulo: 'Do meu plano', icone: 'nutrition-outline' },
 ]
+
+const COMER_MAIS: Opcao[] = [
+  { chave: 'buscar', rotulo: 'Buscar', icone: 'search-outline' },
+  { chave: 'repetir', rotulo: 'Repetir', icone: 'repeat-outline' },
+  { chave: 'codigo', rotulo: 'Código de barras', icone: 'barcode-outline' },
+  { chave: 'receitas', rotulo: 'Receitas', icone: 'book-outline' },
+]
+
+/* O que se anota em segundos, quase todo dia. */
+const ANOTAR: Opcao[] = [
+  { chave: 'agua', rotulo: 'Água', icone: 'water-outline' },
+  { chave: 'peso', rotulo: 'Peso', icone: 'speedometer-outline' },
+  { chave: 'sono', rotulo: 'Sono', icone: 'moon-outline' },
+  { chave: 'treino', rotulo: 'Treino', icone: 'barbell-outline' },
+]
+
+/* O que se define uma vez e passa a valer. Fica por último porque é raro — e
+   porque estar por último não o esconde: quem veio definir uma meta veio de
+   propósito, e rola a tela. */
+const DEFINIR: Opcao[] = [
+  { chave: 'plano', rotulo: 'Plano alimentar', icone: 'restaurant-outline' },
+  { chave: 'metas', rotulo: 'Metas', icone: 'flag-outline' },
+  { chave: 'energetico', rotulo: 'Cálculo energético', icone: 'flame-outline' },
+]
+
+/* Cada forma de comer aponta para uma porta do diário. Aqui, e não espalhado no
+   JSX, para a lista de portas e a lista de botões não divergirem. */
+const TODAS: Opcao[] = [...COMER, ...COMER_MAIS, ...ANOTAR, ...DEFINIR]
+
+const PORTA_DE: Record<string, PortaDoDiario> = {
+  falar: 'escrever',
+  foto: 'foto',
+  doPlano: 'plano',
+  buscar: 'busca',
+  repetir: 'repetir',
+  codigo: 'codigo',
+  receitas: 'receitas',
+}
 
 /* O que o "+" da barra abre.
  *
@@ -70,8 +122,12 @@ export function RegistrarScreen({
   const styles = estilos()
   const { top } = useSafeAreaInsets()
   const [escolhida, setEscolhida] = useState<Opcao | null>(
-    () => OPCOES.find(o => o.chave === inicial) ?? null,
+    () => TODAS.find(o => o.chave === inicial) ?? null,
   )
+  /* As quatro formas menos usadas ficam recolhidas. Aberto uma vez, continua
+     aberto enquanto a tela existir: quem foi buscar "código de barras" costuma
+     ir de novo na mesma sessão. */
+  const [maisFormas, setMaisFormas] = useState(false)
 
   /* Voltar de dentro de uma opção volta para a grade: errar o toque não deveria
      custar a tela inteira. Mas quando a grade nunca apareceu — atalho —, ela
@@ -92,7 +148,7 @@ export function RegistrarScreen({
            aqui pela sugestão e descobriu que falta a meta vai definir a meta, e
            voltar dela ao meio do assistente de plano seria devolver a pessoa a
            um lugar que ela já abandonou. */
-        onDefinirMetas={() => setEscolhida(OPCOES.find(o => o.chave === 'metas') ?? null)}
+        onDefinirMetas={() => setEscolhida(TODAS.find(o => o.chave === 'metas') ?? null)}
       />
     )
   }
@@ -133,9 +189,17 @@ export function RegistrarScreen({
     return <SonoScreen contaId={contaId} onFechar={voltarDaOpcao} onMudou={onSonoMudou} />
   }
 
-  if (escolhida?.chave === 'calorias') {
+  /* As sete formas de comer levam à MESMA tela, cada uma abrindo numa porta
+     diferente. Um `if` por forma seria sete blocos idênticos com uma palavra
+     trocada. */
+  if (escolhida && PORTA_DE[escolhida.chave]) {
     return (
-      <ContadorCaloriasScreen contaId={contaId} onFechar={voltarDaOpcao} onMudou={onConsumoMudou} />
+      <ContadorCaloriasScreen
+        contaId={contaId}
+        portaInicial={PORTA_DE[escolhida.chave]}
+        onFechar={voltarDaOpcao}
+        onMudou={onConsumoMudou}
+      />
     )
   }
 
@@ -174,10 +238,12 @@ export function RegistrarScreen({
           bounces={false}
           overScrollMode="never"
         >
-          <Text style={styles.chamada}>O que você quer registrar?</Text>
-
+          {/* O grupo de comer é o único com botões grandes, e é de propósito:
+              é o que se faz cinco vezes por dia. Os outros dois são listas
+              magras — cabem mais na tela e não competem pelo olhar. */}
+          <Text style={styles.grupo}>Comi alguma coisa</Text>
           <View style={styles.grade}>
-            {OPCOES.map(o => (
+            {COMER.map(o => (
               <Pressable
                 key={o.chave}
                 onPress={() => setEscolhida(o)}
@@ -194,9 +260,64 @@ export function RegistrarScreen({
               </Pressable>
             ))}
           </View>
+
+          {maisFormas ? (
+            <View style={styles.lista}>
+              {COMER_MAIS.map(o => (
+                <Linha key={o.chave} opcao={o} onPress={() => setEscolhida(o)} styles={styles} />
+              ))}
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setMaisFormas(true)}
+              style={({ pressed }) => [styles.maisFormas, pressed && styles.cartaoPressionado]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.textoMaisFormas}>Outras formas de registrar</Text>
+              <Ionicons name="chevron-down" size={16} color={paleta().inkSuave} />
+            </Pressable>
+          )}
+
+          <Text style={styles.grupo}>Anotar do dia</Text>
+          <View style={styles.lista}>
+            {ANOTAR.map(o => (
+              <Linha key={o.chave} opcao={o} onPress={() => setEscolhida(o)} styles={styles} />
+            ))}
+          </View>
+
+          <Text style={styles.grupo}>Definir</Text>
+          <View style={styles.lista}>
+            {DEFINIR.map(o => (
+              <Linha key={o.chave} opcao={o} onPress={() => setEscolhida(o)} styles={styles} />
+            ))}
+          </View>
         </ScrollView>
       )}
     </View>
+  )
+}
+
+/* Uma linha de lista, para os grupos que não pedem destaque. */
+function Linha({
+  opcao,
+  onPress,
+  styles,
+}: {
+  opcao: Opcao
+  onPress: () => void
+  styles: ReturnType<typeof estilos>
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.linha, pressed && styles.cartaoPressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={opcao.rotulo}
+    >
+      <Ionicons name={opcao.icone} size={19} color={paleta().cores.verde} />
+      <Text style={styles.rotuloLinha}>{opcao.rotulo}</Text>
+      <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+    </Pressable>
   )
 }
 
@@ -248,6 +369,45 @@ const estilos = estilosDe(t =>
     alignItems: 'center',
     justifyContent: 'center',
   },
+  grupo: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: t.inkSuave,
+    marginTop: 18,
+    marginBottom: 8,
+  },
+
+  lista: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+    overflow: 'hidden',
+  },
+  linha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  rotuloLinha: { flex: 1, fontSize: 15, fontWeight: '600', color: t.cores.ink },
+
+  maisFormas: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  textoMaisFormas: { fontSize: 13.5, fontWeight: '600', color: t.inkSuave },
+
   rotulo: { fontSize: 14, fontWeight: '700', color: t.cores.ink, lineHeight: 19 },
   }),
 )

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
@@ -59,12 +59,25 @@ import { estilosDe, paleta } from '../lib/tema'
    para dizer a mesma coisa acabaria divergindo dele. */
 const PROVISORIO = 'provisorio:'
 
+export type PortaDoDiario = 'busca' | 'plano' | 'repetir' | 'escrever' | 'codigo' | 'receitas' | 'foto'
+
 export function ContadorCaloriasScreen({
   contaId,
+  portaInicial,
   onFechar,
   onMudou,
 }: {
   contaId: string
+  /* Abre já dentro de uma das formas de registrar, em vez de na lista delas.
+   *
+   * É o que permite o "+" da barra levar direto ao microfone. Antes, registrar
+   * o que se comeu — a coisa mais frequente do app — custava tocar no "+",
+   * escolher "Contador de calorias" e só então escolher a forma: três toques e
+   * duas telas para a ação que se repete cinco vezes por dia. O degrau do meio
+   * não decidia nada; só existia porque as portas moravam aqui dentro.
+   *
+   * A refeição continua saindo do relógio, como já saía. */
+  portaInicial?: PortaDoDiario
   onFechar: () => void
   /* A tela inicial mostra o mesmo consumo; avisado ao fechar, e não a cada item,
      para não refazer a busca da Home a cada alimento registrado. */
@@ -81,7 +94,9 @@ export function ContadorCaloriasScreen({
   const [refeicao, setRefeicao] = useState(() => refeicaoPelaHora())
 
   /* null = a tela principal. As portas abrem por cima dela. */
-  const [porta, setPorta] = useState<'busca' | 'plano' | 'repetir' | 'escrever' | 'codigo' | 'receitas' | null>(null)
+  const [porta, setPorta] = useState<Exclude<PortaDoDiario, 'foto'> | null>(
+    portaInicial && portaInicial !== 'foto' ? portaInicial : null,
+  )
   /* O que a pessoa já come nesta refeição. Carregado só quando a porta abre —
      são duas consultas que a maioria das visitas não usa, e pagá-las na abertura
      da tela atrasaria o caso comum por causa do caso eventual. */
@@ -298,6 +313,16 @@ export function ContadorCaloriasScreen({
     setMudou(true)
   }
 
+  /* A foto é a única porta que não é uma tela: ela abre a câmera do sistema.
+     Por isso o `portaInicial === 'foto'` não entra no estado das portas — vira
+     esta chamada, uma vez, quando a tela monta. */
+  const jaAbriuAFoto = useRef(false)
+  useEffect(() => {
+    if (portaInicial !== 'foto' || jaAbriuAFoto.current) return
+    jaAbriuAFoto.current = true
+    void fotografar('camera')
+  }, [portaInicial])
+
   async function fotografar(origem: 'camera' | 'galeria') {
     setErro('')
     setAnalisando(true)
@@ -443,7 +468,13 @@ export function ContadorCaloriasScreen({
         >
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
-        <Text style={styles.tituloTela}>Contador de calorias</Text>
+        {/* "Diário", e não "Contador de calorias".
+            O nome antigo descrevia o MECANISMO — contar caloria — e não o que a
+            pessoa está fazendo, que é anotar o que comeu. E "contar calorias" é
+            o vocabulário que o MyFitnessPal fixou em 2005 e o mercado copiou;
+            todos os concorrentes já chamam esta tela de diário, porque é o que
+            ela é: o registro do dia. */}
+        <Text style={styles.tituloTela}>Diário</Text>
         <View style={styles.botaoVoltar} />
       </View>
 
