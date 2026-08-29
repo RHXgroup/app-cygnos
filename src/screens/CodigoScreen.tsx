@@ -1,11 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import * as Clipboard from 'expo-clipboard'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
+import { carregarCatalogo, jaVinculado } from '../lib/nutricionista'
 import { supabase } from '../lib/supabase'
 import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
+
+/* De quanto em quanto tempo a tela pergunta se o vínculo já aconteceu.
+ *
+ * Esta é a ÚNICA tela do app que pergunta sozinha, e o motivo é o momento: a
+ * pessoa está de pé na frente da nutricionista, acabou de ditar oito
+ * caracteres, e a única coisa que ela quer saber é se funcionou. O vínculo é
+ * feito do lado DELA, e nada avisa o aparelho — em toda outra tela isso se
+ * resolve com puxar para atualizar, mas aqui puxar seria pedir que a pessoa
+ * adivinhasse que precisa puxar.
+ *
+ * Quatro segundos é curto o bastante para parecer imediato e longo o bastante
+ * para a pergunta ser barata: ela devolve um número, e só. */
+const SEGUNDOS_ENTRE_PERGUNTAS = 4
 
 /* O código tem 8 caracteres e é lido em voz alta. Mostrar em dois blocos de
    quatro é o que faz alguém conseguir ditar sem se perder — e são dois blocos
@@ -14,11 +36,27 @@ import { cores, inkFraco, inkMedio, inkSuave } from '../theme'
 const METADE = 4
 
 /* Mesma escolha da tela de perfil: View sobreposta lá no App, não Modal. */
-export function CodigoScreen({ sessao, onFechar }: { sessao: Session; onFechar: () => void }) {
+export function CodigoScreen({
+  sessao,
+  onFechar,
+  onVinculou,
+}: {
+  sessao: Session
+  onFechar: () => void
+  /* Avisa o App no instante em que o vínculo aparece. Sem isto a pessoa vê o
+     "pronto" aqui, fecha, e encontra a tela inicial e a aba Mais ainda dizendo
+     que ela não tem nutricionista — o app teria descoberto e guardado só para
+     esta tela. */
+  onVinculou: () => void
+}) {
   const { top } = useSafeAreaInsets()
   const [codigo, setCodigo] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [copiado, setCopiado] = useState(false)
+  /* Null enquanto não se sabe; o nome dela quando o vínculo existe. O nome só é
+     buscado no instante em que a resposta vira sim — durante a espera, a
+     pergunta é um booleano. */
+  const [vinculada, setVinculada] = useState<string | null>(null)
   /* Guardado para poder cancelar no desmonte: sem isso, fechar a tela logo após
      copiar deixa um setState mirando um componente que não existe mais. */
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -42,6 +80,58 @@ export function CodigoScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
       if (timer.current) clearTimeout(timer.current)
     }
   }, [sessao.user.id])
+
+  /* Fica perguntando enquanto a tela está aberta e ainda não há vínculo.
+   *
+   * Para sozinho assim que encontra — e também quando o app vai para segundo
+   * plano, porque perguntar de quatro em quatro segundos com a tela apagada é
+   * gastar bateria por nada. Volta a perguntar, e pergunta na hora, quando o
+   * app volta: é comum a pessoa sair do app para mostrar o código e voltar. */
+  useEffect(() => {
+    if (vinculada) return
+
+    let ativo = true
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    async function perguntar() {
+      if (!ativo) return
+
+      if (await jaVinculado()) {
+        if (!ativo) return
+        /* Só agora o catálogo, e uma vez: é ele que sabe o nome dela, e é
+           pesado demais para entrar no laço. Se ele falhar, o vínculo ainda
+           assim aconteceu — a tela mostra sem o nome em vez de continuar
+           dizendo que não aconteceu nada. */
+        const r = await carregarCatalogo()
+        if (!ativo) return
+        setVinculada(
+          (r.tipo === 'ok' && r.catalogo.vinculada?.nome) || 'a sua nutricionista',
+        )
+        onVinculou()
+        return
+      }
+
+      if (ativo) timer = setTimeout(perguntar, SEGUNDOS_ENTRE_PERGUNTAS * 1000)
+    }
+
+    void perguntar()
+
+    const sub = AppState.addEventListener('change', e => {
+      if (e !== 'active') {
+        if (timer) clearTimeout(timer)
+        timer = null
+        return
+      }
+      if (timer) clearTimeout(timer)
+      void perguntar()
+    })
+
+    return () => {
+      ativo = false
+      if (timer) clearTimeout(timer)
+      sub.remove()
+    }
+  }, [vinculada])
 
   async function copiar() {
     if (!codigo) return
@@ -79,14 +169,25 @@ export function CodigoScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
           bounces={false}
           overScrollMode="never"
         >
-          <View style={styles.circulo}>
-            <Ionicons name="link-outline" size={26} color={cores.verde} />
+          <View style={[styles.circulo, vinculada && styles.circuloPronto]}>
+            <Ionicons
+              name={vinculada ? 'checkmark' : 'link-outline'}
+              size={26}
+              color={vinculada ? cores.sobreLimao : cores.verde}
+            />
           </View>
 
-          <Text style={styles.chamada}>Informe este código à sua nutricionista</Text>
+          {/* O momento em que a espera acaba.
+              A pessoa está de pé na frente dela e a única pergunta é "deu
+              certo?". Antes a resposta estava em outra tela, e chegar até ela
+              exigia sair desta — que é a que ela foi orientada a abrir. */}
+          <Text style={styles.chamada}>
+            {vinculada ? 'Pronto, vocês estão conectadas' : 'Informe este código à sua nutricionista'}
+          </Text>
           <Text style={styles.explicacao}>
-            É com ele que ela encontra a sua conta e vincula você ao consultório dela. O código é
-            seu e não muda.
+            {vinculada
+              ? `${vinculada} já pode ver o seu acompanhamento. O plano, as metas e os retornos dela passam a chegar aqui.`
+              : 'É com ele que ela encontra a sua conta e vincula você ao consultório dela. O código é seu e não muda.'}
           </Text>
 
           {codigo ? (
@@ -110,10 +211,16 @@ export function CodigoScreen({ sessao, onFechar }: { sessao: Session; onFechar: 
                 <Text style={styles.textoBotaoCopiar}>{copiado ? 'Copiado!' : 'Copiar código'}</Text>
               </Pressable>
 
-              <Text style={styles.aviso}>
-                Só compartilhe com a sua nutricionista. Com este código ela passa a ver o seu
-                acompanhamento.
-              </Text>
+              {/* O aviso some depois do vínculo: ele existe para quem ainda vai
+                  ditar o código, e repeti-lo a quem já ditou é ruído. O código
+                  em si FICA — ele não muda, e trocar de consultório algum dia
+                  vai exigir ditá-lo de novo. */}
+              {!vinculada && (
+                <Text style={styles.aviso}>
+                  Só compartilhe com a sua nutricionista. Com este código ela passa a ver o seu
+                  acompanhamento.
+                </Text>
+              )}
             </>
           ) : (
             /* Mesma situação da tela de perfil: conta criada fora do app não tem
@@ -147,6 +254,7 @@ const styles = StyleSheet.create({
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 32, alignItems: 'center' },
 
+  circuloPronto: { backgroundColor: cores.limao },
   circulo: {
     width: 64,
     height: 64,

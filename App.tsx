@@ -278,6 +278,10 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [versaoConsumo, setVersaoConsumo] = useState(0)
   const [versaoSono, setVersaoSono] = useState(0)
   const [versaoTreino, setVersaoTreino] = useState(0)
+  /* Muda quando a nutricionista vincula o paciente enquanto o app está aberto.
+     Quem percebe é a tela do código, que fica perguntando: o vínculo acontece
+     do lado dela e nada avisa o aparelho. */
+  const [versaoVinculo, setVersaoVinculo] = useState(0)
   const carrossel = useRef<ScrollView>(null)
   /* O Início não é a primeira aba, então o carrossel precisa nascer deslocado.
      A prop contentOffset só funciona no iOS; posicionar no primeiro layout
@@ -443,6 +447,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 versaoConsumo={versaoConsumo}
                 versaoSono={versaoSono}
                 versaoTreino={versaoTreino}
+                versaoVinculo={versaoVinculo}
                 onAbrirPerfil={() => setPerfilAberto(true)}
                 onAbrirCodigo={() => setCodigoAberto(true)}
                 onAbrirNutricionistas={() => setNutricionistasAbertas(true)}
@@ -488,7 +493,17 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
         {codigoAberto && (
           <Sobreposta>
-            <CodigoScreen sessao={sessao} onFechar={() => setCodigoAberto(false)} />
+            <CodigoScreen
+              sessao={sessao}
+              onFechar={() => setCodigoAberto(false)}
+              /* Bate nos três: o vínculo muda o que a aba Mais mostra, e passa
+                 a valer o plano e as metas DELA na tela inicial. */
+              onVinculou={() => {
+                setVersaoVinculo(v => v + 1)
+                setVersaoPlano(v => v + 1)
+                setVersaoMetas(v => v + 1)
+              }}
+            />
           </Sobreposta>
         )}
 
@@ -672,6 +687,7 @@ function TelaDaAba({
   versaoConsumo,
   versaoSono,
   versaoTreino,
+  versaoVinculo,
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirNutricionistas,
@@ -698,6 +714,7 @@ function TelaDaAba({
   versaoConsumo: number
   versaoSono: number
   versaoTreino: number
+  versaoVinculo: number
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirNutricionistas: () => void
@@ -761,6 +778,7 @@ function TelaDaAba({
     case 'mais':
       return (
         <MaisScreen
+          versaoVinculo={versaoVinculo}
           contaId={sessao.user.id}
           email={sessao.user.email ?? ''}
           onAbrirNutricionistas={onAbrirNutricionistas}

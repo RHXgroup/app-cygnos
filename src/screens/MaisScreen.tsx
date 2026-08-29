@@ -38,12 +38,17 @@ const PADDING_CARTAO = 16
 export function MaisScreen({
   contaId,
   email,
+  versaoVinculo,
   onAbrirNutricionistas,
   onAbrirCodigo,
   onAbrirExcluirConta,
 }: {
   contaId: string
   email: string
+  /* Muda quando o vínculo com a nutricionista aparece — hoje, quando a tela do
+     código percebe que ela vinculou. O segundo plano e o puxar-para-atualizar
+     já cobriam o caso de a pessoa sair do app; este cobre o de ela ficar. */
+  versaoVinculo: number
   onAbrirNutricionistas: () => void
   onAbrirCodigo: () => void
   onAbrirExcluirConta: () => void
@@ -96,7 +101,7 @@ export function MaisScreen({
     return () => {
       vivo = false
     }
-  }, [buscar])
+  }, [buscar, versaoVinculo])
 
   /* O mesmo motivo do puxar-para-atualizar, sem exigir o gesto.
    *

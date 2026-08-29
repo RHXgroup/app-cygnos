@@ -87,6 +87,29 @@ async function comFotosAssinadas(lista: Nutricionista[]): Promise<Nutricionista[
   )
 }
 
+/* Já existe vínculo? Uma pergunta e um booleano.
+ *
+ * Serve para a tela do código perceber, sozinha, o momento em que a
+ * nutricionista vincula — que acontece do lado DELA, com o app aberto na mão da
+ * pessoa, e sem nada avisar o aparelho.
+ *
+ * Existe separada de `carregarCatalogo` por causa do custo: aquela traz o
+ * catálogo inteiro quando ainda não há vínculo, e é justamente esse o estado em
+ * que a pergunta se repete de poucos em poucos segundos. Esta devolve um
+ * bigint. O nome dela só é buscado quando a resposta vira sim, uma vez.
+ *
+ * Engole a falha e responde `false`: sem sinal, "ainda não vinculou" é a
+ * resposta certa, e derrubar a tela por causa de uma tentativa perdida no meio
+ * de uma sequência delas seria trocar um silêncio por um erro. */
+export async function jaVinculado(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('app_paciente_da_conta')
+    return !error && data !== null && data !== undefined
+  } catch {
+    return false
+  }
+}
+
 export async function carregarCatalogo(): Promise<ResultadoCatalogo> {
   const { data, error } = await supabase.rpc('app_nutricionistas')
 
