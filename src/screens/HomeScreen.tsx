@@ -83,6 +83,8 @@ import {
   type Sessao,
 } from '../lib/treino'
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
+import { proximoPasso } from '../lib/proximoPasso'
+import { janelaAcordada, ritmoDaAgua } from '../lib/ritmoAgua'
 import { estilosDe, paleta } from '../lib/tema'
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
@@ -464,6 +466,37 @@ export function HomeScreen({
     sessoes,
   })
 
+  /* O que a tela precisa dizer AGORA.
+   *
+   * A saudação ocupava o topo — a área mais valiosa — e não respondia nada.
+   * Aqui vai uma frase só, a mais urgente, e ela leva ao lugar de resolver.
+   * As regras de prioridade e o porquê de cada uma estão em lib/proximoPasso.
+   *
+   * O atraso da água é calculado aqui e entregue pronto: `proximoPasso` decide
+   * PRIORIDADE, e quem sabe repartir a meta pela janela acordada é `ritmoAgua`.
+   * Separar as duas deixou as duas testáveis. */
+  const janela = janelaAcordada(noites)
+  const passo = proximoPasso({
+    metas,
+    aguaAtrasadaMl: (() => {
+      if (!agua) return null
+      const agoraEmMinutos = new Date().getHours() * 60 + new Date().getMinutes()
+      const r = ritmoDaAgua({
+        metaMl: metas.aguaMl,
+        copoMl: metas.copoMl,
+        bebidoMl: totalDe(agua.hoje),
+        janela,
+        agoraEmMinutos,
+      })
+      return r.situacao === 'atrasado' ? -r.diferencaMl : null
+    })(),
+    consumo: consumoDeHoje,
+    plano: planoNaTela,
+    noites,
+    rotina,
+    sessoes,
+  })
+
   /* O que sobra para o gráfico depois das duas colunas de texto do cartão de
      progresso. Calculado, e não fixo, para não estourar num aparelho estreito. */
   const larguraGrafico = Math.max(
@@ -507,13 +540,15 @@ export function HomeScreen({
         </Pressable>
       </View>
 
+      {/* A saudação encolheu para uma linha.
+          Ela ocupava duas, com "vamos juntos em direção a sua melhor versão"
+          na área mais valiosa da tela — e não respondia nada. O nome fica,
+          porque reconhecer quem abriu custa pouco; a frase de efeito sai, e o
+          espaço vai para o que a pessoa precisa fazer agora. */}
       <View style={styles.saudacao}>
         <View style={styles.textoSaudacao}>
           <Text style={styles.ola} numberOfLines={1}>
             Olá, {primeiroNome(nome)} 👋
-          </Text>
-          <Text style={styles.frase}>
-            Vamos juntos em direção a sua <Text style={styles.fraseDestaque}>melhor versão.</Text>
           </Text>
         </View>
 
@@ -531,6 +566,47 @@ export function HomeScreen({
           <Text style={styles.rotuloAnel}>Meta do dia</Text>
         </Pressable>
       </View>
+
+      {/* ── O próximo passo ──
+          Uma frase, a mais urgente, e ela leva ao lugar de resolver. Substitui
+          a frase de efeito que estava aqui.
+
+          Não aparece quando a pessoa está olhando outro dia: "almoço em 40
+          min" não faz sentido em cima da terça passada. */}
+      {ehHoje(diaSelecionado) && (
+        <Pressable
+          onPress={() => {
+            if (passo.destino === 'contador') onAbrirContador()
+            else if (passo.destino === 'agua') onAbrirAgua()
+            else if (passo.destino === 'treino') onAbrirTreino()
+            else if (passo.destino === 'sono') onAbrirSono()
+            else if (passo.destino === 'plano') onMontarPlano()
+            else if (passo.destino === 'metas') onAbrirMetas()
+          }}
+          disabled={passo.destino === null}
+          style={({ pressed }) => [
+            styles.passo,
+            passo.chave === 'em_dia' && styles.passoEmDia,
+            pressed && styles.cartaoPressionado,
+          ]}
+          accessibilityRole={passo.destino ? 'button' : 'text'}
+          accessibilityLabel={passo.texto}
+        >
+          <View style={styles.iconePasso}>
+            <Ionicons
+              name={passo.icone as keyof typeof Ionicons.glyphMap}
+              size={18}
+              color={paleta().cores.verde}
+            />
+          </View>
+          <Text style={styles.textoPasso} numberOfLines={2}>
+            {passo.texto}
+          </Text>
+          {passo.destino && (
+            <Ionicons name="chevron-forward" size={18} color={paleta().inkFraco} />
+          )}
+        </Pressable>
+      )}
 
       {/* ── Dias da semana ── */}
       <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
@@ -1672,12 +1748,34 @@ const estilos = estilosDe(t =>
   },
 
   saudacao: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
-  textoSaudacao: { flex: 1 },
-  ola: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
-  frase: { marginTop: 6, fontSize: 14.5, lineHeight: 21, color: t.inkSuave },
-  fraseDestaque: { color: t.cores.verde, fontWeight: '700' },
   blocoAnel: { alignItems: 'center', gap: 5 },
   rotuloAnel: { fontSize: 11.5, color: t.inkSuave },
+
+  passo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
+    backgroundColor: t.cores.verdeMenta,
+  },
+  /* Sem nada a fazer, o bloco perde o destaque: ele deixou de ser um chamado e
+     virou uma confirmação. */
+  passoEmDia: { borderColor: t.cores.borda, backgroundColor: t.cores.cartao },
+  iconePasso: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verdeClaro,
+  },
+  textoPasso: { flex: 1, fontSize: 14.5, fontWeight: '700', color: t.cores.ink, lineHeight: 19 },
+  textoSaudacao: { flex: 1 },
+  ola: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
 
   cartao: {
     borderRadius: 20,
