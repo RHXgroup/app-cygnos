@@ -14,7 +14,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { NOME_NOVA, buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
+import { anotarBuscaVazia, NOME_NOVA, buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
 import { mascaraQuantidade, numeroDigitado, soDigitos } from '../lib/formulario'
 import { decimal, milhar } from '../lib/formatar'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
@@ -203,6 +203,9 @@ export function BuscarAlimentoScreen({
       } else {
         setErro('')
         setResultados(r.alimentos)
+        /* Achou nada: anota o termo. É assim que a lista do que falta na base
+           se escreve sozinha, com o que as pessoas de fato procuram. */
+        if (r.alimentos.length === 0) anotarBuscaVazia(limpo)
       }
       setBuscando(false)
     }, ESPERA_BUSCA)

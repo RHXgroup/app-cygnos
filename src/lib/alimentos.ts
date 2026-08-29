@@ -122,6 +122,31 @@ export const daLinha = (l: LinhaAlimento): Alimento => ({
   porcaoG: numero(l.porcao_g),
 })
 
+/* Anota que alguém procurou isto e não achou nada.
+ *
+ * É o que responde "o que falta na nossa base?" com dado em vez de palpite —
+ * e a pergunta é cara: ela decide se vale licenciar uma tabela paga.
+ *
+ * Não guarda quem procurou, e a função do banco também não: para saber o que
+ * falta, basta o termo. Guardar a pessoa criaria um histórico do que cada uma
+ * come, ou tenta comer, sem responder nada a mais.
+ *
+ * Nunca rejeita nem atrasa a tela. Se falhar, falhou — é telemetria, e
+ * telemetria que atrapalha o uso não vale o que informa. */
+export function anotarBuscaVazia(termo: string): void {
+  /* Quatro letras, e não as duas que a busca aceita: enquanto a pessoa digita
+     "iogurte", a tela busca por "io", "iog", "iogu"… e todos voltam vazios. Os
+     prefixos curtos são ruído; o termo que a pessoa realmente quis é o mais
+     longo, e é o que precisa aparecer na lista. */
+  const limpo = termo.trim()
+  if (limpo.length < 4) return
+
+  void supabase.rpc('app_registrar_busca_vazia', { p_termo: limpo }).then(
+    () => {},
+    () => {},
+  )
+}
+
 export async function buscarAlimentos(termo: string): Promise<ResultadoBusca> {
   const { data, error } = await supabase.rpc('app_buscar_alimentos', { p_termo: termo })
 
