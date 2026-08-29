@@ -41,6 +41,36 @@ import { supabase } from './supabase'
  * errar palavra. */
 export const OPCOES_DITADO: RecordingOptions = {
   ...RecordingPresets.HIGH_QUALITY,
+
+  /* No Android, AAC cru (ADTS) — e não o .m4a do preset.
+   *
+   * Este é o defeito que custou a noite, e ele não estava no áudio: estava no
+   * CONTAINER. O .m4a é MP4, e no MP4 o índice do arquivo (`moov`) é escrito no
+   * FIM. Para ler o começo é preciso saber o que há no fim, ou seja, voltar
+   * atrás no arquivo.
+   *
+   * O servidor Whisper joga o upload direto no ffmpeg por um CANO, que não
+   * permite voltar atrás. Resultado: o arquivo toca perfeitamente no celular
+   * (que abre o arquivo inteiro e consegue procurar) e vira ruído no servidor.
+   * Medido: gravação com pico de -6,5 dBFS — voz alta e audível no aparelho —
+   * voltava com idioma detectado como INGLÊS numa fala em português, e zero
+   * segmentos. Áudio bom, leitura quebrada.
+   *
+   * É por isso que o sistema da nutricionista sempre funcionou com o MESMO
+   * servidor: ele grava webm, que foi desenhado para transmissão e não tem
+   * índice no fim.
+   *
+   * O Android não produz webm (o expo-audio expõe o container, mas os
+   * codificadores são só AAC e AMR, e webm não aceita AAC). O ADTS resolve pelo
+   * mesmo princípio: é uma sequência de quadros AAC, cada um com o seu próprio
+   * cabeçalho, sem índice nenhum. Lê-se de ponta a ponta, por cano, sem voltar.
+   *
+   * A qualidade é a mesma — é o mesmo codec, só sem a caixa em volta. */
+  android: {
+    extension: '.aac',
+    outputFormat: 'aac_adts',
+    audioEncoder: 'aac',
+  },
   /* Liga a medição do nível de entrada.
    *
    * Serve para a tela mostrar que está OUVINDO, e não só que está gravando —
@@ -114,11 +144,16 @@ export async function transcrever(
     console.log('[cygnos] ditado: não consegui medir o arquivo', uri)
   }
 
+  /* O nome e o tipo saem da extensão de verdade do arquivo, e não de uma
+     constante: quem decide o formato é o preset, por plataforma, e um nome
+     mentindo sobre o conteúdo faz o ffmpeg escolher o leitor errado — que é
+     outra forma de chegar ao mesmo silêncio. */
+  const aac = uri.toLowerCase().endsWith('.aac')
   const forma = new FormData()
   forma.append('audio', {
     uri,
-    name: 'ditado.m4a',
-    type: 'audio/m4a',
+    name: aac ? 'ditado.aac' : 'ditado.m4a',
+    type: aac ? 'audio/aac' : 'audio/m4a',
   } as unknown as Blob)
 
   try {
