@@ -81,13 +81,13 @@ function comAcento(base: Paleta, acento: string): Paleta {
   }
 }
 
-/* O escuro é o padrão, e continua sendo o que o app mostra a quem nunca
-   escolheu nada. */
-let temaAtual: Tema = 'escuro'
+/* O claro é o padrão: é a cara da marca, e é com ela que o app abre para quem
+   nunca escolheu nada. */
+let temaAtual: Tema = 'claro'
 /* Null é "a cor da marca" — o verde que o app sempre teve. Não é ausência de
    escolha: é a escolha padrão, e ela precisa poder ser retomada. */
 let acentoAtual: string | null = null
-let paletaAtual: Paleta = ESCURO
+let paletaAtual: Paleta = CLARO
 
 export const tema = (): Tema => temaAtual
 export const acento = (): string | null => acentoAtual

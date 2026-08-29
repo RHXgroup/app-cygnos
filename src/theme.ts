@@ -3,15 +3,13 @@
  * ── Como ler este arquivo ──────────────────────────────────────────────────
  * `ESCURO` e `CLARO` são paletas completas e independentes. Tudo o que o resto
  * do app importa — `cores`, `coresMacro`, `inkSuave`, `veu`, `degrades` —
- * continua existindo e continua apontando para o ESCURO, que é o padrão. Nenhuma
- * tela precisa mudar por causa deste arquivo.
+ * continua existindo e continua apontando para o PADRÃO, que é o claro — a cara
+ * da marca.
  *
  * Isso é de propósito. A troca em tempo real exige que cada tela monte os
  * estilos a partir do tema atual, porque `StyleSheet.create` congela as cores no
  * instante em que o arquivo é carregado. São 55 arquivos, e convertê-los é
- * trabalho mecânico que pode ser feito um por um: tela convertida responde ao
- * tema, tela não convertida segue no escuro, e o app nunca fica quebrado no
- * meio do caminho.
+ * trabalho mecânico que pode ser feito um por um. Todas já foram convertidas.
  *
  * ── Por que o claro não é o escuro invertido ───────────────────────────────
  * Inverter daria um app sem identidade: o limão neon é lindo sobre preto e
@@ -143,33 +141,45 @@ export const ESCURO: Paleta = {
 
 export const CLARO: Paleta = {
   cores: {
-    verde: '#22C55E',
-    verdeEscuro: '#16A34A',
+    /* Verde de AÇÃO, e a escolha é de contraste, não de gosto.
+     *
+     * O #22C55E que este app usava no tema claro dá 2,28:1 com texto branco por
+     * cima — muito abaixo do mínimo legível de 4,5. O botão primário era verde
+     * vivo com uma palavra branca que quase não se lia, e ninguém tinha medido.
+     * Este dá 5,02:1. */
+    verde: '#15803D',
+    verdeEscuro: '#166534',
 
     /* O papel do limão, traduzido.
      *
-     * Puxado para o amarelo-esverdeado, e não para o verde da ação: no escuro
-     * os dois são matizes diferentes de propósito, e igualá-los aqui faria o
-     * anel de progresso sumir dentro do botão que está ao lado dele. Escuro o
-     * bastante para se ler sobre o creme — é traço, não preenchimento. */
+     * Puxado para o amarelo-esverdeado, e não para o verde da ação: no escuro os
+     * dois são matizes diferentes de propósito, e igualá-los faria o anel de
+     * progresso sumir dentro do botão ao lado dele. 4,35:1 sobre o creme — é
+     * traço, e a régua do traço é 3:1. */
     limao: '#4D7C0F',
     limaoEscuro: '#3F6212',
     sobreLimao: '#FFFFFF',
 
-    verdeClaro: '#DCFCE7',
-    verdeMenta: '#EAFBF1',
+    verdeClaro: 'rgba(77,124,15,0.13)',
+    verdeMenta: 'rgba(21,128,61,0.08)',
 
-    /* Creme, e não branco puro. É o mesmo do ícone adaptativo na loja e o mesmo
-       do sistema web — e é ele que faz o tema claro parecer ESTE app, e não um
-       app qualquer de fundo branco. O cartão sobe para o branco justamente para
-       se destacar dele. */
-    fundo: '#FDFBF6',
-    cartao: '#FFFFFF',
+    /* O creme e o musgo do sistema web, e não branco.
+     *
+     * A primeira versão deste tema usava #FDFBF6 de fundo e BRANCO PURO nos
+     * cartões — e o resultado é o que se esperava: uma tela branca com outra
+     * tela branca por cima, sem relação nenhuma com a marca. Agora o fundo é o
+     * `mist` do sistema, o cartão é um creme um passo mais claro que ele, e só a
+     * superfície elevada chega ao branco. Os três se separam sem ninguém precisar
+     * de borda. */
+    fundo: '#F4EFE4',
+    cartao: '#FBF8F1',
     superficie: '#FFFFFF',
-    trilho: '#E8ECEA',
-    borda: '#EDF1EF',
+    trilho: '#DFE3D4',
+    borda: 'rgba(47,55,34,0.12)',
 
-    ink: '#101413',
+    /* Musgo escuro, e não quase-preto: é o texto do sistema web, e é ele que
+       faz o app parecer da mesma casa. 10,8:1 sobre o fundo. */
+    ink: '#2F3722',
     branco: '#FFFFFF',
 
     deep: '#3F4A2E',
@@ -178,27 +188,31 @@ export const CLARO: Paleta = {
     moss: '#DFE3D4',
     gold: '#C49A5E',
     musgoClaro: '#6F7C52',
-    line: 'rgba(168,90,59,0.16)',
+    line: 'rgba(47,55,34,0.14)',
 
     /* O creme dourado da marca, para o bloco de atenção dos relatórios. */
-    atencaoFundo: 'rgba(196,154,94,0.16)',
+    atencaoFundo: 'rgba(196,154,94,0.18)',
 
-    erroBorda: '#FECACA',
-    erroFundo: '#FEF2F2',
-    erroTexto: '#DC2626',
+    erroBorda: '#E8B4B4',
+    erroFundo: '#FBEFEF',
+    /* #DC2626 dá 4,21:1 sobre o creme — passa raspando por baixo do mínimo.
+       Este dá 5,64:1. */
+    erroTexto: '#B91C1C',
   },
 
-  coresMacro: { proteinas: '#22C55E', carboidratos: '#F59E0B', gorduras: '#6366F1' },
+  coresMacro: { proteinas: '#15803D', carboidratos: '#B45309', gorduras: '#4F46E5' },
 
-  inkSuave: 'rgba(16,20,19,0.56)',
-  inkMedio: 'rgba(16,20,19,0.74)',
-  inkFraco: 'rgba(16,20,19,0.42)',
+  /* Mais fechadas que as do escuro, e isso é medida, não gosto: 56% de musgo
+     sobre o creme dá 3,24:1, que não passa para texto. 70% dá 4,75:1. */
+  inkSuave: 'rgba(47,55,34,0.70)',
+  inkMedio: 'rgba(47,55,34,0.85)',
+  inkFraco: 'rgba(47,55,34,0.55)',
 
-  /* Grafite a 35%, e não preto: sobre fundo claro o preto forte fecha demais e
-     a folha parece um recorte, não uma camada. */
-  veu: 'rgba(16,20,19,0.35)',
+  /* Musgo a 40%, e não preto: sobre creme o preto forte fecha demais e a folha
+     parece um recorte, não uma camada. */
+  veu: 'rgba(47,55,34,0.40)',
 
-  degrades: { destaque: ['#22C55E', '#16A34A'] },
+  degrades: { destaque: ['#15803D', '#166534'] },
 }
 
 /* ── O que o resto do app importa ──────────────────────────────────────────
@@ -207,7 +221,12 @@ export const CLARO: Paleta = {
  * for convertida para ler o tema atual, é daqui que ela tira as cores — e é
  * isso que permite converter uma por vez sem quebrar as outras cinquenta e
  * quatro. */
-export const PADRAO: Paleta = ESCURO
+/* O CLARO é o padrão.
+ *
+ * O app abre com a cara da marca — o creme e o musgo do sistema web —, e quem
+ * quiser o escuro escolhe em Mais. Era o contrário até aqui, e o contrário
+ * fazia o aplicativo não ter parentesco visual nenhum com o resto do produto. */
+export const PADRAO: Paleta = CLARO
 
 export const cores = PADRAO.cores
 export const coresMacro = PADRAO.coresMacro

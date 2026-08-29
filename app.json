@@ -5,11 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/cygnos-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0C0F0B"
+      "backgroundColor": "#F4EFE4"
     },
     "ios": {
       "supportsTablet": false,
