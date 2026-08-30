@@ -144,6 +144,21 @@ async function faxinaUnica(): Promise<void> {
   }
 }
 
+/* "15:00" — o primeiro horário que ainda vai acontecer hoje, ou o primeiro de
+   amanhã quando o dia já passou de todos. Só para a tela ter o que dizer. */
+function proximaHora(horas: number[]): string | null {
+  if (horas.length === 0) return null
+
+  const agora = new Date()
+  const decimalDeAgora = agora.getHours() + agora.getMinutes() / 60
+  const ordenadas = [...horas].sort((a, b) => a - b)
+  const alvo = ordenadas.find(h => h > decimalDeAgora) ?? ordenadas[0]
+
+  const h = Math.floor(alvo)
+  const m = Math.round((alvo - h) * 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 export async function lembretesLigados(): Promise<boolean> {
   try {
     return (await AsyncStorage.getItem(CHAVE_LIGADO)) === '1'
@@ -164,7 +179,10 @@ export async function lembretesDeAguaLigados(): Promise<boolean> {
 }
 
 export type ResultadoLembretes =
-  | { tipo: 'ok'; quantos: number }
+  /* `proximo` é 'HH:MM' e existe para a tela poder provar que funcionou.
+     Ligar um lembrete às dez da noite não produz nada visível até o dia
+     seguinte, e sem essa frase a única leitura possível é "não funcionou". */
+  | { tipo: 'ok'; quantos: number; proximo: string | null }
   | { tipo: 'negado' }
   | { tipo: 'erro'; mensagem: string }
 
@@ -186,6 +204,9 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
   if (!(await temPermissao())) return { tipo: 'negado' }
 
   try {
+    /* Antes de agendar qualquer coisa, e nunca depois: a faxina cancela TUDO, e
+       rodando no meio ela levaria junto o que o outro interruptor acabou de
+       agendar. */
     await faxinaUnica()
     /* O canal é obrigatório no Android para a notificação aparecer; no iOS a
        chamada não faz nada e é ignorada. */
@@ -200,6 +221,7 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
 
     const refeicoes = plano?.refeicoes ?? []
     const ids: string[] = []
+    const horasDoPlano: number[] = []
 
     for (const r of refeicoes) {
       const [hora, minuto] = r.hora.split(':').map(Number)
@@ -226,11 +248,12 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
         },
       })
       ids.push(id)
+      horasDoPlano.push(hora + minuto / 60)
     }
 
     await AsyncStorage.setItem(CHAVE_IDS_REFEICOES, JSON.stringify(ids))
     await AsyncStorage.setItem(CHAVE_LIGADO, '1')
-    return { tipo: 'ok', quantos: ids.length }
+    return { tipo: 'ok', quantos: ids.length, proximo: proximaHora(horasDoPlano) }
   } catch (e) {
     return {
       tipo: 'erro',
@@ -275,9 +298,16 @@ export async function ligarLembretesDeAgua(): Promise<ResultadoLembretes> {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('agua', {
         name: 'Água',
-        /* Mais baixo que o da refeição: perder a hora do almoço tem consequência,
-           e beber água meia hora depois não tem. */
-        importance: Notifications.AndroidImportance.LOW,
+        /* A mesma importância da refeição, e não menos.
+         *
+         * Estava em LOW, com a justificativa de que beber água meia hora depois
+         * não tem consequência. Só que LOW no Android quer dizer sem som e sem
+         * aparecer na tela: o aviso entrava calado na gaveta, e quem ligou o
+         * lembrete concluiu — com razão — que ele não funcionava.
+         *
+         * Um lembrete que não interrompe não é um lembrete. Quem achar demais
+         * desliga, e desligar é um toque. */
+        importance: Notifications.AndroidImportance.DEFAULT,
       })
     }
 
@@ -303,7 +333,10 @@ export async function ligarLembretesDeAgua(): Promise<ResultadoLembretes> {
 
     await AsyncStorage.setItem(CHAVE_IDS_AGUA, JSON.stringify(ids))
     await AsyncStorage.setItem(CHAVE_AGUA, '1')
-    return { tipo: 'ok', quantos: ids.length }
+
+    const horas: number[] = []
+    for (let h = HORA_INICIO; h <= HORA_FIM; h += INTERVALO_HORAS) horas.push(h)
+    return { tipo: 'ok', quantos: ids.length, proximo: proximaHora(horas) }
   } catch (e) {
     return {
       tipo: 'erro',

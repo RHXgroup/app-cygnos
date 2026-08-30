@@ -168,7 +168,9 @@ export function MaisScreen({
 
     setLembretes(true)
     setAvisoLembretes(
-      `${r.quantos} ${r.quantos === 1 ? 'lembrete agendado' : 'lembretes agendados'}, todo dia.`,
+      r.proximo
+        ? `${r.quantos} ${r.quantos === 1 ? 'lembrete agendado' : 'lembretes agendados'}. O próximo é às ${r.proximo}.`
+        : `${r.quantos} ${r.quantos === 1 ? 'lembrete agendado' : 'lembretes agendados'}, todo dia.`,
     )
   }
 
@@ -202,7 +204,13 @@ export function MaisScreen({
     }
 
     setAgua(true)
-    setAvisoAgua(`${r.quantos} avisos por dia, das 9h às 21h.`)
+    /* Diz QUANDO é o próximo. Ligar às dez da noite não produz nada visível até
+       o dia seguinte, e sem essa frase a leitura é "não funcionou". */
+    setAvisoAgua(
+      r.proximo
+        ? `${r.quantos} avisos por dia. O próximo é às ${r.proximo}.`
+        : `${r.quantos} avisos por dia, das 9h às 21h.`,
+    )
   }
 
   async function puxarParaAtualizar() {
