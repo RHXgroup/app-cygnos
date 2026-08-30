@@ -40,7 +40,47 @@ Pior: é silencioso e intermitente. Aceite feito pela dona funciona; o mesmo
 aceite feito pela funcionária não. Ninguém vai suspeitar de QUEM CLICOU.
 
 **O contrato certo:** o vínculo nasce por `get_nutricionista_id()`, e nunca por
-`auth.uid()`. Está sendo corrigido pela sessão que cuida dessas funções.
+`auth.uid()`.
+
+**CORRIGIDA** — conferido no corpo em 30/08/2026: o insert usa a carteira. As
+três funções de pedido estão certas hoje:
+
+| função | estado |
+| --- | --- |
+| `nutri_solicitacoes_recebidas` | ✔ por carteira |
+| `nutri_aceitar_solicitacao` | ✔ por carteira |
+| `nutri_recusar_solicitacao` | ✔ por carteira |
+
+---
+
+## 1b. As TRÊS funções de mensagem ainda estão em `auth.uid()` — ABERTA
+
+Mesma raiz, recorte diferente, e este ainda não foi corrigido:
+
+| função | o que faz | efeito |
+| --- | --- | --- |
+| `nutri_conversas` | lê | ela não vê conversa nenhuma |
+| `nutri_marcar_lidas` | **grava** | não marca nada; o contador dela nunca zera |
+| `nutri_enviar_mensagem` | **grava** | **a resposta nunca chega ao paciente** |
+
+```sql
+insert into app_mensagens (conta_id, nutricionista_id, de, texto)
+values (p_conta_id, auth.uid(), 'nutricionista', ...)
+```
+
+**A terceira é a que importa para o app, e é a pior falha silenciosa das três.**
+
+A mensagem nasce com o `nutricionista_id` da funcionária. A política do lado do
+paciente filtra pelo vínculo dele — que aponta para a nutricionista dona —,
+então aquela linha simplesmente não existe para ele.
+
+E como a leitura DELA também usa `auth.uid()`, do lado dela está tudo coerente:
+ela escreve, a mensagem aparece na conversa, e nada indica problema. **Ela acha
+que respondeu. Ele nunca recebeu.** Ninguém dos dois lados vê erro.
+
+Comparado com isso, `nutri_conversas` e `nutri_marcar_lidas` são só incômodo
+dela: uma esconde a lista, a outra deixa o contador aceso. Nenhuma das duas
+mente para o paciente.
 
 ---
 
