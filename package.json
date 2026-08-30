@@ -33,7 +33,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node scripts/testes.mjs"
+    "test": "node scripts/testes.mjs",
+    "contrato": "node --env-file=.env scripts/contrato.mjs"
   },
   "private": true
 }
