@@ -160,11 +160,6 @@ Por isso é o último: com o desvincular (1) e o compartilhamento por item (5)
 prontos, dá para medir se alguém realmente quer duas ao mesmo tempo. A maioria
 quer **trocar**, e trocar já estará resolvido.
 
-**Não confundir com conta de dependente.** "Uma nutricionista para mim e outra
-para meu filho" são duas PESSOAS, cada uma com o próprio diário e o próprio
-peso. Resolver isso com dois vínculos somaria a comida dos dois no mesmo anel.
-É outro assunto, e maior.
-
 ---
 
 ## Ordem sugerida
