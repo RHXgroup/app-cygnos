@@ -360,10 +360,15 @@ function AreaLogada({ sessao }: { sessao: Session }) {
    * quem NÃO está na conversa — é essa a função dele. A tela avisa de volta
    * quando lê, e aí o ponto apaga sem precisar perguntar ao banco de novo.
    *
-   * Sem push, a contagem se refaz em três momentos: ao entrar, ao voltar do
-   * segundo plano, e a cada troca de aba. Não é instantâneo com o app aberto e
-   * parado na tela inicial — isso só chega com notificação de verdade —, mas
-   * cobre o caminho real, que é abrir o app e olhar. */
+   * A contagem é perguntada ao banco só ao entrar e ao voltar do segundo plano
+   * (`versaoPlano` sobe nas duas). No meio do caminho quem mexe no número é a
+   * própria conversa, que está montada e inscrita o tempo todo: ela avisa
+   * quando chega e quando a pessoa lê.
+   *
+   * NÃO recontar a cada troca de aba é de propósito. Entrar na aba marca tudo
+   * como lido na hora, e a contagem é uma ida à rede: as duas correndo juntas
+   * faziam a resposta atrasada — de antes da marcação — reacender o ponto e
+   * deixá-lo aceso sobre uma conversa que a pessoa estava lendo. */
   const [naoLidas, setNaoLidas] = useState(0)
 
   useEffect(() => {
@@ -372,7 +377,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     return () => {
       vivo = false
     }
-  }, [sessao.user.id, versaoPlano, aba])
+  }, [sessao.user.id, versaoPlano])
 
   /* Um caminho só para os dois contadores: a meta de água mora na mesma linha
      que as de caloria e passos, então gravar metas invalida as duas telas. */
@@ -530,6 +535,8 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                    cartão de plano usa para "montar plano". */
                 onAbrirTreino={() => setRegistrar({ inicial: 'treino' })}
                 onLeuMensagens={() => setNaoLidas(0)}
+                onChegouMensagem={() => setNaoLidas(n => n + 1)}
+                abaAtual={aba}
               />
             </View>
           ))}
@@ -804,6 +811,8 @@ function TelaDaAba({
   onAbrirSono,
   onAbrirTreino,
   onLeuMensagens,
+  onChegouMensagem,
+  abaAtual,
 }: {
   chave: Aba
   sessao: Session
@@ -834,6 +843,13 @@ function TelaDaAba({
   onAbrirTreino: () => void
   /* A conversa avisa que foi lida, e o ponto da aba apaga na hora. */
   onLeuMensagens: () => void
+  /* E avisa quando chega uma com a pessoa em outra aba, para o ponto acender
+     sem esperar a próxima contagem. */
+  onChegouMensagem: () => void
+  /* Qual aba está na frente. `chave` é a aba DESTE painel do carrossel, que
+     existe para todas as quatro ao mesmo tempo — não serve para saber qual
+     delas a pessoa está vendo. */
+  abaAtual: Aba
 }) {
   switch (chave) {
     case 'inicio':
@@ -879,7 +895,12 @@ function TelaDaAba({
       return (
         <MensagensScreen
           onAbrirNutricionistas={onAbrirNutricionistas}
+          /* A aba existe desde o primeiro instante, montada no carrossel: quem
+             diz que ela está na frente é este booleano, não o ciclo de vida. */
+          visivel={abaAtual === 'mensagens'}
+          versaoVinculo={versaoVinculo}
           onLeu={onLeuMensagens}
+          onChegou={onChegouMensagem}
         />
       )
     case 'mais':

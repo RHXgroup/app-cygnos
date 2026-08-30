@@ -51,12 +51,30 @@ import { estilosDe, paleta } from '../lib/tema'
  * plano como rede, para o caso de a inscrição ter caído sem avisar. */
 export function MensagensScreen({
   onAbrirNutricionistas,
+  visivel,
+  versaoVinculo,
   onLeu,
+  onChegou,
 }: {
   onAbrirNutricionistas: () => void
+  /* Esta tela é a aba que a pessoa está vendo AGORA?
+   *
+   * Ela não monta quando a aba é escolhida: as quatro abas vivem no mesmo
+   * carrossel e existem desde o primeiro instante. Sem esta distinção, a
+   * conversa marcaria tudo como lido no fundo, com a pessoa na tela inicial — e
+   * o ponto da aba, que existe justamente para avisar quem NÃO está aqui, nunca
+   * acenderia. */
+  visivel: boolean
+  /* Sobe quando o vínculo aparece. Sem isto, quem vincula com o app aberto vê
+     esta aba continuar dizendo que não há com quem conversar. */
+  versaoVinculo: number
   /* Avisa o App de que a conversa foi lida, para o ponto da aba apagar sem uma
      segunda ida ao banco só para descobrir que agora é zero. */
   onLeu: () => void
+  /* E o contrário: chegou mensagem com a pessoa em outra aba. Como a inscrição
+     vive aqui e nunca desliga, é daqui que o ponto acende na hora, sem esperar
+     a próxima contagem. */
+  onChegou: () => void
 }) {
   const styles = estilos()
   const { top } = useSafeAreaInsets()
@@ -70,22 +88,33 @@ export function MensagensScreen({
 
   const rolagem = useRef<ScrollView>(null)
 
-  /* `onLeu` fora das dependências de propósito: ele é recriado a cada
-     renderização do App, e incluí-lo faria `buscar` mudar de identidade toda
-     vez — o que refaz o efeito de carga, que chama `buscar`, que… Uma função de
-     avisar não é motivo para recarregar a conversa. */
+  /* As funções de avisar ficam FORA das dependências de propósito: são
+     recriadas a cada renderização do App, e incluí-las faria `buscar` mudar de
+     identidade toda vez — o que refaz o efeito de carga, que chama `buscar`,
+     que… Uma função de avisar não é motivo para recarregar a conversa. O mesmo
+     vale para `visivel`, lido por referência para não reatar a inscrição a cada
+     troca de aba. */
+  const visivelRef = useRef(visivel)
+  visivelRef.current = visivel
+
   const buscar = useCallback(async () => {
     const [cat, msgs] = await Promise.all([carregarCatalogo(), carregarMensagens()])
 
     setNutri(cat.tipo === 'ok' ? cat.catalogo.vinculada : null)
-    if (msgs.tipo === 'ok') {
-      setMensagens(msgs.mensagens)
-      /* Marcar como lida é consequência de ter aberto a tela, não de ter
-         carregado: quem chegou aqui viu o que estava escrito. */
-      marcarLidas()
-      onLeu()
-    }
+    if (msgs.tipo === 'ok') setMensagens(msgs.mensagens)
   }, [])
+
+  /* Ler é ter a conversa NA FRENTE, e não tê-la carregado.
+   *
+   * Roda quando a aba passa a ser a visível e sempre que a conversa muda com
+   * ela aberta. `marcarLidas` é barato e idempotente: chamá-lo sem nada para
+   * marcar não faz nada, e é mais simples do que manter a contagem aqui só para
+   * decidir se vale a pena perguntar. */
+  useEffect(() => {
+    if (!visivel) return
+    marcarLidas()
+    onLeu()
+  }, [visivel, mensagens.length])
 
   useEffect(() => {
     let vivo = true
@@ -93,7 +122,7 @@ export function MensagensScreen({
     return () => {
       vivo = false
     }
-  }, [buscar])
+  }, [buscar, versaoVinculo])
 
   /* Rede de segurança, e não o caminho principal: se a inscrição do realtime
      cair sem avisar — sinal ruim, app suspenso por horas —, voltar ao app
@@ -113,10 +142,10 @@ export function MensagensScreen({
       setMensagens(atuais =>
         atuais.some(m => m.id === nova.id) ? atuais : [...atuais, nova],
       )
-      /* Chegou com a conversa aberta: já foi lida, e o ponto não pode acender
-         para uma mensagem que está na tela. */
-      marcarLidas()
-      onLeu()
+      /* Com a conversa na frente, o efeito acima marca como lida assim que a
+         lista cresce. Com a pessoa em outra aba, o ponto acende na hora — é o
+         único ponto do app que não espera a próxima leitura. */
+      if (!visivelRef.current) onChegou()
     })
     return desligar
   }, [nutri])
