@@ -7,6 +7,7 @@ import {
   mesVizinho,
   podeAvancar,
   primeiroDiaDaSemana,
+  formaNaFaixa,
   somandoDias,
 } from './calendarioDoCiclo.ts'
 import type { Ciclo } from './cicloDaPessoa.ts'
@@ -238,6 +239,58 @@ console.log('\n9. até onde dá para avançar')
   /* A virada do ano: dezembro de hoje pode ir a janeiro, e janeiro para. */
   ok('dezembro pode ir a janeiro', podeAvancar(2026, 12, '2026-12-20') === true)
   ok('janeiro seguinte para', podeAvancar(2027, 1, '2026-12-20') === false)
+}
+
+
+console.log('\n10. a faixa contínua')
+
+{
+  const marcados = new Set(['2026-08-10', '2026-08-11', '2026-08-12'])
+  ok('o primeiro abre', formaNaFaixa('2026-08-10', marcados) === 'inicio', formaNaFaixa('2026-08-10', marcados))
+  ok('o do meio é reto', formaNaFaixa('2026-08-11', marcados) === 'meio')
+  ok('o último fecha', formaNaFaixa('2026-08-12', marcados) === 'fim')
+}
+
+{
+  ok('dia solto é sozinho', formaNaFaixa('2026-08-10', new Set(['2026-08-10'])) === 'sozinho')
+  ok('dois dias: abre e fecha',
+    formaNaFaixa('2026-08-10', new Set(['2026-08-10', '2026-08-11'])) === 'inicio' &&
+    formaNaFaixa('2026-08-11', new Set(['2026-08-10', '2026-08-11'])) === 'fim')
+}
+
+{
+  /* 2026-08-29 é SÁBADO e 2026-08-30 é DOMINGO. Eles são vizinhos no
+     calendário e ficam em pontas OPOSTAS da grade — a faixa não pode
+     atravessar a borda, senão ela sai da tela de um lado e reaparece do outro
+     como se fosse contínua. */
+  const marcados = new Set(['2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31'])
+  ok('sábado fecha à direita', formaNaFaixa('2026-08-29', marcados) === 'fim',
+    formaNaFaixa('2026-08-29', marcados))
+  ok('domingo abre à esquerda', formaNaFaixa('2026-08-30', marcados) === 'inicio',
+    formaNaFaixa('2026-08-30', marcados))
+  ok('a sexta antes continua abrindo', formaNaFaixa('2026-08-28', marcados) === 'inicio')
+  ok('a segunda depois fecha', formaNaFaixa('2026-08-31', marcados) === 'fim')
+}
+
+{
+  /* Um sábado sozinho no meio de uma sequência que continua no domingo é
+     'sozinho' pelos dois lados quando não há sexta. */
+  ok('sábado com só o domingo marcado é sozinho',
+    formaNaFaixa('2026-08-29', new Set(['2026-08-29', '2026-08-30'])) === 'sozinho')
+}
+
+{
+  /* Buraco no meio: dia 10 e dia 12 marcados, 11 não. Os dois são sozinhos. */
+  const comBuraco = new Set(['2026-08-10', '2026-08-12'])
+  ok('buraco separa a faixa', formaNaFaixa('2026-08-10', comBuraco) === 'sozinho' &&
+    formaNaFaixa('2026-08-12', comBuraco) === 'sozinho')
+}
+
+{
+  /* Atravessando o mês: 31/08 é segunda e 01/09 é terça. */
+  const virada = new Set(['2026-08-31', '2026-09-01'])
+  ok('a faixa atravessa o mês', formaNaFaixa('2026-08-31', virada) === 'inicio',
+    formaNaFaixa('2026-08-31', virada))
 }
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')

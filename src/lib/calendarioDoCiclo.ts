@@ -149,3 +149,36 @@ export const NOMES_DOS_MESES = [
 ]
 
 export const INICIAIS_DA_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
+
+/* Que forma o dia tem dentro de uma sequência de dias marcados.
+ *
+ * ── Por que isto existe ───────────────────────────────────────────────────
+ * Os aplicativos de ciclo bons não desenham cinco bolinhas soltas para cinco
+ * dias de menstruação: desenham UMA FAIXA contínua, arredondada nas pontas.
+ * A diferença não é enfeite — a faixa mostra que aquilo é um período, e as
+ * bolinhas soltas mostram cinco eventos sem relação.
+ *
+ * E a forma depende dos VIZINHOS, o que é a única razão de isto ser uma função
+ * e não um estilo: o primeiro dia arredonda à esquerda, o último à direita, e
+ * os do meio ficam retos para encostar nos dois lados.
+ *
+ * ── A quebra de semana ────────────────────────────────────────────────────
+ * Sexta e sábado são vizinhos no calendário, mas ficam em pontas opostas da
+ * grade — a faixa não pode "atravessar" a borda. Por isso a função também olha
+ * o dia da semana: sábado sempre fecha à direita e domingo sempre abre à
+ * esquerda, mesmo com o vizinho marcado. */
+export type FormaDoDia = 'sozinho' | 'inicio' | 'meio' | 'fim'
+
+export function formaNaFaixa(data: string, marcados: Set<string>): FormaDoDia {
+  const dia = new Date(Date.parse(data + 'T00:00:00Z')).getUTCDay()
+
+  /* Sábado é 6 e domingo é 0. Um encosta na borda direita da grade e o outro na
+     esquerda, então a faixa termina ali de qualquer forma. */
+  const temAntes = dia !== 0 && marcados.has(somandoDias(data, -1))
+  const temDepois = dia !== 6 && marcados.has(somandoDias(data, 1))
+
+  if (temAntes && temDepois) return 'meio'
+  if (temDepois) return 'inicio'
+  if (temAntes) return 'fim'
+  return 'sozinho'
+}

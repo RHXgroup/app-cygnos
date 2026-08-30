@@ -16,6 +16,14 @@ const DIAS = [
 /* Na ordem de Date.getDay(): 0 = domingo. É esse índice que o plano guarda. */
 export const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+/* Por extenso, para cabeçalho de tela. "Segunda-feira" no topo diz onde a
+   pessoa está sem ela precisar conferir o relógio — e é o que faz a tela
+   parecer que sabe do dia dela, em vez de esperar ser informada. */
+export const DIAS_LONGOS = [
+  'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
+  'Quinta-feira', 'Sexta-feira', 'Sábado',
+]
+
 const MESES = [
   'Janeiro',
   'Fevereiro',

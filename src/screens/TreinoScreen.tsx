@@ -37,7 +37,7 @@ import {
   type Sessao,
   nomeDoEsforco,
 } from '../lib/treino'
-import { DIAS_CURTOS, dataNumerica } from '../lib/formatar'
+import { DIAS_CURTOS, DIAS_LONGOS, dataNumerica } from '../lib/formatar'
 import type { DiaSemana } from '../lib/plano'
 import { dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
@@ -179,6 +179,20 @@ export function TreinoScreen({
     setMudou(true)
   }
 
+  /* O que a tela DIZ na primeira dobra. Calculado aqui, e não dentro do JSX:
+     é a resposta às três perguntas de quem chega na academia — é dia de quê,
+     quanto tem para fazer, e como eu vou. */
+  const treinouHoje = sessoes.some(s => s.data === dataISO(new Date()))
+  /* O "foco" do dia sai do primeiro exercício quando a rotina não tem nome de
+     bloco. É melhor do que "6 exercícios": "Supino reto e mais 5" diz de que
+     treino se trata sem a pessoa abrir nada. */
+  const focoDeHoje =
+    doHoje.length === 0
+      ? ''
+      : doHoje.length === 1
+        ? doHoje[0].nome
+        : `${doHoje[0].nome} e mais ${doHoje.length - 1}`
+
   const naSemana = sessoesNaSemana(sessoes)
   const seguidos = sequencia(sessoes)
 
@@ -189,7 +203,7 @@ export function TreinoScreen({
     >
       <View style={styles.cabecalho}>
         <Pressable
-          onPress={fechar}
+          onPress={() => (aba === 'rotina' ? setAba('hoje') : fechar())}
           style={styles.botaoVoltar}
           hitSlop={8}
           accessibilityRole="button"
@@ -197,25 +211,10 @@ export function TreinoScreen({
         >
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
-        <Text style={styles.tituloTela}>Treino</Text>
+        <Text style={styles.tituloTela}>{aba === 'hoje' ? 'Treino' : 'Minha rotina'}</Text>
         <View style={styles.botaoVoltar} />
       </View>
 
-      <View style={styles.abas}>
-        {(['hoje', 'rotina'] as Aba[]).map(a => (
-          <Pressable
-            key={a}
-            onPress={() => setAba(a)}
-            style={[styles.aba, aba === a && styles.abaAtiva]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: aba === a }}
-          >
-            <Text style={[styles.textoAba, aba === a && styles.textoAbaAtivo]}>
-              {a === 'hoje' ? 'Registrar' : 'Minha rotina'}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
 
       <ScrollView
         contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 24 }]}
@@ -226,22 +225,29 @@ export function TreinoScreen({
           <ActivityIndicator color={paleta().cores.verde} style={styles.girando} />
         ) : aba === 'hoje' ? (
           <>
-            {/* Constância antes do formulário: é o que responde "estou treinando
-                ou não", que é a pergunta de quem abre esta tela. */}
-            <View style={styles.placar}>
-              <View style={styles.numeroPlacar}>
-                <Text style={styles.valorPlacar}>{naSemana}</Text>
-                <Text style={styles.rotuloPlacar}>
-                  {naSemana === 1 ? 'treino nos\núltimos 7 dias' : 'treinos nos\núltimos 7 dias'}
-                </Text>
-              </View>
-              <View style={styles.divisor} />
-              <View style={styles.numeroPlacar}>
-                <Text style={styles.valorPlacar}>{seguidos}</Text>
-                <Text style={styles.rotuloPlacar}>
-                  {seguidos === 1 ? 'dia seguido' : 'dias seguidos'}
-                </Text>
-              </View>
+            {/* A tela DIZ o que é hoje, em vez de perguntar em qual aba entrar.
+                Era esse o problema: rotina numa aba, registro noutra, e a
+                pessoa tinha de saber onde procurar antes de saber o que fazer.
+
+                Aqui a primeira dobra responde as três perguntas de quem chega
+                na academia: é dia de quê, quanto tem para fazer, e como eu vou. */}
+            <View style={styles.hoje}>
+              <Text style={styles.rotuloHoje}>
+                {DIAS_LONGOS[new Date().getDay() as DiaSemana]}
+              </Text>
+              <Text style={styles.tituloHoje}>
+                {treinouHoje
+                  ? 'Você já treinou hoje'
+                  : doHoje.length > 0
+                    ? focoDeHoje || `${doHoje.length} ${doHoje.length === 1 ? 'exercício' : 'exercícios'}`
+                    : 'Sem treino montado para hoje'}
+              </Text>
+              <Text style={styles.subHoje}>
+                {naSemana === 0
+                  ? 'Nenhum treino nos últimos 7 dias'
+                  : `${naSemana} ${naSemana === 1 ? 'treino' : 'treinos'} nos últimos 7 dias` +
+                    (seguidos > 1 ? ` · ${seguidos} dias seguidos` : '')}
+              </Text>
             </View>
 
             {/* O modo treino vem antes do registro porque é o que se usa
@@ -260,14 +266,71 @@ export function TreinoScreen({
             >
               <Ionicons name="play" size={20} color={paleta().cores.branco} />
               <View style={styles.textoModo}>
-                <Text style={styles.tituloModo}>Modo treino</Text>
+                <Text style={styles.tituloModo}>
+                  {doHoje.length > 0 ? 'Começar o treino' : 'Treinar mesmo assim'}
+                </Text>
                 <Text style={styles.subModo}>
                   {doHoje.length > 0
-                    ? `${doHoje.length} ${doHoje.length === 1 ? 'exercício' : 'exercícios'} hoje · o descanso conta sozinho`
-                    : 'Nada montado para hoje'}
+                    ? 'O descanso conta sozinho e avisa'
+                    : 'Sem rotina montada, só o cronômetro'}
                 </Text>
               </View>
             </Pressable>
+
+            {/* O treino de hoje, à vista. Antes ele morava na outra aba, e quem
+                chegava na academia tinha de trocar de aba para lembrar o que ia
+                fazer — depois voltar para começar. */}
+            {doHoje.length > 0 && (
+              <View style={styles.listaHoje}>
+                {doHoje.map((e, i) => (
+                  <View key={e.id} style={styles.linhaHoje}>
+                    <Text style={styles.ordemHoje}>{i + 1}</Text>
+                    <View style={styles.textoSessao}>
+                      <Text style={styles.nomeSessao} numberOfLines={1}>
+                        {e.nome}
+                      </Text>
+                      <Text style={styles.detalheSessao}>{descreverExercicio(e)}</Text>
+                    </View>
+                  </View>
+                ))}
+                <Pressable
+                  onPress={() => setAba('rotina')}
+                  style={styles.linkRotina}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.textoLink}>Mexer na minha rotina</Text>
+                  <Ionicons name="chevron-forward" size={15} color={paleta().cores.verde} />
+                </Pressable>
+              </View>
+            )}
+
+            {/* Sem rotina, o caminho de sair disso vem inteiro e à vista — foi
+                a queixa de não achar onde a IA monta o treino. */}
+            {doHoje.length === 0 && (
+              <View style={styles.semRotina}>
+                <Pressable
+                  onPress={() => setIaAberta(true)}
+                  style={({ pressed }) => [styles.botaoIA, pressed && { opacity: 0.85 }]}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="sparkles" size={18} color={paleta().cores.verde} />
+                  <View style={styles.textoModo}>
+                    <Text style={styles.tituloIA}>Montar com a IA</Text>
+                    <Text style={styles.subIA}>
+                      Diga o que você quer, ou fotografe a ficha da academia
+                    </Text>
+                  </View>
+                </Pressable>
+                <Pressable
+                  onPress={() => setAba('rotina')}
+                  style={styles.linkRotina}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.textoLink}>Montar na mão</Text>
+                  <Ionicons name="chevron-forward" size={15} color={paleta().cores.verde} />
+                </Pressable>
+              </View>
+            )}
 
             <RegistrarTreino
               contaId={contaId}
@@ -290,7 +353,7 @@ export function TreinoScreen({
 
             {sessoes.length > 0 && (
               <>
-                <Text style={styles.tituloSecao}>Seus treinos</Text>
+                <Text style={styles.tituloSecao}>Últimos treinos</Text>
                 {sessoes.map(s => (
                   <View key={s.id} style={styles.linhaSessao}>
                     <View style={styles.textoSessao}>
@@ -1059,26 +1122,8 @@ const estilos = estilosDe(t =>
     borderColor: t.cores.borda,
     backgroundColor: t.cores.cartao,
   },
-  abaAtiva: { backgroundColor: t.cores.superficie, borderColor: t.cores.verde },
-  textoAba: { fontSize: 13.5, fontWeight: '700', color: t.inkSuave },
-  textoAbaAtivo: { color: t.cores.ink },
-
   conteudo: { paddingHorizontal: 20, gap: 10 },
   girando: { marginTop: 40 },
-
-  placar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: t.cores.cartao,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: t.cores.borda,
-    paddingVertical: 16,
-  },
-  numeroPlacar: { flex: 1, alignItems: 'center', gap: 2 },
-  valorPlacar: { fontSize: 30, fontWeight: '800', color: t.cores.limao, letterSpacing: -0.8 },
-  rotuloPlacar: { fontSize: 11.5, color: t.inkSuave, textAlign: 'center', lineHeight: 16 },
-  divisor: { width: 1, height: 40, backgroundColor: t.cores.borda },
 
   convite: {
     flexDirection: 'row',
@@ -1217,6 +1262,68 @@ const estilos = estilosDe(t =>
     paddingHorizontal: 13,
   },
   veioDe: { fontSize: 11.5, color: t.inkFraco, marginTop: 2, fontStyle: 'italic' },
+  hoje: {
+    backgroundColor: t.cores.cartao,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    padding: 17,
+    gap: 3,
+  },
+  rotuloHoje: { fontSize: 12, color: t.inkFraco, fontWeight: '700' },
+  /* Grande e curto: é o que se lê de relance na porta da academia. */
+  tituloHoje: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.5 },
+  subHoje: { fontSize: 13, color: t.inkMedio, marginTop: 4 },
+
+  listaHoje: {
+    backgroundColor: t.cores.cartao,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    overflow: 'hidden',
+  },
+  linhaHoje: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  ordemHoje: {
+    width: 20,
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: t.inkFraco,
+    fontVariant: ['tabular-nums'],
+  },
+  linkRotina: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: t.cores.borda,
+  },
+  textoLink: { fontSize: 13.5, fontWeight: '700', color: t.cores.verde },
+
+  semRotina: {
+    backgroundColor: t.cores.cartao,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    overflow: 'hidden',
+  },
+  botaoIA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+  },
+  tituloIA: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  subIA: { fontSize: 12, color: t.inkFraco },
+
   botaoModo: {
     flexDirection: 'row',
     alignItems: 'center',

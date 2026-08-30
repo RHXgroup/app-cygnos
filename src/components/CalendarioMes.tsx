@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons'
 import {
   INICIAIS_DA_SEMANA,
   NOMES_DOS_MESES,
+  formaNaFaixa,
   marcaDoDia,
   mesDe,
   podeAvancar,
@@ -10,6 +11,10 @@ import {
   type Marca,
 } from '../lib/calendarioDoCiclo'
 import { estilosDe, paleta } from '../lib/tema'
+
+/* O raio das pontas da faixa. Metade da altura dela, para a ponta virar um
+   semicírculo perfeito em vez de um canto arredondado. */
+const RAIO = 16
 
 /* O calendário do mês, com os dias pintados.
  *
@@ -108,8 +113,24 @@ export function CalendarioMes({
 
         {dias.map(d => {
           const marca: Marca = marcaDoDia(d.data, menstruada, previstos, anotados)
-          const fertil = ferteis.has(d.data) && marca !== 'menstruada'
+          const ehMenstruada = marca === 'menstruada'
+          const fertil = ferteis.has(d.data) && !ehMenstruada
           const escolhido = d.data === selecionado
+          const temAnotacao = anotados.has(d.data)
+
+          /* A FAIXA. Cinco dias de menstruação viram uma barra contínua,
+             arredondada nas pontas — e não cinco bolinhas soltas. A diferença
+             não é enfeite: a faixa mostra que aquilo é um período, e as
+             bolinhas mostram cinco eventos sem relação. É o que os aplicativos
+             de ciclo bons fazem, e o que faltava aqui. */
+          const forma = ehMenstruada
+            ? formaNaFaixa(d.data, menstruada)
+            : previstos.has(d.data)
+              ? formaNaFaixa(d.data, previstos)
+              : 'sozinho'
+          const abre = forma === 'sozinho' || forma === 'inicio'
+          const fecha = forma === 'sozinho' || forma === 'fim'
+
           return (
             <Pressable
               key={d.data}
@@ -119,14 +140,38 @@ export function CalendarioMes({
               accessibilityRole="button"
               accessibilityState={{ selected: escolhido, disabled: d.futuro }}
               accessibilityLabel={`Dia ${d.dia}${
-                marca === 'menstruada' ? ', menstruada' : marca === 'previsto' ? ', previsto' : ''
-              }${fertil ? ', janela fértil' : ''}`}
+                ehMenstruada ? ', menstruada' : marca === 'previsto' ? ', previsto' : ''
+              }${fertil ? ', janela fértil' : ''}${temAnotacao ? ', com anotação' : ''}`}
             >
+              {/* A faixa é uma camada ATRÁS do número e ocupa a célula inteira
+                  na horizontal, para encostar na vizinha. Sem isso sobraria um
+                  vão entre os dias e a barra sairia picotada. */}
+              <View
+                style={[
+                  styles.faixa,
+                  ehMenstruada && styles.faixaMenstruada,
+                  marca === 'previsto' && styles.faixaPrevista,
+                  (ehMenstruada || marca === 'previsto') && {
+                    borderTopLeftRadius: abre ? RAIO : 0,
+                    borderBottomLeftRadius: abre ? RAIO : 0,
+                    borderTopRightRadius: fecha ? RAIO : 0,
+                    borderBottomRightRadius: fecha ? RAIO : 0,
+                    marginLeft: abre ? 3 : 0,
+                    marginRight: fecha ? 3 : 0,
+                  },
+                ]}
+              />
+
               <View
                 style={[
                   styles.dia,
-                  marca === 'menstruada' && styles.diaMenstruada,
-                  marca === 'previsto' && styles.diaPrevisto,
+                  /* O dia registrado ganha o círculo cheio POR CIMA da faixa
+                     clara: a faixa diz "este período", e o círculo diz "este
+                     dia". Sem os dois, ou some o período ou some o dia. */
+                  ehMenstruada && styles.diaMenstruada,
+                  /* O anel verde da janela fértil é fino e por fora, e não um
+                     bloco cheio: ela é ESTIMATIVA, e um preenchimento sólido
+                     pareceria tão certo quanto o dia que ela registrou. */
                   fertil && styles.diaFertil,
                   d.ehHoje && styles.diaHoje,
                   escolhido && styles.diaEscolhido,
@@ -136,25 +181,38 @@ export function CalendarioMes({
                   style={[
                     styles.numero,
                     d.futuro && styles.numeroFuturo,
-                    marca === 'menstruada' && styles.numeroClaro,
+                    ehMenstruada && styles.numeroClaro,
                     escolhido && styles.numeroClaro,
                   ]}
                 >
                   {d.dia}
                 </Text>
               </View>
-              {/* O ponto de "tem anotação" só aparece quando o dia não está
-                  pintado por outra coisa — senão vira sujeira em cima da cor. */}
-              {marca === 'anotado' && <View style={styles.ponto} />}
+
+              {/* O ponto de "tem anotação" aparece SEMPRE, inclusive em cima da
+                  faixa — só troca de cor para continuar visível.
+
+                  Antes ele era escondido quando o dia estava pintado, e o
+                  efeito foi este: registrar uma coisa no primeiro dia da
+                  menstruação não devolvia sinal nenhum na tela. A pessoa salvou
+                  e o app não mostrou nada. */}
+              <View
+                style={[
+                  styles.ponto,
+                  !temAnotacao && styles.pontoInvisivel,
+                  ehMenstruada && styles.pontoClaro,
+                ]}
+              />
             </Pressable>
           )
         })}
       </View>
 
       <View style={styles.legenda}>
-        <Item cor={paleta().cores.erroTexto} texto="menstruada" styles={styles} />
-        <Item cor={paleta().cores.erroBorda} texto="previsto" styles={styles} />
-        <Item cor={paleta().cores.verdeClaro} texto="janela fértil" styles={styles} />
+        <Item cor={paleta().cores.cicloForte} texto="menstruada" styles={styles} />
+        <Item cor={paleta().cores.cicloPrevisto} texto="previsto" styles={styles} />
+        <Item cor={paleta().cores.verde} texto="janela fértil" styles={styles} />
+        <Item cor={paleta().inkFraco} texto="com anotação" styles={styles} />
       </View>
     </View>
   )
@@ -204,29 +262,50 @@ const estilos = estilosDe(t =>
     /* 14,28% é 1/7. Percentual, e não largura fixa: em aparelho estreito uma
        largura fixa empurraria o sétimo dia para a linha de baixo, e o mês
        inteiro sairia torto. */
-    celula: { width: '14.28%', alignItems: 'center', paddingVertical: 3 },
+    celula: {
+      width: '14.28%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 46,
+    },
+    /* A camada da faixa, atrás de tudo. Ocupa a célula inteira na horizontal
+       para encostar na vizinha e formar a barra contínua. */
+    faixa: { ...StyleSheet.absoluteFillObject, top: 4, bottom: 10 },
+    faixaMenstruada: { backgroundColor: t.cores.cicloFundo },
+    faixaPrevista: {
+      borderTopWidth: 1.5,
+      borderBottomWidth: 1.5,
+      borderColor: t.cores.cicloPrevisto,
+      borderStyle: 'dashed',
+    },
+
     dia: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    diaMenstruada: { backgroundColor: t.cores.erroTexto },
-    diaPrevisto: { borderWidth: 1.5, borderColor: t.cores.erroBorda, borderStyle: 'dashed' },
-    diaFertil: { backgroundColor: t.cores.verdeClaro },
-    diaHoje: { borderWidth: 1.5, borderColor: t.cores.ink },
+    /* Anel fino, e não bloco cheio: a janela fértil é ESTIMATIVA, e preenchida
+       pareceria tão certa quanto o dia que ela registrou. */
+    diaMenstruada: { backgroundColor: t.cores.cicloForte },
+    diaFertil: { borderWidth: 1.5, borderColor: t.cores.verde },
+    diaHoje: { borderWidth: 2, borderColor: t.cores.ink },
     diaEscolhido: { backgroundColor: t.cores.verde },
-    numero: { fontSize: 14, fontWeight: '600', color: t.cores.ink },
+    numero: { fontSize: 14.5, fontWeight: '600', color: t.cores.ink },
     numeroFuturo: { color: t.inkFraco },
     numeroClaro: { color: t.cores.branco, fontWeight: '800' },
     ponto: {
-      width: 4,
-      height: 4,
-      borderRadius: 2,
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
       backgroundColor: t.cores.verde,
-      marginTop: 1,
+      marginTop: 3,
     },
+    /* Invisível, e não ausente: sem ocupar o mesmo espaço sempre, o número
+       pularia para cima e para baixo conforme o dia tem anotação ou não. */
+    pontoInvisivel: { opacity: 0 },
+    pontoClaro: { backgroundColor: t.cores.branco },
 
     legenda: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 4 },
     itemLegenda: { flexDirection: 'row', alignItems: 'center', gap: 5 },

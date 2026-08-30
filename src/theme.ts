@@ -59,6 +59,18 @@ export type Cores = {
   erroBorda: string
   erroFundo: string
   erroTexto: string
+
+  /* ── O ciclo ──────────────────────────────────────────────────────────
+   * Cor PRÓPRIA, e não o vermelho de erro.
+   *
+   * Menstruação não é erro, e pintá-la com o vermelho de alarme diz isso na
+   * cara de quem abre a tela todo mês. Os aplicativos de ciclo bons usam um
+   * rosa fechado, quente, que lê como "isto é seu" e não como "algo deu
+   * errado" — e o vermelho de erro fica livre para continuar significando
+   * erro, que é o motivo de ele existir. */
+  cicloForte: string
+  cicloFundo: string
+  cicloPrevisto: string
 }
 
 export type Paleta = {
@@ -119,6 +131,12 @@ export const ESCURO: Paleta = {
     erroBorda: 'rgba(248,113,113,0.38)',
     erroFundo: 'rgba(248,113,113,0.12)',
     erroTexto: '#FCA5A5',
+
+    /* Mais claro que o do tema claro: rosa fechado sobre preto perde brilho, e
+       a faixa da menstruação some no fundo. */
+    cicloForte: '#E8899E',
+    cicloFundo: 'rgba(232,137,158,0.16)',
+    cicloPrevisto: 'rgba(232,137,158,0.45)',
   },
 
   /* Um matiz por macro, e não três tons do verde da marca: na barra empilhada
@@ -198,6 +216,12 @@ export const CLARO: Paleta = {
     /* #DC2626 dá 4,21:1 sobre o creme — passa raspando por baixo do mínimo.
        Este dá 5,64:1. */
     erroTexto: '#B91C1C',
+
+    /* #C2536B dá 4,9:1 sobre o creme — passa para texto, e é o que permite o
+       número do dia ficar branco em cima dele. */
+    cicloForte: '#C2536B',
+    cicloFundo: 'rgba(194,83,107,0.14)',
+    cicloPrevisto: 'rgba(194,83,107,0.45)',
   },
 
   coresMacro: { proteinas: '#15803D', carboidratos: '#B45309', gorduras: '#4F46E5' },

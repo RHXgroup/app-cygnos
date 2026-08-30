@@ -112,6 +112,10 @@ export function CicloScreen({
   const [ano, setAno] = useState(() => Number(hoje.slice(0, 4)))
   const [mes, setMes] = useState(() => Number(hoje.slice(5, 7)))
   const [diaAberto, setDiaAberto] = useState<string | null>(null)
+  /* Qual dia o resumo abaixo do calendário está mostrando. Fica separado do
+     `diaAberto` porque ele continua valendo DEPOIS de a folha fechar — é o que
+     devolve à pessoa o que ela acabou de salvar. */
+  const [selecionadoResumo, setSelecionadoResumo] = useState<string | null>(null)
   const [salvandoDia, setSalvandoDia] = useState(false)
 
   const [compartilha, setCompartilha] = useState(false)
@@ -215,6 +219,39 @@ export function CicloScreen({
   )
 
   const doDia = (data: string) => dias.find(d => d.data === data) ?? null
+
+  /* O que está anotado num dia, em uma frase.
+   *
+   * Existe por uma queixa de uso: ela marcou um dia, salvou, e o app não
+   * mostrou NADA de volta. Salvar sem devolução é o mesmo que não salvar, do
+   * ponto de vista de quem está olhando.
+   *
+   * Inclui o que é privado — esta é a tela DELA, e esconder aqui o que ela
+   * mesma escreveu não protege ninguém. O que não sai daqui é o espelho para a
+   * nutricionista, e isso o servidor garante. */
+  function resumoDoDia(d: Dia): string {
+    const partes: string[] = []
+    if (ehComeco(d.data)) partes.push('menstruação começou')
+    if (d.fluxo) partes.push(`fluxo ${d.fluxo}`)
+    if (d.sintomas.length) partes.push(d.sintomas.join(', '))
+    if (d.humor) partes.push(`humor ${d.humor}`)
+    if (d.desejoAlimentar.length) partes.push(`vontade de ${d.desejoAlimentar.join(', ')}`)
+    if (d.relacao) partes.push(
+      d.relacaoProtegida === true
+        ? 'relação com proteção'
+        : d.relacaoProtegida === false
+          ? 'relação sem proteção'
+          : 'relação',
+    )
+    if ((d.observacao ?? '').trim()) partes.push('recado para a nutricionista')
+    if ((d.notaPrivada ?? '').trim()) partes.push('nota sua')
+    return partes.join(' · ')
+  }
+
+  /* O último dia com alguma coisa. É ele que a tela mostra quando nenhum está
+     selecionado — para o registro de agora aparecer sem a pessoa procurar. */
+  const ultimoAnotado = [...dias].filter(diaTemAlgo).sort((a, b) => b.data.localeCompare(a.data))[0]
+  const emDestaque = (selecionadoResumo && doDia(selecionadoResumo)) || ultimoAnotado || null
   const ehComeco = (data: string) => (registros ?? []).some(r => r.comecou === data)
 
   async function marcarComeco(data: string, ligado: boolean) {
@@ -261,6 +298,9 @@ export function CicloScreen({
     setMudou(true)
     setDias(atuais => [...atuais.filter(x => x.data !== r.dia.data), r.dia])
     setDiaAberto(null)
+    /* Fecha a folha e DEIXA o dia em destaque: é assim que a pessoa vê o que
+       acabou de salvar sem ter de abrir de novo. */
+    setSelecionadoResumo(r.dia.data)
     void sincronizarCiclo()
   }
 
@@ -390,14 +430,40 @@ export function CicloScreen({
             previstos={pintados.previstos}
             ferteis={pintados.ferteis}
             anotados={pintados.anotados}
-            selecionado={diaAberto}
-            onSelecionar={setDiaAberto}
+            selecionado={selecionadoResumo}
+            onSelecionar={data => {
+              setSelecionadoResumo(data)
+              setDiaAberto(data)
+            }}
             onTrocarMes={passo => {
               const v = mesVizinho(ano, mes, passo)
               setAno(v.ano)
               setMes(v.mes)
             }}
           />
+
+          {/* O que está anotado no dia em destaque. Sem isto, salvar não
+              devolvia nada — e salvar sem devolução é o mesmo que não salvar,
+              do ponto de vista de quem está olhando a tela. */}
+          {emDestaque && resumoDoDia(emDestaque) !== '' && (
+            <Pressable
+              onPress={() => {
+                setSelecionadoResumo(emDestaque.data)
+                setDiaAberto(emDestaque.data)
+              }}
+              style={({ pressed }) => [styles.cartao, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Editar o dia ${diaEMes(emDestaque.data)}`}
+            >
+              <View style={styles.linhaChave}>
+                <View style={styles.textoChave}>
+                  <Text style={styles.tituloCartao}>{diaEMes(emDestaque.data)}</Text>
+                  <Text style={styles.linhaInfo}>{resumoDoDia(emDestaque)}</Text>
+                </View>
+                <Ionicons name="create-outline" size={18} color={paleta().inkFraco} />
+              </View>
+            </Pressable>
+          )}
 
           {/* ── O cruzamento com o diário ───────────────────────────────── */}
           {comparacao &&
