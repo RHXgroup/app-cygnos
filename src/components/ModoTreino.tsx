@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { createAudioPlayer } from 'expo-audio'
+import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
 import { relogio } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
 import type { Exercicio } from '../lib/treino'
@@ -36,6 +38,14 @@ import type { Exercicio } from '../lib/treino'
  *
  * A vibração vem primeiro na ordem de importância: no volume da academia, com
  * fone ou sem, é ela que a pessoa sente. O som é o reforço. */
+
+/* Quanto tempo um treino interrompido ainda vale para retomar.
+ *
+ * Seis horas. Quem saiu da academia e volta amanhã não quer continuar o treino
+ * de ontem — quer começar o de hoje —, e oferecer isso seria pior do que não
+ * oferecer nada. Mas o telefone bloquear no meio da série e o Android recolher
+ * o app é questão de minutos, e é esse o caso que precisa ser coberto. */
+const HORAS_DE_RASCUNHO = 6
 
 const PADRAO_DE_DESCANSO = 60
 const PASSO = 15
@@ -83,6 +93,9 @@ export function ModoTreino({
   const [fimDoDescanso, setFimDoDescanso] = useState<number | null>(null)
 
   const tocador = useRef<ReturnType<typeof createAudioPlayer> | null>(null)
+  /* Enquanto o rascunho não foi lido, não dá para gravar por cima dele — senão
+     o primeiro render (com tudo zerado) apagaria o treino que estava salvo. */
+  const [restaurado, setRestaurado] = useState(false)
 
   useEffect(() => {
     if (!visivel) return
@@ -97,7 +110,51 @@ export function ModoTreino({
     setFeitas({})
     setInicio(null)
     setFimDoDescanso(null)
+    setRestaurado(false)
   }, [visivel])
+
+  /* O TREINO INTERROMPIDO.
+   *
+   * O Android mata app em segundo plano quando precisa de memória, e a tela do
+   * treino fica aberta 50 minutos — boa parte deles com o telefone no bolso,
+   * que é exatamente quando o sistema recolhe. Sem isto, voltar significava
+   * cronômetro zerado, sem saber em que exercício estava nem quantas séries
+   * havia feito: a sessão inteira perdida no meio dela, no cenário para o qual
+   * este modo foi feito.
+   *
+   * O que volta é o INÍCIO, e não o tempo decorrido: o tempo é sempre calculado
+   * de `agora - inicio`, então retomar recupera os minutos que passaram
+   * inclusive com o app fechado — que é o que de fato aconteceu. */
+  useEffect(() => {
+    if (!visivel) return
+    let vivo = true
+    void lerRascunho<{ inicio: number; indice: number; feitas: Record<string, number> }>(
+      RASCUNHO.treino,
+      HORAS_DE_RASCUNHO,
+    ).then(r => {
+      if (!vivo) return
+      if (r && typeof r.inicio === 'number') {
+        setInicio(r.inicio)
+        setIndice(Math.min(r.indice ?? 0, Math.max(0, exercicios.length - 1)))
+        setFeitas(r.feitas ?? {})
+        setFase('treinando')
+      }
+      setRestaurado(true)
+    })
+    return () => {
+      vivo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visivel])
+
+  /* Guarda a cada mudança do que importa. Não guarda o descanso em andamento:
+     retomar no meio de uma contagem que já passou seria mostrar um número que
+     não quer dizer nada. */
+  useEffect(() => {
+    if (!visivel || !restaurado) return
+    if (inicio === null) return
+    void guardarRascunho(RASCUNHO.treino, { inicio, indice, feitas })
+  }, [visivel, restaurado, inicio, indice, feitas])
 
   /* Um tocador por sessão, criado na primeira vez que precisa. Criar a cada
      descanso deixaria um por série pendurado até o app fechar. */
@@ -139,6 +196,11 @@ export function ModoTreino({
   function comecar() {
     setInicio(Date.now())
     setFase('treinando')
+  }
+
+  function terminar() {
+    void apagarRascunho(RASCUNHO.treino)
+    onTerminar(Math.max(1, minutos))
   }
 
   function fizASerie() {
@@ -196,6 +258,10 @@ export function ModoTreino({
               Monte a rotina deste dia e o modo treino conduz a sessão inteira: uma série por
               toque, com o descanso certo de cada exercício.
             </Text>
+          </View>
+        ) : !restaurado ? (
+          <View style={styles.centro}>
+            <ActivityIndicator color={paleta().cores.verde} />
           </View>
         ) : fase === 'parado' ? (
           <View style={styles.centro}>
@@ -317,7 +383,7 @@ export function ModoTreino({
                       />
                     </Pressable>
                     <Pressable
-                      onPress={() => onTerminar(Math.max(1, minutos))}
+                      onPress={terminar}
                       style={styles.botaoTerminar}
                       accessibilityRole="button"
                     >

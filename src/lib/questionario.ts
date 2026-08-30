@@ -46,6 +46,25 @@ const texto = (v: unknown): string | null => {
   return t === '' ? null : t
 }
 
+/* SÓ se existe um esperando resposta. Uma ida à rede, e leve.
+ *
+ * A aba Mais só precisa saber se mostra a linha ou não — mas ela chamava
+ * `carregarQuestionario`, que faz DUAS idas e traz o modelo inteiro com seções,
+ * campos e a lista de objetivos da nutricionista. Isso acontecia toda vez que a
+ * aba carregava E toda vez que o app voltava do segundo plano, para desenhar
+ * uma linha de um toque.
+ *
+ * Defeito meu, de dois dias atrás, e do tipo que não aparece: no wi-fi de casa
+ * ninguém nota, e no 3G da rua a aba Mais fica lenta sem motivo aparente. */
+export async function existeQuestionarioPendente(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('app_questionario_pendente')
+  if (error) {
+    falha('Não consegui verificar se há questionário para você.', error)
+    return false
+  }
+  return texto((data as { token?: unknown } | null)?.token) !== null
+}
+
 export async function carregarQuestionario(): Promise<ResultadoQuestionario> {
   const pendente = await supabase.rpc('app_questionario_pendente')
   if (pendente.error)

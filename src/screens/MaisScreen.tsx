@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
 import { LINKS, abrirLink } from '../lib/links'
 import { carregarCatalogo, type Catalogo } from '../lib/nutricionista'
-import { carregarQuestionario } from '../lib/questionario'
+import { existeQuestionarioPendente } from '../lib/questionario'
 import { supabase } from '../lib/supabase'
 import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
 import {
@@ -135,8 +135,7 @@ export function MaisScreen({
        Falhar em saber se há questionário não é motivo para cobrir a tela de
        Mais com uma mensagem: o que a pessoa veio fazer aqui continua todo
        disponível, e a linha reaparece na próxima leitura. */
-    const q = await carregarQuestionario()
-    setTemQuestionario(q.tipo === 'ok')
+    setTemQuestionario(await existeQuestionarioPendente())
   }, [])
 
   useEffect(() => {

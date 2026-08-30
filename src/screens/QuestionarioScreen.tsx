@@ -15,6 +15,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
 import { carregarQuestionario, responderQuestionario, type Questionario } from '../lib/questionario'
 import {
   ALERGENOS,
@@ -49,6 +50,14 @@ import { estilosDe, paleta } from '../lib/tema'
  * ou cinco, e a barra em cima diz quanto falta — que é a informação que decide
  * entre continuar e desistir. */
 
+/* Quanto tempo o que ela respondeu continua valendo para retomar.
+ *
+ * Uma semana. Ao contrário do treino, aqui parar no meio e voltar dias depois é
+ * o uso NORMAL: são trinta perguntas, e ninguém responde tudo na fila do
+ * mercado. O que se perde ao guardar demais é quase nada; o que se perde ao
+ * guardar de menos é a anamnese inteira, e quem perde não responde de novo. */
+const DIAS_DE_RASCUNHO = 7
+
 export function QuestionarioScreen({
   onFechar,
   onRespondido,
@@ -72,14 +81,23 @@ export function QuestionarioScreen({
 
   useEffect(() => {
     let vivo = true
-    void carregarQuestionario().then(res => {
+    void carregarQuestionario().then(async res => {
       if (!vivo) return
       if (res.tipo === 'ok') {
         setQ(res.questionario)
-        /* Os vazios saem do modelo que ESTE questionário usa, e não de uma lista
+        /* Três camadas, da menos para a mais recente: o vazio do modelo, o que
+           o servidor já tem gravado, e por cima o rascunho deste aparelho.
+
+           Os vazios saem do modelo que ESTE questionário usa, e não de uma lista
            fixa: campo novo já nasce com o vazio certo, e campo que ela tirou não
-           fica sobrando na resposta. O que já foi respondido entra por cima. */
-        setR({ ...vazioDoModelo(res.questionario.modelo), ...res.questionario.respostas })
+           fica sobrando na resposta.
+
+           O rascunho vem por último porque é o mais novo: se ela respondeu
+           quinze perguntas e o app morreu, é isso que ela espera encontrar. */
+        const base = { ...vazioDoModelo(res.questionario.modelo), ...res.questionario.respostas }
+        const rascunho = await lerRascunho<Respostas>(RASCUNHO.questionario, DIAS_DE_RASCUNHO * 24)
+        if (!vivo) return
+        setR(rascunho ? { ...base, ...rascunho } : base)
         setEstado('pronto')
         return
       }
@@ -125,7 +143,13 @@ export function QuestionarioScreen({
   }
 
   function responder(chave: string, valor: unknown) {
-    setR(atual => ({ ...atual, [chave]: valor }))
+    setR(atual => {
+      const novo = { ...atual, [chave]: valor }
+      /* A cada resposta, e não ao trocar de seção: o app pode morrer no meio de
+         uma seção tanto quanto entre duas. */
+      void guardarRascunho(RASCUNHO.questionario, novo)
+      return novo
+    })
   }
 
   async function enviar() {
@@ -139,6 +163,9 @@ export function QuestionarioScreen({
       return
     }
     setErro('')
+    /* Só depois de o servidor confirmar. Apagar antes deixaria a pessoa sem o
+       rascunho E sem o envio se a rede caísse no meio. */
+    void apagarRascunho(RASCUNHO.questionario)
     setEnviado(true)
     onRespondido()
   }
