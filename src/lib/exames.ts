@@ -38,6 +38,10 @@ export type Exame = {
   criadoEm: string
 }
 
+/* Onde o sistema guarda exame e documento do paciente. Privado, e por isso todo
+   endereço precisa ser assinado com a sessão de quem está olhando. */
+export const BUCKET_DOCUMENTOS = 'documentos-paciente'
+
 export type ResultadoExames = { tipo: 'ok'; exames: Exame[] } | { tipo: 'erro'; mensagem: string }
 
 type Linha = {
@@ -64,8 +68,13 @@ export async function carregarExames(): Promise<ResultadoExames> {
   const linhas = (data ?? []) as Linha[]
   if (linhas.length === 0) return { tipo: 'ok', exames: [] }
 
-  /* Uma ida à rede para assinar todos, e não uma por exame. */
-  const enderecos = await assinados(linhas.map(l => l.arquivo_url))
+  /* Uma ida à rede para assinar todos, e não uma por exame.
+   *
+   * O bucket vai explícito porque o sistema guarda o exame como CAMINHO PURO
+   * ("exames/<nutri>/<pac>/x.pdf"), e não como URL — não há de onde deduzir o
+   * bucket. Sem isto o assinador devolvia o caminho como veio, e o cartão do
+   * exame não abria nada. */
+  const enderecos = await assinados(linhas.map(l => l.arquivo_url), BUCKET_DOCUMENTOS)
 
   return {
     tipo: 'ok',

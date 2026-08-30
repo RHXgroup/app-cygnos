@@ -25,9 +25,35 @@ const ENDERECO_PUBLICO = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/
 
 export type PartesDoEndereco = { bucket: string; caminho: string }
 
-export function partesDoEndereco(url: string): PartesDoEndereco | null {
+/* O `bucketPadrao` existe por um caso medido, e não por precaução.
+ *
+ * O sistema guarda o exame como CAMINHO PURO — "exames/<nutri>/<pac>/x.pdf" —,
+ * e não como URL. A expressão acima não casa, a função devolvia null, e o
+ * assinador então devolvia o caminho como veio: uma string que não é endereço
+ * de nada, posta num link.
+ *
+ * Somado à falta de policy no Storage (corrigida na 20260831030000), a tela de
+ * exames listava seis cartões e não abria nenhum — sem erro em lugar nenhum,
+ * porque cada metade falhava em silêncio. Quem sabe em que bucket o caminho
+ * mora é quem chama; aqui só se aceita a informação. */
+export function partesDoEndereco(url: string, bucketPadrao?: string): PartesDoEndereco | null {
   const achado = ENDERECO_PUBLICO.exec(url)
-  if (!achado) return null
+  if (!achado) {
+    /* Caminho puro: sem esquema, sem barra na frente, e com pelo menos uma
+       pasta. `http...` que não casou com o formato conhecido continua saindo
+       null — é endereço de outro lugar, e reescrevê-lo seria chutar. */
+    const limpo = (url ?? '').trim()
+    if (
+      bucketPadrao &&
+      limpo !== '' &&
+      !limpo.includes('://') &&
+      !limpo.startsWith('/') &&
+      limpo.includes('/')
+    ) {
+      return { bucket: bucketPadrao, caminho: limpo }
+    }
+    return null
+  }
 
   /* O `?t=` que o sistema pendura no fim é quebra-cache dele, não faz parte do
      nome do arquivo — assinar com ele junto procuraria um arquivo que não
@@ -62,12 +88,12 @@ export async function assinado(url: string): Promise<string> {
  *
  * Devolve na mesma ordem que recebeu. O que não deu para assinar volta como
  * veio. */
-export async function assinados(urls: string[]): Promise<string[]> {
+export async function assinados(urls: string[], bucketPadrao?: string): Promise<string[]> {
   const porBucket = new Map<string, string[]>()
   const doIndice = new Map<number, PartesDoEndereco>()
 
   urls.forEach((url, i) => {
-    const partes = partesDoEndereco(url)
+    const partes = partesDoEndereco(url, bucketPadrao)
     /* Endereço fora do formato conhecido fica como veio: pode ser de outro lugar
        que já funciona, e reescrever o que não se entende é pior que não mexer. */
     if (!partes) return
