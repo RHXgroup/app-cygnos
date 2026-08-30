@@ -888,6 +888,17 @@ function MeusPedidos({
               )}
             </View>
 
+            {/* A frase que ele escreveu, do jeito que escreveu, como balão dele.
+                Vem ANTES da explicação porque é o que ele foi ali conferir: sem
+                isto, "aguardando resposta" era tudo o que restava de uma
+                mensagem que ele escreveu e viu sumir — e a conclusão de quem lê
+                isso é que a mensagem não saiu. */}
+            {!!s.mensagem && (
+              <View style={styles.balaoPedido}>
+                <Text style={styles.textoBalaoPedido}>{s.mensagem}</Text>
+              </View>
+            )}
+
             <Text style={styles.explicacaoPedido}>{estado.explicacao}</Text>
           </View>
         )
@@ -1104,6 +1115,18 @@ const estilos = estilosDe(t =>
   nomePedidoLinha: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
   estadoPedido: { marginTop: 1, fontSize: 11.5, color: t.inkFraco },
   explicacaoPedido: { marginLeft: 28, fontSize: 12, lineHeight: 17, color: t.inkSuave },
+  balaoPedido: {
+    marginLeft: 28,
+    marginTop: 2,
+    alignSelf: 'flex-start',
+    maxWidth: '92%',
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 13,
+    borderBottomLeftRadius: 4,
+    backgroundColor: t.cores.verdeClaro,
+  },
+  textoBalaoPedido: { fontSize: 13, lineHeight: 18, color: t.cores.ink },
   desfazer: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
 
   /* ── Painel de pedir contato ── */

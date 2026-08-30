@@ -32,6 +32,17 @@ export type Solicitacao = {
   status: string
   criadaEm: string
   respondidaEm: string | null
+  /* A frase que ELE escreveu ao pedir.
+   *
+   * Vinha do banco e era descartada aqui, e o efeito foi o primeiro relato do
+   * usuário: ele escreveu, a frase sumiu da vista, e a leitura foi "a mensagem
+   * não saiu" — com a reação natural de mandar de novo.
+   *
+   * Opcional no tipo, e não `| null`, porque depende de a função do banco
+   * devolver a coluna. Se não devolver, o campo simplesmente não vem e a tela
+   * continua funcionando sem ele — mesmo cuidado de `medidaCaseira` em
+   * lib/alimentos.ts. */
+  mensagem?: string | null
 }
 
 export type ResultadoSolicitacoes =
@@ -55,6 +66,7 @@ type Linha = {
   status: string
   criada_em: string
   respondida_em: string | null
+  mensagem?: string | null
 }
 
 export async function carregarMinhasSolicitacoes(): Promise<ResultadoSolicitacoes> {
@@ -84,6 +96,9 @@ export async function carregarMinhasSolicitacoes(): Promise<ResultadoSolicitacoe
       status: l.status,
       criadaEm: l.criada_em,
       respondidaEm: l.respondida_em,
+      /* Texto em branco é o mesmo que não ter escrito: a frase é opcional, e um
+         balão vazio na tela seria pior do que nenhum. */
+      mensagem: l.mensagem?.trim() || null,
     })),
   }
 }

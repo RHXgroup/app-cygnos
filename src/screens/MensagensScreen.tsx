@@ -520,5 +520,23 @@ const estilos = estilosDe(t =>
     },
     botaoVerPressionado: { backgroundColor: t.cores.verdeMenta },
     textoVer: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
+
+    pedidos: { alignSelf: 'stretch', marginTop: 16, gap: 14, paddingHorizontal: 4 },
+    pedido: { gap: 5 },
+    nomePedido: { fontSize: 12.5, fontWeight: '700', color: t.inkSuave },
+    /* Balão à direita e verde, igual ao das mensagens dele na conversa: é a
+       mesma coisa — o que ele escreveu —, e desenhar diferente sugeriria que é
+       outra. */
+    balaoPedido: {
+      alignSelf: 'flex-end',
+      maxWidth: '90%',
+      paddingHorizontal: 13,
+      paddingVertical: 9,
+      borderRadius: 16,
+      borderBottomRightRadius: 5,
+      backgroundColor: t.cores.verde,
+    },
+    textoBalaoPedido: { fontSize: 14.5, lineHeight: 20, color: t.cores.branco },
+    semTextoPedido: { fontSize: 12.5, color: t.inkFraco, fontStyle: 'italic' },
   }),
 )
