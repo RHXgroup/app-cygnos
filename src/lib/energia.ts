@@ -23,6 +23,11 @@ export const NOME_DA_FORMULA: Record<Formula, string> = {
   fao_who_crianca: 'FAO/OMS',
 }
 
+/* O slug vem do banco, e uma fórmula nova sairia como "undefined" no meio da
+   linha do cálculo salvo. Ver a armadilha 10. */
+export const nomeDaFormula = (f: string): string =>
+  NOME_DA_FORMULA[f as Formula] ?? 'fórmula não identificada'
+
 export type SobreAFormula = {
   chave: Formula
   nome: string

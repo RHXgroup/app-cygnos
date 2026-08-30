@@ -36,6 +36,7 @@ import {
   carregarObjetivoPeso,
   seguindoOFoco,
   type ObjetivoPeso,
+  nomeDoObjetivo,
 } from '../lib/metas'
 import { dataISO, dataNumerica } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
@@ -414,7 +415,7 @@ function CartaoEvolucao({
             {/* O foco só entra na frase quando foi declarado. Sem ele o cartão
                 diz o fato e cala — que é o que ele fazia antes de a coluna
                 existir, e continua sendo o certo para quem não quis dizer. */}
-            {objetivo !== null && ` Seu foco é ${NOME_DO_OBJETIVO[objetivo].toLowerCase()}.`}
+            {objetivo !== null && ` Seu foco é ${nomeDoObjetivo(objetivo).toLowerCase()}.`}
           </Text>
 
           {/* A leitura de direção, e não de mérito: "no sentido do seu foco" ou

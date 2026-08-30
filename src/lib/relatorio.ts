@@ -12,6 +12,7 @@ import {
   tempoDormindo,
   type Fator,
   type Noite,
+  nomeDoFator,
 } from './sono'
 
 /* A aba de Relatórios: o passado, lido do que já está gravado.
@@ -453,7 +454,7 @@ function resumoDoSono(noites: Noite[], metaHoras: number | null): ResumoSonoPeri
         ? noites.filter(n => tempoDormindo(n) >= metaHoras * 60).length
         : null,
     fatores: [...contagem.entries()]
-      .map(([fator, vezes]) => ({ fator, rotulo: NOME_DO_FATOR[fator], vezes }))
+      .map(([fator, vezes]) => ({ fator, rotulo: nomeDoFator(fator), vezes }))
       .sort((a, b) => b.vezes - a.vezes),
     irregularidadeMin: irregularidadeDe(noites),
   }
@@ -586,7 +587,7 @@ function padraoFatorDoSono(dias: DiaRelatorio[]): Padrao | null {
   return {
     chave: `fator-${pior.fator}`,
     icone: 'moon-outline',
-    titulo: `${NOME_DO_FATOR[pior.fator]} aparece nas suas piores noites`,
+    titulo: `${nomeDoFator(pior.fator)} aparece nas suas piores noites`,
     texto: `Nas ${pior.vezes} noites em que você marcou este fator, dormiu ${minutos(pior.diferenca)} a menos que nas demais.`,
     tom: 'atencao',
   }

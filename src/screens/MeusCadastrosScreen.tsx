@@ -34,6 +34,7 @@ import {
   atividadePor,
   carregarCalculos,
   type CalculoSalvo,
+  nomeDaFormula,
 } from '../lib/energia'
 import { Confirmacao } from '../components/Confirmacao'
 import { estilosDe, paleta } from '../lib/tema'
@@ -643,7 +644,7 @@ function CartaoCalculo({
               feita, e é o que explica dois cálculos darem números diferentes. */}
           <Text style={styles.retrato}>
             {decimal(calculo.peso)} kg · {calculo.alturaCm} cm · {calculo.idade} anos ·{' '}
-            {NOME_DA_FORMULA[calculo.formula]} · {atividadePor(calculo.atividade).rotulo}
+            {nomeDaFormula(calculo.formula)} · {atividadePor(calculo.atividade).rotulo}
           </Text>
 
           <Text style={styles.data}>Feito em {dataNumerica(new Date(calculo.criadoEm))}</Text>

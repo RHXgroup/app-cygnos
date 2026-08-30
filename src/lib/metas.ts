@@ -330,6 +330,18 @@ export const NOME_DO_OBJETIVO: Record<Exclude<ObjetivoPeso, null>, string> = {
   ganho: 'Ganhar peso',
 }
 
+/* Nunca o índice cru quando o valor veio do BANCO.
+ *
+ * `NOME_DO_OBJETIVO[objetivo]` devolve undefined para qualquer palavra fora das
+ * três, e duas telas faziam `.toLowerCase()` no resultado — o que não mostra
+ * texto torto, DERRUBA a tela inteira por causa de um valor novo numa coluna.
+ *
+ * Ver a armadilha 10 do AGENTS.md. O texto de reserva admite que o app não
+ * sabe, em vez de chutar um dos três: dizer "perder peso" para quem marcou
+ * outra coisa é pior do que não dizer nada. */
+export const nomeDoObjetivo = (o: string | null): string =>
+  o === null ? 'sem foco definido' : (NOME_DO_OBJETIVO[o as Exclude<ObjetivoPeso, null>] ?? 'um foco que este app ainda não conhece')
+
 export async function carregarObjetivoPeso(
   contaId: string,
 ): Promise<{ tipo: 'ok'; objetivo: ObjetivoPeso } | { tipo: 'erro'; mensagem: string }> {
@@ -345,7 +357,16 @@ export async function carregarObjetivoPeso(
       tipo: 'erro',
       mensagem: falha('Não consegui carregar o seu foco de peso. Verifique a conexão.', error),
     }
-  return { tipo: 'ok', objetivo: (data?.objetivo_peso as ObjetivoPeso) ?? null }
+  /* Filtrado, e não convertido com `as`.
+   *
+   * O `as` fazia o TypeScript acreditar que a coluna só tem os três valores, e
+   * quem acredita não confere. Qualquer outra palavra passava por aqui intacta
+   * e ia estourar lá na frente, na tela. Valor que o app não conhece vira null:
+   * é o mesmo que "não escolheu", que é o único tratamento honesto para um foco
+   * que ele não sabe seguir. */
+  const cru = data?.objetivo_peso
+  const conhecido = cru === 'perda' || cru === 'manter' || cru === 'ganho'
+  return { tipo: 'ok', objetivo: conhecido ? cru : null }
 }
 
 export async function salvarObjetivoPeso(

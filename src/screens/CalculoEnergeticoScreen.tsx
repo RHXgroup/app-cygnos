@@ -40,6 +40,7 @@ import {
   salvarMetas,
   type MetasSalvas,
   type ObjetivoPeso,
+  nomeDoObjetivo,
 } from '../lib/metas'
 import { carregarPeso } from '../lib/peso'
 import { decimal, milhar } from '../lib/formatar'
@@ -702,7 +703,7 @@ function EtapaResultado({
         <Text style={styles.tituloBloco}>Sua meta de calorias</Text>
         <Text style={styles.ajudaBloco}>
           {foco
-            ? `Seu foco no perfil é ${NOME_DO_OBJETIVO[foco].toLowerCase()}, então partimos de ${sugerido > 0 ? '+' : ''}${sugerido}% sobre o gasto.`
+            ? `Seu foco no perfil é ${nomeDoObjetivo(foco).toLowerCase()}, então partimos de ${sugerido > 0 ? '+' : ''}${sugerido}% sobre o gasto.`
             : 'Você não definiu foco de peso no perfil, então partimos da manutenção. Dá para ajustar aqui.'}
         </Text>
 

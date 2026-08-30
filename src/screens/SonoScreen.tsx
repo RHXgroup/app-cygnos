@@ -34,6 +34,7 @@ import {
   type ComoAcordou,
   type Fator,
   type Noite,
+  nomeDoFator,
 } from '../lib/sono'
 import { METAS_VAZIAS, carregarMetas, type Metas } from '../lib/metas'
 import { mascaraHora, validarHora } from '../lib/formulario'
@@ -489,7 +490,7 @@ export function SonoScreen({
                     <Text style={styles.rotuloCampo}>O que mais se repete</Text>
                     {resumo.fatoresFrequentes.slice(0, 4).map(f => (
                       <View key={f.fator} style={styles.linhaFator}>
-                        <Text style={styles.nomeFator}>{NOME_DO_FATOR[f.fator]}</Text>
+                        <Text style={styles.nomeFator}>{nomeDoFator(f.fator)}</Text>
                         <Text style={styles.vezesFator}>
                           {f.vezes} de {resumo.quantas}
                         </Text>

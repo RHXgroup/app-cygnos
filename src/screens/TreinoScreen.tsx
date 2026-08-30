@@ -35,6 +35,7 @@ import {
   sessoesNaSemana,
   type Exercicio,
   type Sessao,
+  nomeDoEsforco,
 } from '../lib/treino'
 import { DIAS_CURTOS, dataNumerica } from '../lib/formatar'
 import type { DiaSemana } from '../lib/plano'

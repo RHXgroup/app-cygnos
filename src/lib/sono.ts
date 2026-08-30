@@ -44,6 +44,11 @@ export const NOME_DO_FATOR: Record<Fator, string> = Object.fromEntries(
   FATORES.map(f => [f.chave, f.rotulo]),
 ) as Record<Fator, string>
 
+/* O fator vem gravado no banco. Um marcado por uma versão futura do app viraria
+   "undefined aparece nas suas piores noites" no relatório. Ver a armadilha 10. */
+export const nomeDoFator = (f: string): string =>
+  NOME_DO_FATOR[f as Fator] ?? 'Outro fator'
+
 export const COMO_ACORDOU: { chave: ComoAcordou; rotulo: string }[] = [
   { chave: 'descansado', rotulo: 'Descansado' },
   { chave: 'media', rotulo: 'Na média' },
