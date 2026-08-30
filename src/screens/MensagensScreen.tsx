@@ -6,6 +6,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -85,6 +86,10 @@ export function MensagensScreen({
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
+  /* Separado do erro de enviar: um é sobre a mensagem que não saiu, o outro
+     sobre a conversa que não veio, e trocar um pelo outro confunde. */
+  const [erroCarga, setErroCarga] = useState('')
+  const [atualizando, setAtualizando] = useState(false)
 
   const rolagem = useRef<ScrollView>(null)
 
@@ -100,8 +105,24 @@ export function MensagensScreen({
   const buscar = useCallback(async () => {
     const [cat, msgs] = await Promise.all([carregarCatalogo(), carregarMensagens()])
 
-    setNutri(cat.tipo === 'ok' ? cat.catalogo.vinculada : null)
-    if (msgs.tipo === 'ok') setMensagens(msgs.mensagens)
+    /* Falhou a leitura do catálogo: FICA com o que já estava. Zerar aqui trocaria
+       a conversa em andamento pelo convite a procurar nutricionista, por causa
+       de um túnel — e dizer a alguém que ela não tem profissional é a pior coisa
+       que esta tela pode dizer errado. */
+    if (cat.tipo === 'ok') setNutri(cat.catalogo.vinculada)
+
+    /* O erro é limpo no sucesso, e não só escrito na falha: esta tela relê
+       sozinha, e um erro que fica faria a conversa aparecer atrás de uma
+       mensagem vencida. Ver a armadilha 9. */
+    if (msgs.tipo === 'ok') {
+      setErroCarga('')
+      setMensagens(msgs.mensagens)
+    } else {
+      /* Sem isto, falhar em carregar parecia conversa vazia — "vocês ainda não
+         trocaram mensagens" sobre uma conversa que existe e não desceu. Silêncio
+         que se lê como fato é pior do que erro. */
+      setErroCarga(msgs.mensagem)
+    }
   }, [])
 
   /* Ler é ter a conversa NA FRENTE, e não tê-la carregado.
@@ -272,8 +293,22 @@ export function MensagensScreen({
             contentContainerStyle={styles.conteudoConversa}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            /* Puxar para tentar de novo é o gesto óbvio de quem viu a conversa
+               não descer, e a tela precisa atender ao gesto que ela sugere. */
+            refreshControl={
+              <RefreshControl
+                refreshing={atualizando}
+                onRefresh={() => {
+                  setAtualizando(true)
+                  buscar().finally(() => setAtualizando(false))
+                }}
+                tintColor={paleta().cores.limao}
+              />
+            }
           >
-            {mensagens.length === 0 ? (
+            {erroCarga ? (
+              <Text style={styles.primeira}>{erroCarga}</Text>
+            ) : mensagens.length === 0 ? (
               <Text style={styles.primeira}>
                 Vocês ainda não trocaram mensagens. Escreva a primeira.
               </Text>
