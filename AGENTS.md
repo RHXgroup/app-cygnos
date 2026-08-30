@@ -272,8 +272,10 @@ de investigação aqui — ver o comentário do carregamento em `NutricionistasS
 melhor do que traduzir. Está em `lib/agenda.ts`, na hora de pedir consulta, e é o
 único lugar.
 
-Nem toda lib já foi convertida. Ao mexer numa que ainda devolve `error.message`
-cru, converta-a de passagem.
+Hoje sobra **um** `error.message` cru em todo o `src/lib`, e é o de pedir
+consulta — a exceção acima. Se aparecer outro, é regressão: converta de
+passagem, e prefira `falha()` mesmo quando ninguém vai ler a frase, porque o
+console é a outra metade do trabalho.
 
 ## 13. As quatro abas existem todas ao mesmo tempo
 
