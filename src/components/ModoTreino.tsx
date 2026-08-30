@@ -15,7 +15,8 @@ import { createAudioPlayer } from 'expo-audio'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
 import { relogio } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
-import type { Exercicio } from '../lib/treino'
+import { gravarSerie, ultimaVezDoExercicio, type Exercicio, type UltimaVez } from '../lib/treino'
+import { dataISO } from '../lib/formatar'
 
 /* O modo treino: o telefone conduz a sessão, em vez de esperar ser alimentado.
  *
@@ -58,14 +59,28 @@ const PADRAO_DA_VIBRACAO = [0, 200, 120, 200, 120, 450]
 
 type Fase = 'parado' | 'treinando' | 'descansando'
 
+/* O primeiro número de "8-12", "10", "até a falha".
+ *
+ * Texto, e não número, porque é assim que se escreve repetição — e é assim que
+ * a ficha da academia vem. Quando não há número nenhum ("até a falha"), volta
+ * nulo: inventar 10 gravaria um dado que ninguém mediu. */
+function primeiroNumero(texto: string | null): number | null {
+  const achado = /\d+/.exec(texto ?? '')
+  if (!achado) return null
+  const n = Number(achado[0])
+  return Number.isFinite(n) && n > 0 && n <= 1000 ? n : null
+}
+
 export function ModoTreino({
   visivel,
+  contaId,
   exercicios,
   onDescansoMudou,
   onTerminar,
   onFechar,
 }: {
   visivel: boolean
+  contaId: string
   /* Os do DIA, já na ordem. Vazio é possível — a tela diz o que fazer. */
   exercicios: Exercicio[]
   /* A pessoa ajustou o descanso deste exercício. Persiste, porque ajustar de
@@ -96,6 +111,17 @@ export function ModoTreino({
   /* Enquanto o rascunho não foi lido, não dá para gravar por cima dele — senão
      o primeiro render (com tudo zerado) apagaria o treino que estava salvo. */
   const [restaurado, setRestaurado] = useState(false)
+
+  /* O peso e a repetição EM USO nesta sessão, por exercício.
+   *
+   * Nascem do plano. Quem levantou o de sempre não toca em nada e o "fiz a
+   * série" grava o valor certo — zero toque a mais do que antes. Só mexe quem
+   * mudou a carga, que é exatamente quem quer que aquilo fique registrado. */
+  const [cargas, setCargas] = useState<Record<string, number | null>>({})
+  const [reps, setReps] = useState<Record<string, number | null>>({})
+  /* O que ela fez neste exercício da última vez. É a informação que se procura
+     no caderninho, e a que transforma cronômetro em acompanhamento. */
+  const [ultima, setUltima] = useState<UltimaVez | null>(null)
 
   useEffect(() => {
     if (!visivel) return
@@ -175,6 +201,25 @@ export function ModoTreino({
   const exercicio = exercicios[indice] as Exercicio | undefined
   const descansoDe = (e: Exercicio) =>
     descansos[e.id] ?? e.descansoSeg ?? PADRAO_DE_DESCANSO
+  const cargaDe = (e: Exercicio) => (e.id in cargas ? cargas[e.id] : e.cargaKg)
+  const repsDe = (e: Exercicio) => (e.id in reps ? reps[e.id] : primeiroNumero(e.repeticoes))
+
+  /* Busca o histórico quando o exercício muda. Uma ida por exercício, e não
+     uma por série: o que ela fez da última vez não muda no meio do treino. */
+  useEffect(() => {
+    if (!visivel || !exercicio) {
+      setUltima(null)
+      return
+    }
+    let vivo = true
+    setUltima(null)
+    void ultimaVezDoExercicio(contaId, exercicio.id, dataISO(new Date())).then(u => {
+      if (vivo) setUltima(u)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [visivel, contaId, exercicio?.id])
 
   const restamNoDescanso =
     fimDoDescanso === null ? 0 : Math.max(0, Math.round((fimDoDescanso - agora) / 1000))
@@ -207,6 +252,18 @@ export function ModoTreino({
     if (!exercicio) return
     const jaFeitas = (feitas[exercicio.id] ?? 0) + 1
     setFeitas(f => ({ ...f, [exercicio.id]: jaFeitas }))
+
+    /* Sem `await`: a gravação não pode segurar o começo do descanso. Ela não
+       rejeita — o pior caso é uma linha de histórico perdida, e o melhor caso
+       de esperar seria um treino travado com a pessoa segurando a barra. */
+    void gravarSerie(contaId, {
+      exercicioId: exercicio.id,
+      nome: exercicio.nome,
+      data: dataISO(new Date()),
+      serie: jaFeitas,
+      cargaKg: cargaDe(exercicio),
+      repeticoes: repsDe(exercicio),
+    })
 
     const alvo = exercicio.series
     const acabou = alvo !== null && jaFeitas >= alvo
@@ -294,6 +351,43 @@ export function ModoTreino({
                   .filter(Boolean)
                   .join(' · ') || 'à vontade'}
               </Text>
+
+              {/* O que ela fez da última vez. Vem ANTES dos controles porque é
+                  a referência: a pessoa olha isto para decidir o peso de hoje,
+                  e não depois de escolher. */}
+              {ultima && (
+                <View style={styles.ultimaVez}>
+                  <Ionicons name="trending-up-outline" size={15} color={paleta().cores.verde} />
+                  <Text style={styles.textoUltima}>
+                    Da última vez: {ultima.series}{' '}
+                    {ultima.series === 1 ? 'série' : 'séries'}
+                    {ultima.repeticoes ? ` de ${ultima.repeticoes}` : ''}
+                    {ultima.cargaKg !== null ? ` com ${ultima.cargaKg} kg` : ''}
+                  </Text>
+                </View>
+              )}
+
+              {/* Peso e repetição JÁ PREENCHIDOS com o plano. Quem levantou o de
+                  sempre não toca aqui, e o "fiz a série" grava o valor certo:
+                  zero toque a mais do que antes. */}
+              {exercicio && (
+                <View style={styles.linhaCargas}>
+                  <Ajuste
+                    rotulo="kg"
+                    valor={cargaDe(exercicio)}
+                    passo={2.5}
+                    onMudar={n => setCargas(c => ({ ...c, [exercicio.id]: n }))}
+                    styles={styles}
+                  />
+                  <Ajuste
+                    rotulo="reps"
+                    valor={repsDe(exercicio)}
+                    passo={1}
+                    onMudar={n => setReps(r => ({ ...r, [exercicio.id]: n }))}
+                    styles={styles}
+                  />
+                </View>
+              )}
 
               {/* As séries como bolinhas: quantas faltam se lê de relance, e de
                   relance é como se olha o telefone no meio de um treino. */}
@@ -415,6 +509,56 @@ export function ModoTreino({
   )
 }
 
+/* Um número com menos e mais. Toque grande, porque isto é usado de pé, com a
+   mão suada, e errar o alvo aqui grava o peso errado. */
+function Ajuste({
+  rotulo,
+  valor,
+  passo,
+  onMudar,
+  styles,
+}: {
+  rotulo: string
+  valor: number | null
+  passo: number
+  onMudar: (n: number | null) => void
+  styles: ReturnType<typeof estilos>
+}) {
+  const mudar = (delta: number) => {
+    const base = valor ?? 0
+    const novo = Math.round((base + delta) * 100) / 100
+    /* Abaixo de zero volta a "—": peso do corpo é 0, e menos que isso não
+       existe. O nulo é o "não registrei", e é diferente do zero. */
+    onMudar(novo < 0 ? null : novo)
+  }
+  return (
+    <View style={styles.ajuste}>
+      <Pressable
+        onPress={() => mudar(-passo)}
+        style={styles.botaoNumero}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={`Menos ${passo} ${rotulo}`}
+      >
+        <Text style={styles.sinal}>−</Text>
+      </Pressable>
+      <View style={styles.valorBloco}>
+        <Text style={styles.valor}>{valor === null ? '—' : valor}</Text>
+        <Text style={styles.rotuloValor}>{rotulo}</Text>
+      </View>
+      <Pressable
+        onPress={() => mudar(passo)}
+        style={styles.botaoNumero}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={`Mais ${passo} ${rotulo}`}
+      >
+        <Text style={styles.sinal}>+</Text>
+      </Pressable>
+    </View>
+  )
+}
+
 const estilos = estilosDe(t =>
   StyleSheet.create({
     tela: { flex: 1, backgroundColor: t.cores.fundo },
@@ -448,6 +592,40 @@ const estilos = estilosDe(t =>
        banco do supino. */
     nomeExercicio: { fontSize: 30, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.8, lineHeight: 36 },
     detalhe: { fontSize: 15, color: t.inkMedio },
+
+    ultimaVez: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 },
+    textoUltima: { flex: 1, fontSize: 13.5, color: t.cores.verde, fontWeight: '700' },
+
+    linhaCargas: { flexDirection: 'row', gap: 10, marginTop: 10 },
+    ajuste: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      backgroundColor: t.cores.cartao,
+      paddingHorizontal: 6,
+      paddingVertical: 6,
+    },
+    botaoNumero: {
+      width: 42,
+      height: 42,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.superficie,
+    },
+    sinal: { fontSize: 21, fontWeight: '800', color: t.cores.ink, lineHeight: 24 },
+    valorBloco: { alignItems: 'center' },
+    valor: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: t.cores.ink,
+      fontVariant: ['tabular-nums'],
+    },
+    rotuloValor: { fontSize: 10.5, color: t.inkFraco, fontWeight: '700' },
 
     bolinhas: { flexDirection: 'row', gap: 8, marginTop: 6 },
     bolinha: {

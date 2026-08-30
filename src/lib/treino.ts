@@ -381,6 +381,11 @@ export const NOME_DO_ESFORCO: Record<number, string> = {
   5: 'Máximo',
 }
 
+/* A escala é de 1 a 5, e o número vem do banco. Um 0 ou um 7 — de uma versão
+   futura, ou de um registro torto — sairia como "undefined" ao lado da duração
+   da sessão. Ver a armadilha 10. */
+export const nomeDoEsforco = (n: number): string => NOME_DO_ESFORCO[n] ?? `esforço ${n}`
+
 /* Quantas sessões nos últimos sete dias. É a leitura que interessa: constância,
    e não total histórico — quem treinou 200 vezes no ano passado e nenhuma neste
    mês não está treinando. */
@@ -417,4 +422,125 @@ export function sequencia(sessoes: Sessao[], hoje = new Date()): number {
   }
 
   return total
+}
+
+/* ── A série feita ─────────────────────────────────────────────────────────*/
+
+/* O que foi LEVANTADO, e não o que estava planejado.
+ *
+ * `app_treino_exercicios.carga_kg` é uma linha só, sobrescrita: é o plano. Sem
+ * esta tabela, "há seis semanas você fazia 40 kg, hoje fez 55" era impossível
+ * de dizer — não por falta de tela, por falta de dado. O app pedia, guardava, e
+ * no fim da semana a pessoa não levava nada.
+ *
+ * E não custa um toque a mais: o modo treino já tem o "fiz a série", e ele
+ * passa a gravar peso e repetição JÁ PREENCHIDOS com o plano. Só mexe quem
+ * mudou a carga — que é exatamente quem quer que aquilo fique registrado. */
+
+export type SerieFeita = {
+  exercicioId: string | null
+  nome: string
+  data: string
+  serie: number
+  cargaKg: number | null
+  repeticoes: number | null
+}
+
+type LinhaSerie = {
+  exercicio_id: string | null
+  nome: string
+  data: string
+  serie: number
+  carga_kg: number | null
+  repeticoes: number | null
+}
+
+const daSerie = (l: LinhaSerie): SerieFeita => ({
+  exercicioId: l.exercicio_id,
+  nome: l.nome,
+  data: l.data,
+  serie: l.serie,
+  cargaKg: numero(l.carga_kg),
+  repeticoes: l.repeticoes,
+})
+
+const COLUNAS_SERIE = 'exercicio_id, nome, data, serie, carga_kg, repeticoes'
+
+/* Grava a série, ou corrige a que já estava lá.
+ *
+ * Upsert pela mesma (exercício, dia, número): tocar duas vezes por engano não
+ * vira duas séries, e voltar para ajustar o peso corrige em vez de acrescentar.
+ *
+ * Nunca rejeita para a tela. Está no meio de um treino: falhar em gravar uma
+ * série não pode parar a sessão nem abrir uma caixa de erro com a pessoa
+ * segurando a barra. O que se perde é uma linha de histórico; o que se
+ * perderia interrompendo é o treino. */
+export async function gravarSerie(contaId: string, s: SerieFeita): Promise<void> {
+  const { error } = await supabase.from('app_treino_series').upsert(
+    {
+      conta_id: contaId,
+      exercicio_id: s.exercicioId,
+      nome: s.nome.trim() || 'Exercício',
+      data: s.data,
+      serie: s.serie,
+      carga_kg: s.cargaKg,
+      repeticoes: s.repeticoes,
+    },
+    { onConflict: 'conta_id,exercicio_id,data,serie' },
+  )
+  if (error) falha('Não consegui guardar essa série.', error)
+}
+
+export type UltimaVez = {
+  data: string
+  series: number
+  /* A maior carga daquele dia. A maior, e não a média: é o que a pessoa lembra
+     e é o que ela quer bater. */
+  cargaKg: number | null
+  repeticoes: number | null
+}
+
+/* O que ela fez neste exercício da ÚLTIMA vez, antes de hoje.
+ *
+ * É a informação que qualquer pessoa na academia procura no caderninho, e a que
+ * transforma o modo treino de cronômetro em acompanhamento.
+ *
+ * Busca pelo id do exercício, e não pelo nome: exercício adaptado troca de nome
+ * e mantém o id, e é a mesma história. */
+export async function ultimaVezDoExercicio(
+  contaId: string,
+  exercicioId: string,
+  hoje: string,
+): Promise<UltimaVez | null> {
+  const { data, error } = await supabase
+    .from('app_treino_series')
+    .select(COLUNAS_SERIE)
+    .eq('conta_id', contaId)
+    .eq('exercicio_id', exercicioId)
+    .lt('data', hoje)
+    .order('data', { ascending: false })
+    .limit(20)
+
+  if (error) {
+    falha('Não consegui ver o que você fez da última vez.', error)
+    return null
+  }
+
+  const linhas = ((data ?? []) as LinhaSerie[]).map(daSerie)
+  if (linhas.length === 0) return null
+
+  /* Só o dia mais recente. As 20 linhas cobrem com folga um dia de séries, e
+     pegar mais de um dia misturaria treinos diferentes na mesma frase. */
+  const dia = linhas[0].data
+  const doDia = linhas.filter(l => l.data === dia)
+
+  const cargas = doDia.map(l => l.cargaKg).filter((c): c is number => c !== null)
+  const reps = doDia.map(l => l.repeticoes).filter((r): r is number => r !== null)
+
+  return {
+    data: dia,
+    series: doDia.length,
+    cargaKg: cargas.length ? Math.max(...cargas) : null,
+    repeticoes: reps.length ? Math.max(...reps) : null,
+  }
 }

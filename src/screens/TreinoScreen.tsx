@@ -299,7 +299,7 @@ export function TreinoScreen({
                       <Text style={styles.detalheSessao}>
                         {dataNumerica(comoData(s.data))}
                         {s.duracaoMin !== null && ` · ${s.duracaoMin} min`}
-                        {s.esforco !== null && ` · ${NOME_DO_ESFORCO[s.esforco]}`}
+                        {s.esforco !== null && ` · ${nomeDoEsforco(s.esforco)}`}
                       </Text>
                     </View>
                     <Pressable
@@ -330,6 +330,7 @@ export function TreinoScreen({
 
       <ModoTreino
         visivel={modoAberto}
+        contaId={contaId}
         exercicios={doHoje}
         /* Persiste na hora. Ajustar o descanso toda semana é exatamente o
            atrito que este modo existe para tirar. */
@@ -525,7 +526,7 @@ function RegistrarTreino({
           ))}
         </View>
         {sessaoDeHoje.esforco !== null && (
-          <Text style={styles.legendaEsforco}>{NOME_DO_ESFORCO[sessaoDeHoje.esforco]}</Text>
+          <Text style={styles.legendaEsforco}>{nomeDoEsforco(sessaoDeHoje.esforco)}</Text>
         )}
       </View>
     )
