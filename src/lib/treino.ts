@@ -126,6 +126,48 @@ export async function adicionarExercicio(
   return { tipo: 'ok', exercicio: doExercicio(data as LinhaExercicio) }
 }
 
+/* Corrige um exercício que já está na rotina.
+ *
+ * Existe porque a ficha vem de FOTO de letra pequena, e o nome sai errado de
+ * vez em quando. Enquanto só dava para remover, corrigir "Rosca dirota" custava
+ * apagar a linha e redigitar as quatro informações — que é justamente o
+ * trabalho que a importação por foto existe para poupar.
+ *
+ * Não toca em `adaptado_de`: corrigir a grafia de um exercício adaptado não
+ * desfaz a adaptação, e apagar a origem aqui seria perder a única pista de que
+ * houve troca. Quem mexe naquela coluna é a `trocarPorAdaptado`, abaixo.
+ *
+ * Nem em `dia` e `ordem`: mudar de dia é mover o bloco, e tem caminho próprio
+ * na conferência da rotina. */
+export async function editarExercicio(
+  id: string,
+  campos: { nome: string; series: number | null; repeticoes: string | null; cargaKg: number | null },
+): Promise<{ tipo: 'ok'; exercicio: Exercicio } | { tipo: 'erro'; mensagem: string }> {
+  const nome = campos.nome.trim()
+  if (nome.length < 2) {
+    return { tipo: 'erro', mensagem: 'Dê um nome ao exercício.' }
+  }
+
+  const { data, error } = await supabase
+    .from('app_treino_exercicios')
+    .update({
+      nome,
+      series: campos.series,
+      repeticoes: campos.repeticoes?.trim() || null,
+      carga_kg: campos.cargaKg,
+    })
+    .eq('id', id)
+    .select(COLUNAS_EXERCICIO)
+    .single()
+
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui salvar a alteração agora. Verifique a conexão.', error),
+    }
+  return { tipo: 'ok', exercicio: doExercicio(data as LinhaExercicio) }
+}
+
 /* Troca o nome de um exercício por causa de uma limitação, guardando qual era.
  *
  * Uma função só para isto, e não um `atualizarExercicio` genérico, porque as

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
@@ -23,6 +23,7 @@ import {
   NOME_DO_ESFORCO,
   adicionarExercicio,
   apagarExercicio,
+  editarExercicio,
   trocarPorAdaptado,
   apagarSessao,
   carregarRotina,
@@ -119,8 +120,31 @@ export function TreinoScreen({
     }
   }, [contaId])
 
+  /* A camada aberta DENTRO da aba Rotina, se houver — hoje o editor de um
+   * exercício, amanhã o que vier.
+   *
+   * Um ref e não um estado, e um ref do PAI passado para o filho, e isso tem
+   * motivo. O AGENTS.md manda registrar o tratador no filho sem lista de
+   * dependências para ele ganhar do central; a receita não serve aqui, porque
+   * o tratador desta tela TAMBÉM re-registra a cada renderização. Os efeitos do
+   * filho rodam antes dos do pai, então o pai sempre registra por último — e,
+   * como o React Native chama na ordem inversa, o pai sempre ganharia.
+   *
+   * Sem isto, o voltar do aparelho fechava a tela de treino inteira com a
+   * correção em andamento, que é o gesto que mais se usa para "cancelar". */
+  const camadaDaRotina = useRef<(() => void) | null>(null)
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      /* Descasca uma camada por vez, de dentro para fora. */
+      if (camadaDaRotina.current) {
+        camadaDaRotina.current()
+        return true
+      }
+      if (iaAberta) {
+        setIaAberta(false)
+        return true
+      }
       fechar()
       return true
     })
@@ -272,6 +296,7 @@ export function TreinoScreen({
             onErro={setErro}
             erro={erro}
             onPedirIA={() => setIaAberta(true)}
+            camadaAberta={camadaDaRotina}
           />
         )}
       </ScrollView>
@@ -523,6 +548,7 @@ function Rotina({
   onErro,
   erro,
   onPedirIA,
+  camadaAberta,
 }: {
   contaId: string
   exercicios: Exercicio[]
@@ -530,6 +556,10 @@ function Rotina({
   onErro: (m: string) => void
   erro: string
   onPedirIA: () => void
+  /* Onde este componente anuncia que tem uma camada aberta por cima. Quem lê é
+     o voltar do aparelho, lá na tela de treino — ver o comentário de
+     `camadaDaRotina`. */
+  camadaAberta: MutableRefObject<(() => void) | null>
 }) {
   const styles = estilos()
   const [dia, setDia] = useState<DiaSemana>(() => new Date().getDay() as DiaSemana)
@@ -542,6 +572,17 @@ function Rotina({
      voltar do aparelho já a fecha pelo `onRequestClose` dela — por isso não há
      BackHandler aqui: um segundo tratador para a mesma camada fecharia duas. */
   const [adaptando, setAdaptando] = useState<Exercicio | null>(null)
+  /* Qual exercício está aberto para correção, e o rascunho dele.
+
+     O id, e não o objeto: o objeto é substituído a cada gravação, e guardá-lo
+     deixaria o editor apontando para uma versão que não existe mais. */
+  const [editando, setEditando] = useState<string | null>(null)
+  const [rascunho, setRascunho] = useState({
+    nome: '',
+    series: '',
+    repeticoes: '',
+    carga: '',
+  })
 
   const doDia = exercicios.filter(e => e.dia === dia)
 
@@ -577,6 +618,50 @@ function Rotina({
     setCarga('')
     onErro('')
   }
+
+  function abrirEditor(e: Exercicio) {
+    setEditando(e.id)
+    setRascunho({
+      nome: e.nome,
+      /* Arredondado ao PREENCHER. A coluna é numeric, e um 4.0 que voltasse
+         como "4.5" entraria num campo que só aceita dígito — e o primeiro
+         toque para corrigir faria o filtro virar isso em "45". Foi assim que
+         a medida caseira multiplicou um peso por dez. */
+      series: e.series === null ? '' : String(Math.round(e.series)),
+      repeticoes: e.repeticoes ?? '',
+      /* Vírgula, porque é assim que se digita peso aqui. `salvarEdicao` troca
+         por ponto na volta — sem isso, `Number("22,5")` é NaN. */
+      carga: e.cargaKg === null ? '' : String(e.cargaKg).replace('.', ','),
+    })
+    onErro('')
+  }
+
+  async function salvarEdicao(alvo: Exercicio) {
+    const r = await editarExercicio(alvo.id, {
+      nome: rascunho.nome,
+      series: rascunho.series ? Number(rascunho.series) : null,
+      repeticoes: rascunho.repeticoes.trim() || null,
+      cargaKg: rascunho.carga ? Number(rascunho.carga.replace(',', '.')) : null,
+    })
+    if (r.tipo === 'erro') {
+      onErro(r.mensagem)
+      return
+    }
+    setEditando(null)
+    onErro('')
+    onMudou(exercicios.map(x => (x.id === alvo.id ? r.exercicio : x)))
+  }
+
+  /* Avisa o voltar do aparelho de que há um degrau a descer antes de fechar a
+     tela. A limpeza é obrigatória: sem ela, sair da aba Rotina com o editor
+     aberto deixaria o voltar apontando para um `setEditando` de um componente
+     que não está mais na tela, e o botão pararia de funcionar. */
+  useEffect(() => {
+    camadaAberta.current = editando ? () => setEditando(null) : null
+    return () => {
+      camadaAberta.current = null
+    }
+  }, [editando, camadaAberta])
 
   /* Grava a troca e atualiza a linha no lugar.
    *
@@ -659,41 +744,133 @@ function Rotina({
           registro já vem com o nome certo.
         </Text>
       ) : (
-        doDia.map(e => (
-          <View key={e.id} style={styles.linhaExercicio}>
-            <View style={styles.textoSessao}>
-              <Text style={styles.nomeSessao} numberOfLines={1}>
-                {e.nome}
-              </Text>
-              <Text style={styles.detalheSessao}>{descreverExercicio(e)}</Text>
-              {/* De onde ele veio. Sem esta linha, "Leg press" no lugar onde
-                  havia "Agachamento livre" some sem explicação, e daqui a um
-                  mês ninguém — nem ela — sabe por que a rotina mudou. */}
-              {e.adaptadoDe && (
-                <Text style={styles.veioDe} numberOfLines={1}>
-                  no lugar de {e.adaptadoDe}
-                </Text>
-              )}
+        doDia.map(e =>
+          editando === e.id ? (
+            /* O editor no LUGAR da linha, e não numa tela por cima: o que ela
+               está corrigindo é o que a foto leu errado, e os vizinhos na tela
+               são a referência de como o resto saiu. */
+            <View key={e.id} style={styles.editorExercicio}>
+              <TextInput
+                value={rascunho.nome}
+                onChangeText={t => setRascunho(r => ({ ...r, nome: t }))}
+                placeholder="Supino reto"
+                placeholderTextColor={paleta().inkFraco}
+                keyboardAppearance="dark"
+                maxLength={60}
+                autoFocus
+                style={styles.campo}
+                accessibilityLabel="Nome do exercício"
+              />
+              <View style={styles.linhaCampos}>
+                <View style={styles.campoPequeno}>
+                  <Text style={styles.rotuloPequeno}>Séries</Text>
+                  <TextInput
+                    value={rascunho.series}
+                    onChangeText={t =>
+                      setRascunho(r => ({ ...r, series: t.replace(/[^0-9]/g, '') }))
+                    }
+                    placeholder="4"
+                    placeholderTextColor={paleta().inkFraco}
+                    keyboardType="number-pad"
+                    keyboardAppearance="dark"
+                    maxLength={2}
+                    style={styles.campo}
+                    accessibilityLabel="Séries"
+                  />
+                </View>
+                <View style={styles.campoPequeno}>
+                  <Text style={styles.rotuloPequeno}>Reps</Text>
+                  <TextInput
+                    value={rascunho.repeticoes}
+                    onChangeText={t => setRascunho(r => ({ ...r, repeticoes: t }))}
+                    placeholder="8-12"
+                    placeholderTextColor={paleta().inkFraco}
+                    keyboardAppearance="dark"
+                    maxLength={20}
+                    style={styles.campo}
+                    accessibilityLabel="Repetições"
+                  />
+                </View>
+                <View style={styles.campoPequeno}>
+                  <Text style={styles.rotuloPequeno}>Carga</Text>
+                  <TextInput
+                    value={rascunho.carga}
+                    onChangeText={t =>
+                      setRascunho(r => ({ ...r, carga: t.replace(/[^0-9,.]/g, '') }))
+                    }
+                    placeholder="20"
+                    placeholderTextColor={paleta().inkFraco}
+                    keyboardType="decimal-pad"
+                    keyboardAppearance="dark"
+                    maxLength={6}
+                    style={styles.campo}
+                    accessibilityLabel="Carga em quilos"
+                  />
+                </View>
+              </View>
+              <View style={styles.linhaBotoesEditor}>
+                <Pressable
+                  onPress={() => setEditando(null)}
+                  style={styles.botaoCancelar}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.textoCancelar}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void salvarEdicao(e)}
+                  style={styles.botaoPronto}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.textoPronto}>Pronto</Text>
+                </Pressable>
+              </View>
             </View>
-            <Pressable
-              onPress={() => setAdaptando(e)}
-              hitSlop={10}
-              style={styles.botaoAdaptar}
-              accessibilityRole="button"
-              accessibilityLabel={`Adaptar ${e.nome}`}
-            >
-              <Ionicons name="swap-horizontal" size={17} color={paleta().cores.verde} />
-            </Pressable>
-            <Pressable
-              onPress={() => remover(e)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={`Remover ${e.nome}`}
-            >
-              <Ionicons name="close" size={16} color={paleta().inkFraco} />
-            </Pressable>
-          </View>
-        ))
+          ) : (
+            <View key={e.id} style={styles.linhaExercicio}>
+              {/* A linha inteira abre a correção. A ficha vem de foto de letra
+                  pequena, e o nome sai errado de vez em quando — enquanto só
+                  dava para remover, corrigir uma letra custava apagar e
+                  redigitar as quatro informações, que é o trabalho que a foto
+                  existe para poupar. */}
+              <Pressable
+                onPress={() => abrirEditor(e)}
+                style={styles.textoSessao}
+                accessibilityRole="button"
+                accessibilityLabel={`Editar ${e.nome}`}
+              >
+                <Text style={styles.nomeSessao} numberOfLines={1}>
+                  {e.nome}
+                </Text>
+                <Text style={styles.detalheSessao}>{descreverExercicio(e)}</Text>
+                {/* De onde ele veio. Sem esta linha, "Leg press" no lugar onde
+                    havia "Agachamento livre" some sem explicação, e daqui a um
+                    mês ninguém — nem ela — sabe por que a rotina mudou. */}
+                {e.adaptadoDe && (
+                  <Text style={styles.veioDe} numberOfLines={1}>
+                    no lugar de {e.adaptadoDe}
+                  </Text>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={() => setAdaptando(e)}
+                hitSlop={10}
+                style={styles.botaoAdaptar}
+                accessibilityRole="button"
+                accessibilityLabel={`Adaptar ${e.nome}`}
+              >
+                <Ionicons name="swap-horizontal" size={17} color={paleta().cores.verde} />
+              </Pressable>
+              <Pressable
+                onPress={() => remover(e)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Remover ${e.nome}`}
+              >
+                <Ionicons name="close" size={16} color={paleta().inkFraco} />
+              </Pressable>
+            </View>
+          ),
+        )
       )}
 
       {adaptando && (
@@ -991,6 +1168,34 @@ const estilos = estilosDe(t =>
     paddingHorizontal: 13,
   },
   veioDe: { fontSize: 11.5, color: t.inkFraco, marginTop: 2, fontStyle: 'italic' },
+  editorExercicio: {
+    gap: 8,
+    backgroundColor: t.cores.cartao,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
+    padding: 12,
+  },
+  linhaBotoesEditor: { flexDirection: 'row', gap: 8 },
+  botaoCancelar: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 42,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  textoCancelar: { fontSize: 14, fontWeight: '700', color: t.inkMedio },
+  botaoPronto: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 42,
+    borderRadius: 11,
+    backgroundColor: t.cores.verde,
+  },
+  textoPronto: { fontSize: 14, fontWeight: '800', color: t.cores.branco },
   botaoAdaptar: {
     width: 32,
     height: 32,
