@@ -95,46 +95,46 @@ catálogo depois do login, então a permissão está mais larga que o uso. Se um
 a vitrine for pública de propósito (site, link compartilhável), que seja um
 endereço público desenhado para isso — não a chave do aplicativo.
 
+**Ainda aberta em 29/08/2026.** Conferido chamando a função com a chave pública
+e sem sessão nenhuma: voltaram as seis nutricionistas com nome, CRN e cidade. As
+funções novas — pedido, mensagem — já respondem `permission denied` a `anon`,
+então o padrão certo está sendo seguido; falta só a antiga.
+
+```sql
+revoke all on function public.app_nutricionistas() from anon;
+```
+
+`revoke ... from public` não basta: o Supabase concede EXECUTE a `anon`
+explicitamente, e o revoke precisa nomeá-lo.
+
 ---
 
 ## Parte 2 — O funil (a razão de o app existir)
 
-### 2.1 Solicitação de contato do paciente
+### 2.1 Solicitação de contato do paciente — ENTREGUE
 
-O paciente vê o catálogo e **pede** para ser atendido. Ela recebe na caixa de
-entrada dela e aceita. Hoje o vínculo é uma via só: ele dita o código e ela
-digita — ele não tem como começar, e ela não sabe que ele existe.
+Existe `solicitacoes_de_vinculo`, com `app_solicitar_vinculo(p_nutricionista_id,
+p_mensagem)`, `app_minhas_solicitacoes()` e `app_cancelar_solicitacao_vinculo(p_id)`.
 
-**Precisa:**
+No app: o cartão do catálogo virou botão, abre a ficha dela com um campo de
+frase opcional, e "Meus pedidos" fica acima da lista com o estado de cada um e o
+desfazer. Ver `lib/solicitacoes.ts` e `NutricionistasScreen`.
 
-```
-solicitacoes_de_vinculo
-  id
-  conta_app_id      -- quem pediu (app_contas.id)
-  nutricionista_id
-  status            -- 'enviada' | 'aceita' | 'recusada' | 'cancelada'
-  criada_em
-  respondida_em
-```
+As regras que ficaram valendo, porque valem para os dois lados:
 
-- `app_solicitar_vinculo(p_nutricionista_id)` — cria
-- `app_minhas_solicitacoes()` — lista as do paciente, com nome e foto de quem ele
-  pediu
-- `app_cancelar_solicitacao_vinculo(p_id)` — ele desiste
-
-**Regras decididas:**
-
-- **Sem limite de quantas profissionais** ele pode procurar — ele pode consultar
-  todas, e isso é direito dele. O limite é **um pedido em aberto por
-  nutricionista**, para a caixa de entrada dela não virar dez pedidos da mesma
-  pessoa.
-- **Vai nome e telefone**, com o paciente confirmando o envio na tela. Os dois já
-  estão em `app_contas` — não precisa coletar nada novo.
+- **Sem limite de quantas profissionais** ele procura — consultar três antes de
+  escolher é o normal, e é direito dele. O que o banco impede é um segundo
+  pedido EM ABERTO para a MESMA pessoa.
+- **A direção é de mão única.** Ela não navega paciente, não busca ninguém e não
+  vê quem usa o app: enxerga quem pediu por ela e quem já é dela. Nenhuma função
+  lista paciente solto, e essa é uma decisão de produto, não uma pendência.
 - **Solicitação não é vínculo.** O vínculo nasce quando ela aceita, e só então.
-  Ele pode ter cinco conversas abertas e nenhum vínculo.
+- **Recusa não trava o cartão.** Pedir de novo depois de um "não" é direito
+  dele; só o pedido em aberto bloqueia.
 
-**O app já tem:** o catálogo inteiro, com foto, CRN, especialidades e cidade.
-Falta o botão e a tela do pedido — dias de trabalho, não semanas.
+**Falta do lado do sistema:** a caixa de entrada dela — a tela onde os pedidos
+chegam e são aceitos ou recusados. Sem ela, o pedido sai do app e não chega a
+lugar nenhum que alguém olhe.
 
 ### 2.2 Um vínculo ativo, com história
 
@@ -220,38 +220,42 @@ um acompanhamento, e é a razão pela qual o paciente volta ao app amanhã.
 (`lib/avatar.ts` já faz escolher → recortar → reduzir → enviar) e a tela de
 refeições do dia.
 
-### 3.3 Receitas da nutricionista
+### 3.3 Receitas da nutricionista — ENTREGUE
 
-A queixa mais comum de quem recebe plano alimentar é não saber o que cozinhar.
-Dietbox, WebDiet e Nutrium mandam receita para o app.
+`app_receitas_da_nutricionista()` devolve o que ela publicou, e a tela mora
+dentro da ficha dela (`ConteudoNutriScreen`). Ver `lib/receitasDaNutri.ts`.
 
-**Precisa:** receita ligada à refeição do plano — ingredientes, modo de preparo,
-rendimento.
+**Falta:** ligar a receita à REFEIÇÃO do plano. Hoje ela chega como lista solta,
+e o valor real é abrir o almoço de quinta e ver o que fazer com aqueles
+ingredientes.
 
-**O app já tem:** o plano por refeição e a lista de compras. Receita é o passo
-seguinte natural, e encaixa na estrutura que já existe.
+### 3.4 Exames laboratoriais — ENTREGUE
 
-### 3.4 Exames laboratoriais
+`app_exames_do_paciente()`, com os arquivos assinados por `lib/arquivos.ts` —
+bucket privado, endereço assinado, nunca `getPublicUrl`. Ver `lib/exames.ts`.
 
-Dietbox, WebDiet e Healthie mostram. É leitura pura: o sistema já guarda, falta
-uma função e uma tela — o padrão de `app_antropometria_do_paciente` serve de
-molde.
+### 3.5 Conversa livre — ENTREGUE
 
-### 3.5 Conversa livre
+`app_mensagens` com RLS pelo par vinculado, `app_enviar_mensagem(p_texto)`,
+`app_marcar_mensagens_lidas()`. **Dentro do sistema, não no WhatsApp** — a
+conversa é parte do acompanhamento e é a prova de que o paciente veio pelo
+aplicativo.
 
-Depois do mural, e depois de saber o volume real de uso. Chat cria promessa de
-tempo de resposta que uma nutricionista com 200 pacientes talvez não sustente —
-o risco dele é de produto, não de código.
+Três decisões que ficaram, e que o lado de lá precisa respeitar:
 
-Quando for: tabela de mensagens, permissão restrita ao par vinculado, realtime, e
-push. **Dentro do sistema, não no WhatsApp** — a conversa é parte do
-acompanhamento e é patrimônio da plataforma, além de ser prova de que o paciente
-veio pelo aplicativo.
+- **Ler é direto na tabela, escrever é por função.** O realtime entrega o que a
+  política deixa ler, então a leitura precisa passar por RLS. Escrever passa por
+  função porque é lá que o vínculo é conferido e que se decide de quem é a
+  mensagem — se `de` viesse do cliente, um lado poderia se passar pelo outro.
+- **O canal é escolha dela**, no parâmetro `canal_de_contato`. O padrão é o
+  sistema, e nesse caso o banco **não devolve o telefone dela ao app**. Só com
+  `'whatsapp'` o número vem, e aí o app mostra o botão verde.
+- **`lida_em` é do banco**, e é o que faz o ponto de "mensagem nova" valer entre
+  aparelhos: o que ele leu no celular não pisca de novo no tablet.
 
-**Enquanto isso**, a aba Mensagens deixou de ser uma casca: ela mostra a
-nutricionista vinculada e abre a conversa no WhatsApp dela, dizendo numa linha
-que a conversa por dentro está a caminho. Quando a tabela existir, essa mesma
-tela vira a lista da conversa e o cartão do WhatsApp desce para o rodapé.
+**Falta:** push. Sem ele, a mensagem que chega com o app fechado só aparece na
+próxima abertura — o realtime cobre o app aberto, e nada cobre o resto. É a
+maior lacuna que sobrou desta parte.
 
 ### 3.6 Videoconsulta e pagamento
 
@@ -281,8 +285,14 @@ Para o time do sistema saber o que **não** precisa pedir:
 - código de vínculo e exclusão de conta
 
 - avisos do sino, derivados do que mudou desde a última visita
-- conversa apontando para o WhatsApp dela, enquanto a de dentro não existe
+- pedido de contato do paciente, com "meus pedidos" e desfazer
+- conversa dentro do app, com realtime e marca de lida
+- receitas dela e exames laboratoriais
 
-Todas as telas que mostram dado do sistema já releem sozinhas ao voltar do
-segundo plano e aceitam puxar-para-atualizar. Não há realtime em lugar nenhum: se
-o sistema quiser que algo chegue na hora, isso precisa ser dito aqui.
+Todas as telas que mostram dado do sistema releem sozinhas ao voltar do segundo
+plano e aceitam puxar-para-atualizar.
+
+**Realtime existe agora, em um lugar só:** `app_mensagens`. Todo o resto continua
+descobrindo o que mudou por releitura. Se o sistema quiser que outra coisa chegue
+na hora, isso precisa ser dito aqui — e precisa de política de RLS na tabela, não
+só de uma função.
