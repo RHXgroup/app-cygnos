@@ -45,13 +45,21 @@ export type RotinaDaIA = {
 
 /* As chaves que o prompt manda a IA usar, e o número do dia na semana que o
    resto do app usa (0 = domingo, como `Date.getDay`). */
-const DIAS: Record<string, DiaSemana> = {
+/* `Object.create(null)` e não `{}`, e isto veio de bug achado sondando entrada
+   hostil: um objeto literal HERDA `constructor`, `valueOf`, `toString` e mais
+   meia dúzia. Se a chave vem de fora — do JSON de uma IA, do que a pessoa
+   digitou —, `MAPA['constructor']` devolve a função construtora, e o teste
+   `=== undefined` não pega, porque função não é undefined.
+
+   O efeito medido: um dia de treino virava uma FUNÇÃO, e ia assim para o
+   banco. Sem protótipo, a busca só encontra o que foi escrito aqui. */
+const DIAS: Record<string, DiaSemana> = Object.assign(Object.create(null), {
   dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6,
   /* O modelo escorrega para a forma acentuada e para a extensa de vez em
      quando. Aceitar custa uma linha; recusar joga fora o dia inteiro. */
   sáb: 6, sabado: 6, sábado: 6, domingo: 0, segunda: 1, terca: 2, terça: 2,
   quarta: 3, quinta: 4, sexta: 5,
-}
+})
 
 const SERIES_MAX = 12
 const EXERCICIOS_POR_DIA_MAX = 15
@@ -168,4 +176,59 @@ export function rotinaDaIA(bruto: unknown): RotinaConvertida {
     exercicios,
     problemas,
   }
+}
+
+/* ── Editar a rotina antes de ela virar rotina ─────────────────────────────*/
+
+/* Estas três moram aqui, e não dentro da tela de conferência, por um motivo
+ * que custou caro: enquanto estavam lá, não davam para exercitar. E são elas
+ * que decidem em que dia cada exercício cai e em que ordem ele aparece — os
+ * dois lugares onde erro passa calado, porque uma rotina no dia errado parece
+ * uma rotina.
+ *
+ * Regra do projeto: só `import type` neste arquivo, e por isso ele roda fora
+ * do aparelho. */
+
+/* Move o BLOCO inteiro de um dia para outro.
+ *
+ * Um exercício por vez seria pior: ficha de academia é "Treino A", um conjunto
+ * que anda junto. O caso comum é "isto aqui é quarta, não segunda" — e a IA
+ * sempre chuta segunda, porque o prompt manda converter o primeiro bloco nela e
+ * ficha não diz dia da semana.
+ *
+ * Mover para um dia que JÁ TEM exercício junta os dois, e isso é o certo: quem
+ * arrastou o bloco A para a quarta em que já havia o B quis os dois na quarta.
+ * A ordem de quem chega continua depois de quem já estava. */
+export function moverDia(
+  exercicios: ExercicioNovo[],
+  de: DiaSemana,
+  para: DiaSemana,
+): ExercicioNovo[] {
+  if (de === para) return exercicios
+  const quantosJaHa = exercicios.filter(e => e.dia === para).length
+  let n = 0
+  return exercicios.map(e =>
+    e.dia === de ? { ...e, dia: para, ordem: quantosJaHa + n++ } : e,
+  )
+}
+
+/* Tira um exercício pela posição na lista. */
+export const tirarDaRotina = (exercicios: ExercicioNovo[], i: number): ExercicioNovo[] =>
+  exercicios.filter((_, n) => n !== i)
+
+/* Renumera a ordem dentro de cada dia, do zero e sem buraco.
+ *
+ * Tirar exercício e mover bloco deixam furo na numeração — (0, 2, 3) —, e a
+ * próxima leitura ordena por ela. Um furo não quebra nada hoje, mas vira
+ * pergunta sem resposta para quem for ler depois: sumiu um exercício, ou a
+ * numeração é que está torta?
+ *
+ * A ordem RELATIVA é preservada: quem estava antes continua antes. */
+export function renumerar(exercicios: ExercicioNovo[]): ExercicioNovo[] {
+  const porDia = new Map<DiaSemana, number>()
+  return exercicios.map(e => {
+    const n = porDia.get(e.dia) ?? 0
+    porDia.set(e.dia, n + 1)
+    return { ...e, ordem: n }
+  })
 }

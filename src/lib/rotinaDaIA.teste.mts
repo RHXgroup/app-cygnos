@@ -1,4 +1,4 @@
-import { rotinaDaIA } from './rotinaDaIA.ts'
+import { moverDia, renumerar, rotinaDaIA, tirarDaRotina } from './rotinaDaIA.ts'
 
 let passou = 0
 let falhou = 0
@@ -183,6 +183,82 @@ const BOA = {
   ok('repetição cortada em 20', (r.exercicios[0].repeticoes ?? '').length === 20)
   ok('divisão cortada em 60', (r.divisao ?? '').length === 60)
   ok('observação cortada em 400', (r.observacao ?? '').length === 400)
+}
+
+// ── 12. A ficha de academia que caiu toda na segunda ─────────────────────────
+{
+  console.log('\n12. a ficha real que quebrou')
+
+  /* Isto é o que a leitura de uma ficha "Treino A / Treino B" devolve: a IA
+     converte o primeiro bloco em segunda e o segundo em terça, porque ficha de
+     academia NÃO diz dia da semana e ela precisa escolher algum.
+     Não é bug da conversão — é o limite dela. O bug era a tela não deixar
+     corrigir. */
+  const daFicha = rotinaDaIA({
+    divisao: 'ABC',
+    dias: {
+      seg: { foco: 'Treino A', exercicios: [
+        { nome: 'Supino reto', series: 4, reps: '8-12' },
+        { nome: 'Crucifixo', series: 3, reps: '12' },
+      ] },
+      ter: { foco: 'Treino B', exercicios: [{ nome: 'Agachamento', series: 4, reps: '10' }] },
+    },
+  })
+  ok('dois dias', new Set(daFicha.exercicios.map(e => e.dia)).size === 2)
+
+  /* A correção que a pessoa faz: "o Treino A é quarta". */
+  const movido = moverDia(daFicha.exercicios, 1, 3)
+  ok('o bloco inteiro anda', movido.filter(e => e.dia === 3).length === 2,
+    JSON.stringify(movido.map(e => e.dia)))
+  ok('nada sobra na segunda', movido.every(e => e.dia !== 1))
+  ok('o outro dia não se mexe', movido.filter(e => e.dia === 2).length === 1)
+  ok('a ordem dentro do bloco é preservada',
+    movido.filter(e => e.dia === 3).map(e => e.nome).join() === 'Supino reto,Crucifixo')
+
+  /* Mover para um dia que JÁ TEM exercício junta os dois, e quem chega fica
+     depois de quem já estava. */
+  const juntos = moverDia(daFicha.exercicios, 1, 2)
+  const naTerca = juntos.filter(e => e.dia === 2).sort((a, b) => a.ordem - b.ordem)
+  ok('junta no mesmo dia', naTerca.length === 3, String(naTerca.length))
+  ok('quem já estava vem primeiro', naTerca[0].nome === 'Agachamento', naTerca[0].nome)
+  ok('sem ordem repetida', new Set(naTerca.map(e => e.ordem)).size === 3,
+    JSON.stringify(naTerca.map(e => e.ordem)))
+
+  ok('mover para o mesmo dia não muda nada', moverDia(daFicha.exercicios, 1, 1) === daFicha.exercicios)
+}
+
+// ── 13. Tirar e renumerar ────────────────────────────────────────────────────
+{
+  console.log('\n13. o buraco na ordem')
+
+  const lista = rotinaDaIA({
+    dias: { seg: { exercicios: [
+      { nome: 'Um' }, { nome: 'Dois' }, { nome: 'Tres' },
+    ] } },
+  }).exercicios
+
+  const semOMeio = tirarDaRotina(lista, 1)
+  ok('tirou um', semOMeio.length === 2)
+  ok('e deixou buraco na ordem', semOMeio.map(e => e.ordem).join() === '0,2',
+    JSON.stringify(semOMeio.map(e => e.ordem)))
+
+  /* O buraco não quebra nada hoje, mas a próxima leitura ordena por ele e vira
+     pergunta sem resposta: sumiu um exercício, ou a numeração é que está torta? */
+  const arrumado = renumerar(semOMeio)
+  ok('renumerar fecha o buraco', arrumado.map(e => e.ordem).join() === '0,1')
+  ok('e não troca a ordem relativa', arrumado.map(e => e.nome).join() === 'Um,Tres')
+
+  /* Cada dia conta do zero. Um contador só para a semana inteira faria a quarta
+     começar em 5, e a tela ordena por dia. */
+  const doisDias = renumerar([
+    ...rotinaDaIA({ dias: { seg: { exercicios: [{ nome: 'Rosca' }, { nome: 'Tríceps' }] } } }).exercicios,
+    ...rotinaDaIA({ dias: { qua: { exercicios: [{ nome: 'Leg press' }] } } }).exercicios,
+  ])
+  ok('cada dia conta do zero',
+    doisDias.filter(e => e.dia === 3)[0].ordem === 0,
+    String(doisDias.filter(e => e.dia === 3)[0].ordem))
+
+  ok('lista vazia não quebra', renumerar([]).length === 0 && tirarDaRotina([], 0).length === 0)
 }
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')

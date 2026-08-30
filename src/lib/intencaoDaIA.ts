@@ -69,14 +69,22 @@ export type Convertida = {
   problemas: Problema[]
 }
 
-const TIPOS: Record<string, TipoIntencao> = {
+/* `Object.create(null)` e não `{}`, e isto veio de bug achado sondando entrada
+   hostil: um objeto literal HERDA `constructor`, `valueOf`, `toString` e mais
+   meia dúzia. Se a chave vem de fora — do JSON de uma IA, do que a pessoa
+   digitou —, `MAPA['constructor']` devolve a função construtora, e o teste
+   `=== undefined` não pega, porque função não é undefined.
+
+   O efeito medido: um dia de treino virava uma FUNÇÃO, e ia assim para o
+   banco. Sem protótipo, a busca só encontra o que foi escrito aqui. */
+const TIPOS: Record<string, TipoIntencao> = Object.assign(Object.create(null), {
   refeicao_fora: 'refeicao_fora',
   refeicao_pulada: 'refeicao_pulada',
   treino: 'treino',
   viagem: 'viagem',
   evento: 'evento',
   proposito: 'proposito',
-}
+})
 
 const TEXTO_MAX = 160
 const REFEICAO_MAX = 30

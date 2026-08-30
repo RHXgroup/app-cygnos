@@ -18,7 +18,7 @@ import { estilosDe, paleta } from '../lib/tema'
 import type { DiaSemana } from '../lib/plano'
 import type { ExercicioNovo } from '../lib/treino'
 import { lerFichaDaFoto, pedirRotina, type PedidoDeTreino } from '../lib/treinoIA'
-import type { RotinaConvertida } from '../lib/rotinaDaIA'
+import { moverDia, renumerar, tirarDaRotina, type RotinaConvertida } from '../lib/rotinaDaIA'
 
 /* Pedir a rotina de treino falando, e conferir antes de virar rotina.
  *
@@ -156,34 +156,21 @@ export function RotinaPorIA({
   const ordemDaSemana: DiaSemana[] = [1, 2, 3, 4, 5, 6, 0]
   const diasComExercicio = ordemDaSemana.filter(d => exercicios.some(e => e.dia === d))
 
+  /* Estas três vêm de `rotinaDaIA`, e não são escritas aqui.
+   *
+   * Elas decidem em que dia cada exercício cai e em que ordem ele aparece — os
+   * dois lugares onde erro passa calado, porque uma rotina no dia errado parece
+   * uma rotina. Lá elas são exercitadas com 15 casos, incluindo a ficha "Treino
+   * A / Treino B" que caiu toda na segunda. Aqui dentro não daria. */
   const tirar = (i: number) => {
-    setExercicios(atuais => atuais.filter((_, n) => n !== i))
+    setExercicios(atuais => tirarDaRotina(atuais, i))
     setEditando(null)
   }
 
   const mudar = (i: number, campos: Partial<ExercicioNovo>) =>
     setExercicios(atuais => atuais.map((e, n) => (n === i ? { ...e, ...campos } : e)))
 
-  /* Move o BLOCO inteiro de dia.
-   *
-   * Um por um seria pior: ficha de academia é "Treino A", um conjunto que anda
-   * junto. Quem quiser separar tira e monta na mão depois — mas o caso comum é
-   * "isto aqui é quarta, não segunda". */
-  const moverDia = (de: DiaSemana, para: DiaSemana) =>
-    setExercicios(atuais => atuais.map(e => (e.dia === de ? { ...e, dia: para } : e)))
-
-  function usar() {
-    /* A ordem é renumerada por dia no fim: mover bloco e tirar exercício deixam
-       buraco na numeração, e a próxima leitura ordena por ela — um buraco vira
-       pergunta sem resposta. */
-    const porDia = new Map<DiaSemana, number>()
-    const finais = exercicios.map(e => {
-      const n = porDia.get(e.dia) ?? 0
-      porDia.set(e.dia, n + 1)
-      return { ...e, ordem: n }
-    })
-    onUsar(finais)
-  }
+  const usar = () => onUsar(renumerar(exercicios))
 
   return (
     <Modal
@@ -192,7 +179,15 @@ export function RotinaPorIA({
       transparent={false}
       /* Uma camada por vez: da conferência volta ao formulário; do formulário,
          sai. */
-      onRequestClose={() => (rotina ? setRotina(null) : onFechar())}
+      /* TRÊS camadas, e não duas. A conferência ganhou um editor de exercício
+         depois, e o voltar continuou pulando ele: quem abria o editor e apertava
+         voltar perdia a rotina inteira, que tinha custado uma chamada paga.
+         Regra 1 do projeto — descascar UMA por vez. */
+      onRequestClose={() => {
+        if (editando !== null) setEditando(null)
+        else if (rotina) setRotina(null)
+        else onFechar()
+      }}
     >
       <KeyboardAvoidingView
         style={[styles.tela, { paddingTop: top + 8 }]}
@@ -200,7 +195,11 @@ export function RotinaPorIA({
       >
         <View style={styles.cabecalho}>
           <Pressable
-            onPress={() => (rotina ? setRotina(null) : onFechar())}
+            onPress={() => {
+              if (editando !== null) setEditando(null)
+              else if (rotina) setRotina(null)
+              else onFechar()
+            }}
             style={styles.botaoVoltar}
             hitSlop={8}
             accessibilityRole="button"
@@ -408,7 +407,7 @@ export function RotinaPorIA({
                     {ordemDaSemana.map(alvo => (
                       <Pressable
                         key={alvo}
-                        onPress={() => alvo !== d && moverDia(d, alvo)}
+                        onPress={() => setExercicios(atuais => moverDia(atuais, d, alvo))}
                         style={[styles.diaChip, alvo === d && styles.diaChipAtivo]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: alvo === d }}

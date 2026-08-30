@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ActivityIndicator,
+  AppState,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
@@ -48,29 +57,74 @@ export function ComerScreen({
 
   const [plano, setPlano] = useState<PlanoCompleto | null>(null)
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
+  const [puxando, setPuxando] = useState(false)
+  /* Sobe quando o app volta do segundo plano. Regra 8 do projeto: o plano é
+     publicado do lado DA NUTRICIONISTA e nada avisa o aparelho — sem isto, quem
+     recebe o plano com o app aberto continua vendo "monte seu plano". */
+  const [versaoLocal, setVersaoLocal] = useState(0)
 
   useEffect(() => {
-    let vivo = true
-    carregarPlanoAtivo(contaId).then(r => {
-      if (!vivo) return
-      /* Falha aqui não vira mensagem de erro: sem plano a tela já tem o que
-         mostrar, e um aviso vermelho no topo de uma aba que funciona assusta
-         mais do que informa. */
-      setPlano(r.tipo === 'ok' ? r.plano : null)
-      setCarregando(false)
+    const sub = AppState.addEventListener('change', e => {
+      if (e === 'active') setVersaoLocal(v => v + 1)
     })
-    return () => {
-      vivo = false
-    }
-  }, [contaId, versaoPlano])
+    return () => sub.remove()
+  }, [])
+
+  const carregar = useCallback(
+    async (dePuxao = false) => {
+      const r = await carregarPlanoAtivo(contaId)
+      /* Falhar em carregar NÃO é o mesmo que não ter plano.
+         A primeira versão tratava os dois igual, e o efeito era uma mentira:
+         a rede caía e a tela dizia "monte seu plano alimentar" para quem já
+         tinha um. Pior que erro na tela é erro que se disfarça de resposta. */
+      if (r.tipo === 'erro') {
+        if (!dePuxao) setErro(r.mensagem)
+      } else {
+        /* O `else` limpa. Regra 9: enquanto a tela carregava uma vez, deixar o
+           erro para sempre era inofensivo; relendo sozinha, ele esconde o
+           conteúdo da leitura seguinte, que deu certo. */
+        setErro('')
+        setPlano(r.plano)
+      }
+      setCarregando(false)
+    },
+    [contaId],
+  )
+
+  useEffect(() => {
+    /* Sem piscar: o indicador de carregando só vale para a PRIMEIRA carga.
+       Trocar o conteúdo por um spinner a cada volta do segundo plano paga um
+       susto por uma leitura que quase sempre não muda nada. */
+    void carregar()
+  }, [carregar, versaoPlano, versaoLocal])
 
   const hoje = new Date().getDay()
   const valeHoje = plano !== null && plano.diasSemana.includes(hoje as never)
 
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
-      <ScrollView contentContainerStyle={styles.conteudo} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.conteudo}
+        showsVerticalScrollIndicator={false}
+        /* Puxar para atualizar vale MAIS na ramificação de erro: é ali que o
+           gesto é o óbvio, e a tela prometia "tente de novo" sem ter o controle
+           que atende ao gesto. */
+        refreshControl={
+          <RefreshControl
+            refreshing={puxando}
+            onRefresh={async () => {
+              setPuxando(true)
+              await carregar(true)
+              setPuxando(false)
+            }}
+            tintColor={paleta().cores.verde}
+          />
+        }
+      >
         <Text style={styles.titulo}>Comer</Text>
+
+        {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
         {carregando ? (
           <View style={styles.cartao}>
@@ -229,6 +283,13 @@ const estilos = estilosDe(t =>
       fontVariant: ['tabular-nums'],
     },
     nomeRefeicao: { flex: 1, fontSize: 15, color: t.cores.ink },
+    erro: {
+      marginHorizontal: 20,
+      marginBottom: 10,
+      fontSize: 13,
+      color: t.cores.erroTexto,
+      lineHeight: 18,
+    },
     foraDoDia: { fontSize: 13, color: t.inkMedio, lineHeight: 19 },
 
     convite: {

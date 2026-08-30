@@ -32,7 +32,15 @@ export type ItemLido = {
 
 /* As medidas que a gramática reconhece, e o singular de cada uma. A chave é o
    que se escreve; o valor é como o app chama. */
-const MEDIDAS: Record<string, string> = {
+/* `Object.create(null)` e não `{}`, e isto veio de bug achado sondando entrada
+   hostil: um objeto literal HERDA `constructor`, `valueOf`, `toString` e mais
+   meia dúzia. Se a chave vem de fora — do JSON de uma IA, do que a pessoa
+   digitou —, `MAPA['constructor']` devolve a função construtora, e o teste
+   `=== undefined` não pega, porque função não é undefined.
+
+   O efeito medido: um dia de treino virava uma FUNÇÃO, e ia assim para o
+   banco. Sem protótipo, a busca só encontra o que foi escrito aqui. */
+const MEDIDAS: Record<string, string> = Object.assign(Object.create(null), {
   g: 'g',
   grama: 'g',
   gramas: 'g',
@@ -62,14 +70,14 @@ const MEDIDAS: Record<string, string> = {
   filé: 'unidade',
   file: 'unidade',
   files: 'unidade',
-}
+})
 
 /* Palavras que só ligam as partes da frase e não dizem nada sobre o alimento.
    Saem do nome para a busca não procurar por "de pão". */
 const LIGACOES = new Set(['de', 'do', 'da', 'dos', 'das', 'com', 'e'])
 
 /* "meia", "meio" e "um" aparecem mais que os números na fala de comida. */
-const NUMEROS_ESCRITOS: Record<string, number> = {
+const NUMEROS_ESCRITOS: Record<string, number> = Object.assign(Object.create(null), {
   um: 1,
   uma: 1,
   dois: 2,
@@ -80,7 +88,7 @@ const NUMEROS_ESCRITOS: Record<string, number> = {
   seis: 6,
   meio: 0.5,
   meia: 0.5,
-}
+})
 
 const semAcento = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -193,8 +201,16 @@ export function lerItem(pedaco: string): ItemLido | null {
   /* 1. Um número no começo? "200g de arroz", "2 fatias de pão". */
   const m = limpo.match(PADRAO_NUMERO)
   if (m) {
-    quantidade = Number(m[1].replace(',', '.'))
-    achouQuantidade = true
+    const lido = Number(m[1].replace(',', '.'))
+    /* Um teto, e ele veio de sonda com entrada hostil: "999999999999999999999 g
+       de pão" virava 1e21 gramas, e esse número atravessava a conta do dia
+       inteira sem nada estranho aparecer — a caloria do dia ficava em notação
+       científica na tela.
+       Dez mil cobre qualquer coisa que caiba num prato: 10 kg em gramas. Acima
+       disso não é quantidade, é dedo preso na tecla — e aí o número vira parte
+       do NOME, que é onde a pessoa vê e corrige. */
+    quantidade = Number.isFinite(lido) && lido > 0 && lido <= 10000 ? lido : 1
+    achouQuantidade = Number.isFinite(lido) && lido > 0 && lido <= 10000
     resto = limpo.slice(m[0].length).trim()
 
     /* A palavra colada ou logo depois do número pode ser a medida. */
