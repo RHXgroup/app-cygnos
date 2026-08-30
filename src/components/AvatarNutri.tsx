@@ -20,9 +20,16 @@ import { estilosDe, paleta } from '../lib/tema'
  * Native não desenha nada — e o cartão fica com um buraco do tamanho do avatar,
  * que é pior do que nunca ter tido foto: a ficha inteira parece quebrada.
  *
- * Isso não é hipótese. O catálogo inteiro está assim hoje: o sistema monta URL
- * pública para um bucket privado, e nenhuma delas carrega. O defeito é de lá e
- * é lá que se conserta — mas a tela não pode depender disso para ficar de pé. */
+ * Isso não é hipótese, e a causa já mudou uma vez. Era o sistema montando URL
+ * pública para um bucket privado — resolvido, hoje o endereço é assinado em
+ * lib/arquivos.ts. Restou a outra: das quatro que apontam para uma logo, o
+ * ARQUIVO não está no bucket, e o servidor responde `Object not found`. Isso se
+ * conserta do lado de lá, subindo a logo ou desligando `usar_logo_documentos`
+ * no perfil — mas a tela não pode depender disso para ficar de pé.
+ *
+ * E endereço assinado VENCE, uma hora depois. Tela que fica aberta a tarde
+ * inteira perde a foto sem nada ter quebrado; guardar QUAL falhou é o que faz o
+ * endereço novo, da releitura seguinte, entrar tentando de novo. */
 export function AvatarNutri({
   nutri,
   tamanho = 52,
