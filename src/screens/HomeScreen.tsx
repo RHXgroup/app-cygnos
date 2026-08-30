@@ -16,6 +16,7 @@ import type { Session } from '@supabase/supabase-js'
 import { carregarIntencoes } from '../lib/intencao'
 import { valemPara, type Intencao } from '../lib/intencaoDaIA'
 import { AnelCalorias } from '../components/AnelCalorias'
+import { CartaoDaSemana } from '../components/CartaoDaSemana'
 import { AnelProgresso } from '../components/AnelProgresso'
 import { FaixaDeDias } from '../components/FaixaDeDias'
 import { MenuTopo } from '../components/MenuTopo'
@@ -602,6 +603,22 @@ export function HomeScreen({
 
           Não aparece quando a pessoa está olhando outro dia: "almoço em 40
           min" não faz sentido em cima da terça passada. */}
+
+      {/* O que a semana rendeu, uma vez por semana, e só quando há o que dizer.
+          Acima do próximo passo de propósito: o passo é o que fazer AGORA, e
+          este é o motivo de fazer — e o motivo vem antes da tarefa, não depois.
+          Some quando fechado, e não volta até a segunda seguinte. */}
+      {ehHoje(diaSelecionado) && (
+        <CartaoDaSemana
+          contaId={sessao.user.id}
+          sessoes={sessoes}
+          pesos={pesos}
+          aguaDaSemana={agua?.semana ?? []}
+          metaDeAguaMl={metas.aguaMl}
+          metaDeCalorias={metas.calorias}
+        />
+      )}
+
       {ehHoje(diaSelecionado) && (
         <Pressable
           onPress={() => {
