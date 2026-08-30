@@ -43,6 +43,14 @@ export type Exercicio = {
      nem ela, sabe por que mudou. É também o que a nutricionista precisa ver, já
      que o resultado sozinho não conta que houve uma troca. */
   adaptadoDe: string | null
+  /* Segundos de descanso ENTRE AS SÉRIES deste exercício.
+   *
+   * Era texto dentro de `observacao` — a frase "Descanso 90s", que a IA
+   * devolvia como número e o app transformava em prosa. Dado que vira frase não
+   * volta a ser dado: o cronômetro não tinha como saber quanto descansar, e por
+   * isso descansava sempre o mesmo tempo escolhido na mão, em toda série de todo
+   * treino. É a diferença entre um cronômetro e um treino. */
+  descansoSeg: number | null
 }
 
 export type ResultadoRotina =
@@ -61,9 +69,11 @@ type LinhaExercicio = {
   carga_kg: number | null
   observacao: string | null
   adaptado_de: string | null
+  descanso_seg: number | null
 }
 
-const COLUNAS_EXERCICIO = 'id, dia, nome, ordem, series, repeticoes, carga_kg, observacao, adaptado_de'
+const COLUNAS_EXERCICIO =
+  'id, dia, nome, ordem, series, repeticoes, carga_kg, observacao, adaptado_de, descanso_seg'
 
 const doExercicio = (l: LinhaExercicio): Exercicio => ({
   id: l.id,
@@ -75,6 +85,7 @@ const doExercicio = (l: LinhaExercicio): Exercicio => ({
   cargaKg: numero(l.carga_kg),
   observacao: l.observacao,
   adaptadoDe: l.adaptado_de ?? null,
+  descansoSeg: numero(l.descanso_seg),
 })
 
 /* A rotina inteira, de todos os dias. A tela mostra um dia por vez, mas a
@@ -114,6 +125,7 @@ export async function adicionarExercicio(
       carga_kg: e.cargaKg,
       observacao: e.observacao?.trim() || null,
       adaptado_de: e.adaptadoDe?.trim() || null,
+      descanso_seg: e.descansoSeg,
     })
     .select(COLUNAS_EXERCICIO)
     .single()
@@ -192,6 +204,20 @@ export async function trocarPorAdaptado(
       mensagem: falha('Não consegui trocar o exercício agora. Verifique a conexão.', error),
     }
   return { tipo: 'ok', exercicio: doExercicio(data as LinhaExercicio) }
+}
+
+/* O descanso que ela ajustou no meio do treino.
+ *
+ * Grava e segue: se falhar, o ajuste vale para a sessão de hoje e volta ao
+ * anterior amanhã. Interromper um treino com "não consegui salvar o descanso"
+ * seria trocar um incômodo pequeno por um grande — e ela está com a barra na
+ * mão. O erro vai para o console, que é onde eu leio. */
+export async function salvarDescanso(id: string, segundos: number): Promise<void> {
+  const { error } = await supabase
+    .from('app_treino_exercicios')
+    .update({ descanso_seg: segundos })
+    .eq('id', id)
+  if (error) falha('Não consegui guardar o descanso deste exercício.', error)
 }
 
 export async function apagarExercicio(id: string): Promise<{ erro: string } | null> {

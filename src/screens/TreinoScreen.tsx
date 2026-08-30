@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Confirmacao } from '../components/Confirmacao'
-import { CronometroDeTreino } from '../components/CronometroDeTreino'
+import { ModoTreino } from '../components/ModoTreino'
 import { RotinaPorIA } from '../components/RotinaPorIA'
 import { AdaptarExercicio } from '../components/AdaptarExercicio'
 import { carregarCalculoAtivo } from '../lib/energia'
@@ -24,6 +24,7 @@ import {
   adicionarExercicio,
   apagarExercicio,
   editarExercicio,
+  salvarDescanso,
   trocarPorAdaptado,
   apagarSessao,
   carregarRotina,
@@ -77,6 +78,14 @@ export function TreinoScreen({
   const [iaAberta, setIaAberta] = useState(false)
   /* Quanto o cronômetro mediu. Vira sugestão de duração no registro. */
   const [minutosMedidos, setMinutosMedidos] = useState(0)
+  const [modoAberto, setModoAberto] = useState(false)
+
+  /* O que está montado para HOJE, na ordem. É o que o modo treino conduz — e é
+     por isso que ele não pergunta nada antes de começar: o dia da semana já
+     responde qual treino é. */
+  const doHoje = rotina
+    .filter(e => e.dia === (new Date().getDay() as DiaSemana))
+    .sort((a, b) => a.ordem - b.ordem)
   /* O que a IA precisa saber da pessoa. Vem do cálculo energético e do último
      peso do diário — o mesmo par que a sugestão de plano usa, e pelo mesmo
      motivo: o peso do cálculo pode ser de meses atrás. Nulo é aceitável; a
@@ -234,12 +243,30 @@ export function TreinoScreen({
               </View>
             </View>
 
-            {/* O cronômetro vem antes do registro porque é o que se usa
-                DURANTE o treino; registrar é o que se faz no fim. E o tempo
-                que ele mede preenche a duração sozinho — a pergunta "quanto
-                tempo" sempre teve resposta chutada, porque ninguém cronometra
-                o próprio treino. */}
-            <CronometroDeTreino onTempo={setMinutosMedidos} />
+            {/* O modo treino vem antes do registro porque é o que se usa
+                DURANTE; registrar é o que se faz no fim. E o tempo que ele mede
+                preenche a duração sozinho — a pergunta "quanto tempo" sempre
+                teve resposta chutada, porque ninguém cronometra o próprio
+                treino.
+
+                Botão grande e sozinho: é o primeiro toque de quem chegou na
+                academia, e ele tem de estar onde o polegar já está. */}
+            <Pressable
+              onPress={() => setModoAberto(true)}
+              style={({ pressed }) => [styles.botaoModo, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir o modo treino"
+            >
+              <Ionicons name="play" size={20} color={paleta().cores.branco} />
+              <View style={styles.textoModo}>
+                <Text style={styles.tituloModo}>Modo treino</Text>
+                <Text style={styles.subModo}>
+                  {doHoje.length > 0
+                    ? `${doHoje.length} ${doHoje.length === 1 ? 'exercício' : 'exercícios'} hoje · o descanso conta sozinho`
+                    : 'Nada montado para hoje'}
+                </Text>
+              </View>
+            </Pressable>
 
             <RegistrarTreino
               contaId={contaId}
@@ -300,6 +327,24 @@ export function TreinoScreen({
           />
         )}
       </ScrollView>
+
+      <ModoTreino
+        visivel={modoAberto}
+        exercicios={doHoje}
+        /* Persiste na hora. Ajustar o descanso toda semana é exatamente o
+           atrito que este modo existe para tirar. */
+        onDescansoMudou={(id, seg) => {
+          void salvarDescanso(id, seg)
+          setRotina(atuais =>
+            atuais.map(e => (e.id === id ? { ...e, descansoSeg: seg } : e)),
+          )
+        }}
+        onTerminar={min => {
+          setMinutosMedidos(min)
+          setModoAberto(false)
+        }}
+        onFechar={() => setModoAberto(false)}
+      />
 
       <RotinaPorIA
         visivel={iaAberta}
@@ -603,6 +648,7 @@ function Rotina({
       cargaKg: carga ? Number(carga.replace(',', '.')) : null,
       observacao: null,
       adaptadoDe: null,
+      descansoSeg: null,
     })
     setSalvando(false)
 
@@ -1168,6 +1214,18 @@ const estilos = estilosDe(t =>
     paddingHorizontal: 13,
   },
   veioDe: { fontSize: 11.5, color: t.inkFraco, marginTop: 2, fontStyle: 'italic' },
+  botaoModo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    backgroundColor: t.cores.verde,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  textoModo: { flex: 1, gap: 2 },
+  tituloModo: { fontSize: 16.5, fontWeight: '800', color: t.cores.branco },
+  subModo: { fontSize: 12, color: t.cores.branco, opacity: 0.85 },
   editorExercicio: {
     gap: 8,
     backgroundColor: t.cores.cartao,

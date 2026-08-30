@@ -94,17 +94,29 @@ const BOA = {
   }
 }
 
-// ── 5. O descanso vira observação, e só quando faz sentido ───────────────────
+// ── 5. O descanso é NÚMERO, e não uma frase dentro da observação ─────────────
 {
   console.log('\n5. o descanso')
+  /* Ele virava a frase "Descanso 90s" em `observacao`. Número que vira prosa não
+     volta a ser número: o modo treino não tinha como saber quanto descansar
+     naquele exercício, e descansava sempre o mesmo tempo escolhido na mão — em
+     toda série de todo treino. */
   const r = rotinaDaIA({ dias: { seg: { exercicios: [{ nome: 'Rosca', descanso_seg: 90 }] } } })
-  ok('90s vira observação', r.exercicios[0].observacao === 'Descanso 90s', String(r.exercicios[0].observacao))
+  ok('90s vira campo', r.exercicios[0].descansoSeg === 90, String(r.exercicios[0].descansoSeg))
+  ok('e não polui a observação', r.exercicios[0].observacao === null)
+
+  const texto = rotinaDaIA({ dias: { seg: { exercicios: [{ nome: 'Rosca', descanso_seg: '90' }] } } })
+  ok('texto "90" também vira número', texto.exercicios[0].descansoSeg === 90)
 
   const absurdo = rotinaDaIA({ dias: { seg: { exercicios: [{ nome: 'Rosca', descanso_seg: 9999 }] } } })
-  ok('descanso absurdo não entra', absurdo.exercicios[0].observacao === null)
+  ok('descanso absurdo não entra', absurdo.exercicios[0].descansoSeg === null)
+
+  const curto = rotinaDaIA({ dias: { seg: { exercicios: [{ nome: 'Rosca', descanso_seg: 1 }] } } })
+  ok('descanso curto demais não entra', curto.exercicios[0].descansoSeg === null)
 
   const sem = rotinaDaIA({ dias: { seg: { exercicios: [{ nome: 'Rosca' }] } } })
-  ok('sem descanso não inventa', sem.exercicios[0].observacao === null)
+  ok('sem descanso não inventa', sem.exercicios[0].descansoSeg === null)
+  ok('e a observação continua livre', sem.exercicios[0].observacao === null)
 }
 
 // ── 6. A carga nunca vem da IA ───────────────────────────────────────────────

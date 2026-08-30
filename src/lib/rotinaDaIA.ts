@@ -175,7 +175,15 @@ export function rotinaDaIA(bruto: unknown): RotinaConvertida {
         cargaKg: null,
         /* O descanso não tem coluna própria; vira observação, que é onde a
            pessoa lê na hora de treinar. */
-        observacao: descanso === null ? null : `Descanso ${descanso}s`,
+        /* O descanso vai para o CAMPO dele, e não vira a frase "Descanso 90s"
+           dentro da observação. Era assim antes, e o preço apareceu no
+           cronômetro: número que vira prosa não volta a ser número, e o modo
+           treino não tinha como saber quanto descansar naquele exercício —
+           descansava sempre o mesmo tempo escolhido na mão.
+
+           A observação fica livre para o que é observação de verdade. */
+        observacao: null,
+        descansoSeg: descanso,
         alerta: texto(e?.alerta).slice(0, 200) || null,
         /* Nasce nulo sempre. A rotina que a IA monta já respeita a limitação, e
            a ficha da academia é copiada como está — em nenhum dos dois houve
