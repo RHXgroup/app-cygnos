@@ -36,18 +36,39 @@ ele contratou, e é o que distingue uma nutricionista de um leitor de PDF.
 
 ## O que muda no banco
 
-### 1. O vínculo precisa de fim
+### 1. Desvincular já existe — o que falta é o vínculo TERMINAR em vez de sumir
 
-Hoje `app_vinculos` tem só `conta_id`, `nutricionista_id`, `criado_em`.
-**Não há `ativo`, não há `fim`, não há `id`.** Sem fim, não existe desvincular
-nem trocar: o paciente fica preso na primeira que aceitar.
+`app_desvincular(p_paciente_id)` existe. Uma versão anterior deste documento
+dizia que não, e o erro foi meu: sondei a função sem argumento, o PostgREST
+respondeu "Could not find the function", e eu li isso como "não existe". Chamar
+com o argumento certo mostra a função rodando. É a armadilha que eu já tinha
+anotado nesta mesma investigação e repeti mesmo assim.
 
-- coluna de encerramento (`fim timestamptz`, nulo enquanto ativo)
-- `app_desvincular()` para o paciente
-- `nutri_desvincular(p_conta_id)` para ela
+O corpo faz `delete from app_vinculos`. E é aí que está o problema de verdade:
 
-**Os dois lados podem desvincular** — decisão do Helton, e concordo: obrigar
-alguém a continuar acompanhado por quem não quer é errado nas duas direções.
+```
+app_vinculos  →  conta_id, nutricionista_id, paciente_id, criado_em
+                 (sem id, sem ativo, sem fim)
+```
+
+**O vínculo some, não termina.** Com a linha apagada, some junto a informação de
+que aquele acompanhamento existiu entre tais datas — e isso derruba a regra que
+o próprio Helton definiu: o plano deveria congelar como *"prescrito por Fulana,
+de 12/03 a 28/08 — encerrado"*, e depois do `delete` não sobra nem o 12/03 nem
+o 28/08.
+
+Então o pedido não é uma função nova. É:
+
+- **`fim timestamptz`** em `app_vinculos`, nulo enquanto ativo
+- `app_desvincular` passa a **marcar o fim**, e não a apagar a linha
+- `nutri_desvincular(p_conta_id)` para o outro lado — **os dois podem
+  desvincular**, porque obrigar alguém a continuar acompanhado por quem não
+  quer é errado nas duas direções
+- tudo que hoje pergunta "tem vínculo?" passa a perguntar "tem vínculo **sem
+  fim**?"
+
+O último item é o que dá trabalho e é onde mora o risco: qualquer lugar que
+esqueça o `fim is null` volta a mostrar como atual um acompanhamento encerrado.
 
 **Encerrar não apaga nada.** Plano, metas, histórico e conversa continuam
 existindo e legíveis para ele. O plano congela como "prescrito por Fulana, de
@@ -70,17 +91,25 @@ pendura na linha, então **ele nasce dentro da carteira de quem pediu**.
 Precisa passar a pendurar na conta do app, com a profissional virando um
 **atributo** do exame, e não o dono dele:
 
+As colunas de hoje, conferidas uma a uma:
+
 ```
 exames_laboratoriais
-  conta_id           -- o dono, e é ele
-  pedido_por         -- qual nutricionista pediu (atributo, pode ser nulo)
-  importado_por      -- 'paciente' | 'nutricionista'
-  data_coleta        -- OBRIGATÓRIO, ver abaixo
+  id, nutricionista_id, paciente_id, nome, arquivo_url, tipo_arquivo,
+  tamanho, data_exame, observacoes, importado_por, importado_por_nome,
+  created_at, analise, analisado_em
 ```
 
-**`data_coleta` não é detalhe.** Exame de seis meses lido como se fosse de hoje
-é erro clínico. Se o arquivo viaja, a data viaja junto — compartilhar o
-resultado sem ela seria pior do que não compartilhar.
+Boa parte do que eu ia pedir **já existe**: `data_exame`, `importado_por` e
+`importado_por_nome` estão lá. O que falta é só:
+
+- **`conta_id`**, para o exame pendurar na pessoa e não na carteira
+- `nutricionista_id` virar `pedido_por`, um atributo, e poder ser nulo
+
+E uma regra em vez de uma coluna: **`data_exame` obrigatória**. Hoje é
+convenção — os 23 exames existentes têm data, nenhum está sem —, e convenção
+não sobrevive ao primeiro import automático. Exame de seis meses lido como se
+fosse de hoje é erro clínico, e se o arquivo viaja, a data viaja junto.
 
 ### 3. Quem importa, o outro lado recebe
 
@@ -92,9 +121,18 @@ Nos dois sentidos, e é o mesmo arquivo:
 O segundo caso é o que hoje não acontece, e é o mais comum: ela recebe o PDF por
 e-mail e sobe do lado dela.
 
-### 4. A análise é uma coisa à parte
+### 4. A análise precisa SAIR de dentro do exame
 
-Não é campo do exame — é registro dela, referenciando o exame:
+E aqui está o motivo estrutural, que eu não tinha visto: `analise` e
+`analisado_em` são **colunas da própria linha do exame**.
+
+Isso quer dizer que, do jeito que está, **compartilhar o exame compartilha a
+análise junto** — a menos que cada consulta lembre de não trazer aquela coluna.
+Uma regra que depende de todo mundo lembrar não é uma regra; é uma espera.
+
+Por isso a análise vira registro à parte, referenciando o exame. Não é
+preciosismo de modelagem: é o que faz a fronteira existir na estrutura em vez de
+na disciplina de quem escreve a próxima consulta.
 
 ```
 analises_de_exame
@@ -112,20 +150,38 @@ Três regras:
 - **Ele não pode repassar a análise** para outra profissional pelo app. O exame
   ele repassa; a análise, não.
 
-> **Ajuste que eu proponho, e é o único ponto onde eu não sigo o combinado ao
-> pé da letra.** Ficou dito que "ela pode até compartilhar a análise se ela
-> quiser" — o que, lido literalmente, deixaria ela decidir se o PACIENTE vê.
-> Eu separaria: o que ela **entrega** a ele (parecer, conduta) é dele para ler,
-> porque foi o serviço prestado; o que fica em rascunho é dela. O que ele não
-> pode é **repassar** aquilo a uma concorrente como se fosse um bem portátil —
-> e é isso que a regra protege de verdade.
+> **O ponto que ficou em aberto, e a leitura que chegou.** Ficou dito que "ela
+> pode até compartilhar a análise se ela quiser" — o que, lido ao pé da letra,
+> deixaria a profissional decidir se o PACIENTE vê.
 >
-> Vale um "sim" ou "não" do Helton antes de virar migração.
+> A sessão do sistema leu assim, e eu concordo: **isso não é um poder que ela
+> tem.** Dois caminhos independentes chegam no mesmo lugar. A análise entregue é
+> o serviço que ele contratou e pagou — negar acesso ao produto do serviço é
+> contratual antes de ser regulatório. E é dado pessoal DELE tratado por ela: o
+> art. 18 da LGPD dá ao titular acesso aos dados tratados, e uma interpretação
+> laboratorial é dado sobre a saúde dele, não opinião sobre um terceiro.
+>
+> Rascunho é outra coisa: anotação em elaboração, ainda não entregue, e não há
+> direito de acesso a documento que ainda não é documento. **O que não pode é o
+> rascunho virar gaveta onde a entrega some** — nem depois do vínculo acabar,
+> que é justamente quando a tentação de reter aparece.
+>
+> Nenhum de nós dois é advogado, e os documentos legais do projeto ainda esperam
+> parecer. Mas a separação entregue/rascunho é a única que se sustenta pelos dois
+> caminhos ao mesmo tempo, e é ela que vai para a migração.
 
-E uma honestidade sobre o alcance disso: "não pode repassar" vale **dentro do
-app**. Ninguém impede uma captura de tela. A regra existe para o produto não
-transformar o trabalho dela em moeda de troca, não para criar cadeado — e não
-vale construir cadeado, que só incomoda quem cumpre a regra.
+E o caso que faltava, levantado do outro lado: **e se ela ERRAR a análise e ele
+quiser levar a outra profissional?**
+
+Bloquear o repasse pelo app não impede a circulação — empurra para a captura de
+tela. Só impede a circulação **rastreável**. E o cenário não é comercial, é de
+segurança: segunda opinião sobre um laudo mal lido é exatamente o que o paciente
+precisa poder buscar.
+
+Por isso o bloqueio é de PRODUTO, e não cadeado: o app não oferece "encaminhar a
+análise" porque não quer transformar o trabalho dela em moeda de troca. Não vale
+construir mecanismo de retenção — ele só incomoda quem cumpre a regra, e não
+segura quem não cumpre.
 
 ### 5. Compartilhar é por ITEM, nunca em bloco
 
@@ -141,6 +197,17 @@ app_compartilhamentos
 Um botão "liberar meu histórico" não serve. **Tem coisa que ele conta para uma e
 não para a outra** — o ciclo menstrual é o exemplo extremo, mas vale para exame
 de saúde mental, para peso, para o que for.
+
+**E isto tem pressa, por um motivo específico:** o ciclo já ganhou mecanismo
+PRÓPRIO — existe `app_contas.compartilha_ciclo`, uma chave booleana criada numa
+migração recente. Se a tabela genérica nascer depois, vão existir dois
+mecanismos respondendo à mesma pergunta, e o caso mais sensível de todos fica no
+que foi feito às pressas.
+
+Decidir a forma genérica **antes do segundo caso** é o que impede o terceiro de
+nascer com um terceiro mecanismo. Quando `app_compartilhamentos` existir, o
+ciclo migra para ela e a chave em `app_contas` sai — e a Política de
+Privacidade passa a descrever um mecanismo só, em vez de um por assunto.
 
 Isso responde a pergunta que só aparece quando existem duas profissionais: *"o
 ciclo vai para as duas ou para uma?"* Vai para quem ele marcar, e para mais
@@ -164,9 +231,9 @@ quer **trocar**, e trocar já estará resolvido.
 
 ## Ordem sugerida
 
-1. **fim do vínculo + desvincular dos dois lados** — pequeno, e destrava o
-   paciente que hoje está preso
-2. **exame pendurando na pessoa, com `data_coleta`** — é a correção de fundo
+1. **`fim` no vínculo** — `app_desvincular` já existe, mas apaga a linha; sem o
+   fim não há como o plano congelar com as datas do acompanhamento
+2. **`conta_id` no exame, e `data_exame` obrigatória** — é a correção de fundo
 3. **análise como registro à parte**
 4. **compartilhamento por item**
 5. **dois vínculos ativos**, se o uso pedir
