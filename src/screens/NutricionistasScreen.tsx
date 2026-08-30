@@ -58,7 +58,16 @@ import { estilosDe, paleta } from '../lib/tema'
  * ficha de uma só. Quem decide qual dos dois é o banco — ver lib/nutricionista.ts.
  *
  * Mesma escolha das outras telas do menu: View sobreposta no App, não Modal. */
-export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
+export function NutricionistasScreen({
+  onFechar,
+  onConversar,
+}: {
+  onFechar: () => void
+  /* Fecha esta tela e leva à aba da conversa. A ficha responde "quem acompanha
+     você"; falar com ela é o passo seguinte óbvio, e sem este botão o caminho
+     era voltar, achar a aba e entrar — três toques para o que devia ser um. */
+  onConversar: () => void
+}) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
@@ -278,6 +287,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
               consultas={consultas}
               onAbrir={setAberto}
               onAgendar={() => setAgendando(true)}
+              onConversar={onConversar}
             />
           ) : (
             <Lista
@@ -439,6 +449,7 @@ function Ficha({
   consultas,
   onAbrir,
   onAgendar,
+  onConversar,
 }: {
   nutri: Nutricionista
   conteudo: ConteudoNutri | null
@@ -446,6 +457,7 @@ function Ficha({
   consultas: MinhaConsulta[]
   onAbrir: (chave: ChaveConteudo) => void
   onAgendar: () => void
+  onConversar: () => void
 }) {
   const styles = estilos()
   /* Uma consulta em destaque e a contagem do resto. A ficha não é a agenda: ela
@@ -513,6 +525,19 @@ function Ficha({
         <Text style={styles.textoAgendar}>
           {destaque ? 'Marcar outro horário' : 'Agendar consulta'}
         </Text>
+      </Pressable>
+
+      {/* Segundo, e não primeiro: marcar consulta é o que mais se faz aqui. Mas
+          tinha que existir — a ficha diz quem acompanha a pessoa, e falar com
+          essa pessoa era voltar, achar a aba e entrar. */}
+      <Pressable
+        onPress={onConversar}
+        style={({ pressed }) => [styles.botaoConversar, pressed && styles.botaoConversarPressionado]}
+        accessibilityRole="button"
+        accessibilityLabel={`Conversar com ${nutri.nome}`}
+      >
+        <Ionicons name="chatbubble-ellipses-outline" size={17} color={paleta().cores.verde} />
+        <Text style={styles.textoConversar}>Conversar</Text>
       </Pressable>
 
       <Acompanhamento conteudo={conteudo} erro={erroConteudo} onAbrir={onAbrir} />
@@ -1043,6 +1068,18 @@ const estilos = estilosDe(t =>
   crnCartao: { marginTop: 2, fontSize: 12, color: t.inkSuave },
   lugarCartao: { marginTop: 1, fontSize: 11.5, color: t.inkFraco },
   cartaoPressionado: { backgroundColor: t.cores.verdeClaro },
+  botaoConversar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: t.cores.verdeClaro,
+  },
+  botaoConversarPressionado: { backgroundColor: t.cores.verdeMenta },
+  textoConversar: { fontSize: 15, fontWeight: '800', color: t.cores.verde },
   jaPedido: { marginTop: 10, fontSize: 12, fontWeight: '600', color: t.inkFraco },
 
   /* ── Meus pedidos ── */

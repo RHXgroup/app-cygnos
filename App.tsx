@@ -582,7 +582,15 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
         {nutricionistasAbertas && (
           <Sobreposta>
-            <NutricionistasScreen onFechar={() => setNutricionistasAbertas(false)} />
+            <NutricionistasScreen
+              onFechar={() => setNutricionistasAbertas(false)}
+              /* Fecha a tela ANTES de trocar de aba: voltar da conversa tem que
+                 devolver ao app, e não a uma ficha que ficou aberta por baixo. */
+              onConversar={() => {
+                setNutricionistasAbertas(false)
+                irPara('mensagens')
+              }}
+            />
           </Sobreposta>
         )}
 
