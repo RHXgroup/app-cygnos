@@ -267,15 +267,32 @@ if (error) return { tipo: 'erro', mensagem: falha('Não consegui registrar o cop
 Os dois lados importam. Engolir o erro em silêncio já custou uma sessão inteira
 de investigação aqui — ver o comentário do carregamento em `NutricionistasScreen`.
 
-**A exceção**, e é uma só: quando o BANCO escreve a mensagem para alguém ler (um
-`RAISE` em português, como "Esse horário não está mais disponível."), repassar é
-melhor do que traduzir. Está em `lib/agenda.ts`, na hora de pedir consulta, e é o
-único lugar.
+**A exceção**: quando o BANCO escreve a mensagem para alguém ler (um `RAISE` em
+português, como "Esse horário não está mais disponível."), repassar é melhor do
+que traduzir — quem sabe por que recusou é quem recusou. Acontece em pedir
+consulta, mandar mensagem e pedir vínculo.
 
-Hoje sobra **um** `error.message` cru em todo o `src/lib`, e é o de pedir
-consulta — a exceção acima. Se aparecer outro, é regressão: converta de
-passagem, e prefira `falha()` mesmo quando ninguém vai ler a frase, porque o
-console é a outra metade do trabalho.
+**Mas a exceção tinha o caminho largo demais, e isso custou uma passada de
+teste.** `error.message` não é só o `RAISE`: a MESMA chamada devolve "Network
+request failed", "permission denied for function" e "JWT expired". Esses iam
+para a tela em inglês — exatamente o que o `falha()` existe para impedir.
+
+Use `mensagemDoBanco(error, 'a nossa frase')` de `lib/erros.ts`. Ele repassa o
+texto do banco só quando ele TEM CARA de frase escrita para gente (português,
+sem jargão de banco) e cai na nossa frase no resto. A decisão é pela cara do
+texto, e não pelo `errcode`: o `RAISE` chega como P0001 num caso e 23514 noutro,
+e depender disso quebraria calado no dia em que alguém trocasse o `using
+errcode`.
+
+**Nenhum `error.message` cru deve chegar à tela.** Não conte quantos existem
+aqui — a contagem envelhece e convence quem lê. Rode:
+
+```bash
+grep -rn "error.message" src/lib | grep -v "falha(\|mensagemDoBanco"
+```
+
+O que sobrar é comentário ou é regressão. E prefira `falha()` mesmo quando
+ninguém vai ler a frase, porque o console é a outra metade do trabalho.
 
 ## 13. As quatro abas existem todas ao mesmo tempo
 

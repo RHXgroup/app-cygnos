@@ -1,4 +1,4 @@
-import { falha } from './erros'
+import { falha, mensagemDoBanco } from './erros'
 import { supabase } from './supabase'
 import { dataCurta, dataPorExtenso, horaCurta } from './formatar'
 
@@ -99,7 +99,13 @@ export const consultaEmDestaque = (consultas: MinhaConsulta[]): MinhaConsulta | 
    quem sabe por que recusou é quem recusou. */
 export async function solicitarConsulta(inicio: string): Promise<void> {
   const { error } = await supabase.rpc('app_solicitar_consulta', { p_inicio: inicio })
-  if (error) throw new Error(error.message)
+  /* A frase do banco quando ela foi escrita para alguém ler; a nossa quando o
+     que voltou foi "Network request failed" ou "permission denied" — que a
+     MESMA chamada devolve, e que ia para a tela em inglês. */
+  if (error)
+    throw new Error(
+      mensagemDoBanco(error, 'Não consegui pedir a consulta agora. Verifique a conexão.'),
+    )
 }
 
 /* Aqui NÃO se repassa o texto do banco, ao contrário do pedido logo acima.

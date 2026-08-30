@@ -120,6 +120,17 @@ export function ModoTreino({
   const [fimDoDescanso, setFimDoDescanso] = useState<number | null>(null)
 
   const tocador = useRef<ReturnType<typeof createAudioPlayer> | null>(null)
+  /* Quando o último toque em "fiz a série" foi aceito.
+   *
+   * Achado varrendo os caminhos de escrita: o botão não tinha guarda de toque
+   * duplo. Na última série de um exercício, ele PASSA para o próximo em vez de
+   * ir para o descanso — então dois toques rápidos marcavam uma série no
+   * exercício A e outra no B, que não foi feita, e as duas iam para o banco.
+   *
+   * Mão suada e luva de treino produzem toque duplo o tempo todo. Meio segundo
+   * é curto o bastante para não atrapalhar quem faz série rápida de aquecimento
+   * e longo o bastante para o repique não passar. */
+  const ultimoToque = useRef(0)
   /* Enquanto o rascunho não foi lido, não dá para gravar por cima dele — senão
      o primeiro render (com tudo zerado) apagaria o treino que estava salvo. */
   const [restaurado, setRestaurado] = useState(false)
@@ -272,6 +283,9 @@ export function ModoTreino({
 
   function fizASerie() {
     if (!exercicio) return
+    const agoraMs = Date.now()
+    if (agoraMs - ultimoToque.current < 500) return
+    ultimoToque.current = agoraMs
     const jaFeitas = (feitas[exercicio.id] ?? 0) + 1
     setFeitas(f => ({ ...f, [exercicio.id]: jaFeitas }))
 

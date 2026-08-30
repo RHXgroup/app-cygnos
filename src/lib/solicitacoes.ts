@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { assinados } from './arquivos'
-import { falha } from './erros'
+import { falha, mensagemDoBanco } from './erros'
 
 /* O primeiro contato, que parte SEMPRE do paciente.
  *
@@ -112,7 +112,11 @@ export async function solicitarVinculo(
     p_mensagem: mensagem.trim() || null,
   })
 
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: mensagemDoBanco(error, 'Não consegui enviar o seu pedido agora. Verifique a conexão.'),
+    }
   return { tipo: 'ok' }
 }
 

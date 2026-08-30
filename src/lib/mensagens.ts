@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { falha } from './erros'
+import { falha, mensagemDoBanco } from './erros'
 
 /* A conversa entre o paciente e a nutricionista dele.
  *
@@ -97,7 +97,13 @@ export type ResultadoEnvio = { tipo: 'ok' } | { tipo: 'erro'; mensagem: string }
    seria perder o motivo. Mesma exceção de lib/agenda.ts. */
 export async function enviarMensagem(texto: string): Promise<ResultadoEnvio> {
   const { error } = await supabase.rpc('app_enviar_mensagem', { p_texto: texto })
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      /* A frase do banco quando ela foi escrita para alguém ler; a nossa quando
+         o que voltou foi "Network request failed" ou "permission denied". */
+      mensagem: mensagemDoBanco(error, 'Não consegui enviar a sua mensagem agora. Verifique a conexão.'),
+    }
   return { tipo: 'ok' }
 }
 
