@@ -204,5 +204,43 @@ const vazio = {
   ok('nenhuma frase repreende', ruins.length === 0, ruins.map(r => r.texto).join(' | '))
 }
 
+// ── 11. O que a pessoa avisou, o app não cobra ───────────────────────────────
+{
+  console.log('\n11. a intenção cala a cobrança')
+
+  const intencao = (extra: Record<string, unknown>) =>
+    ({ tipo: 'refeicao_fora', quando: HOJE, ate: null, refeicao: null, texto: 'x', ...extra }) as never
+
+  /* Avisou que almoça fora: o "Almoço em 45 min" não aparece. A refeição
+     continua no plano e nos cartões — o que cala é a COBRANÇA dela. */
+  const base = { ...vazio, plano: plano([{ rotulo: 'Almoço', hora: '12:30' }]) }
+  ok('sem aviso, cobra a refeição',
+    proximoPasso({ ...base, agora: em(11, 45) }).chave === 'refeicao')
+  ok('com aviso, não cobra',
+    proximoPasso({ ...base, intencoesDeHoje: [intencao({ refeicao: 'Almoço' })], agora: em(11, 45) })
+      .chave !== 'refeicao')
+  /* O aviso é da refeição CERTA: quem avisou do jantar continua sendo lembrado
+     do almoço. */
+  ok('aviso de outra refeição não cala esta',
+    proximoPasso({ ...base, intencoesDeHoje: [intencao({ refeicao: 'Jantar' })], agora: em(11, 45) })
+      .chave === 'refeicao')
+
+  /* Viagem e evento calam o dia inteiro. Cobrar registro de quem avisou que
+     está viajando é briga perdida, e ensina que falar com o app não serve. */
+  ok('viajando, não cobra registro',
+    proximoPasso({ ...vazio, metas: metas({ sonoHoras: null }),
+      intencoesDeHoje: [intencao({ tipo: 'viagem' })], agora: em(12) }).chave !== 'comida')
+  ok('em evento, não cobra treino',
+    proximoPasso({ ...vazio, metas: metas({ sonoHoras: null }), consumo: [item()],
+      rotina: [{ id: 'e', dia: SABADO, nome: 'Supino', ordem: 0 } as never],
+      intencoesDeHoje: [intencao({ tipo: 'evento' })], agora: em(19) }).chave !== 'treino')
+
+  /* A intenção NUNCA cria cobrança nova — ela só cala. */
+  ok('aviso não inventa cobrança',
+    proximoPasso({ ...vazio, metas: metas({ sonoHoras: null }), consumo: [item()],
+      plano: plano([{ rotulo: 'Jantar', hora: '20:00' }]),
+      intencoesDeHoje: [intencao({ tipo: 'viagem' })], agora: em(15) }).chave === 'em_dia')
+}
+
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')
 process.exit(falhou > 0 ? 1 : 0)

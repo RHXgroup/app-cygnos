@@ -77,16 +77,32 @@ export function RotinaPorIA({
   const [pedindo, setPedindo] = useState(false)
   const [erro, setErro] = useState('')
   const [rotina, setRotina] = useState<RotinaConvertida | null>(null)
-  /* Os que a pessoa tirou na conferência, pelo par dia+ordem — o exercício
-     ainda não tem id, porque ainda não existe no banco. */
-  const [tirados, setTirados] = useState<Set<string>>(new Set())
+  /* A lista EDITÁVEL da conferência.
+   *
+   * Antes a tela só deixava TIRAR exercício, e isso não bastava por dois
+   * motivos que apareceram no primeiro teste de verdade:
+   *
+   * O DIA vinha sempre errado na foto. Ficha de academia usa "Treino A, B, C",
+   * e o prompt manda converter o primeiro bloco em segunda — então quem
+   * fotografa uma ficha de um bloco só recebe tudo na segunda, toda vez. Não dá
+   * para a IA adivinhar em que dia a pessoa treina; dá para a pessoa dizer, se
+   * a tela deixar.
+   *
+   * O NOME vem errado às vezes, porque ficha é foto de letra pequena. Tirar o
+   * exercício e digitar de novo na outra tela é justamente o trabalho que a
+   * importação existia para poupar. */
+  const [exercicios, setExercicios] = useState<ExercicioNovo[]>([])
+  /* Qual está aberto para editar. O índice na lista, e não o objeto: o objeto
+     muda a cada tecla digitada. */
+  const [editando, setEditando] = useState<number | null>(null)
 
   /* Fechar e reabrir tem de dar tela limpa. Sem isto, quem desiste no meio da
      conferência reabre e encontra a rotina antiga já montada. */
   useEffect(() => {
     if (!visivel) {
       setRotina(null)
-      setTirados(new Set())
+      setExercicios([])
+      setEditando(null)
       setErro('')
       setPedindo(false)
     }
@@ -115,7 +131,7 @@ export function RotinaPorIA({
     setPedindo(false)
     if (r.tipo === 'ok') {
       setRotina(r.rotina)
-      setTirados(new Set())
+      setExercicios(r.rotina.exercicios)
       return
     }
     setErro(r.mensagem)
@@ -129,27 +145,39 @@ export function RotinaPorIA({
     if (r.tipo === 'cancelado') return
     if (r.tipo === 'ok') {
       setRotina(r.rotina)
-      setTirados(new Set())
+      setExercicios(r.rotina.exercicios)
       return
     }
     setErro(r.mensagem)
   }
 
-  const chave = (e: ExercicioNovo) => `${e.dia}-${e.ordem}`
-
-  const restantes = (rotina?.exercicios ?? []).filter(e => !tirados.has(chave(e)))
-
-  /* Os dias que sobraram, na ordem da semana começando na segunda — que é como
-     as pessoas leem uma rotina de treino, e não no domingo. */
+  /* Os dias na ordem da semana começando na SEGUNDA, que é como se lê uma
+     rotina de treino — e não no domingo, que é como o `Date` numera. */
   const ordemDaSemana: DiaSemana[] = [1, 2, 3, 4, 5, 6, 0]
-  const diasComExercicio = ordemDaSemana.filter(d => restantes.some(e => e.dia === d))
+  const diasComExercicio = ordemDaSemana.filter(d => exercicios.some(e => e.dia === d))
+
+  const tirar = (i: number) => {
+    setExercicios(atuais => atuais.filter((_, n) => n !== i))
+    setEditando(null)
+  }
+
+  const mudar = (i: number, campos: Partial<ExercicioNovo>) =>
+    setExercicios(atuais => atuais.map((e, n) => (n === i ? { ...e, ...campos } : e)))
+
+  /* Move o BLOCO inteiro de dia.
+   *
+   * Um por um seria pior: ficha de academia é "Treino A", um conjunto que anda
+   * junto. Quem quiser separar tira e monta na mão depois — mas o caso comum é
+   * "isto aqui é quarta, não segunda". */
+  const moverDia = (de: DiaSemana, para: DiaSemana) =>
+    setExercicios(atuais => atuais.map(e => (e.dia === de ? { ...e, dia: para } : e)))
 
   function usar() {
-    /* A ordem é renumerada depois do que foi tirado: deixar buraco (0, 2, 3)
-       não quebra nada hoje, mas a próxima leitura ordena por ela e o buraco
-       vira pergunta sem resposta. */
+    /* A ordem é renumerada por dia no fim: mover bloco e tirar exercício deixam
+       buraco na numeração, e a próxima leitura ordena por ela — um buraco vira
+       pergunta sem resposta. */
     const porDia = new Map<DiaSemana, number>()
-    const finais = restantes.map(e => {
+    const finais = exercicios.map(e => {
       const n = porDia.get(e.dia) ?? 0
       porDia.set(e.dia, n + 1)
       return { ...e, ordem: n }
@@ -329,6 +357,16 @@ export function RotinaPorIA({
                 Se você contar, eu não incluo exercício que carregue essa parte.
               </Text>
 
+              {pedindo ? (
+                /* Ler a ficha leva de cinco a quinze segundos, e sem isto a tela
+                   fica parada depois que a câmera fecha — a pessoa acha que
+                   não funcionou e toca de novo, gastando outra chamada. */
+                <View style={styles.lendo}>
+                  <ActivityIndicator color={paleta().cores.verde} />
+                  <Text style={styles.textoLendo}>Lendo a ficha…</Text>
+                </View>
+              ) : null}
+
               {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
               <Pressable
@@ -355,13 +393,93 @@ export function RotinaPorIA({
               ) : null}
               {rotina.observacao ? <Text style={styles.observacao}>{rotina.observacao}</Text> : null}
 
+              <Text style={styles.ajuda}>
+                Toque num exercício para corrigir o nome ou as séries. Toque no dia para mudar a
+                semana inteira do bloco.
+              </Text>
+
               {diasComExercicio.map(d => (
                 <View key={d} style={styles.cartaoDia}>
-                  <Text style={styles.tituloDia}>{DIAS_ROTULO[d]}</Text>
-                  {restantes
-                    .filter(e => e.dia === d)
-                    .map(e => (
-                      <View key={chave(e)} style={styles.linhaExercicio}>
+                  {/* O DIA é editável, e é a correção mais importante desta
+                      tela. Ficha de academia se chama "Treino A", não "segunda"
+                      — a IA converte o primeiro bloco em segunda porque precisa
+                      escolher algum, e quem sabe em que dia treina é a pessoa. */}
+                  <View style={styles.fileiraDias}>
+                    {ordemDaSemana.map(alvo => (
+                      <Pressable
+                        key={alvo}
+                        onPress={() => alvo !== d && moverDia(d, alvo)}
+                        style={[styles.diaChip, alvo === d && styles.diaChipAtivo]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: alvo === d }}
+                        accessibilityLabel={`Mover para ${DIAS_ROTULO[alvo]}`}
+                      >
+                        <Text style={[styles.textoDiaChip, alvo === d && styles.textoDiaChipAtivo]}>
+                          {DIAS_ROTULO[alvo]}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  {exercicios.map((e, i) =>
+                    e.dia !== d ? null : editando === i ? (
+                      <View key={i} style={styles.editor}>
+                        <TextInput
+                          style={styles.campoEditor}
+                          value={e.nome}
+                          onChangeText={nome => mudar(i, { nome })}
+                          placeholder="Nome do exercício"
+                          placeholderTextColor={paleta().inkFraco}
+                          maxLength={60}
+                          autoFocus
+                        />
+                        <View style={styles.linhaEditor}>
+                          <TextInput
+                            style={styles.campoPequeno}
+                            value={e.series === null ? '' : String(e.series)}
+                            onChangeText={s => {
+                              const n = Number(soDigitos(s).slice(0, 2))
+                              mudar(i, { series: n > 0 ? n : null })
+                            }}
+                            keyboardType="number-pad"
+                            placeholder="Séries"
+                            placeholderTextColor={paleta().inkFraco}
+                          />
+                          <TextInput
+                            style={styles.campoMedio}
+                            value={e.repeticoes ?? ''}
+                            onChangeText={repeticoes => mudar(i, { repeticoes: repeticoes || null })}
+                            placeholder="Reps (8-12)"
+                            placeholderTextColor={paleta().inkFraco}
+                            maxLength={20}
+                          />
+                        </View>
+                        <View style={styles.linhaEditor}>
+                          <Pressable
+                            onPress={() => tirar(i)}
+                            style={styles.botaoTirar}
+                            accessibilityRole="button"
+                          >
+                            <Ionicons name="trash-outline" size={15} color={paleta().cores.erroTexto} />
+                            <Text style={styles.textoTirar}>Tirar</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setEditando(null)}
+                            style={styles.botaoPronto}
+                            accessibilityRole="button"
+                          >
+                            <Text style={styles.textoPronto}>Pronto</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      <Pressable
+                        key={i}
+                        onPress={() => setEditando(i)}
+                        style={({ pressed }) => [styles.linhaExercicio, pressed && { opacity: 0.6 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Editar ${e.nome}`}
+                      >
                         <View style={styles.textoExercicio}>
                           <Text style={styles.nomeExercicio}>{e.nome}</Text>
                           <Text style={styles.detalheExercicio}>
@@ -371,19 +489,13 @@ export function RotinaPorIA({
                               e.observacao,
                             ]
                               .filter(Boolean)
-                              .join(' · ') || 'Sem detalhe'}
+                              .join(' · ') || 'Toque para completar'}
                           </Text>
                         </View>
-                        <Pressable
-                          onPress={() => setTirados(s => new Set(s).add(chave(e)))}
-                          hitSlop={10}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Tirar ${e.nome}`}
-                        >
-                          <Ionicons name="close" size={18} color={paleta().inkFraco} />
-                        </Pressable>
-                      </View>
-                    ))}
+                        <Ionicons name="create-outline" size={17} color={paleta().inkFraco} />
+                      </Pressable>
+                    ),
+                  )}
                 </View>
               ))}
 
@@ -399,14 +511,14 @@ export function RotinaPorIA({
 
               <Pressable
                 onPress={usar}
-                disabled={restantes.length === 0}
-                style={[styles.botao, restantes.length === 0 && styles.botaoOcupado]}
+                disabled={exercicios.length === 0}
+                style={[styles.botao, exercicios.length === 0 && styles.botaoOcupado]}
                 accessibilityRole="button"
               >
                 <Text style={styles.textoBotao}>
-                  {restantes.length === 0
+                  {exercicios.length === 0
                     ? 'Você tirou todos'
-                    : `Usar esta rotina (${restantes.length})`}
+                    : `Usar esta rotina (${exercicios.length})`}
                 </Text>
               </Pressable>
               <Pressable onPress={() => setRotina(null)} style={styles.botaoTexto}>
@@ -462,8 +574,9 @@ const estilos = estilosDe(t =>
       borderColor: t.cores.borda,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 15,
+      fontSize: 16,
       color: t.cores.ink,
+      minHeight: 48,
     },
     campoGrande: {
       backgroundColor: t.cores.cartao,
@@ -472,10 +585,76 @@ const estilos = estilosDe(t =>
       borderColor: t.cores.borda,
       paddingHorizontal: 14,
       paddingVertical: 12,
+      fontSize: 16,
+      color: t.cores.ink,
+      minHeight: 130,
+      lineHeight: 22,
+    },
+    lendo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+    textoLendo: { fontSize: 14, color: t.inkMedio },
+
+    fileiraDias: { flexDirection: 'row', gap: 4, marginBottom: 4 },
+    diaChip: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 7,
+      borderRadius: 8,
+      backgroundColor: t.cores.superficie,
+    },
+    diaChipAtivo: { backgroundColor: t.cores.verde },
+    textoDiaChip: { fontSize: 11, fontWeight: '700', color: t.inkFraco },
+    textoDiaChipAtivo: { color: t.cores.branco },
+
+    editor: {
+      gap: 8,
+      backgroundColor: t.cores.superficie,
+      borderRadius: 10,
+      padding: 10,
+    },
+    campoEditor: {
+      backgroundColor: t.cores.cartao,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      paddingHorizontal: 12,
+      minHeight: 46,
       fontSize: 15,
       color: t.cores.ink,
-      minHeight: 92,
     },
+    linhaEditor: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    campoPequeno: {
+      width: 84,
+      backgroundColor: t.cores.cartao,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      paddingHorizontal: 12,
+      minHeight: 44,
+      fontSize: 15,
+      color: t.cores.ink,
+      textAlign: 'center',
+    },
+    campoMedio: {
+      flex: 1,
+      backgroundColor: t.cores.cartao,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      paddingHorizontal: 12,
+      minHeight: 44,
+      fontSize: 15,
+      color: t.cores.ink,
+    },
+    botaoTirar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
+    textoTirar: { fontSize: 13, fontWeight: '700', color: t.cores.erroTexto },
+    botaoPronto: {
+      marginLeft: 'auto',
+      paddingHorizontal: 18,
+      paddingVertical: 9,
+      borderRadius: 9,
+      backgroundColor: t.cores.verde,
+    },
+    textoPronto: { fontSize: 13, fontWeight: '800', color: t.cores.branco },
     linhaDitado: { alignItems: 'flex-start' },
     linhaMinutos: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     campoNumero: {

@@ -3,6 +3,7 @@ import type { Metas } from './metas'
 import type { DiaSemana, PlanoCompleto } from './plano'
 import type { Noite } from './sono'
 import type { Exercicio, Sessao } from './treino'
+import type { Intencao } from './intencaoDaIA'
 
 /* A única coisa que a tela inicial precisa dizer agora.
  *
@@ -83,6 +84,7 @@ export function proximoPasso({
   noites,
   rotina,
   sessoes,
+  intencoesDeHoje = [],
   agora = new Date(),
 }: {
   metas: Metas
@@ -95,6 +97,18 @@ export function proximoPasso({
   noites: Noite[]
   rotina: Exercicio[]
   sessoes: Sessao[]
+  /* O que a pessoa AVISOU que ia acontecer, JÁ FILTRADO para hoje.
+   *
+   * É o que dá sentido a falar uma intenção: quem diz "amanhã eu almoço fora" e
+   * mesmo assim recebe "você não anotou o almoço" aprende que falar com o app
+   * não serve para nada. Aqui elas SILENCIAM cobrança — nunca criam uma nova.
+   *
+   * Chegam prontas, e não a lista inteira com a data, pelo mesmo motivo do
+   * atraso da água logo acima: quem sabe qual intenção vale num dia é o
+   * `valemPara`, que mora em `intencaoDaIA` e é testado lá. Este arquivo
+   * decide PRIORIDADE, e importar a função de filtro o faria puxar runtime —
+   * que é justamente o que o mantém exercitável fora do aparelho. */
+  intencoesDeHoje?: Intencao[]
   agora?: Date
 }): Passo {
   const minutos = agora.getHours() * 60 + agora.getMinutes()
@@ -104,6 +118,16 @@ export function proximoPasso({
     String(agora.getMonth() + 1).padStart(2, '0'),
     String(agora.getDate()).padStart(2, '0'),
   ].join('-')
+
+  /* Uma viagem, um evento ou uma refeição marcada fora não mudam o que a pessoa
+     deve fazer — mudam o que o app tem o DIREITO de cobrar. */
+  const diaFora = intencoesDeHoje.some(i => i.tipo === 'viagem' || i.tipo === 'evento')
+  const refeicoesAvisadas = new Set(
+    intencoesDeHoje
+      .filter(i => i.tipo === 'refeicao_fora' || i.tipo === 'refeicao_pulada')
+      .map(i => (i.refeicao ?? '').trim().toLowerCase())
+      .filter(Boolean),
+  )
 
   /* 1. Quem ainda não tem meta não tem o que acompanhar. Vem antes de tudo
         porque é o que destrava o resto do app — sem meta, os cartões mostram
@@ -119,7 +143,14 @@ export function proximoPasso({
 
   /* 2. Refeição chegando. Tem hora marcada, e hora marcada passa. */
   const refeicao = faltaParaProximaRefeicao(plano, minutos, diaDeHoje)
-  if (refeicao && refeicao.emMinutos <= AVISO_DE_REFEICAO) {
+  if (
+    refeicao &&
+    refeicao.emMinutos <= AVISO_DE_REFEICAO &&
+    /* "Almoço em 45 min" para quem avisou que almoça fora hoje é o app não ter
+       ouvido. A refeição continua no plano e nos cartões — o que cala é a
+       COBRANÇA dela. */
+    !refeicoesAvisadas.has(refeicao.rotulo.trim().toLowerCase())
+  ) {
     return {
       chave: 'refeicao',
       texto: `${refeicao.rotulo} ${emQuanto(refeicao.emMinutos)}`,
@@ -142,7 +173,7 @@ export function proximoPasso({
 
   /* 4. Nada anotado e o dia andando. Depois das onze porque quem toma café às
         nove e abre o app às nove e meia não está atrasado em nada. */
-  if (consumo.length === 0 && minutos >= 11 * 60) {
+  if (consumo.length === 0 && minutos >= 11 * 60 && !diaFora) {
     return {
       chave: 'comida',
       texto: 'Você ainda não anotou nada hoje',
@@ -155,7 +186,7 @@ export function proximoPasso({
         tarde: cobrar treino às dez da manhã de quem treina à noite seria
         errado todo dia. */
   const treinaHoje = rotina.some(e => e.dia === diaDeHoje)
-  if (treinaHoje && minutos >= 18 * 60 && !sessoes.some(s => s.data === hoje)) {
+  if (treinaHoje && minutos >= 18 * 60 && !diaFora && !sessoes.some(s => s.data === hoje)) {
     return {
       chave: 'treino',
       texto: 'Hoje é dia de treino na sua rotina',

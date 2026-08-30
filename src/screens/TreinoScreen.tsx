@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Confirmacao } from '../components/Confirmacao'
+import { CronometroDeTreino } from '../components/CronometroDeTreino'
 import { RotinaPorIA } from '../components/RotinaPorIA'
 import { carregarCalculoAtivo } from '../lib/energia'
 import { carregarPeso } from '../lib/peso'
@@ -71,6 +72,8 @@ export function TreinoScreen({
   const [mudou, setMudou] = useState(false)
   const [apagandoSessao, setApagandoSessao] = useState<Sessao | null>(null)
   const [iaAberta, setIaAberta] = useState(false)
+  /* Quanto o cronômetro mediu. Vira sugestão de duração no registro. */
+  const [minutosMedidos, setMinutosMedidos] = useState(0)
   /* O que a IA precisa saber da pessoa. Vem do cálculo energético e do último
      peso do diário — o mesmo par que a sugestão de plano usa, e pelo mesmo
      motivo: o peso do cálculo pode ser de meses atrás. Nulo é aceitável; a
@@ -205,8 +208,16 @@ export function TreinoScreen({
               </View>
             </View>
 
+            {/* O cronômetro vem antes do registro porque é o que se usa
+                DURANTE o treino; registrar é o que se faz no fim. E o tempo
+                que ele mede preenche a duração sozinho — a pergunta "quanto
+                tempo" sempre teve resposta chutada, porque ninguém cronometra
+                o próprio treino. */}
+            <CronometroDeTreino onTempo={setMinutosMedidos} />
+
             <RegistrarTreino
               contaId={contaId}
+              minutosMedidos={minutosMedidos}
               rotina={rotina}
               sessaoDeHoje={sessoes.find(s => s.data === dataISO(new Date())) ?? null}
               onRegistrou={s => {
@@ -311,6 +322,7 @@ const DURACOES = [20, 30, 45, 60, 90]
 function RegistrarTreino({
   contaId,
   rotina,
+  minutosMedidos,
   sessaoDeHoje,
   onRegistrou,
   onRefinou,
@@ -318,6 +330,8 @@ function RegistrarTreino({
 }: {
   contaId: string
   rotina: Exercicio[]
+  /* O que o cronômetro mediu, em minutos. Zero quando ninguém o usou. */
+  minutosMedidos: number
   /* A sessão de hoje, quando já existe. É ela que decide se a tela pergunta
      "treinou?" ou oferece os detalhes opcionais. */
   sessaoDeHoje: Sessao | null
@@ -349,9 +363,10 @@ function RegistrarTreino({
          outro nome. É o que liga a sessão ao que estava planejado. */
       dia: daRotina.length > 0 && !titulo.trim() ? hoje : null,
       titulo: titulo.trim() || null,
-      /* Tempo e esforço NÃO são perguntados aqui. Entram depois, se a pessoa
-         quiser, sobre uma sessão que já existe. */
-      duracaoMin: null,
+      /* O tempo NÃO é perguntado, mas se o cronômetro rodou ele já está
+         medido — e medido vale mais que a estimativa que a pessoa daria
+         depois. Zero significa que ninguém cronometrou, e aí fica nulo. */
+      duracaoMin: minutosMedidos > 0 ? minutosMedidos : null,
       esforco: null,
       observacao: null,
     })
