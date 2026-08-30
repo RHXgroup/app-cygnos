@@ -67,6 +67,29 @@ export async function carregarMensagens(): Promise<ResultadoMensagens> {
   return { tipo: 'ok', mensagens: ((data ?? []) as Linha[]).map(daLinha) }
 }
 
+/* Quantas ela mandou e ele ainda não leu — o número do ponto vermelho.
+ *
+ * `head: true` traz só a contagem, sem uma linha de texto: o sino pergunta isto
+ * a cada abertura do app, e baixar a conversa inteira para contar seria pagar a
+ * conversa toda por um número.
+ *
+ * Engole a falha e responde zero. Sem sinal, "nenhuma nova" é a resposta certa:
+ * um ponto vermelho que aparece por causa de rede ruim manda a pessoa abrir uma
+ * conversa onde não há nada para ler. */
+export async function contarNaoLidas(): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('app_mensagens')
+      .select('id', { count: 'exact', head: true })
+      .eq('de', 'nutricionista')
+      .is('lida_em', null)
+
+    return error ? 0 : (count ?? 0)
+  } catch {
+    return 0
+  }
+}
+
 export type ResultadoEnvio = { tipo: 'ok' } | { tipo: 'erro'; mensagem: string }
 
 /* Falha aqui devolve a frase do BANCO. Ele escreve em português para alguém ler

@@ -29,9 +29,11 @@ import { estilosDe, paleta } from '../lib/tema'
 export function AvisosScreen({
   onFechar,
   onAbrirNutricionistas,
+  onAbrirMensagens,
 }: {
   onFechar: () => void
   onAbrirNutricionistas: () => void
+  onAbrirMensagens: () => void
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
@@ -111,13 +113,11 @@ export function AvisosScreen({
               <Linha
                 key={a.id}
                 aviso={a}
-                onIr={
-                  a.destino === 'nutricionista'
-                    ? onAbrirNutricionistas
-                    : a.destino === 'inicio'
-                      ? onFechar
-                      : undefined
-                }
+                onIr={destinoDe(a.destino, {
+                  onAbrirNutricionistas,
+                  onAbrirMensagens,
+                  onFechar,
+                })}
               />
             ))
           )}
@@ -125,6 +125,20 @@ export function AvisosScreen({
       )}
     </View>
   )
+}
+
+/* Um `Record` indexado pelo destino seria mais curto e devolveria `undefined`
+   para um valor que não estivesse nele — que é justamente o que a gente NÃO
+   quer descobrir em produção. A função com reserva explícita deixa o caso novo
+   virar cartão sem seta, e não travamento. Ver a armadilha 10 do AGENTS.md. */
+function destinoDe(
+  destino: Aviso['destino'],
+  ir: { onAbrirNutricionistas: () => void; onAbrirMensagens: () => void; onFechar: () => void },
+): (() => void) | undefined {
+  if (destino === 'nutricionista') return ir.onAbrirNutricionistas
+  if (destino === 'mensagens') return ir.onAbrirMensagens
+  if (destino === 'inicio') return ir.onFechar
+  return undefined
 }
 
 /* Sem destino, o cartão não afunda ao toque e não mostra a seta: um alvo que

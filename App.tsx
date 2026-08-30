@@ -34,6 +34,7 @@ import { EditarPlanoScreen } from './src/screens/EditarPlanoScreen'
 import { ExcluirContaScreen } from './src/screens/ExcluirContaScreen'
 import { MaisScreen } from './src/screens/MaisScreen'
 import { MensagensScreen } from './src/screens/MensagensScreen'
+import { contarNaoLidas } from './src/lib/mensagens'
 import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
 import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
 import { ReceitasScreen } from './src/screens/ReceitasScreen'
@@ -353,6 +354,26 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     return () => sub.remove()
   }, [])
 
+  /* O ponto da aba Mensagens.
+   *
+   * Mora aqui, e não na tela de conversa, porque o ponto tem que aparecer para
+   * quem NÃO está na conversa — é essa a função dele. A tela avisa de volta
+   * quando lê, e aí o ponto apaga sem precisar perguntar ao banco de novo.
+   *
+   * Sem push, a contagem se refaz em três momentos: ao entrar, ao voltar do
+   * segundo plano, e a cada troca de aba. Não é instantâneo com o app aberto e
+   * parado na tela inicial — isso só chega com notificação de verdade —, mas
+   * cobre o caminho real, que é abrir o app e olhar. */
+  const [naoLidas, setNaoLidas] = useState(0)
+
+  useEffect(() => {
+    let vivo = true
+    contarNaoLidas().then(n => vivo && setNaoLidas(n))
+    return () => {
+      vivo = false
+    }
+  }, [sessao.user.id, versaoPlano, aba])
+
   /* Um caminho só para os dois contadores: a meta de água mora na mesma linha
      que as de caloria e passos, então gravar metas invalida as duas telas. */
   function aoSalvarMetas() {
@@ -508,12 +529,18 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                    e abrir o "+" já naquela opção é o mesmo caminho que o
                    cartão de plano usa para "montar plano". */
                 onAbrirTreino={() => setRegistrar({ inicial: 'treino' })}
+                onLeuMensagens={() => setNaoLidas(0)}
               />
             </View>
           ))}
         </ScrollView>
 
-        <BarraAbas ativa={aba} onTrocar={irPara} onRegistrar={() => setRegistrar({})} />
+        <BarraAbas
+          ativa={aba}
+          onTrocar={irPara}
+          onRegistrar={() => setRegistrar({})}
+          naoLidas={naoLidas}
+        />
 
         {/* Sobreposto por cima de tudo, inclusive da barra de abas. É uma View
             e não um Modal de propósito: no iOS, abrir a câmera de dentro de um
@@ -561,6 +588,13 @@ function AreaLogada({ sessao }: { sessao: Session }) {
               onAbrirNutricionistas={() => {
                 setAvisosAbertos(false)
                 setNutricionistasAbertas(true)
+              }}
+              /* Mesma ideia: fecha os avisos e leva à aba da conversa. Sem o
+                 fechamento, ler a mensagem e voltar devolveria à lista de
+                 avisos, com o aviso que a pessoa acabou de atender ainda lá. */
+              onAbrirMensagens={() => {
+                setAvisosAbertos(false)
+                irPara('mensagens')
               }}
             />
           </Sobreposta>
@@ -769,6 +803,7 @@ function TelaDaAba({
   onAbrirContador,
   onAbrirSono,
   onAbrirTreino,
+  onLeuMensagens,
 }: {
   chave: Aba
   sessao: Session
@@ -797,6 +832,8 @@ function TelaDaAba({
   onAbrirContador: () => void
   onAbrirSono: () => void
   onAbrirTreino: () => void
+  /* A conversa avisa que foi lida, e o ponto da aba apaga na hora. */
+  onLeuMensagens: () => void
 }) {
   switch (chave) {
     case 'inicio':
@@ -839,7 +876,12 @@ function TelaDaAba({
         />
       )
     case 'mensagens':
-      return <MensagensScreen onAbrirNutricionistas={onAbrirNutricionistas} />
+      return (
+        <MensagensScreen
+          onAbrirNutricionistas={onAbrirNutricionistas}
+          onLeu={onLeuMensagens}
+        />
+      )
     case 'mais':
       return (
         <MaisScreen

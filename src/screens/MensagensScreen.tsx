@@ -51,8 +51,12 @@ import { estilosDe, paleta } from '../lib/tema'
  * plano como rede, para o caso de a inscrição ter caído sem avisar. */
 export function MensagensScreen({
   onAbrirNutricionistas,
+  onLeu,
 }: {
   onAbrirNutricionistas: () => void
+  /* Avisa o App de que a conversa foi lida, para o ponto da aba apagar sem uma
+     segunda ida ao banco só para descobrir que agora é zero. */
+  onLeu: () => void
 }) {
   const styles = estilos()
   const { top } = useSafeAreaInsets()
@@ -66,6 +70,10 @@ export function MensagensScreen({
 
   const rolagem = useRef<ScrollView>(null)
 
+  /* `onLeu` fora das dependências de propósito: ele é recriado a cada
+     renderização do App, e incluí-lo faria `buscar` mudar de identidade toda
+     vez — o que refaz o efeito de carga, que chama `buscar`, que… Uma função de
+     avisar não é motivo para recarregar a conversa. */
   const buscar = useCallback(async () => {
     const [cat, msgs] = await Promise.all([carregarCatalogo(), carregarMensagens()])
 
@@ -75,6 +83,7 @@ export function MensagensScreen({
       /* Marcar como lida é consequência de ter aberto a tela, não de ter
          carregado: quem chegou aqui viu o que estava escrito. */
       marcarLidas()
+      onLeu()
     }
   }, [])
 
@@ -104,7 +113,10 @@ export function MensagensScreen({
       setMensagens(atuais =>
         atuais.some(m => m.id === nova.id) ? atuais : [...atuais, nova],
       )
+      /* Chegou com a conversa aberta: já foi lida, e o ponto não pode acender
+         para uma mensagem que está na tela. */
       marcarLidas()
+      onLeu()
     })
     return desligar
   }, [nutri])

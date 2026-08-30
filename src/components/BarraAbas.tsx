@@ -25,10 +25,15 @@ export function BarraAbas({
   ativa,
   onTrocar,
   onRegistrar,
+  naoLidas = 0,
 }: {
   ativa: Aba
   onTrocar: (a: Aba) => void
   onRegistrar: () => void
+  /* Mensagens dela ainda não lidas. Vira um ponto sobre o ícone de Mensagens —
+     é a única coisa no app que chega de fora e espera resposta, e sem o ponto
+     ela só é descoberta por quem abre a aba por acaso. */
+  naoLidas?: number
 }) {
   const styles = estilos()
   /* A faixa do gesto de voltar do iPhone come a parte de baixo. Sem este
@@ -42,14 +47,14 @@ export function BarraAbas({
     <View style={[styles.envolucro, { paddingBottom: Math.max(bottom, 12) }]}>
       <View style={styles.barra}>
         {ABAS.slice(0, 2).map(a => (
-          <ItemAba key={a.chave} aba={a} ativa={ativa} onTrocar={onTrocar} />
+          <ItemAba key={a.chave} aba={a} ativa={ativa} onTrocar={onTrocar} naoLidas={naoLidas} />
         ))}
 
         {/* Espaço reservado para o botão flutuante do meio. */}
         <View style={styles.vao} />
 
         {ABAS.slice(2).map(a => (
-          <ItemAba key={a.chave} aba={a} ativa={ativa} onTrocar={onTrocar} />
+          <ItemAba key={a.chave} aba={a} ativa={ativa} onTrocar={onTrocar} naoLidas={naoLidas} />
         ))}
       </View>
 
@@ -71,22 +76,41 @@ function ItemAba({
   aba,
   ativa,
   onTrocar,
+  naoLidas,
 }: {
   aba: { chave: Aba; rotulo: string; icone: keyof typeof Ionicons.glyphMap }
   ativa: Aba
   onTrocar: (a: Aba) => void
+  naoLidas: number
 }) {
   const styles = estilos()
   const selecionada = aba.chave === ativa
+  const ponto = aba.chave === 'mensagens' && naoLidas > 0
+
   return (
     <Pressable
       onPress={() => onTrocar(aba.chave)}
       style={styles.item}
       accessibilityRole="tab"
       accessibilityState={{ selected: selecionada }}
-      accessibilityLabel={aba.rotulo}
+      /* O número entra no rótulo lido em voz alta, e não só no desenho: um
+         ponto colorido não existe para quem usa leitor de tela. */
+      accessibilityLabel={
+        ponto
+          ? `${aba.rotulo}, ${naoLidas} ${naoLidas === 1 ? 'não lida' : 'não lidas'}`
+          : aba.rotulo
+      }
     >
-      <Ionicons name={aba.icone} size={21} color={selecionada ? paleta().cores.limao : paleta().inkFraco} />
+      <View>
+        <Ionicons
+          name={aba.icone}
+          size={21}
+          color={selecionada ? paleta().cores.limao : paleta().inkFraco}
+        />
+        {/* Ponto e não número: acima de nove o balão fica maior que o ícone, e
+            o que importa é "tem coisa para ler", não quanta. */}
+        {ponto && <View style={styles.ponto} />}
+      </View>
       <Text style={[styles.rotulo, selecionada && styles.rotuloAtivo]} numberOfLines={1}>
         {aba.rotulo}
       </Text>
@@ -97,6 +121,19 @@ function ItemAba({
 const estilos = estilosDe(t =>
   StyleSheet.create({
   envolucro: { paddingTop: LEVANTE, backgroundColor: t.cores.fundo },
+  ponto: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: t.cores.limao,
+    /* Anel da cor da barra: sobre o ícone claro, ponto sem contorno some no
+       desenho em vez de saltar dele. */
+    borderWidth: 1.5,
+    borderColor: t.cores.superficie,
+  },
   barra: {
     flexDirection: 'row',
     alignItems: 'center',
