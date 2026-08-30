@@ -59,80 +59,35 @@ três funções de pedido estão certas hoje:
 
 ---
 
-## 1b. As TRÊS funções de mensagem ainda estão em `auth.uid()` — ABERTA
+## 1b. As três funções de mensagem — RESOLVIDAS
 
-Mesma raiz, recorte diferente, e este ainda não foi corrigido:
+Ficaram como abertas por algumas horas neste documento, com base num relato de
+que ainda usavam `auth.uid()`. **Estava desatualizado.** O corpo real, lido com
+`pg_get_functiondef` em 30/08/2026, mostra as três por carteira:
 
-| função | o que faz | efeito |
-| --- | --- | --- |
-| `nutri_conversas` | lê | ela não vê conversa nenhuma |
-| `nutri_marcar_lidas` | **grava** | não marca nada; o contador dela nunca zera |
-| `nutri_enviar_mensagem` | **grava** | **a resposta nunca chega ao paciente** |
+| função | como resolve a nutricionista |
+| --- | --- |
+| `nutri_conversas` | `where v.nutricionista_id = (select public.get_nutricionista_id())` |
+| `nutri_enviar_mensagem` | `v_carteira uuid := public.get_nutricionista_id()` — e o insert usa `v_carteira` |
+| `nutri_marcar_lidas` | `and nutricionista_id = (select public.get_nutricionista_id())` |
 
-> **Trecho do corpo que JÁ ESTÁ no banco, citado para mostrar o defeito. Não é
-> comando para rodar** — as reticências são minhas, querendo dizer "e o resto da
-> função". Colar isso no editor SQL devolve `syntax error at or near ".."`, e é
-> o que tem de acontecer.
->
-> ```
-> insert into app_mensagens (conta_id, nutricionista_id, de, texto)
-> values (p_conta_id, auth.uid(), 'nutricionista', ...)
->                     ^^^^^^^^^^^  aqui devia ser a carteira
-> ```
+Nenhum `auth.uid()` nas três. **As seis funções do lado dela estão por
+carteira**, e nada aqui está aberto.
 
-Para ver o corpo real das três, isto é leitura pura e não muda nada:
+E o corpo mostrou três coisas boas que não estavam sendo pedidas:
 
-```sql
-select p.proname, pg_get_functiondef(p.oid)
-  from pg_proc p
-  join pg_namespace n on n.oid = p.pronamespace
- where n.nspname = 'public'
-   and p.proname in ('nutri_conversas', 'nutri_marcar_lidas', 'nutri_enviar_mensagem');
-```
+- **As três checam `func_pode('{pacientes,acessar}')`.** Carteira certa e
+  permissão são coisas diferentes, e as duas estão no lugar.
+- **`nutri_enviar_mensagem` confere o vínculo antes de gravar**, e recusa com
+  frase em português — "Este paciente não está vinculado a você." Também recusa
+  texto vazio. É o mesmo padrão do lado do app, onde a frase do banco é
+  repassada em vez de traduzida.
+- **`nutri_conversas` já devolve `nao_lidas`**, contando `de = 'paciente' and
+  lida_em is null`. Isso responde a pergunta 5 deste documento, que sai da lista.
 
-**A terceira é a que importa para o app, e é a pior falha silenciosa das três.**
-
-A mensagem nasce com o `nutricionista_id` da funcionária. A política do lado do
-paciente filtra pelo vínculo dele — que aponta para a nutricionista dona —,
-então aquela linha simplesmente não existe para ele.
-
-E como a leitura DELA também usa `auth.uid()`, do lado dela está tudo coerente:
-ela escreve, a mensagem aparece na conversa, e nada indica problema. **Ela acha
-que respondeu. Ele nunca recebeu.** Ninguém dos dois lados vê erro.
-
-Comparado com isso, `nutri_conversas` e `nutri_marcar_lidas` são só incômodo
-dela: uma esconde a lista, a outra deixa o contador aceso. Nenhuma das duas
-mente para o paciente.
-
----
-
-## 2. A RLS de `app_mensagens` deixa ela ler — RESPONDIDA, existe
-
-**Pergunta:** existe política de `select` em `app_mensagens` para a
-nutricionista do par? E ela cobre as duas direções — o que ele escreveu e o que
-ela escreveu?
-
-**Por que importa:** escrever ela consegue, porque `nutri_enviar_mensagem`
-existe e é `security definer`. **Ler é outra permissão.** Sem a política, a
-conversa aparece vazia do lado dela, e o realtime não entrega nada — porque o
-realtime entrega o que a política deixa ler, não o que uma função devolve.
-
-Não há função de leitura, e isso está certo: tem que ser direto na tabela,
-justamente por causa do realtime.
-
-**Resposta (30/08/2026):** a política existe — `"nutri le as conversas dela"`,
-de SELECT. O realtime tem o que entregar; não era o buraco que eu temia.
-
-Mesma ressalva da pergunta 1: ela filtra por `auth.uid()`, então hoje
-funcionária não lê conversa nenhuma. Correção combinada.
-
-**E um aviso para quem for corrigir**, porque é o tipo de conserto que se faz em
-bloco e quebra o outro lado: a política `"paciente le a propria conversa"`
-TAMBÉM usa `auth.uid()`, e ali está **certa** — o login é o próprio sujeito.
-Trocar `auth.uid()` por carteira varrendo todas as policies derruba o app do
-paciente.
-
----
+Uma observação de desempenho, e é só isso — não é defeito: `nutri_conversas`
+faz quatro subconsultas correlacionadas por paciente e não tem `limit`. Com
+carteira grande isso cresce por multiplicação. Se um dia ficar lenta, é aí.
 
 ## 3. Alguma coisa escreve em `notificacoes` quando o paciente manda?
 
@@ -175,13 +130,11 @@ da tabela. Depois custa migração e reescrita da tela junto.
 
 ---
 
-## 5. `nutri_conversas()` devolve quantas não lidas?
+## 5. `nutri_conversas()` devolve quantas não lidas — RESPONDIDA
 
-**Pergunta:** a lista de conversas traz um contador de mensagens com `lida_em`
-nulo e `de = 'paciente'`?
-
-**Por que importa:** é o que permite o ponto vermelho na lista dela. Do lado do
-paciente isso já existe e usa exatamente essa conta.
+Devolve: a coluna `nao_lidas` conta `de = 'paciente' and lida_em is null`, que é
+exatamente a mesma conta que o app do paciente usa do lado dele. O ponto
+vermelho na lista dela tem de onde sair.
 
 ---
 
@@ -237,12 +190,12 @@ certo** e não é urgente. Vale só saber se é intencional.
 
 ---
 
-## O teste que responde 5 e 6, e confere a correção de 1 e 2
+## O teste que responde 3 e 6, e confere as seis funções de uma vez
 
-As perguntas 1 e 2 já foram respondidas lendo o corpo no banco. O teste abaixo
-continua valendo — agora como conferência de que a correção do `auth.uid()`
-pegou. **Faça o passo 2 com o login de uma FUNCIONÁRIA**, não com o da dona: é
-com ele que o defeito aparece.
+As perguntas 1, 1b, 2 e 5 foram respondidas lendo o corpo no banco. O teste
+abaixo continua valendo como conferência de ponta a ponta. **Faça o passo 2 com
+o login de uma FUNCIONÁRIA**, não com o da dona: é com ele que erro de carteira
+aparece, e é o único jeito de provar que a correção pegou.
 
 Dois minutos, e não precisa ler código nenhum:
 
