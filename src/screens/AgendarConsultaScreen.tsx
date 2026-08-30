@@ -43,7 +43,7 @@ import { estilosDe, paleta } from '../lib/tema'
  * seria a mentira mais cara possível, porque a pessoa apareceria no consultório. */
 export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
 
   const [dias, setDias] = useState<DiaComVagas[] | null>(null)
   const [consultas, setConsultas] = useState<MinhaConsulta[]>([])
@@ -231,7 +231,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
              remarcar nada mais para a frente, então a lista continua. */
       aguardando || dias.length === 0 ? (
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           refreshControl={controleDeAtualizar}
         >
@@ -270,7 +270,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
         <SectionList
           sections={dias.map(d => ({ dia: d.dia, data: d.vagas }))}
           keyExtractor={v => v.inicio}
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           refreshControl={controleDeAtualizar}
           ListHeaderComponent={cabecalhoDaLista}

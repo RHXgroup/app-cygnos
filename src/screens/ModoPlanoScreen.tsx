@@ -21,7 +21,7 @@ export function ModoPlanoScreen({
   onVoltar: () => void
 }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
 
   return (
     <>
@@ -40,7 +40,7 @@ export function ModoPlanoScreen({
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.conteudo}
+        contentContainerStyle={[styles.conteudo, { paddingBottom: 24 + bottom }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"

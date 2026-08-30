@@ -90,7 +90,7 @@ export function ConteudoNutriScreen({
   onFechar: () => void
 }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [atualizando, setAtualizando] = useState(false)
@@ -177,7 +177,7 @@ export function ConteudoNutriScreen({
 
       {erro ? (
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           refreshControl={controleDeAtualizar}
         >
@@ -189,7 +189,7 @@ export function ConteudoNutriScreen({
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           refreshControl={controleDeAtualizar}
         >

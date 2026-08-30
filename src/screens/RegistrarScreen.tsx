@@ -120,7 +120,7 @@ export function RegistrarScreen({
   onTreinoMudou: () => void
 }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
   const [escolhida, setEscolhida] = useState<Opcao | null>(
     () => TODAS.find(o => o.chave === inicial) ?? null,
   )
@@ -233,7 +233,7 @@ export function RegistrarScreen({
         <EmBreveScreen titulo={escolhida.rotulo} icone={escolhida.icone} />
       ) : (
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"

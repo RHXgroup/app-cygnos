@@ -50,7 +50,7 @@ export function CodigoScreen({
   onVinculou: () => void
 }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
   const [codigo, setCodigo] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [copiado, setCopiado] = useState(false)
@@ -176,7 +176,7 @@ export function CodigoScreen({
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"

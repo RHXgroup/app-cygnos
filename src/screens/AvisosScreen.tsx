@@ -34,7 +34,7 @@ export function AvisosScreen({
   onAbrirNutricionistas: () => void
 }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
 
   const [lista, setLista] = useState<Aviso[] | null>(null)
   const [atualizando, setAtualizando] = useState(false)
@@ -91,7 +91,7 @@ export function AvisosScreen({
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={[styles.conteudo, lista.length === 0 && styles.conteudoVazio]}
+          contentContainerStyle={[styles.conteudo, lista.length === 0 && styles.conteudoVazio, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl

@@ -33,7 +33,7 @@ import { estilosDe, paleta } from '../lib/tema'
  * Modal. */
 export function ExcluirContaScreen({ email, onFechar }: { email: string; onFechar: () => void }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
   const [palavra, setPalavra] = useState('')
   const [excluindo, setExcluindo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -87,7 +87,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 40 + bottom }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >

@@ -48,7 +48,7 @@ import { estilosDe, paleta } from '../lib/tema'
  * Mesma escolha das outras telas do menu: View sobreposta no App, não Modal. */
 export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
   const [conteudo, setConteudo] = useState<ConteudoNutri | null>(null)
   const [erroConteudo, setErroConteudo] = useState<string | null>(null)
@@ -228,7 +228,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
            o gesto óbvio, e a tela vinha prometendo isso por escrito sem ter o
            controle que atende ao gesto. */
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           refreshControl={puxarParaAtualizar}
         >
@@ -238,7 +238,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
         </ScrollView>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 32 + bottom }]}
           showsVerticalScrollIndicator={false}
           refreshControl={puxarParaAtualizar}
         >
