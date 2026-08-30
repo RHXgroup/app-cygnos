@@ -36,11 +36,45 @@ const MEDIDAS = [
   'pedaço',
 ]
 
-/* Volume vira peso pela densidade da água: 1 ml ≈ 1 g. É aproximação, não
-   verdade — azeite dá 0,92 e leite 1,03 —, por isso entra como sugestão no
-   campo, que continua editável. Para o resto não há palpite possível: uma
-   colher de sopa de azeite e uma de farinha não pesam nem perto do mesmo. */
-const PESO_SUGERIDO: Record<string, string> = { ml: '1', litro: '1000' }
+/* ── Quanto pesa uma dessas ────────────────────────────────────────────────
+ *
+ * Volume vira peso pela densidade da água: 1 ml ≈ 1 g. É aproximação, não
+ * verdade — azeite dá 0,92 e leite 1,03 —, por isso entra como sugestão num
+ * campo que continua editável.
+ *
+ * `copo` e `xícara` entraram porque são RECIPIENTES, e um recipiente tem volume
+ * conhecido: são a mesma conta do ml, só que com o ml já contado. Sem elas,
+ * escolher "copo" — a medida mais natural para leite, suco e café — deixava o
+ * peso em branco, e a tela dizia 0 kcal para um copo de leite.
+ *
+ * As COLHERES continuam de fora, e é decisão, não esquecimento: uma colher de
+ * sopa de azeite pesa 14 g e uma de farinha pesa 8, porque a farinha não ocupa
+ * a colher inteira. Chutar 15 para as duas erraria quase o dobro na segunda,
+ * com cara de número oficial. Quem usa colher digita o peso, ou usa gramas.
+ *
+ * Os valores em ml, e não em gramas, para o rótulo poder dizer de onde saiu o
+ * número: "considerando copo de 200 ml" é o que permite a pessoa perceber que o
+ * copo dela é de 250 e corrigir. */
+const VOLUME_ML: Record<string, number> = {
+  ml: 1,
+  copo: 200,
+  xícara: 240,
+  litro: 1000,
+}
+
+/* "0 kcal" é mentira para qualquer coisa que tenha caloria.
+ *
+ * Um mililitro de leite tem 0,43 kcal, e arredondar isso para zero faz a tela
+ * afirmar que não tem nenhuma. Abaixo de dez o número ganha uma casa; abaixo de
+ * um décimo, a frase diz o que é. Ver a armadilha 6 do AGENTS.md: zero é uma
+ * afirmação, e afirmar errado é pior do que não afirmar. */
+function kcalLegivel(kcal: number | null): string {
+  if (kcal === null) return '—'
+  if (kcal === 0) return '0 kcal'
+  if (kcal < 0.1) return 'menos de 0,1 kcal'
+  if (kcal < 10) return `${decimal(kcal)} kcal`
+  return `${Math.round(kcal)} kcal`
+}
 
 /* Abreviação não flexiona: "200 mls" não existe. */
 const INVARIAVEIS = new Set(['ml', 'l', 'g', 'kg'])
@@ -275,6 +309,10 @@ export function BuscarAlimentoScreen({
 
   const kcal = selecionado && gramasTotais ? porcao(selecionado.calorias, gramasTotais) : null
 
+  /* Só quando a medida escrita É uma das conhecidas: o campo aceita texto livre,
+     e "copão" não é copo. */
+  const volumeDaMedida = VOLUME_ML[medida.trim().toLowerCase()] ?? null
+
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
       {/* O KeyboardAvoidingView cobre só a busca e a lista. O painel de
@@ -492,7 +530,7 @@ export function BuscarAlimentoScreen({
 
                 <View style={styles.blocoTotal}>
                   <Text style={styles.rotuloCampo}>Nesta quantidade</Text>
-                  <Text style={styles.total}>{kcal === null ? '—' : `${Math.round(kcal)} kcal`}</Text>
+                  <Text style={styles.total}>{kcalLegivel(kcal)}</Text>
                   <Text style={styles.macros}>{resumoMacros(selecionado, gramasTotais ?? 0)}</Text>
                 </View>
               </View>
@@ -542,10 +580,20 @@ export function BuscarAlimentoScreen({
                       key={m}
                       onPress={() => {
                         setMedida(m)
-                        /* Escolher a fita é ato explícito, então pode
-                           sobrescrever o peso: ml e litro têm equivalência
-                           conhecida, o resto continua com o que estava. */
-                        if (PESO_SUGERIDO[m]) setPesoUnidade(PESO_SUGERIDO[m])
+                        /* Trocar a fita SEMPRE mexe no peso, inclusive para
+                           apagá-lo.
+                         *
+                         * Antes só escrevia quando havia sugestão, e o resto
+                         * "continuava com o que estava" — o que era o defeito:
+                         * quem tocava em `ml` (1 g) e depois em `copo` ficava com
+                         * um copo de 1 grama. A conta dava 0 kcal e a tela
+                         * mostrava 0 kcal, sem nada indicando que o número era
+                         * herdado de outra medida.
+                         *
+                         * Peso de uma medida não vale para outra. Sem sugestão,
+                         * o campo volta a vazio e a tela pede o peso — que é a
+                         * verdade, e é o que ela já sabe dizer. */
+                        setPesoUnidade(VOLUME_ML[m] ? String(VOLUME_ML[m]) : '')
                       }}
                       style={[styles.fita, medida === m && styles.fitaAtiva]}
                       accessibilityRole="button"
@@ -560,6 +608,14 @@ export function BuscarAlimentoScreen({
                 <View style={styles.linhaQuantidade}>
                   <View style={styles.blocoCampo}>
                     <Text style={styles.rotuloCampo}>Peso de 1 {medida.trim() || 'unidade'}</Text>
+                    {/* De onde saiu o número. Sem isto, "200 g" num copo é um
+                        número que apareceu sozinho: quem usa copo de 250 não
+                        tem como desconfiar que devia mudar. */}
+                    {!!volumeDaMedida && (
+                      <Text style={styles.origemPeso}>
+                        considerando {medida.trim()} de {volumeDaMedida} ml
+                      </Text>
+                    )}
                     <View style={styles.campoComUnidade}>
                       <TextInput
                         value={pesoUnidade}
@@ -579,7 +635,7 @@ export function BuscarAlimentoScreen({
                   <View style={styles.blocoTotal}>
                     <Text style={styles.rotuloCampo}>Nesta quantidade</Text>
                     <Text style={styles.total}>
-                      {kcal === null ? '—' : `${Math.round(kcal)} kcal`}
+                      {kcalLegivel(kcal)}
                     </Text>
                     {/* Sem chute de peso: o item entra no plano do mesmo jeito,
                         só fica de fora da soma — e a tela diz isso. */}
@@ -874,6 +930,7 @@ const estilos = estilosDe(t =>
   blocoQuantas: { width: 96 },
   blocoMedida: { flex: 1 },
   blocoTotal: { flex: 1 },
+  origemPeso: { marginTop: 2, fontSize: 10.5, color: t.inkFraco },
   rotuloCampo: { marginBottom: 6, fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
   campoComUnidade: {
     flexDirection: 'row',
