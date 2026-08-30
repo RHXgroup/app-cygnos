@@ -62,6 +62,9 @@ export function MaisScreen({
   onAbrirNutricionistas,
   onAbrirCodigo,
   onAbrirExcluirConta,
+  onAbrirMensagens,
+  naoLidas,
+  onAbrirMetas,
 }: {
   contaId: string
   email: string
@@ -78,6 +81,15 @@ export function MaisScreen({
   onAbrirNutricionistas: () => void
   onAbrirCodigo: () => void
   onAbrirExcluirConta: () => void
+  /* Mensagens deixou de ser aba e virou linha aqui. O contador vem junto:
+     era o ponto sobre o ícone da aba, e sem ele a mensagem dela só seria
+     descoberta por quem abrisse este menu por acaso. */
+  onAbrirMensagens: () => void
+  naoLidas: number
+  /* O lembrete de água não é nada sem a meta: é dela que saem quantos avisos, a
+     que horas, e quanto o botão da notificação registra. Sem este caminho, a
+     tela diria "defina sua meta" e deixaria a pessoa procurando onde. */
+  onAbrirMetas: () => void
 }) {
   const styles = estilos()
   const { top } = useSafeAreaInsets()
@@ -94,6 +106,9 @@ export function MaisScreen({
   const [agua, setAgua] = useState(false)
   const [mexendoAgua, setMexendoAgua] = useState(false)
   const [avisoAgua, setAvisoAgua] = useState('')
+  /* Ligado quando o aviso acima é sobre a meta faltando: aí ele ganha um
+     caminho, em vez de mandar a pessoa procurar. */
+  const [faltaMeta, setFaltaMeta] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
@@ -219,6 +234,7 @@ export function MaisScreen({
      resto quase não muda. */
   async function alternarAgua() {
     setAvisoAgua('')
+    setFaltaMeta(false)
     setMexendoAgua(true)
 
     if (agua) {
@@ -247,11 +263,29 @@ export function MaisScreen({
     }
 
     setAgua(true)
+
+    /* Sem meta, o lembrete funciona pela metade e é honesto dizer qual metade.
+     *
+     * Os avisos tocam — de três em três horas, das 9h às 21h —, mas eles não
+     * conhecem o dia da pessoa e não trazem o botão de registrar, porque o
+     * botão precisa saber QUANTO gravar. Ficar calado aqui faria alguém achar
+     * que o app não sabe fazer melhor, quando o que falta é um número que ela
+     * ainda não deu. */
+    if (!ritmo) {
+      setFaltaMeta(true)
+      setAvisoAgua(
+        `Ligado: ${r.quantos} avisos por dia, das 9h às 21h. Com a sua meta de água definida, ` +
+          'eles passam a caber no seu dia e ganham o botão de registrar sem abrir o app.',
+      )
+      return
+    }
+
     /* Diz QUANDO é o próximo. Ligar às dez da noite não produz nada visível até
        o dia seguinte, e sem essa frase a leitura é "não funcionou". */
     setAvisoAgua(
       r.proximo
-        ? `${r.quantos} avisos por dia${ritmo && !ritmo.daJanelaPadrao ? ', no seu ritmo' : ''}. O próximo é às ${r.proximo}.`
+        ? `${r.quantos} avisos de ${ritmo.mlPorVez} ml${ritmo.daJanelaPadrao ? '' : ', no seu ritmo'}. O próximo é às ${r.proximo}.` +
+            (ritmo.daJanelaPadrao ? ' Anote três noites de sono e os horários passam a seguir a sua rotina.' : '')
         : `${r.quantos} avisos por dia, das 9h às 21h.`,
     )
   }
@@ -284,6 +318,28 @@ export function MaisScreen({
         onAbrir={onAbrirNutricionistas}
         onAbrirCodigo={onAbrirCodigo}
       />
+
+      <Pressable
+        onPress={onAbrirMensagens}
+        style={({ pressed }) => [styles.linhaMensagens, pressed && styles.linhaPressionada]}
+        accessibilityRole="button"
+        accessibilityLabel={
+          naoLidas > 0
+            ? `Mensagens, ${naoLidas} ${naoLidas === 1 ? 'não lida' : 'não lidas'}`
+            : 'Mensagens'
+        }
+      >
+        <View style={styles.iconeMensagens}>
+          <Ionicons name="chatbubble-ellipses-outline" size={19} color={paleta().cores.verde} />
+        </View>
+        <Text style={styles.textoMensagens}>Mensagens</Text>
+        {naoLidas > 0 && (
+          <View style={styles.selo}>
+            <Text style={styles.textoSelo}>{naoLidas > 9 ? '9+' : naoLidas}</Text>
+          </View>
+        )}
+        <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+      </Pressable>
 
       <View style={styles.cartao}>
         <Text style={styles.tituloCartao}>Lembretes</Text>
@@ -351,6 +407,17 @@ export function MaisScreen({
         </Pressable>
 
         {!!avisoAgua && <Text style={styles.avisoLembrete}>{avisoAgua}</Text>}
+        {faltaMeta && (
+          <Pressable
+            onPress={onAbrirMetas}
+            style={({ pressed }) => [styles.linkMeta, pressed && styles.linkMetaPressionado]}
+            accessibilityRole="button"
+            accessibilityLabel="Definir a minha meta de água"
+          >
+            <Text style={styles.textoLinkMeta}>Definir minha meta de água</Text>
+            <Ionicons name="chevron-forward" size={15} color={paleta().cores.verde} />
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.cartao}>
@@ -700,6 +767,37 @@ const estilos = estilosDe(t =>
 
   titulo: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
 
+  linhaMensagens: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: t.cores.cartao,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  linhaPressionada: { backgroundColor: t.cores.superficie },
+  iconeMensagens: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: t.cores.verdeMenta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textoMensagens: { flex: 1, fontSize: 15, fontWeight: '600', color: t.cores.ink },
+  selo: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    backgroundColor: t.cores.verde,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textoSelo: { fontSize: 11, fontWeight: '800', color: t.cores.branco },
   cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: PADDING_CARTAO },
   cartaoPressionado: { backgroundColor: t.cores.trilho },
   cartaoCarregando: { alignItems: 'center', paddingVertical: 34 },
@@ -808,6 +906,19 @@ linhaTema: { flexDirection: 'row', gap: 10, marginTop: 12 },
   botaoLembreteDesligado: { opacity: 0.45 },
   textoBotaoLembreteAtivo: { color: t.cores.sobreLimao },
   avisoLembrete: { fontSize: 12.5, color: t.inkSuave, lineHeight: 18, marginTop: 10 },
+  linkMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 3,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    backgroundColor: t.cores.verdeClaro,
+  },
+  linkMetaPressionado: { backgroundColor: t.cores.verdeMenta },
+  textoLinkMeta: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
   botaoSairPressionado: { backgroundColor: t.cores.verdeMenta },
   textoBotaoSair: { fontSize: 15, fontWeight: '600', color: t.cores.verde },
 

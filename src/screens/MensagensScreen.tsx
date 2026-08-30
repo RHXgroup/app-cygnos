@@ -51,12 +51,16 @@ import { estilosDe, paleta } from '../lib/tema'
  * volta não é conversa. Esta tem realtime — e mantém a releitura do segundo
  * plano como rede, para o caso de a inscrição ter caído sem avisar. */
 export function MensagensScreen({
+  onFechar,
   onAbrirNutricionistas,
   visivel,
   versaoVinculo,
   onLeu,
   onChegou,
 }: {
+  /* Existe desde que Mensagens deixou de ser aba e virou tela aberta por cima.
+     Como aba ela não precisava fechar — a barra levava embora. */
+  onFechar: () => void
   onAbrirNutricionistas: () => void
   /* Esta tela é a aba que a pessoa está vendo AGORA?
    *
@@ -215,7 +219,18 @@ export function MensagensScreen({
   if (!nutri) {
     return (
       <View style={[styles.tela, { paddingTop: top + 8 }]}>
-        <Text style={styles.titulo}>Mensagens</Text>
+        <View style={styles.linhaTopo}>
+        <Pressable
+          onPress={onFechar}
+          style={styles.botaoVoltar}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
+        </Pressable>
+          <Text style={styles.tituloComVolta}>Mensagens</Text>
+        </View>
         <View style={styles.vazio}>
           <View style={styles.circulo}>
             <Ionicons name="chatbubble-ellipses-outline" size={26} color={paleta().cores.verde} />
@@ -249,6 +264,15 @@ export function MensagensScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
+        <Pressable
+          onPress={onFechar}
+          style={styles.botaoVoltar}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
+        </Pressable>
         <AvatarNutri nutri={nutri} tamanho={38} />
         <View style={styles.textoCabecalho}>
           <Text style={styles.nome} numberOfLines={1}>
@@ -385,6 +409,9 @@ const estilos = estilosDe(t =>
       letterSpacing: -0.6,
     },
 
+    linhaTopo: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: 4 },
+    botaoVoltar: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+    tituloComVolta: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.4 },
     cabecalho: {
       flexDirection: 'row',
       alignItems: 'center',

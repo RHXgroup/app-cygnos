@@ -46,7 +46,8 @@ import { RecuperarSenhaScreen } from './src/screens/RecuperarSenhaScreen'
 import { PesoScreen } from './src/screens/PesoScreen'
 import { RefeicaoScreen } from './src/screens/RefeicaoScreen'
 import { RegistrarScreen } from './src/screens/RegistrarScreen'
-import { RelatoriosScreen } from './src/screens/RelatoriosScreen'
+import { ComerScreen } from './src/screens/ComerScreen'
+import { CorpoScreen } from './src/screens/CorpoScreen'
 import { SonoScreen } from './src/screens/SonoScreen'
 import type { PlanoCompleto, RefeicaoSalva } from './src/lib/plano'
 import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/tema'
@@ -263,12 +264,13 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   /* Só a faixa da barra de status usa: o respiro do conteúdo é assunto de cada
      tela, e continua sendo. */
   const insets = useSafeAreaInsets()
-  const [aba, setAba] = useState<Aba>('inicio')
+  const [aba, setAba] = useState<Aba>('hoje')
   /* As telas do menu vivem aqui, e não dentro da Home, para poder cobrir também
      a barra de abas. Dentro da Home elas seriam recortadas pelo carrossel. */
   const [perfilAberto, setPerfilAberto] = useState(false)
   const [codigoAberto, setCodigoAberto] = useState(false)
   const [nutricionistasAbertas, setNutricionistasAbertas] = useState(false)
+  const [mensagensAbertas, setMensagensAbertas] = useState(false)
   const [avisosAbertos, setAvisosAbertos] = useState(false)
   const [excluirContaAberta, setExcluirContaAberta] = useState(false)
   const [cadastrosAberto, setCadastrosAberto] = useState(false)
@@ -460,6 +462,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         [cadastrosAberto, () => setCadastrosAberto(false)],
         [excluirContaAberta, () => setExcluirContaAberta(false)],
         [nutricionistasAbertas, () => setNutricionistasAbertas(false)],
+        [mensagensAbertas, () => setMensagensAbertas(false)],
         [avisosAbertos, () => setAvisosAbertos(false)],
         [codigoAberto, () => setCodigoAberto(false)],
         [perfilAberto, () => setPerfilAberto(false)],
@@ -474,8 +477,8 @@ function AreaLogada({ sessao }: { sessao: Session }) {
       /* Sem nada aberto, o voltar leva ao Início, como em qualquer app de abas.
          Já no Início, devolve o evento ao Android: sair dali é o esperado, e
          segurar o voltar para sempre prenderia a pessoa dentro do app. */
-      if (aba !== 'inicio') {
-        irPara('inicio')
+      if (aba !== 'hoje') {
+        irPara('hoje')
         return true
       }
 
@@ -498,6 +501,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     cadastrosAberto,
     excluirContaAberta,
     nutricionistasAbertas,
+    mensagensAbertas,
     avisosAbertos,
     codigoAberto,
     perfilAberto,
@@ -528,7 +532,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
             jaPosicionou.current = true
             larguraPosicionada.current = width
 
-            const destino = primeira ? 'inicio' : aba
+            const destino = primeira ? 'hoje' : aba
             carrossel.current?.scrollTo({ x: ORDEM_ABAS.indexOf(destino) * width, animated: false })
           }}
           style={styles.carrossel}
@@ -567,9 +571,9 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                    e abrir o "+" já naquela opção é o mesmo caminho que o
                    cartão de plano usa para "montar plano". */
                 onAbrirTreino={() => setRegistrar({ inicial: 'treino' })}
-                onLeuMensagens={() => setNaoLidas(0)}
-                onChegouMensagem={() => setNaoLidas(n => n + 1)}
-                abaAtual={aba}
+                onAbrirReceitas={() => setReceitasAbertas(true)}
+                onAbrirMensagens={() => setMensagensAbertas(true)}
+                naoLidas={naoLidas}
               />
             </View>
           ))}
@@ -621,8 +625,30 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                  devolver ao app, e não a uma ficha que ficou aberta por baixo. */
               onConversar={() => {
                 setNutricionistasAbertas(false)
-                irPara('mensagens')
+                setMensagensAbertas(true)
               }}
+            />
+          </Sobreposta>
+        )}
+
+        {/* Mensagens saiu da barra de abas e virou tela.
+            Ela ocupava um dos quatro lugares e nascia VAZIA para quem não tem
+            nutricionista — que é a maioria de quem instala. Aba vazia ensina em
+            duas semanas que ali não tem nada, e depois disso nem quem vincula
+            volta a olhar. Agora ela é uma linha em Mais, e o ponto de não lidas
+            migrou para o ícone de Mais junto com ela. */}
+        {mensagensAbertas && (
+          <Sobreposta>
+            <MensagensScreen
+              onFechar={() => setMensagensAbertas(false)}
+              onAbrirNutricionistas={() => {
+                setMensagensAbertas(false)
+                setNutricionistasAbertas(true)
+              }}
+              visivel={mensagensAbertas}
+              versaoVinculo={versaoVinculo}
+              onLeu={() => setNaoLidas(0)}
+              onChegou={() => setNaoLidas(n => n + 1)}
             />
           </Sobreposta>
         )}
@@ -642,7 +668,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                  avisos, com o aviso que a pessoa acabou de atender ainda lá. */
               onAbrirMensagens={() => {
                 setAvisosAbertos(false)
-                irPara('mensagens')
+                setMensagensAbertas(true)
               }}
             />
           </Sobreposta>
@@ -851,9 +877,9 @@ function TelaDaAba({
   onAbrirContador,
   onAbrirSono,
   onAbrirTreino,
-  onLeuMensagens,
-  onChegouMensagem,
-  abaAtual,
+  onAbrirReceitas,
+  onAbrirMensagens,
+  naoLidas,
 }: {
   chave: Aba
   sessao: Session
@@ -882,18 +908,12 @@ function TelaDaAba({
   onAbrirContador: () => void
   onAbrirSono: () => void
   onAbrirTreino: () => void
-  /* A conversa avisa que foi lida, e o ponto da aba apaga na hora. */
-  onLeuMensagens: () => void
-  /* E avisa quando chega uma com a pessoa em outra aba, para o ponto acender
-     sem esperar a próxima contagem. */
-  onChegouMensagem: () => void
-  /* Qual aba está na frente. `chave` é a aba DESTE painel do carrossel, que
-     existe para todas as quatro ao mesmo tempo — não serve para saber qual
-     delas a pessoa está vendo. */
-  abaAtual: Aba
+  onAbrirReceitas: () => void
+  onAbrirMensagens: () => void
+  naoLidas: number
 }) {
   switch (chave) {
-    case 'inicio':
+    case 'hoje':
       return (
         <HomeScreen
           sessao={sessao}
@@ -920,28 +940,30 @@ function TelaDaAba({
           onAbrirTreino={onAbrirTreino}
         />
       )
-    case 'relatorios':
+    case 'comer':
       return (
-        <RelatoriosScreen
+        <ComerScreen
           contaId={sessao.user.id}
-          /* A soma dos seis contadores, e não um sétimo: os relatórios leem TODOS
-             os assuntos, então qualquer registro os invalida. Como cada contador
-             só cresce, a soma também só cresce — que é a única coisa de que o
-             efeito da tela precisa. */
-          versao={versaoPlano + versaoAgua + versaoMetas + versaoPeso + versaoConsumo + versaoSono}
-          onAbrirMetas={onAbrirMetas}
+          versaoPlano={versaoPlano}
+          onAbrirPlano={onEditarPlano}
+          onMontarPlano={onMontarPlano}
+          onAbrirDiario={onAbrirContador}
+          onAbrirReceitas={onAbrirReceitas}
+          onAbrirCompras={onAbrirCompras}
         />
       )
-    case 'mensagens':
+    case 'corpo':
       return (
-        <MensagensScreen
-          onAbrirNutricionistas={onAbrirNutricionistas}
-          /* A aba existe desde o primeiro instante, montada no carrossel: quem
-             diz que ela está na frente é este booleano, não o ciclo de vida. */
-          visivel={abaAtual === 'mensagens'}
-          versaoVinculo={versaoVinculo}
-          onLeu={onLeuMensagens}
-          onChegou={onChegouMensagem}
+        <CorpoScreen
+          contaId={sessao.user.id}
+          /* A soma dos seis contadores, e não um sétimo: o relatório dentro
+             desta aba lê TODOS os assuntos, então qualquer registro o invalida.
+             Como cada contador só cresce, a soma também só cresce. */
+          versao={versaoPlano + versaoAgua + versaoMetas + versaoPeso + versaoConsumo + versaoSono}
+          onAbrirPeso={onAbrirPeso}
+          onAbrirSono={onAbrirSono}
+          onAbrirTreino={onAbrirTreino}
+          onAbrirMetas={onAbrirMetas}
         />
       )
     case 'mais':
@@ -957,6 +979,9 @@ function TelaDaAba({
           onAbrirNutricionistas={onAbrirNutricionistas}
           onAbrirCodigo={onAbrirCodigo}
           onAbrirExcluirConta={onAbrirExcluirConta}
+          onAbrirMensagens={onAbrirMensagens}
+          naoLidas={naoLidas}
+          onAbrirMetas={onAbrirMetas}
         />
       )
   }

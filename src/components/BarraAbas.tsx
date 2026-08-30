@@ -3,15 +3,26 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { estilosDe, paleta } from '../lib/tema'
 
-export type Aba = 'inicio' | 'relatorios' | 'mensagens' | 'mais'
+export type Aba = 'hoje' | 'comer' | 'corpo' | 'mais'
 
 /* O botão "+" do meio NÃO é uma aba: é uma ação de registro. Por isso a lista
    tem quatro itens e o espaço central é reservado à parte. */
+/* As quatro abas, por ASSUNTO e não por tela.
+ *
+ * A barra anterior era Início · Relatórios · Mensagens · Mais, e duas das
+ * quatro vagas iam para uso raro: relatório se lê uma vez por mês, e Mensagens
+ * só serve a quem tem nutricionista — para todo o resto ela nascia vazia, e
+ * aba permanentemente vazia ensina em duas semanas que ali não tem nada.
+ *
+ * Comer e Corpo entram no lugar delas porque nenhuma das duas depende de ter
+ * nutricionista: o diário alimentar e o peso existem para todo mundo. Os
+ * relatórios foram para dentro de Corpo e as mensagens para dentro de Mais,
+ * onde o contador de não lidas continua chamando. */
 const ABAS: { chave: Aba; rotulo: string; icone: keyof typeof Ionicons.glyphMap }[] = [
-  { chave: 'inicio', rotulo: 'Início', icone: 'home' },
-  { chave: 'relatorios', rotulo: 'Relatórios', icone: 'stats-chart-outline' },
-  { chave: 'mensagens', rotulo: 'Mensagens', icone: 'chatbubble-ellipses-outline' },
-  { chave: 'mais', rotulo: 'Mais', icone: 'grid-outline' },
+  { chave: 'hoje', rotulo: 'Hoje', icone: 'home' },
+  { chave: 'comer', rotulo: 'Comer', icone: 'restaurant-outline' },
+  { chave: 'corpo', rotulo: 'Corpo', icone: 'pulse-outline' },
+  { chave: 'mais', rotulo: 'Mais', icone: 'menu-outline' },
 ]
 
 /* A ordem das abas é a mesma do deslizamento lateral. Exportada para o App não
@@ -85,7 +96,11 @@ function ItemAba({
 }) {
   const styles = estilos()
   const selecionada = aba.chave === ativa
-  const ponto = aba.chave === 'mensagens' && naoLidas > 0
+  /* O ponto migrou de Mensagens para Mais, junto com a tela. É o único sinal
+     que chega de FORA e espera resposta, e sem ele a mensagem dela só seria
+     descoberta por quem abrisse a aba por acaso — agora, por quem abrisse o
+     menu por acaso, que é ainda mais raro. */
+  const ponto = aba.chave === 'mais' && naoLidas > 0
 
   return (
     <Pressable
