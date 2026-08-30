@@ -77,18 +77,27 @@ Não há função para LER as mensagens de uma conversa, e isso está certo: a
 leitura é direta na tabela com RLS, porque é o que o realtime exige. Ver o item
 4 abaixo.
 
-**Duas coisas que este documento NÃO consegue conferir de fora**, e que valem
-uma olhada em quem escreveu a migração:
+**As duas dúvidas que ficaram foram respondidas em 30/08/2026**, lendo o corpo
+no banco: o aceite cria o vínculo, e a política de SELECT em `app_mensagens`
+para a nutricionista existe. Nenhum dos dois buracos que eu temia era real.
 
-1. **`nutri_aceitar_solicitacao` cria o vínculo na mesma transação?** É o ponto
-   mais caro se ficou de fora — o paciente lê "Pedido aceito" no app e continua
-   sem nutricionista.
-2. **A política de RLS de `app_mensagens` deixa ela ler?** Sem isso, a conversa
-   fica vazia do lado dela e o realtime não entrega nada.
+**Mas apareceu um terceiro, e é o pior dos três.** O vínculo nasce com
+`nutricionista_id = auth.uid()` — o uuid de QUEM CLICOU. Aceite feito por
+funcionária grava o vínculo apontando para o login dela, e não para a carteira
+do consultório. Do lado do app isso é indistinguível de "não vinculou":
+`app_nutricionistas` não acha nenhuma nutricionista com aquele uuid, e o
+paciente lê "Pedido aceito" e continua sem ninguém na tela.
 
-O jeito de conferir os dois é o mesmo: entrar no sistema como nutricionista,
-aceitar um pedido de teste, e ver se o app do paciente passa a mostrar o vínculo
-e a conversa.
+E é silencioso e intermitente — funciona quando a dona clica, falha quando a
+funcionária clica. Ninguém vai suspeitar de quem apertou o botão.
+
+**O contrato é `get_nutricionista_id()`, nunca `auth.uid()`, em toda função que
+grava vínculo, mensagem ou resposta de pedido.** A exceção é a política do lado
+do PACIENTE, onde `auth.uid()` é o próprio sujeito e está correta — quem for
+varrer as policies precisa saber disso, ou derruba o app dele.
+
+Detalhes e o teste que confere a correção estão em
+[perguntas-para-o-sistema.md](perguntas-para-o-sistema.md).
 
 ---
 

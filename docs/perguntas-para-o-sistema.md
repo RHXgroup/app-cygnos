@@ -11,7 +11,7 @@ Cada uma diz por que importa e como se responde.
 
 ---
 
-## 1. O aceite cria o vínculo na mesma transação?
+## 1. O aceite cria o vínculo — RESPONDIDA, e apareceu outra coisa
 
 **Pergunta:** `nutri_aceitar_solicitacao(p_id)` só muda o `status` para
 `'aceita'`, ou também cria o vínculo?
@@ -21,12 +21,30 @@ Cada uma diz por que importa e como se responde.
 concluir que o app está quebrado, quando o que faltou foi metade da operação do
 outro lado.
 
-**Como responder:** ler o corpo da função. Ou o teste de ponta a ponta do fim
-deste documento.
+**Resposta (30/08/2026, sessão do Nutriviet, lendo o corpo):** cria, sim. A
+função tem `insert into app_vinculos (conta_id, nutricionista_id)`. O "Pedido
+aceito" não fica órfão.
+
+**Mas o segundo argumento é `auth.uid()`** — o vínculo nasce sob o uuid de QUEM
+CLICOU. Se quem aceita é uma funcionária, e não a nutricionista dona da
+carteira, o vínculo aponta para o login dela.
+
+**O que isso faz no app**, que é o lado que este documento cobre: `app_vinculos`
+passa a ter uma linha cujo `nutricionista_id` não corresponde a nenhuma
+nutricionista do catálogo. `app_nutricionistas` junta as duas coisas para
+devolver a vinculada — e não acha. **O paciente vê "Pedido aceito" e continua
+sem nutricionista na tela**, que é exatamente o sintoma que esta pergunta
+existia para evitar, chegando por outro caminho.
+
+Pior: é silencioso e intermitente. Aceite feito pela dona funciona; o mesmo
+aceite feito pela funcionária não. Ninguém vai suspeitar de QUEM CLICOU.
+
+**O contrato certo:** o vínculo nasce por `get_nutricionista_id()`, e nunca por
+`auth.uid()`. Está sendo corrigido pela sessão que cuida dessas funções.
 
 ---
 
-## 2. A RLS de `app_mensagens` deixa ela ler?
+## 2. A RLS de `app_mensagens` deixa ela ler — RESPONDIDA, existe
 
 **Pergunta:** existe política de `select` em `app_mensagens` para a
 nutricionista do par? E ela cobre as duas direções — o que ele escreveu e o que
@@ -39,6 +57,18 @@ realtime entrega o que a política deixa ler, não o que uma função devolve.
 
 Não há função de leitura, e isso está certo: tem que ser direto na tabela,
 justamente por causa do realtime.
+
+**Resposta (30/08/2026):** a política existe — `"nutri le as conversas dela"`,
+de SELECT. O realtime tem o que entregar; não era o buraco que eu temia.
+
+Mesma ressalva da pergunta 1: ela filtra por `auth.uid()`, então hoje
+funcionária não lê conversa nenhuma. Correção combinada.
+
+**E um aviso para quem for corrigir**, porque é o tipo de conserto que se faz em
+bloco e quebra o outro lado: a política `"paciente le a propria conversa"`
+TAMBÉM usa `auth.uid()`, e ali está **certa** — o login é o próprio sujeito.
+Trocar `auth.uid()` por carteira varrendo todas as policies derruba o app do
+paciente.
 
 ---
 
@@ -145,7 +175,12 @@ certo** e não é urgente. Vale só saber se é intencional.
 
 ---
 
-## O teste que responde 1, 2, 5 e 6 de uma vez
+## O teste que responde 5 e 6, e confere a correção de 1 e 2
+
+As perguntas 1 e 2 já foram respondidas lendo o corpo no banco. O teste abaixo
+continua valendo — agora como conferência de que a correção do `auth.uid()`
+pegou. **Faça o passo 2 com o login de uma FUNCIONÁRIA**, não com o da dona: é
+com ele que o defeito aparece.
 
 Dois minutos, e não precisa ler código nenhum:
 
