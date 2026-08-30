@@ -3,12 +3,15 @@ import {
   ActivityIndicator,
   AppState,
   BackHandler,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -35,8 +38,17 @@ import {
   estadoDaConsulta,
   type MinhaConsulta,
 } from '../lib/agenda'
+import {
+  cancelarSolicitacao,
+  carregarMinhasSolicitacoes,
+  estadoDaSolicitacao,
+  estaEmAberto,
+  solicitarVinculo,
+  type Solicitacao,
+} from '../lib/solicitacoes'
 import { ConteudoNutriScreen, type ChaveConteudo } from './ConteudoNutriScreen'
 import { AgendarConsultaScreen } from './AgendarConsultaScreen'
+import { dataCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* O catálogo de nutricionistas Cygnos, em tela cheia.
@@ -63,6 +75,10 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
   const [aberto, setAberto] = useState<ChaveConteudo | null>(null)
   const [agendando, setAgendando] = useState(false)
   const [consultas, setConsultas] = useState<MinhaConsulta[]>([])
+  /* Os pedidos que ele já fez, e para quem o painel de pedir está aberto.
+     Só existem sem vínculo: depois do aceite, isto some com a lista. */
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([])
+  const [pedindo, setPedindo] = useState<Nutricionista | null>(null)
 
   /* Recarrega ao voltar da tela de agendamento: quem acabou de pedir horário
      precisa ver o pedido aparecer aqui, e não uma ficha igual à de antes. */
@@ -82,6 +98,12 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
    * para o App, que sabe fechar esta tela. Ver a armadilha 1 do AGENTS.md. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      /* O painel de pedir é a camada mais alta: fecha primeiro, e sem mexer em
+         nada — quem desistiu de pedir volta para a lista, não para "Mais". */
+      if (pedindo) {
+        setPedindo(null)
+        return true
+      }
       if (aberto) {
         setAberto(null)
         return true
@@ -98,7 +120,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
     })
 
     return () => sub.remove()
-  }, [aberto, agendando])
+  }, [aberto, agendando, pedindo])
 
   /* E recarrega também ao voltar do segundo plano.
    *
@@ -130,7 +152,12 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
          desta tela, e derrubar a ficha inteira por causa dele seria trocar o
          telefone de quem acompanha a pessoa por uma mensagem de erro. */
       carregarMinhasConsultas().catch(() => []),
-    ]).then(([cat, cont, minhas]) => {
+      /* Os pedidos entram no mesmo lote pelo mesmo motivo das consultas: chegar
+         depois faria a lista aparecer pronta e só então crescer um bloco em
+         cima dela. Falha aqui vira lista vazia — sem pedido a tela continua
+         inteira, e um erro no lugar do catálogo custaria mais do que o bloco. */
+      carregarMinhasSolicitacoes().catch(() => ({ tipo: 'erro' as const, mensagem: '' })),
+    ]).then(([cat, cont, minhas, pedidos]) => {
       if (!vivo) return
 
       /* O erro é limpo no sucesso, e não só escrito na falha: agora que a tela
@@ -149,6 +176,7 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
       }
 
       setConsultas(minhas)
+      if (pedidos.tipo === 'ok') setSolicitacoes(pedidos.solicitacoes)
 
       /* Falha aqui NÃO derruba a tela: sem o resumo, a ficha da nutricionista
          continua inteira e útil, e trocá-la por uma mensagem de erro tiraria da
@@ -252,11 +280,153 @@ export function NutricionistasScreen({ onFechar }: { onFechar: () => void }) {
               onAgendar={() => setAgendando(true)}
             />
           ) : (
-            <Lista nutris={catalogo?.lista ?? []} />
+            <Lista
+              nutris={catalogo?.lista ?? []}
+              solicitacoes={solicitacoes}
+              onPedir={setPedindo}
+              onCancelar={async id => {
+                const r = await cancelarSolicitacao(id)
+                /* Relê em vez de tirar da lista aqui: quem decide se o pedido
+                   pôde mesmo ser desfeito é o banco, e uma linha que some da
+                   tela e volta na próxima leitura é pior do que uma que demora
+                   meio segundo para sumir. */
+                if (r.tipo === 'ok') setVersao(v => v + 1)
+                return r
+              }}
+            />
           )}
         </ScrollView>
       )}
+
+      {/* Por cima de tudo, e depois do ScrollView: é a camada mais alta da tela
+          e precisa cobrir a lista inteira. */}
+      {!!pedindo && (
+        <PainelDePedido
+          nutri={pedindo}
+          onFechar={() => setPedindo(null)}
+          onEnviou={() => {
+            setPedindo(null)
+            setVersao(v => v + 1)
+          }}
+        />
+      )}
     </View>
+  )
+}
+
+/* ── Pedir contato ─────────────────────────────────────────────────────────
+ *
+ * O primeiro contato parte SEMPRE do paciente: ele acha a profissional aqui,
+ * escreve uma frase e pede. Ela recebe na caixa dela e aceita ou não. Ela não
+ * navega paciente e não procura ninguém — a mão é única de propósito.
+ *
+ * A frase é opcional. Exigir texto para pedir contato transforma um toque num
+ * formulário, e quem só quer ser atendido não tem o que escrever. */
+function PainelDePedido({
+  nutri,
+  onFechar,
+  onEnviou,
+}: {
+  nutri: Nutricionista
+  onFechar: () => void
+  onEnviou: () => void
+}) {
+  const styles = estilos()
+  const { top, bottom } = useSafeAreaInsets()
+  const [mensagem, setMensagem] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  async function enviar() {
+    if (enviando) return
+    setEnviando(true)
+    setErro('')
+
+    const r = await solicitarVinculo(nutri.id, mensagem)
+    if (r.tipo === 'ok') {
+      onEnviou()
+      return
+    }
+
+    /* Só desliga o "enviando" na falha: no sucesso o painel já saiu da tela, e
+       mexer no estado de um componente desmontado é aviso no console à toa. */
+    setEnviando(false)
+    setErro(r.mensagem)
+  }
+
+  return (
+    /* behavior declarado, senão no Android o teclado cobre o campo — a caixa de
+       texto fica na metade de baixo do painel. Ver a armadilha 2. */
+    <KeyboardAvoidingView
+      style={[styles.painel, { paddingTop: top + 8, paddingBottom: bottom + 16 }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.cabecalho}>
+        <Pressable
+          onPress={onFechar}
+          style={styles.botaoVoltar}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar sem pedir"
+        >
+          <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
+        </Pressable>
+        <Text style={styles.tituloTela}>Pedir contato</Text>
+        <View style={styles.botaoVoltar} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.conteudoPainel}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.blocoPedido}>
+          <AvatarNutri nutri={nutri} tamanho={72} />
+          <Text style={styles.nomePedido}>{nutri.nome}</Text>
+          {!!nutri.crn && <Text style={styles.crnCartao}>CRN {nutri.crn}</Text>}
+          {!!lugarDe(nutri) && <Text style={styles.lugarCartao}>{lugarDe(nutri)}</Text>}
+        </View>
+
+        {nutri.especialidades.length > 0 && <Chips itens={nutri.especialidades} />}
+
+        <Text style={styles.rotuloCampo}>Escreva algo, se quiser</Text>
+        <TextInput
+          value={mensagem}
+          onChangeText={setMensagem}
+          placeholder="Conte em uma frase o que você procura."
+          placeholderTextColor={paleta().inkFraco}
+          style={styles.campoPedido}
+          multiline
+          maxLength={500}
+          textAlignVertical="top"
+        />
+
+        <Text style={styles.avisoPedido}>
+          Ela recebe o seu pedido e responde quando puder. Enquanto isso, você pode pedir para
+          outras — e nada muda no seu app até alguém aceitar.
+        </Text>
+
+        {!!erro && <Text style={styles.erroPedido}>{erro}</Text>}
+      </ScrollView>
+
+      <Pressable
+        onPress={enviar}
+        disabled={enviando}
+        style={({ pressed }) => [
+          styles.botaoPedir,
+          enviando && styles.botaoPedirApagado,
+          pressed && styles.botaoPedirPressionado,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Enviar pedido de contato para ${nutri.nome}`}
+      >
+        {enviando ? (
+          <ActivityIndicator size="small" color={paleta().cores.branco} />
+        ) : (
+          <Text style={styles.textoPedir}>Enviar pedido</Text>
+        )}
+      </Pressable>
+    </KeyboardAvoidingView>
   )
 }
 
@@ -505,8 +675,27 @@ function Acompanhamento({
 
 /* ── Sem vínculo ───────────────────────────────────────────────────────────*/
 
-function Lista({ nutris }: { nutris: Nutricionista[] }) {
+function Lista({
+  nutris,
+  solicitacoes,
+  onPedir,
+  onCancelar,
+}: {
+  nutris: Nutricionista[]
+  solicitacoes: Solicitacao[]
+  onPedir: (n: Nutricionista) => void
+  onCancelar: (id: number) => Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }>
+}) {
   const styles = estilos()
+
+  /* Para quem já há pedido EM ABERTO. Recusado e cancelado ficam de fora de
+     propósito: pedir de novo depois de um "não" é direito dele, e um cartão
+     travado para sempre por causa de uma recusa de meses atrás seria o app
+     decidindo por ela. */
+  const emAberto = new Set(
+    solicitacoes.filter(s => estaEmAberto(s.status)).map(s => s.nutricionistaId),
+  )
+
   if (nutris.length === 0) {
     return (
       <View style={styles.vazio}>
@@ -523,27 +712,58 @@ function Lista({ nutris }: { nutris: Nutricionista[] }) {
 
   return (
     <>
+      <MeusPedidos solicitacoes={solicitacoes} onCancelar={onCancelar} />
+
       <Text style={styles.chamadaLista}>
         {nutris.length} {nutris.length === 1 ? 'profissional' : 'profissionais'} no Cygnos
       </Text>
       <Text style={styles.explicacaoLista}>
-        Escolheu uma? Informe a ela o seu código de vínculo — é com ele que ela puxa a sua conta
-        para o consultório dela.
+        Toque em quem você quer que acompanhe você e mande um pedido de contato. Se você já está
+        com ela, dê o seu código de vínculo — é com ele que ela puxa a sua conta.
       </Text>
 
       <View style={styles.listaCartoes}>
         {nutris.map(n => (
-          <CartaoDaLista key={n.id} nutri={n} />
+          <CartaoDaLista
+            key={n.id}
+            nutri={n}
+            pedido={emAberto.has(n.id)}
+            onPedir={() => onPedir(n)}
+          />
         ))}
       </View>
     </>
   )
 }
 
-function CartaoDaLista({ nutri }: { nutri: Nutricionista }) {
+/* O cartão inteiro é o botão, e não um "pedir" escondido num canto: a lista tem
+   uma ação só, e um alvo do tamanho do cartão erra menos do que um do tamanho
+   de uma palavra.
+   Sem telefone aqui. Antes do aceite não há relação, e oferecer o WhatsApp de
+   quem nunca disse sim ao paciente é abrir a porta pelo lado de fora. */
+function CartaoDaLista({
+  nutri,
+  pedido,
+  onPedir,
+}: {
+  nutri: Nutricionista
+  pedido: boolean
+  onPedir: () => void
+}) {
   const styles = estilos()
+
   return (
-    <View style={styles.cartao}>
+    <Pressable
+      onPress={pedido ? undefined : onPedir}
+      disabled={pedido}
+      style={({ pressed }) => [styles.cartao, pressed && !pedido && styles.cartaoPressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={
+        pedido
+          ? `${nutri.nome}. Pedido enviado, aguardando resposta.`
+          : `Pedir contato com ${nutri.nome}`
+      }
+    >
       <View style={styles.linhaCartao}>
         <AvatarNutri nutri={nutri} tamanho={54} />
         <View style={styles.textoCartao}>
@@ -553,11 +773,96 @@ function CartaoDaLista({ nutri }: { nutri: Nutricionista }) {
           {!!nutri.crn && <Text style={styles.crnCartao}>CRN {nutri.crn}</Text>}
           {!!lugarDe(nutri) && <Text style={styles.lugarCartao}>{lugarDe(nutri)}</Text>}
         </View>
+
+        {pedido ? (
+          <Ionicons name="hourglass-outline" size={18} color={paleta().inkFraco} />
+        ) : (
+          <Ionicons name="chevron-forward" size={18} color={paleta().inkFraco} />
+        )}
       </View>
 
       {nutri.especialidades.length > 0 && <Chips itens={nutri.especialidades} limite={4} />}
 
-      {!!nutri.telefone && <Contato telefone={nutri.telefone} compacto />}
+      {pedido && <Text style={styles.jaPedido}>Pedido enviado, aguardando resposta</Text>}
+    </Pressable>
+  )
+}
+
+/* ── Meus pedidos ──────────────────────────────────────────────────────────
+ *
+ * Fica ACIMA da lista, e não numa tela à parte: quem abre esta tela depois de
+ * ter pedido vem justamente saber se responderam, e essa resposta não pode
+ * estar a dois toques de distância.
+ *
+ * Some quando não há pedido nenhum — um bloco vazio explicando que não há nada
+ * ocupa a primeira tela de quem nunca pediu, que é a maioria. */
+function MeusPedidos({
+  solicitacoes,
+  onCancelar,
+}: {
+  solicitacoes: Solicitacao[]
+  onCancelar: (id: number) => Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }>
+}) {
+  const styles = estilos()
+  const [cancelando, setCancelando] = useState<number | null>(null)
+  const [erro, setErro] = useState('')
+
+  if (solicitacoes.length === 0) return null
+
+  return (
+    <View style={styles.blocoPedidos}>
+      <Text style={styles.tituloPedidos}>Meus pedidos</Text>
+
+      {solicitacoes.map(s => {
+        const estado = estadoDaSolicitacao(s.status)
+        const aberto = estaEmAberto(s.status)
+
+        return (
+          <View key={s.id} style={styles.pedido}>
+            <View style={styles.linhaPedido}>
+              <Ionicons
+                name={estado.icone}
+                size={18}
+                color={s.status === 'aceita' ? paleta().cores.verde : paleta().inkFraco}
+              />
+              <View style={styles.textoPedido}>
+                <Text style={styles.nomePedidoLinha} numberOfLines={1}>
+                  {s.nome}
+                </Text>
+                <Text style={styles.estadoPedido}>
+                  {estado.titulo} · {dataCurta(new Date(s.criadaEm))}
+                </Text>
+              </View>
+
+              {aberto && (
+                <Pressable
+                  onPress={async () => {
+                    setCancelando(s.id)
+                    setErro('')
+                    const r = await onCancelar(s.id)
+                    setCancelando(null)
+                    if (r.tipo === 'erro') setErro(r.mensagem)
+                  }}
+                  disabled={cancelando === s.id}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Desfazer o pedido para ${s.nome}`}
+                >
+                  {cancelando === s.id ? (
+                    <ActivityIndicator size="small" color={paleta().inkFraco} />
+                  ) : (
+                    <Text style={styles.desfazer}>Desfazer</Text>
+                  )}
+                </Pressable>
+              )}
+            </View>
+
+            <Text style={styles.explicacaoPedido}>{estado.explicacao}</Text>
+          </View>
+        )
+      })}
+
+      {!!erro && <Text style={styles.erroPedido}>{erro}</Text>}
     </View>
   )
 }
@@ -737,6 +1042,69 @@ const estilos = estilosDe(t =>
   nomeCartao: { fontSize: 15.5, fontWeight: '700', color: t.cores.ink, lineHeight: 21 },
   crnCartao: { marginTop: 2, fontSize: 12, color: t.inkSuave },
   lugarCartao: { marginTop: 1, fontSize: 11.5, color: t.inkFraco },
+  cartaoPressionado: { backgroundColor: t.cores.verdeClaro },
+  jaPedido: { marginTop: 10, fontSize: 12, fontWeight: '600', color: t.inkFraco },
+
+  /* ── Meus pedidos ── */
+  blocoPedidos: {
+    marginTop: 6,
+    marginBottom: 22,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: t.cores.cartao,
+    gap: 12,
+  },
+  tituloPedidos: { fontSize: 13, fontWeight: '800', color: t.inkSuave, letterSpacing: 0.3 },
+  pedido: { gap: 4 },
+  linhaPedido: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  textoPedido: { flex: 1 },
+  nomePedidoLinha: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  estadoPedido: { marginTop: 1, fontSize: 11.5, color: t.inkFraco },
+  explicacaoPedido: { marginLeft: 28, fontSize: 12, lineHeight: 17, color: t.inkSuave },
+  desfazer: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
+
+  /* ── Painel de pedir contato ── */
+  painel: { ...StyleSheet.absoluteFillObject, backgroundColor: t.cores.fundo },
+  conteudoPainel: { paddingHorizontal: 20, paddingBottom: 24 },
+  blocoPedido: { alignItems: 'center', paddingVertical: 16, gap: 2 },
+  nomePedido: {
+    marginTop: 12,
+    fontSize: 20,
+    fontWeight: '800',
+    color: t.cores.ink,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+  },
+  rotuloCampo: {
+    marginTop: 22,
+    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: t.inkSuave,
+  },
+  campoPedido: {
+    minHeight: 108,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: t.cores.cartao,
+    color: t.cores.ink,
+    fontSize: 14.5,
+    lineHeight: 20,
+  },
+  avisoPedido: { marginTop: 14, fontSize: 12.5, lineHeight: 18, color: t.inkFraco },
+  erroPedido: { marginTop: 12, fontSize: 13, lineHeight: 19, color: t.cores.erroTexto },
+  botaoPedir: {
+    marginHorizontal: 20,
+    marginTop: 4,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verde,
+  },
+  botaoPedirPressionado: { backgroundColor: t.cores.verdeEscuro },
+  botaoPedirApagado: { opacity: 0.6 },
+  textoPedir: { fontSize: 15.5, fontWeight: '800', color: t.cores.branco },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   chip: {
