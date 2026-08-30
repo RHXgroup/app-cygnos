@@ -196,17 +196,32 @@ export type EstadoDoCompartilhamento = { ligado: boolean; temNutricionista: bool
 export async function estadoDoCompartilhamento(
   contaId: string,
 ): Promise<EstadoDoCompartilhamento> {
-  const [conta, vinculo] = await Promise.all([
+  const [conta, vinculos] = await Promise.all([
     supabase.from('app_contas').select('compartilha_ciclo').eq('id', contaId).maybeSingle(),
-    supabase.from('app_vinculos').select('paciente_id').eq('conta_id', contaId).maybeSingle(),
+    /* Lista, e não `maybeSingle()`.
+     *
+     * A chave primária de `app_vinculos` é (conta_id, nutricionista_id): uma
+     * conta pode ter VÁRIOS vínculos, um por profissional. `maybeSingle()`
+     * REJEITA quando volta mais de uma linha — a tela quebraria inteira, e
+     * quebraria só para quem tem duas nutricionistas, que é o caso que ninguém
+     * testa.
+     *
+     * E `paciente_id` pode ser nulo: vínculo sem paciente não tem ficha onde
+     * escrever, então não conta como "tem nutricionista para mandar". */
+    supabase.from('app_vinculos').select('paciente_id').eq('conta_id', contaId),
   ])
 
   if (conta.error) falha('Não consegui ler a sua preferência de compartilhamento.', conta.error)
-  if (vinculo.error) falha('Não consegui verificar o seu vínculo.', vinculo.error)
+  if (vinculos.error) falha('Não consegui verificar o seu vínculo.', vinculos.error)
+
+  const validos = (vinculos.data ?? []).filter(v => v.paciente_id !== null)
 
   return {
     ligado: conta.data?.compartilha_ciclo === true,
-    temNutricionista: !!vinculo.data,
+    /* EXATAMENTE um. Com dois, o servidor se recusa a mandar — escolher entre
+       profissionais é decisão dela, e não há tela para isso —, e a chave tem de
+       aparecer desligada aqui pelo mesmo motivo. */
+    temNutricionista: validos.length === 1,
   }
 }
 
