@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
 import {
   carregarCatalogo,
+  conversaNoApp,
   linkDoWhatsapp,
   telefoneFormatado,
   type Catalogo,
@@ -549,7 +550,12 @@ function Ficha({
         </View>
       )}
 
-      {!!nutri.telefone && <Contato telefone={nutri.telefone} />}
+      {/* Duas condições para a mesma coisa, de propósito. Hoje o banco só
+          devolve o telefone quando ela escolheu o WhatsApp, então `telefone`
+          bastaria — mas o dia em que a coluna voltar a vir preenchida por
+          qualquer outro motivo é o dia em que o botão verde aparece para quem
+          pediu para não aparecer. A regra fica escrita aqui também. */}
+      {!!nutri.telefone && !conversaNoApp(nutri) && <Contato telefone={nutri.telefone} />}
     </>
   )
 }
