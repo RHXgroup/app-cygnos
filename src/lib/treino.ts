@@ -35,6 +35,14 @@ export type Exercicio = {
   repeticoes: string | null
   cargaKg: number | null
   observacao: string | null
+  /* O nome do exercício ORIGINAL, quando este entrou no lugar dele por causa de
+     uma limitação física. Nulo no exercício comum.
+
+     Existe para a rotina continuar legível: "Leg press" sozinho, no lugar onde
+     havia "Agachamento livre", some sem explicação — e daqui a um mês ninguém,
+     nem ela, sabe por que mudou. É também o que a nutricionista precisa ver, já
+     que o resultado sozinho não conta que houve uma troca. */
+  adaptadoDe: string | null
 }
 
 export type ResultadoRotina =
@@ -52,7 +60,10 @@ type LinhaExercicio = {
   repeticoes: string | null
   carga_kg: number | null
   observacao: string | null
+  adaptado_de: string | null
 }
+
+const COLUNAS_EXERCICIO = 'id, dia, nome, ordem, series, repeticoes, carga_kg, observacao, adaptado_de'
 
 const doExercicio = (l: LinhaExercicio): Exercicio => ({
   id: l.id,
@@ -63,6 +74,7 @@ const doExercicio = (l: LinhaExercicio): Exercicio => ({
   repeticoes: l.repeticoes,
   cargaKg: numero(l.carga_kg),
   observacao: l.observacao,
+  adaptadoDe: l.adaptado_de ?? null,
 })
 
 /* A rotina inteira, de todos os dias. A tela mostra um dia por vez, mas a
@@ -71,7 +83,7 @@ const doExercicio = (l: LinhaExercicio): Exercicio => ({
 export async function carregarRotina(contaId: string): Promise<ResultadoRotina> {
   const { data, error } = await supabase
     .from('app_treino_exercicios')
-    .select('id, dia, nome, ordem, series, repeticoes, carga_kg, observacao')
+    .select(COLUNAS_EXERCICIO)
     .eq('conta_id', contaId)
     .order('dia', { ascending: true })
     .order('ordem', { ascending: true })
@@ -101,14 +113,41 @@ export async function adicionarExercicio(
       repeticoes: e.repeticoes?.trim() || null,
       carga_kg: e.cargaKg,
       observacao: e.observacao?.trim() || null,
+      adaptado_de: e.adaptadoDe?.trim() || null,
     })
-    .select('id, dia, nome, ordem, series, repeticoes, carga_kg, observacao')
+    .select(COLUNAS_EXERCICIO)
     .single()
 
   if (error)
     return {
       tipo: 'erro',
       mensagem: falha('Não consegui adicionar o exercício agora. Verifique a conexão.', error),
+    }
+  return { tipo: 'ok', exercicio: doExercicio(data as LinhaExercicio) }
+}
+
+/* Troca o nome de um exercício por causa de uma limitação, guardando qual era.
+ *
+ * Uma função só para isto, e não um `atualizarExercicio` genérico, porque as
+ * duas colunas andam juntas: gravar o nome novo sem gravar o antigo apaga a
+ * única pista de que houve troca, e é exatamente o descuido que um atualizador
+ * de campos soltos convida. */
+export async function trocarPorAdaptado(
+  id: string,
+  nomeNovo: string,
+  nomeOriginal: string,
+): Promise<{ tipo: 'ok'; exercicio: Exercicio } | { tipo: 'erro'; mensagem: string }> {
+  const { data, error } = await supabase
+    .from('app_treino_exercicios')
+    .update({ nome: nomeNovo.trim(), adaptado_de: nomeOriginal.trim() })
+    .eq('id', id)
+    .select(COLUNAS_EXERCICIO)
+    .single()
+
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui trocar o exercício agora. Verifique a conexão.', error),
     }
   return { tipo: 'ok', exercicio: doExercicio(data as LinhaExercicio) }
 }

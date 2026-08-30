@@ -247,3 +247,103 @@ export async function lerFichaDaFoto(
   }
   return { tipo: 'ok', rotina }
 }
+
+/* ── Adaptar um exercício à limitação da pessoa ────────────────────────────*/
+
+export type Alternativa = { nome: string; porque: string }
+
+export type ResultadoAdaptacao =
+  | { tipo: 'ok'; alternativas: Alternativa[]; aviso: string | null }
+  | { tipo: 'sem_limitacao'; mensagem: string }
+  | { tipo: 'limite'; mensagem: string }
+  | { tipo: 'erro'; mensagem: string }
+
+/* Pede alternativas para um exercício que a limitação dela não permite.
+ *
+ * Quem tem problema no ombro precisa adaptar TODO exercício que carrega o
+ * ombro. A rotina montada por IA já respeita isso; a ficha importada da ACADEMIA
+ * não sabe de nada — ela foi montada para uma pessoa média.
+ *
+ * A limitação NÃO vai daqui: a função a lê do banco. Ela é a regra de segurança
+ * desta chamada, e mandá-la do cliente deixaria o chamador escolher a própria
+ * regra — um corpo sem o campo viraria "sem limitação nenhuma", que é
+ * exatamente a resposta perigosa. */
+export async function adaptarExercicio(
+  exercicio: string,
+  observacao: string | null,
+  onde: string,
+): Promise<ResultadoAdaptacao> {
+  try {
+    const { data, error } = await supabase.functions.invoke('app-adaptar-exercicio', {
+      body: { exercicio, observacao, onde },
+    })
+
+    if (error) {
+      const corpo = await (error as { context?: Response }).context?.json?.().catch(() => null)
+      const codigo = corpo?.error as string | undefined
+
+      if (codigo === 'sem_limitacao') {
+        return {
+          tipo: 'sem_limitacao',
+          mensagem:
+            String(corpo?.message ?? '') ||
+            'Me conte primeiro qual é a sua limitação, para eu saber o que evitar.',
+        }
+      }
+      if (codigo === 'forbidden' || codigo === 'unauthorized') {
+        return { tipo: 'erro', mensagem: 'Sua sessão expirou. Entre de novo.' }
+      }
+      if (codigo === 'nao_liberado') {
+        return {
+          tipo: 'erro',
+          mensagem: String(corpo?.message ?? '') || 'Adaptar exercício ainda não foi liberado.',
+        }
+      }
+      if (codigo === 'limite') {
+        return {
+          tipo: 'limite',
+          mensagem: String(corpo?.message ?? '') || 'Muitas adaptações em pouco tempo.',
+        }
+      }
+      return { tipo: 'erro', mensagem: 'Não consegui adaptar agora. Verifique a conexão.' }
+    }
+
+    const bruto = (data?.adaptacao ?? {}) as {
+      alternativas?: unknown
+      aviso?: unknown
+    }
+
+    /* A validação é a mesma doutrina do resto: o que não dá para ler é
+       DESCARTADO, e o que sobra é o que a tela mostra. Uma alternativa sem nome
+       viraria linha em branco que a pessoa tocaria sem saber no quê. */
+    const lista = Array.isArray(bruto.alternativas) ? bruto.alternativas : []
+    const alternativas: Alternativa[] = []
+    for (const a of lista.slice(0, 3)) {
+      const item = a as { nome?: unknown; porque?: unknown }
+      const nome = typeof item?.nome === 'string' ? item.nome.trim().slice(0, 60) : ''
+      if (nome.length < 2) continue
+      alternativas.push({
+        nome,
+        porque: typeof item?.porque === 'string' ? item.porque.trim().slice(0, 200) : '',
+      })
+    }
+
+    const aviso = typeof bruto.aviso === 'string' && bruto.aviso.trim()
+      ? bruto.aviso.trim().slice(0, 300)
+      : null
+
+    /* Sem alternativa E sem aviso é resposta vazia, e mostrar "nenhuma opção"
+       sem dizer por quê deixa a pessoa sem saber se o app falhou ou se o caso
+       dela não tem saída. */
+    if (alternativas.length === 0 && aviso === null) {
+      return {
+        tipo: 'erro',
+        mensagem: 'Não consegui pensar em alternativa para esse. Tente descrever melhor a sua limitação.',
+      }
+    }
+
+    return { tipo: 'ok', alternativas, aviso }
+  } catch {
+    return { tipo: 'erro', mensagem: 'Não consegui falar com o servidor. Verifique a conexão.' }
+  }
+}

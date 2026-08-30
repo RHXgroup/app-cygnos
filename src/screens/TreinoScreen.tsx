@@ -16,12 +16,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Confirmacao } from '../components/Confirmacao'
 import { CronometroDeTreino } from '../components/CronometroDeTreino'
 import { RotinaPorIA } from '../components/RotinaPorIA'
+import { AdaptarExercicio } from '../components/AdaptarExercicio'
 import { carregarCalculoAtivo } from '../lib/energia'
 import { carregarPeso } from '../lib/peso'
 import {
   NOME_DO_ESFORCO,
   adicionarExercicio,
   apagarExercicio,
+  trocarPorAdaptado,
   apagarSessao,
   carregarRotina,
   carregarSessoes,
@@ -276,6 +278,7 @@ export function TreinoScreen({
 
       <RotinaPorIA
         visivel={iaAberta}
+        contaId={contaId}
         perfil={corpo}
         onFechar={() => setIaAberta(false)}
         onUsar={async novos => {
@@ -535,6 +538,10 @@ function Rotina({
   const [repeticoes, setRepeticoes] = useState('')
   const [carga, setCarga] = useState('')
   const [salvando, setSalvando] = useState(false)
+  /* Qual exercício está sendo adaptado. A folha de adaptação é um Modal, e o
+     voltar do aparelho já a fecha pelo `onRequestClose` dela — por isso não há
+     BackHandler aqui: um segundo tratador para a mesma camada fecharia duas. */
+  const [adaptando, setAdaptando] = useState<Exercicio | null>(null)
 
   const doDia = exercicios.filter(e => e.dia === dia)
 
@@ -554,6 +561,7 @@ function Rotina({
       repeticoes: repeticoes || null,
       cargaKg: carga ? Number(carga.replace(',', '.')) : null,
       observacao: null,
+      adaptadoDe: null,
     })
     setSalvando(false)
 
@@ -568,6 +576,22 @@ function Rotina({
     setRepeticoes('')
     setCarga('')
     onErro('')
+  }
+
+  /* Grava a troca e atualiza a linha no lugar.
+   *
+   * Sem otimismo aqui, ao contrário do remover: a pessoa acabou de escolher
+   * entre três alternativas, e ver o nome novo aparecer e voltar atrás por
+   * falha de rede seria pior do que esperar o meio segundo da gravação. */
+  async function adaptar(alvo: Exercicio, nomeNovo: string) {
+    setAdaptando(null)
+    const r = await trocarPorAdaptado(alvo.id, nomeNovo, alvo.adaptadoDe ?? alvo.nome)
+    if (r.tipo === 'erro') {
+      onErro(r.mensagem)
+      return
+    }
+    onErro('')
+    onMudou(exercicios.map(x => (x.id === alvo.id ? r.exercicio : x)))
   }
 
   async function remover(e: Exercicio) {
@@ -642,7 +666,24 @@ function Rotina({
                 {e.nome}
               </Text>
               <Text style={styles.detalheSessao}>{descreverExercicio(e)}</Text>
+              {/* De onde ele veio. Sem esta linha, "Leg press" no lugar onde
+                  havia "Agachamento livre" some sem explicação, e daqui a um
+                  mês ninguém — nem ela — sabe por que a rotina mudou. */}
+              {e.adaptadoDe && (
+                <Text style={styles.veioDe} numberOfLines={1}>
+                  no lugar de {e.adaptadoDe}
+                </Text>
+              )}
             </View>
+            <Pressable
+              onPress={() => setAdaptando(e)}
+              hitSlop={10}
+              style={styles.botaoAdaptar}
+              accessibilityRole="button"
+              accessibilityLabel={`Adaptar ${e.nome}`}
+            >
+              <Ionicons name="swap-horizontal" size={17} color={paleta().cores.verde} />
+            </Pressable>
             <Pressable
               onPress={() => remover(e)}
               hitSlop={10}
@@ -653,6 +694,18 @@ function Rotina({
             </Pressable>
           </View>
         ))
+      )}
+
+      {adaptando && (
+        <AdaptarExercicio
+          visivel
+          contaId={contaId}
+          exercicio={adaptando.nome}
+          observacao={adaptando.observacao}
+          onde=""
+          onTrocar={nome => void adaptar(adaptando, nome)}
+          onFechar={() => setAdaptando(null)}
+        />
       )}
 
       <View style={styles.cartao}>
@@ -936,6 +989,15 @@ const estilos = estilosDe(t =>
     borderColor: t.cores.borda,
     paddingVertical: 11,
     paddingHorizontal: 13,
+  },
+  veioDe: { fontSize: 11.5, color: t.inkFraco, marginTop: 2, fontStyle: 'italic' },
+  botaoAdaptar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verdeMenta,
   },
   textoSessao: { flex: 1, gap: 1 },
   nomeSessao: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },

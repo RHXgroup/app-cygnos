@@ -18,7 +18,14 @@ import { estilosDe, paleta } from '../lib/tema'
 import type { DiaSemana } from '../lib/plano'
 import type { ExercicioNovo } from '../lib/treino'
 import { lerFichaDaFoto, pedirRotina, type PedidoDeTreino } from '../lib/treinoIA'
-import { moverDia, renumerar, tirarDaRotina, type RotinaConvertida } from '../lib/rotinaDaIA'
+import { carregarLimitacoes, salvarLimitacoes } from '../lib/limitacoes'
+import {
+  moverDia,
+  renumerar,
+  tirarDaRotina,
+  type ExercicioComAlerta,
+  type RotinaConvertida,
+} from '../lib/rotinaDaIA'
 
 /* Pedir a rotina de treino falando, e conferir antes de virar rotina.
  *
@@ -53,11 +60,13 @@ const soDigitos = (t: string) => t.replace(/[^0-9]/g, '')
 
 export function RotinaPorIA({
   visivel,
+  contaId,
   perfil,
   onUsar,
   onFechar,
 }: {
   visivel: boolean
+  contaId: string
   /* O que o app já sabe da pessoa. Vai junto para a IA não perguntar de novo
      o que já está no perfil. */
   perfil: { idade: number | null; genero: string | null; pesoKg: number | null }
@@ -72,6 +81,13 @@ export function RotinaPorIA({
   const [minutos, setMinutos] = useState('60')
   const [onde, setOnde] = useState(ONDE[0])
   const [experiencia, setExperiencia] = useState(EXPERIENCIA[0])
+  /* A limitação. Nasce do PERFIL, e volta para ele.
+   *
+   * Antes ela era digitada aqui, usada uma vez e esquecida quando a tela
+   * fechava — e no mês seguinte tudo de novo. Pior: a ficha importada por foto
+   * lê a limitação do BANCO, então o que ela escrevia neste campo não chegava
+   * lá. Quem contasse do ombro e depois importasse a ficha da academia não
+   * recebia aviso nenhum. */
   const [limitacoes, setLimitacoes] = useState('')
 
   const [pedindo, setPedindo] = useState(false)
@@ -91,7 +107,7 @@ export function RotinaPorIA({
    * O NOME vem errado às vezes, porque ficha é foto de letra pequena. Tirar o
    * exercício e digitar de novo na outra tela é justamente o trabalho que a
    * importação existia para poupar. */
-  const [exercicios, setExercicios] = useState<ExercicioNovo[]>([])
+  const [exercicios, setExercicios] = useState<ExercicioComAlerta[]>([])
   /* Qual está aberto para editar. O índice na lista, e não o objeto: o objeto
      muda a cada tecla digitada. */
   const [editando, setEditando] = useState<number | null>(null)
@@ -105,8 +121,32 @@ export function RotinaPorIA({
       setEditando(null)
       setErro('')
       setPedindo(false)
+      return
     }
-  }, [visivel])
+    /* A limitação é a exceção do que se limpa: ela é da PESSOA, não deste
+       pedido, e vem do perfil toda vez que a folha abre. */
+    let vivo = true
+    void carregarLimitacoes(contaId).then(r => {
+      if (vivo && r.tipo === 'ok' && r.limitacoes) setLimitacoes(r.limitacoes)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [visivel, contaId])
+
+  /* Guarda antes de chamar a IA, e não depois.
+   *
+   * A leitura da ficha por foto lê a limitação do BANCO — é lá que ela é regra,
+   * e não no corpo da requisição, para o chamador não escolher a própria regra
+   * de segurança. Então o que ela acabou de digitar precisa estar gravado ANTES
+   * da chamada, ou a foto sai sem aviso nenhum.
+   *
+   * A falha é engolida de propósito: não gravar o perfil não é motivo para
+   * recusar montar o treino, e a rotina gerada leva a limitação no pedido de
+   * qualquer jeito. */
+  async function guardarLimitacao() {
+    await salvarLimitacoes(contaId, limitacoes)
+  }
 
   async function montar() {
     const texto = pedido.trim()
@@ -116,6 +156,7 @@ export function RotinaPorIA({
     }
     setErro('')
     setPedindo(true)
+    await guardarLimitacao()
     const p: PedidoDeTreino = {
       pedido: texto,
       dias,
@@ -139,6 +180,9 @@ export function RotinaPorIA({
 
   async function importarFicha(origem: 'galeria' | 'camera') {
     setErro('')
+    /* Antes de abrir a câmera: a função da foto lê a limitação do banco, e
+       gravá-la depois seria gravar tarde demais. */
+    await guardarLimitacao()
     setPedindo(true)
     const r = await lerFichaDaFoto(origem)
     setPedindo(false)
@@ -350,10 +394,11 @@ export function RotinaPorIA({
                 onChangeText={setLimitacoes}
                 placeholder="Ex.: dor no joelho direito, cirurgia no ombro"
                 placeholderTextColor={paleta().inkFraco}
-                maxLength={200}
+                maxLength={500}
               />
               <Text style={styles.ajuda}>
-                Se você contar, eu não incluo exercício que carregue essa parte.
+                Eu guardo isso no seu perfil e uso em todo treino — inclusive para avisar quando a
+                ficha que você importar tiver exercício que carregue essa parte.
               </Text>
 
               {pedindo ? (
@@ -490,6 +535,22 @@ export function RotinaPorIA({
                               .filter(Boolean)
                               .join(' · ') || 'Toque para completar'}
                           </Text>
+                          {/* O aviso da limitação. Ele APONTA e não muda nada:
+                              a ficha foi montada por alguém, e a pessoa decidiu
+                              usá-la — reescrever a prescrição de outro
+                              profissional em silêncio seria o app se achar dono
+                              de um treino que não é dele. Ela lê, e decide se
+                              troca, pula, ou fala com quem montou. */}
+                          {e.alerta && (
+                            <View style={styles.linhaAlerta}>
+                              <Ionicons
+                                name="alert-circle-outline"
+                                size={13}
+                                color={paleta().cores.erroTexto}
+                              />
+                              <Text style={styles.textoAlerta}>{e.alerta}</Text>
+                            </View>
+                          )}
                         </View>
                         <Ionicons name="create-outline" size={17} color={paleta().inkFraco} />
                       </Pressable>
@@ -723,5 +784,7 @@ const estilos = estilosDe(t =>
     textoExercicio: { flex: 1, gap: 2 },
     nomeExercicio: { fontSize: 15, color: t.cores.ink, fontWeight: '600' },
     detalheExercicio: { fontSize: 12, color: t.inkFraco },
+    linhaAlerta: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 4 },
+    textoAlerta: { flex: 1, fontSize: 11.5, color: t.cores.erroTexto, lineHeight: 16 },
   }),
 )

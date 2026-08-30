@@ -28,6 +28,10 @@ export type ExercicioDaIA = {
   series?: number | string | null
   reps?: number | string | null
   descanso_seg?: number | string | null
+  /* Só a leitura de ficha preenche: "leva o braço acima da linha do ombro".
+     Aparece quando a pessoa declarou uma limitação e AQUELE exercício carrega a
+     região dela. */
+  alerta?: string | null
 }
 
 export type DiaDaIA = {
@@ -97,11 +101,19 @@ function repeticoes(v: unknown): string | null {
 
 export type Problema = { onde: string; motivo: string }
 
+/* Um exercício mais o aviso que veio com ele.
+ *
+ * O alerta NÃO vira `observacao` nem `adaptado_de`: ele não é parte do
+ * exercício, é uma leitura sobre ele. A ficha da academia continua exatamente
+ * como o professor montou — quem decide o que fazer com o aviso é a pessoa, na
+ * tela de conferência, e o que ela não usar não chega ao banco. */
+export type ExercicioComAlerta = ExercicioNovo & { alerta: string | null }
+
 export type RotinaConvertida = {
   divisao: string | null
   nivel: string | null
   observacao: string | null
-  exercicios: ExercicioNovo[]
+  exercicios: ExercicioComAlerta[]
   /* O que foi descartado, e por quê. A tela não precisa mostrar tudo, mas
      precisa poder dizer "montei 4 dias e um exercício não deu para ler" em vez
      de entregar uma rotina furada em silêncio. */
@@ -110,7 +122,7 @@ export type RotinaConvertida = {
 
 export function rotinaDaIA(bruto: unknown): RotinaConvertida {
   const problemas: Problema[] = []
-  const exercicios: ExercicioNovo[] = []
+  const exercicios: ExercicioComAlerta[] = []
 
   const r = (bruto ?? {}) as RotinaDaIA
   const dias = r.dias
@@ -164,6 +176,12 @@ export function rotinaDaIA(bruto: unknown): RotinaConvertida {
         /* O descanso não tem coluna própria; vira observação, que é onde a
            pessoa lê na hora de treinar. */
         observacao: descanso === null ? null : `Descanso ${descanso}s`,
+        alerta: texto(e?.alerta).slice(0, 200) || null,
+        /* Nasce nulo sempre. A rotina que a IA monta já respeita a limitação, e
+           a ficha da academia é copiada como está — em nenhum dos dois houve
+           troca de exercício, então marcar um original seria inventar uma
+           história que não aconteceu. Só a adaptação pedida por ela preenche. */
+        adaptadoDe: null,
       })
       ordem++
     }
@@ -187,7 +205,14 @@ export function rotinaDaIA(bruto: unknown): RotinaConvertida {
  * uma rotina.
  *
  * Regra do projeto: só `import type` neste arquivo, e por isso ele roda fora
- * do aparelho. */
+ * do aparelho.
+ *
+ * ── E por que as três são genéricas ────────────────────────────────────────
+ * Elas mexem em `dia` e `ordem`, e devolvem o MESMO tipo que receberam. Sem o
+ * genérico, um `ExercicioComAlerta[]` entrava e saía como `ExercicioNovo[]`, e
+ * o alerta desaparecia do tipo — sem erro nenhum, porque o valor continua lá em
+ * tempo de execução. A tela pararia de conseguir mostrá-lo só por ter movido um
+ * bloco de dia. */
 
 /* Move o BLOCO inteiro de um dia para outro.
  *
@@ -199,11 +224,11 @@ export function rotinaDaIA(bruto: unknown): RotinaConvertida {
  * Mover para um dia que JÁ TEM exercício junta os dois, e isso é o certo: quem
  * arrastou o bloco A para a quarta em que já havia o B quis os dois na quarta.
  * A ordem de quem chega continua depois de quem já estava. */
-export function moverDia(
-  exercicios: ExercicioNovo[],
+export function moverDia<T extends ExercicioNovo>(
+  exercicios: T[],
   de: DiaSemana,
   para: DiaSemana,
-): ExercicioNovo[] {
+): T[] {
   if (de === para) return exercicios
   const quantosJaHa = exercicios.filter(e => e.dia === para).length
   let n = 0
@@ -213,7 +238,7 @@ export function moverDia(
 }
 
 /* Tira um exercício pela posição na lista. */
-export const tirarDaRotina = (exercicios: ExercicioNovo[], i: number): ExercicioNovo[] =>
+export const tirarDaRotina = <T extends ExercicioNovo>(exercicios: T[], i: number): T[] =>
   exercicios.filter((_, n) => n !== i)
 
 /* Renumera a ordem dentro de cada dia, do zero e sem buraco.
@@ -224,7 +249,7 @@ export const tirarDaRotina = (exercicios: ExercicioNovo[], i: number): Exercicio
  * numeração é que está torta?
  *
  * A ordem RELATIVA é preservada: quem estava antes continua antes. */
-export function renumerar(exercicios: ExercicioNovo[]): ExercicioNovo[] {
+export function renumerar<T extends ExercicioNovo>(exercicios: T[]): T[] {
   const porDia = new Map<DiaSemana, number>()
   return exercicios.map(e => {
     const n = porDia.get(e.dia) ?? 0

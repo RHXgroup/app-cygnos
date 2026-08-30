@@ -261,5 +261,56 @@ const BOA = {
   ok('lista vazia não quebra', renumerar([]).length === 0 && tirarDaRotina([], 0).length === 0)
 }
 
+// ── 14. O alerta da ficha, que avisa e não muda nada ─────────────────────────
+{
+  console.log('\n14. o alerta da limitacao')
+
+  /* A ficha da academia foi montada por um professor, e a pessoa decidiu usá-la.
+     O app APONTA o que carrega a região limitada dela — e não troca, não tira,
+     não mexe em série. Reescrever a prescrição de outro em silêncio seria o app
+     se achar dono de um treino que não é dele. */
+  const r = rotinaDaIA({
+    dias: {
+      seg: {
+        exercicios: [
+          { nome: 'Desenvolvimento militar', series: 4, reps: '10',
+            alerta: 'Leva o braço acima da linha do ombro.' },
+          { nome: 'Rosca direta', series: 3, reps: '12' },
+        ],
+      },
+    },
+  })
+
+  ok('os dois entram', r.exercicios.length === 2, String(r.exercicios.length))
+  ok('o alertado traz o aviso', r.exercicios[0].alerta?.startsWith('Leva o braço') === true,
+    String(r.exercicios[0].alerta))
+  ok('o outro fica sem aviso', r.exercicios[1].alerta === null, String(r.exercicios[1].alerta))
+
+  /* O que NÃO pode acontecer: o alerta virar parte do exercício. Ele é uma
+     leitura SOBRE o exercício, e a ficha continua igual ao papel. */
+  ok('o nome não muda', r.exercicios[0].nome === 'Desenvolvimento militar')
+  ok('a série não muda', r.exercicios[0].series === 4)
+  ok('a repetição não muda', r.exercicios[0].repeticoes === '10')
+  ok('o alerta não vaza para a observação',
+    (r.exercicios[0].observacao ?? '').indexOf('ombro') === -1,
+    String(r.exercicios[0].observacao))
+
+  /* Alerta gigante é cortado, como todo texto que vem de fora. */
+  const grande = rotinaDaIA({
+    dias: { seg: { exercicios: [{ nome: 'Supino reto', alerta: 'x'.repeat(900) }] } },
+  })
+  ok('alerta cortado em 200', grande.exercicios[0].alerta?.length === 200,
+    String(grande.exercicios[0].alerta?.length))
+
+  /* Alerta que não é texto some, em vez de virar "[object Object]" na tela. */
+  for (const lixo of [42, true, {}, [], null]) {
+    const l = rotinaDaIA({
+      dias: { seg: { exercicios: [{ nome: 'Supino reto', alerta: lixo as never }] } },
+    })
+    ok(`alerta ${JSON.stringify(lixo)} vira null`, l.exercicios[0].alerta === null,
+      String(l.exercicios[0].alerta))
+  }
+}
+
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')
 process.exit(falhou > 0 ? 1 : 0)
