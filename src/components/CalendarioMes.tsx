@@ -42,6 +42,7 @@ export function CalendarioMes({
   previstos,
   ferteis,
   anotados,
+  comRelacao,
   selecionado,
   onSelecionar,
   onTrocarMes,
@@ -53,8 +54,16 @@ export function CalendarioMes({
   previstos: Set<string>
   /* A janela fértil estimada. Só sai quando há previsão de verdade. */
   ferteis: Set<string>
-  /* Dias com alguma anotação — desenha um ponto embaixo do número. */
+  /* Dias com alguma anotação clínica — desenha um ponto embaixo do número. */
   anotados: Set<string>
+  /* Dias com relação registrada — desenha um coração.
+   *
+   * Marca própria, e não mais um ponto, porque é o que a pessoa procura no
+   * calendário quando volta: é o único registro que ela faz para lembrar de uma
+   * data, e não para descrever como se sentiu. Gota para fluxo, coração para
+   * relação e carinha para humor é o vocabulário que Clue e Flo já usam — quem
+   * vem de outro aplicativo entende sem legenda. */
+  comRelacao: Set<string>
   selecionado: string | null
   onSelecionar: (data: string) => void
   onTrocarMes: (passo: -1 | 1) => void
@@ -117,6 +126,7 @@ export function CalendarioMes({
           const fertil = ferteis.has(d.data) && !ehMenstruada
           const escolhido = d.data === selecionado
           const temAnotacao = anotados.has(d.data)
+          const teveRelacao = comRelacao.has(d.data)
 
           /* A FAIXA. Cinco dias de menstruação viram uma barra contínua,
              arredondada nas pontas — e não cinco bolinhas soltas. A diferença
@@ -141,7 +151,9 @@ export function CalendarioMes({
               accessibilityState={{ selected: escolhido, disabled: d.futuro }}
               accessibilityLabel={`Dia ${d.dia}${
                 ehMenstruada ? ', menstruada' : marca === 'previsto' ? ', previsto' : ''
-              }${fertil ? ', janela fértil' : ''}${temAnotacao ? ', com anotação' : ''}`}
+              }${fertil ? ', janela fértil' : ''}${temAnotacao ? ', com anotação' : ''}${
+                teveRelacao ? ', com relação' : ''
+              }`}
             >
               {/* A faixa é uma camada ATRÁS do número e ocupa a célula inteira
                   na horizontal, para encostar na vizinha. Sem isso sobraria um
@@ -189,20 +201,29 @@ export function CalendarioMes({
                 </Text>
               </View>
 
-              {/* O ponto de "tem anotação" aparece SEMPRE, inclusive em cima da
-                  faixa — só troca de cor para continuar visível.
+              {/* As marcas do dia, embaixo do número.
 
-                  Antes ele era escondido quando o dia estava pintado, e o
-                  efeito foi este: registrar uma coisa no primeiro dia da
-                  menstruação não devolvia sinal nenhum na tela. A pessoa salvou
-                  e o app não mostrou nada. */}
-              <View
-                style={[
-                  styles.ponto,
-                  !temAnotacao && styles.pontoInvisivel,
-                  ehMenstruada && styles.pontoClaro,
-                ]}
-              />
+                  Aparecem SEMPRE que existem, inclusive em cima da faixa — só
+                  trocam de cor para continuar visíveis. Antes o ponto era
+                  escondido quando o dia estava pintado, e o efeito foi este:
+                  registrar uma coisa no primeiro dia da menstruação não
+                  devolvia sinal nenhum na tela.
+
+                  Altura fixa mesmo vazia, senão o número pularia de linha
+                  conforme o dia tem marca ou não, e o mês inteiro ficaria
+                  desalinhado. */}
+              <View style={styles.marcas}>
+                {teveRelacao && (
+                  <Ionicons
+                    name="heart"
+                    size={9}
+                    color={ehMenstruada ? paleta().cores.branco : paleta().cores.cicloForte}
+                  />
+                )}
+                {temAnotacao && (
+                  <View style={[styles.ponto, ehMenstruada && styles.pontoClaro]} />
+                )}
+              </View>
             </Pressable>
           )
         })}
@@ -212,8 +233,28 @@ export function CalendarioMes({
         <Item cor={paleta().cores.cicloForte} texto="menstruada" styles={styles} />
         <Item cor={paleta().cores.cicloPrevisto} texto="previsto" styles={styles} />
         <Item cor={paleta().cores.verde} texto="janela fértil" styles={styles} />
-        <Item cor={paleta().inkFraco} texto="com anotação" styles={styles} />
+        <Item cor={paleta().inkFraco} texto="anotação" styles={styles} />
+        <ItemIcone icone="heart" cor={paleta().cores.cicloForte} texto="relação" styles={styles} />
       </View>
+    </View>
+  )
+}
+
+function ItemIcone({
+  icone,
+  cor,
+  texto,
+  styles,
+}: {
+  icone: keyof typeof Ionicons.glyphMap
+  cor: string
+  texto: string
+  styles: ReturnType<typeof estilos>
+}) {
+  return (
+    <View style={styles.itemLegenda}>
+      <Ionicons name={icone} size={9} color={cor} />
+      <Text style={styles.textoLegenda}>{texto}</Text>
     </View>
   )
 }
@@ -295,16 +336,22 @@ const estilos = estilosDe(t =>
     numero: { fontSize: 14.5, fontWeight: '600', color: t.cores.ink },
     numeroFuturo: { color: t.inkFraco },
     numeroClaro: { color: t.cores.branco, fontWeight: '800' },
+    /* Altura fixa, mesmo vazia: sem isso o número pula de linha conforme o dia
+       tem marca ou não, e o mês inteiro fica desalinhado. */
+    marcas: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 3,
+      height: 11,
+      marginTop: 1,
+    },
     ponto: {
       width: 5,
       height: 5,
       borderRadius: 2.5,
       backgroundColor: t.cores.verde,
-      marginTop: 3,
     },
-    /* Invisível, e não ausente: sem ocupar o mesmo espaço sempre, o número
-       pularia para cima e para baixo conforme o dia tem anotação ou não. */
-    pontoInvisivel: { opacity: 0 },
     pontoClaro: { backgroundColor: t.cores.branco },
 
     legenda: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 4 },

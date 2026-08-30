@@ -21,6 +21,7 @@ import {
   carregarDias,
   compartilharCiclo,
   diaTemAlgo,
+  diaTemAlgoClinico,
   estadoDoCompartilhamento,
   registrarComeco,
   salvarDia,
@@ -36,6 +37,7 @@ import {
 } from '../lib/cicloDaPessoa'
 import { diasMenstruada, diasPrevistos, mesVizinho, somandoDias } from '../lib/calendarioDoCiclo'
 import { diasFerteis, janelaFertil } from '../lib/fertilidade'
+import { avisoDaSemana, padraoAntesDaMenstruacao } from '../lib/padraoDoCiclo'
 import { carregarConsumoPeriodo } from '../lib/consumo'
 import { dataISO, milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
@@ -213,10 +215,37 @@ export function CicloScreen({
       menstruada: diasMenstruada(registros ?? []),
       previstos: diasPrevistos(situacao.proximaPrevista, registros ?? []),
       ferteis: diasFerteis(janela),
-      anotados: new Set(dias.filter(diaTemAlgo).map(d => d.data)),
+      /* Só o que é CLÍNICO vira ponto. Se o ponto saísse também para o dia em
+         que ela só marcou relação, ele seria a mesma marca para duas coisas
+         muito diferentes — e o coração já diz aquilo. */
+      anotados: new Set(dias.filter(diaTemAlgoClinico).map(d => d.data)),
+      comRelacao: new Set(dias.filter(d => d.relacao === true).map(d => d.data)),
     }),
     [registros, dias, situacao.proximaPrevista, janela],
   )
+
+  /* O AVISO. É a peça que separa registrar de acompanhar.
+   *
+   * Os aplicativos grandes dão "insight" genérico de população; este sai dos
+   * ciclos DELA, e só quando aparece em mais de um — um sintoma que aconteceu
+   * uma vez é um dia ruim, não um padrão. Sem isso o aviso erraria, e um aviso
+   * que erra ensina a ignorar todos os outros.
+   *
+   * E o que ele NÃO recebe: relação, proteção e nota privada. Não é só que
+   * aquilo não sobe para a nutricionista — também não vira padrão nem
+   * estatística. A função nem tem os campos. */
+  const aviso = useMemo(() => {
+    const padroes = padraoAntesDaMenstruacao(
+      registros ?? [],
+      dias.map(d => ({
+        data: d.data,
+        sintomas: d.sintomas,
+        humor: d.humor,
+        desejoAlimentar: d.desejoAlimentar,
+      })),
+    )
+    return avisoDaSemana(situacao.proximaPrevista, situacao.irregular, padroes, hoje)
+  }, [registros, dias, situacao.proximaPrevista, situacao.irregular, hoje])
 
   const doDia = (data: string) => dias.find(d => d.data === data) ?? null
 
@@ -422,6 +451,15 @@ export function CicloScreen({
             )}
           </View>
 
+          {/* Antes do calendário: é o que ela precisa saber ANTES de olhar os
+              dias, e é o único bloco da tela que fala do futuro próximo. */}
+          {aviso && (
+            <View style={styles.aviso}>
+              <Ionicons name="sparkles" size={17} color={paleta().cores.cicloForte} />
+              <Text style={styles.textoAviso}>{aviso.texto}</Text>
+            </View>
+          )}
+
           <CalendarioMes
             ano={ano}
             mes={mes}
@@ -430,6 +468,7 @@ export function CicloScreen({
             previstos={pintados.previstos}
             ferteis={pintados.ferteis}
             anotados={pintados.anotados}
+            comRelacao={pintados.comRelacao}
             selecionado={selecionadoResumo}
             onSelecionar={data => {
               setSelecionadoResumo(data)
@@ -596,6 +635,16 @@ const estilos = estilosDe(t =>
     forte: { fontWeight: '800', color: t.cores.ink },
     ressalva: { fontSize: 12, color: t.inkFraco },
     ajuda: { fontSize: 12, color: t.inkFraco, lineHeight: 17 },
+
+    aviso: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      backgroundColor: t.cores.cicloFundo,
+      borderRadius: 14,
+      padding: 15,
+    },
+    textoAviso: { flex: 1, fontSize: 13.5, color: t.cores.ink, lineHeight: 20, fontWeight: '600' },
 
     linhaChave: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     textoChave: { flex: 1, gap: 4 },
