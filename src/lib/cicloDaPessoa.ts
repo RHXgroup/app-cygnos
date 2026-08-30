@@ -1,0 +1,255 @@
+/* O ciclo menstrual dela, calculado do que ELA registrou.
+ *
+ * ── O que a evidência diz, e o que ela não diz ─────────────────────────────
+ * Pesquisei antes de escrever. "Comer por fase do ciclo" tem evidência FRACA:
+ * o metabolismo de repouso não muda de forma relevante entre as fases, e não há
+ * base para conselho geral por fase. Os aplicativos que vendem isso estão
+ * vendendo tendência.
+ *
+ * O contrário tem evidência boa: 23 de 28 estudos mostram efeito da DIETA sobre
+ * os sintomas menstruais.
+ *
+ * Por isso este arquivo não dá conselho nenhum. Ele calcula em que dia do ciclo
+ * ela está, e o resto do app cruza isso com o diário dela — "nos seus últimos
+ * três ciclos, você comeu em média 300 kcal a mais nos quatro dias antes".
+ * Isso é o dado dela, e é o que a nutricionista precisa ver.
+ *
+ * ── Nada de 28 dias por omissão ───────────────────────────────────────────
+ * Ciclo de 28 dias é média de população, não a dela. Prever a próxima
+ * menstruação com 28 quando ela tem 34 é errar seis dias e chamar isso de
+ * previsão. Sem dois registros, este arquivo diz que NÃO SABE.
+ *
+ * ── Só tipo, nenhum import de execução ─────────────────────────────────────
+ * Regra do projeto. Datas entram e saem como texto ISO, que é como o banco
+ * guarda e como a comparação funciona igual em qualquer fuso. */
+
+export type Fase = 'menstrual' | 'folicular' | 'ovulatoria' | 'lutea'
+
+export type Ciclo = {
+  /* Primeiro dia da menstruação, em ISO. É o único marco que a pessoa observa
+     sem depender de exame — por isso é ele que ancora tudo. */
+  comecou: string
+  /* Último dia do fluxo, quando ela registrou. Nulo enquanto está acontecendo,
+     ou quando ela não marcou o fim. */
+  terminou: string | null
+}
+
+export type Situacao = {
+  /* Em que dia do ciclo ela está. 1 é o primeiro dia da menstruação. Nulo
+     quando não há registro nenhum. */
+  diaDoCiclo: number | null
+  fase: Fase | null
+  /* A duração TÍPICA dos ciclos dela, em dias. Nula com menos de dois
+     registros — e aí o app não prevê nada. */
+  duracaoTipica: number | null
+  /* Quando a próxima deve começar. Nula quando não dá para prever: sem
+     histórico, ou com ciclos irregulares demais. */
+  proximaPrevista: string | null
+  /* Verdadeiro quando os ciclos dela variam demais para previsão valer.
+     Existe para a tela DIZER isso, em vez de mostrar uma data que vai errar. */
+  irregular: boolean
+  /* Quantos dias passaram da data prevista. Nulo quando não há previsão ou a
+     data ainda não chegou. */
+  atrasoEmDias: number | null
+}
+
+const DIA = 86400000
+
+const emDias = (de: string, ate: string): number =>
+  Math.round((Date.parse(ate + 'T00:00:00Z') - Date.parse(de + 'T00:00:00Z')) / DIA)
+
+const somandoDias = (iso: string, dias: number): string =>
+  new Date(Date.parse(iso + 'T00:00:00Z') + dias * DIA).toISOString().slice(0, 10)
+
+const ISO = /^\d{4}-\d{2}-\d{2}$/
+
+/* Ciclo humano possível. Fora disso é erro de digitação — dedo no mês errado,
+   ano trocado — e entrar na média estragaria a previsão de todos os meses
+   seguintes. A literatura clínica trata 21 a 35 como a faixa comum e 45 como o
+   limite do que ainda é ciclo; acima disso é ausência de menstruação, que é
+   outro assunto e não se resolve prevendo. */
+const MINIMO = 15
+const MAXIMO = 45
+
+/* Quanto os ciclos podem variar antes de a previsão deixar de valer.
+ *
+ * Nove dias entre o mais curto e o mais longo. Acima disso a data prevista erra
+ * mais do que acerta, e mostrar "sua menstruação está atrasada" para quem tem
+ * ciclo irregular é criar susto com um número que nunca teve base. A ausência
+ * da previsão é a informação honesta. */
+const VARIACAO_MAXIMA = 9
+
+const mediana = (ns: number[]): number => {
+  const ordenados = [...ns].sort((a, b) => a - b)
+  const meio = Math.floor(ordenados.length / 2)
+  return ordenados.length % 2 === 0
+    ? Math.round((ordenados[meio - 1] + ordenados[meio]) / 2)
+    : ordenados[meio]
+}
+
+/* As durações entre um começo e o seguinte, descartando o impossível.
+ *
+ * MEDIANA e não média: um ciclo digitado errado, ou um mês em que ela esqueceu
+ * de registrar e o intervalo saiu dobrado, puxa a média e não move a mediana. */
+export function duracoes(ciclos: Ciclo[]): number[] {
+  const comecos = ciclos
+    .map(c => c.comecou)
+    .filter(d => ISO.test(d))
+    .sort()
+
+  const fora: number[] = []
+  for (let i = 1; i < comecos.length; i++) {
+    const d = emDias(comecos[i - 1], comecos[i])
+    if (d >= MINIMO && d <= MAXIMO) fora.push(d)
+  }
+  return fora
+}
+
+/* A fase, calculada DE TRÁS PARA A FRENTE a partir da próxima menstruação.
+ *
+ * É o que a fisiologia manda: a fase lútea — da ovulação até a menstruação —
+ * dura perto de 14 dias em quase todo mundo, e o que varia entre ciclos longos
+ * e curtos é a folicular, no começo. Calcular para a frente ("ovulação no dia
+ * 14") só acerta em ciclo de 28; num de 35, erra a ovulação por uma semana.
+ *
+ * Sem duração conhecida, a única fase que dá para afirmar é a menstrual, que a
+ * pessoa está OBSERVANDO. As outras ficam nulas — dizer "folicular" sem saber a
+ * duração do ciclo dela seria chute com cara de medida. */
+export function faseDoDia(
+  diaDoCiclo: number,
+  duracaoTipica: number | null,
+  diasDeFluxo: number,
+): Fase | null {
+  if (diaDoCiclo <= Math.max(1, diasDeFluxo)) return 'menstrual'
+  if (duracaoTipica === null) return null
+
+  const faltamParaAProxima = duracaoTipica - diaDoCiclo
+  /* A janela de ovulação, contada de trás: perto de 14 dias antes da próxima
+     menstruação, com dois dias de folga para cada lado. */
+  if (faltamParaAProxima >= 12 && faltamParaAProxima <= 16) return 'ovulatoria'
+  if (faltamParaAProxima < 12) return 'lutea'
+  return 'folicular'
+}
+
+export function situacaoDoCiclo(
+  ciclos: Ciclo[],
+  hoje: string,
+): Situacao {
+  const validos = ciclos.filter(c => ISO.test(c.comecou) && c.comecou <= hoje)
+  if (validos.length === 0) {
+    return {
+      diaDoCiclo: null,
+      fase: null,
+      duracaoTipica: null,
+      proximaPrevista: null,
+      irregular: false,
+      atrasoEmDias: null,
+    }
+  }
+
+  const ultimo = validos.reduce((a, b) => (a.comecou >= b.comecou ? a : b))
+  /* Dia 1 é o primeiro dia da menstruação, e não zero: é assim que a pessoa
+     conta, é assim que a nutricionista pergunta, e é assim que todo aplicativo
+     de ciclo mostra. */
+  const diaDoCiclo = emDias(ultimo.comecou, hoje) + 1
+
+  const ds = duracoes(validos)
+  const duracaoTipica = ds.length >= 2 ? mediana(ds) : null
+  const irregular = ds.length >= 2 && Math.max(...ds) - Math.min(...ds) > VARIACAO_MAXIMA
+
+  /* Quantos dias de fluxo, quando ela registrou o fim. Cinco por omissão, que é
+     a duração mais comum — e aqui a média serve, porque erra por um dia e o
+     efeito é só o rótulo "menstrual" durar um dia a mais ou a menos. */
+  const fluxo =
+    ultimo.terminou !== null && ISO.test(ultimo.terminou)
+      ? Math.max(1, emDias(ultimo.comecou, ultimo.terminou) + 1)
+      : 5
+
+  const proximaPrevista =
+    duracaoTipica !== null && !irregular ? somandoDias(ultimo.comecou, duracaoTipica) : null
+
+  const atraso =
+    proximaPrevista !== null && hoje > proximaPrevista ? emDias(proximaPrevista, hoje) : null
+
+  return {
+    diaDoCiclo,
+    fase: faseDoDia(diaDoCiclo, duracaoTipica, fluxo),
+    duracaoTipica,
+    proximaPrevista,
+    irregular,
+    atrasoEmDias: atraso,
+  }
+}
+
+/* ── O cruzamento com o diário ─────────────────────────────────────────────*/
+
+export type DiaDoDiario = { data: string; calorias: number }
+
+export type Comparacao = {
+  /* Média de calorias nos dias ANTES da menstruação, nos ciclos que deram para
+     comparar. Nula quando não há dado suficiente. */
+  mediaNosDiasAntes: number | null
+  /* Média no resto do ciclo, para servir de referência. */
+  mediaNoResto: number | null
+  /* Quantos ciclos entraram na conta. A tela mostra isso: "nos seus últimos
+     três ciclos" vale mais que um número sem procedência. */
+  ciclosComparados: number
+  /* Quantos dias antes foram considerados. */
+  diasAntes: number
+}
+
+/* Quanto ela comeu nos dias antes da menstruação, contra o resto do ciclo.
+ *
+ * Este é o recurso. Não é conselho de fase — é o dado DELA, cruzado com o
+ * diário que ela mesma preencheu. Nenhum concorrente faz isso, porque nenhum
+ * tem as duas coisas no mesmo lugar.
+ *
+ * Exige pelo menos dois ciclos completos e um mínimo de dias registrados em
+ * cada janela: comparar a média de dois dias anotados contra a de trinta seria
+ * apresentar ruído como achado. */
+export function compararAntesDaMenstruacao(
+  ciclos: Ciclo[],
+  diario: DiaDoDiario[],
+  diasAntes = 4,
+  minimoDeDiasPorJanela = 3,
+): Comparacao {
+  const comecos = ciclos
+    .map(c => c.comecou)
+    .filter(d => ISO.test(d))
+    .sort()
+
+  const antes: number[] = []
+  const resto: number[] = []
+  let ciclosComparados = 0
+
+  for (let i = 1; i < comecos.length; i++) {
+    const inicio = comecos[i - 1]
+    const fim = comecos[i]
+    const d = emDias(inicio, fim)
+    if (d < MINIMO || d > MAXIMO) continue
+
+    const limiteDoAntes = somandoDias(fim, -diasAntes)
+    const doCiclo = diario.filter(x => x.data >= inicio && x.data < fim)
+    /* Um ciclo sem quase nada anotado não entra: ele diluiria a média dos
+       outros e a conclusão sairia do vazio. */
+    if (doCiclo.length < minimoDeDiasPorJanela * 2) continue
+
+    ciclosComparados++
+    for (const x of doCiclo) {
+      if (x.data >= limiteDoAntes) antes.push(x.calorias)
+      else resto.push(x.calorias)
+    }
+  }
+
+  const media = (ns: number[]) =>
+    ns.length >= minimoDeDiasPorJanela
+      ? Math.round(ns.reduce((s, n) => s + n, 0) / ns.length)
+      : null
+
+  return {
+    mediaNosDiasAntes: media(antes),
+    mediaNoResto: media(resto),
+    ciclosComparados,
+    diasAntes,
+  }
+}

@@ -30,6 +30,7 @@ export function CorpoScreen({
   onAbrirPeso,
   onAbrirSono,
   onAbrirTreino,
+  onAbrirCiclo,
   onAbrirMetas,
 }: {
   contaId: string
@@ -40,6 +41,7 @@ export function CorpoScreen({
   onAbrirPeso: () => void
   onAbrirSono: () => void
   onAbrirTreino: () => void
+  onAbrirCiclo: () => void
   onAbrirMetas: () => void
 }) {
   const styles = estilos()
@@ -73,6 +75,16 @@ export function CorpoScreen({
             titulo="Treino"
             sub="Sua rotina e o que já treinou"
             onPress={onAbrirTreino}
+            styles={styles}
+          />
+          {/* Por último dos quatro, e sem enfeite nenhum na linha: quem não
+              menstrua passa por ela todo dia, e um destaque a transformaria em
+              ruído permanente. Quem usa acha na segunda vez. */}
+          <Linha
+            icone="ellipse-outline"
+            titulo="Ciclo"
+            sub="Menstruação, e o que ela mostra no seu diário"
+            onPress={onAbrirCiclo}
             styles={styles}
           />
         </View>

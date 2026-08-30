@@ -48,6 +48,7 @@ import { RefeicaoScreen } from './src/screens/RefeicaoScreen'
 import { RegistrarScreen } from './src/screens/RegistrarScreen'
 import { ComerScreen } from './src/screens/ComerScreen'
 import { CorpoScreen } from './src/screens/CorpoScreen'
+import { CicloScreen } from './src/screens/CicloScreen'
 import { SonoScreen } from './src/screens/SonoScreen'
 import type { PlanoCompleto, RefeicaoSalva } from './src/lib/plano'
 import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/tema'
@@ -289,6 +290,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [pesoAberto, setPesoAberto] = useState(false)
   const [contadorAberto, setContadorAberto] = useState(false)
   const [sonoAberto, setSonoAberto] = useState(false)
+  const [cicloAberto, setCicloAberto] = useState(false)
   /* null = fechada. Aberta, guarda em que opção ela deve nascer: 'plano' quando
      veio do botão da Home, 'energetico' quando veio de Meus cadastros, undefined
      quando veio do + e a grade é o começo. */
@@ -458,6 +460,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         [pesoAberto, () => setPesoAberto(false)],
         [contadorAberto, () => setContadorAberto(false)],
         [sonoAberto, () => setSonoAberto(false)],
+        [cicloAberto, () => setCicloAberto(false)],
         [metasAbertas !== null, () => setMetasAbertas(null)],
         [comprasDe !== null, () => setComprasDe(null)],
         [aguaAberta, () => setAguaAberta(false)],
@@ -497,6 +500,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     pesoAberto,
     contadorAberto,
     sonoAberto,
+    cicloAberto,
     metasAbertas,
     comprasDe,
     aguaAberta,
@@ -571,6 +575,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 onAbrirPeso={() => setPesoAberto(true)}
                 onAbrirContador={() => setContadorAberto(true)}
                 onAbrirSono={() => setSonoAberto(true)}
+                onAbrirCiclo={() => setCicloAberto(true)}
                 /* Treino não tem tela própria no App: ele mora dentro do "+",
                    e abrir o "+" já naquela opção é o mesmo caminho que o
                    cartão de plano usa para "montar plano". */
@@ -774,6 +779,20 @@ function AreaLogada({ sessao }: { sessao: Session }) {
           </Sobreposta>
         )}
 
+        {cicloAberto && (
+          <Sobreposta>
+            <CicloScreen
+              contaId={sessao.user.id}
+              onFechar={() => setCicloAberto(false)}
+              /* Sem contador próprio: nada fora desta tela lê o ciclo hoje, e
+                 um `versaoCiclo` que ninguém consome seria peso morto na lista
+                 de dependências de quatro abas. No dia em que a tela inicial
+                 mostrar algo dele, ele nasce junto. */
+              onMudou={() => {}}
+            />
+          </Sobreposta>
+        )}
+
         {contadorAberto && (
           <Sobreposta>
             <ContadorCaloriasScreen
@@ -881,6 +900,7 @@ function TelaDaAba({
   onAbrirPeso,
   onAbrirContador,
   onAbrirSono,
+  onAbrirCiclo,
   onAbrirTreino,
   onAbrirReceitas,
   versaoIntencao,
@@ -913,6 +933,7 @@ function TelaDaAba({
   onAbrirPeso: () => void
   onAbrirContador: () => void
   onAbrirSono: () => void
+  onAbrirCiclo: () => void
   onAbrirTreino: () => void
   onAbrirReceitas: () => void
   versaoIntencao: number
@@ -971,6 +992,7 @@ function TelaDaAba({
           onAbrirPeso={onAbrirPeso}
           onAbrirSono={onAbrirSono}
           onAbrirTreino={onAbrirTreino}
+          onAbrirCiclo={onAbrirCiclo}
           onAbrirMetas={onAbrirMetas}
         />
       )
