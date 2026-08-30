@@ -209,3 +209,175 @@ export async function estadoDoCompartilhamento(
     temNutricionista: !!vinculo.data,
   }
 }
+
+/* ── O dia do calendário ───────────────────────────────────────────────────*/
+
+/* Cada dia que ela toca no calendário pode virar uma linha aqui. Duas
+ * categorias, e a diferença entre elas é o desenho todo:
+ *
+ *   O QUE SOBE para a nutricionista, quando ela ligou o compartilhamento:
+ *   fluxo, sintomas, humor, vontade alimentar e o recado escrito PARA ela.
+ *   Cólica e inchaço mudam o que se recomenda; vontade de doce na fase lútea é
+ *   conversa de nutrição.
+ *
+ *   O QUE NUNCA SOBE: se teve relação, se foi com proteção, e a nota privada.
+ *   Isso não é uma chave desligada — é ausência de código: a função de espelho
+ *   no banco não lê essas três colunas. Quem quiser mandá-las vai ter de
+ *   escrevê-las lá.
+ *
+ * A tela diz as duas coisas com todas as letras, e é por isso que os campos
+ * ficam em blocos separados e não numa lista só. */
+
+export type Fluxo = 'nenhum' | 'leve' | 'moderado' | 'intenso'
+export type Humor = 'bem' | 'irritada' | 'triste' | 'ansiosa' | 'oscilando'
+
+export type DiaDoCiclo = {
+  data: string
+  fluxo: Fluxo | null
+  sintomas: string[]
+  humor: Humor | null
+  desejoAlimentar: string[]
+  observacao: string | null
+  /* Os três que ficam. */
+  relacao: boolean | null
+  relacaoProtegida: boolean | null
+  notaPrivada: string | null
+}
+
+type LinhaDia = {
+  data: string
+  fluxo: string | null
+  sintomas: string[] | null
+  humor: string | null
+  desejo_alimentar: string[] | null
+  observacao: string | null
+  relacao: boolean | null
+  relacao_protegida: boolean | null
+  nota_privada: string | null
+}
+
+const COLUNAS_DIA =
+  'data, fluxo, sintomas, humor, desejo_alimentar, observacao, relacao, relacao_protegida, nota_privada'
+
+const doDia = (l: LinhaDia): DiaDoCiclo => ({
+  data: l.data,
+  fluxo: (l.fluxo as Fluxo | null) ?? null,
+  sintomas: l.sintomas ?? [],
+  humor: (l.humor as Humor | null) ?? null,
+  desejoAlimentar: l.desejo_alimentar ?? [],
+  observacao: l.observacao,
+  relacao: l.relacao,
+  relacaoProtegida: l.relacao_protegida,
+  notaPrivada: l.nota_privada,
+})
+
+export const diaVazio = (data: string): DiaDoCiclo => ({
+  data,
+  fluxo: null,
+  sintomas: [],
+  humor: null,
+  desejoAlimentar: [],
+  observacao: null,
+  relacao: null,
+  relacaoProtegida: null,
+  notaPrivada: null,
+})
+
+export type ResultadoDias =
+  | { tipo: 'ok'; dias: DiaDoCiclo[] }
+  | { tipo: 'erro'; mensagem: string }
+
+/* Os dias de um intervalo. A tela pede o mês inteiro de uma vez, e não um dia
+   por célula: trinta e uma idas à rede para desenhar um calendário. */
+export async function carregarDias(
+  contaId: string,
+  de: string,
+  ate: string,
+): Promise<ResultadoDias> {
+  const { data, error } = await supabase
+    .from('app_ciclo_dias')
+    .select(COLUNAS_DIA)
+    .eq('conta_id', contaId)
+    .gte('data', de)
+    .lte('data', ate)
+    .order('data', { ascending: true })
+
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar o seu calendário agora. Verifique a conexão.', error),
+    }
+  return { tipo: 'ok', dias: ((data ?? []) as LinhaDia[]).map(doDia) }
+}
+
+/* Grava o dia inteiro de uma vez.
+ *
+ * Upsert por (conta_id, data): voltar num dia CORRIGE o que estava lá, e não
+ * acrescenta linha. Sem isto, o segundo toque no mesmo dia levaria o erro de
+ * chave única do Postgres para a tela — e "duplicate key value violates unique
+ * constraint" não diz nada para quem só queria mudar de "leve" para "moderado". */
+export async function salvarDia(
+  contaId: string,
+  d: DiaDoCiclo,
+): Promise<{ tipo: 'ok'; dia: DiaDoCiclo } | { tipo: 'erro'; mensagem: string }> {
+  const { data, error } = await supabase
+    .from('app_ciclo_dias')
+    .upsert(
+      {
+        conta_id: contaId,
+        data: d.data,
+        fluxo: d.fluxo,
+        sintomas: d.sintomas,
+        humor: d.humor,
+        desejo_alimentar: d.desejoAlimentar,
+        observacao: d.observacao?.trim() || null,
+        relacao: d.relacao,
+        /* O banco recusa proteção sem relação, e com razão: seria um "sim"
+           solto na tela. Aqui a coerência é garantida antes de sair. */
+        relacaoProtegida: undefined,
+        relacao_protegida: d.relacao === true ? d.relacaoProtegida : null,
+        nota_privada: d.notaPrivada?.trim() || null,
+      },
+      { onConflict: 'conta_id,data' },
+    )
+    .select(COLUNAS_DIA)
+    .single()
+
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui salvar esse dia agora. Verifique a conexão.', error),
+    }
+  return { tipo: 'ok', dia: doDia(data as LinhaDia) }
+}
+
+/* O dia não tem nada anotado? Serve para não gravar linha vazia e para a tela
+   saber se pinta o ponto. */
+export const diaTemAlgo = (d: DiaDoCiclo): boolean =>
+  d.fluxo !== null ||
+  d.sintomas.length > 0 ||
+  d.humor !== null ||
+  d.desejoAlimentar.length > 0 ||
+  (d.observacao ?? '').trim() !== '' ||
+  d.relacao !== null ||
+  (d.notaPrivada ?? '').trim() !== ''
+
+/* Só o que SOBE. É o que a tela usa para dizer "isto aqui a sua nutricionista
+   vê" sem repetir a regra em dois lugares — e para o ponto do calendário não
+   revelar, sozinho, que aquele dia teve só coisa privada. */
+export const diaTemAlgoClinico = (d: DiaDoCiclo): boolean =>
+  d.fluxo !== null ||
+  d.sintomas.length > 0 ||
+  d.humor !== null ||
+  d.desejoAlimentar.length > 0 ||
+  (d.observacao ?? '').trim() !== ''
+
+export async function apagarDia(contaId: string, data: string): Promise<{ erro: string } | null> {
+  const { error } = await supabase
+    .from('app_ciclo_dias')
+    .delete()
+    .eq('conta_id', contaId)
+    .eq('data', data)
+  if (!error) return null
+  return { erro: falha('Não consegui limpar esse dia agora. Verifique a conexão.', error) }
+}
