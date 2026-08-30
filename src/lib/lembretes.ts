@@ -370,7 +370,14 @@ export async function ligarLembretesDeAgua(
           body: mlDoGole
             ? `Cerca de ${mlDoGole} ml agora deixa o dia no ritmo.`
             : 'Toque para registrar um copo.',
-          categoryIdentifier: CATEGORIA_AGUA,
+          /* SEM meta definida não há botão.
+           *
+           * O botão registra um número, e o número sai da meta. Sem ela, ele
+           * apareceria e não faria nada — e um botão que não faz nada é pior do
+           * que botão nenhum: a pessoa toca, acha que registrou, e o dia fecha
+           * com menos água do que ela bebeu. Quem não tem meta recebe o aviso
+           * comum, que abre o app. */
+          ...(mlDoGole ? { categoryIdentifier: CATEGORIA_AGUA } : {}),
           /* Quanto o botão registra. Vai no aviso, e não numa conta refeita na
              hora de responder: quando a pessoa toca, o app pode estar
              carregando — e o número certo é o de quando o aviso foi montado. */
