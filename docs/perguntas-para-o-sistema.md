@@ -1,5 +1,11 @@
 # O que só a sessão do sistema web consegue responder
 
+> **Sobre os blocos de código deste documento:** os que aparecem dentro de um
+> bloco citado (`>`) são TRECHOS do que já existe no banco, colados para mostrar
+> um defeito — não são comandos para executar, e vários nem são SQL válido
+> porque estão cortados no meio. Comando para rodar está sempre solto, completo,
+> e com uma frase antes dizendo o que ele faz.
+
 Conferi o que dá para conferir de fora, com a chave pública do app: **quais
 funções existem e com que assinatura**, quais tabelas existem, quais colunas
 elas têm, e quais estão no realtime. Isso está registrado em
@@ -63,9 +69,25 @@ Mesma raiz, recorte diferente, e este ainda não foi corrigido:
 | `nutri_marcar_lidas` | **grava** | não marca nada; o contador dela nunca zera |
 | `nutri_enviar_mensagem` | **grava** | **a resposta nunca chega ao paciente** |
 
+> **Trecho do corpo que JÁ ESTÁ no banco, citado para mostrar o defeito. Não é
+> comando para rodar** — as reticências são minhas, querendo dizer "e o resto da
+> função". Colar isso no editor SQL devolve `syntax error at or near ".."`, e é
+> o que tem de acontecer.
+>
+> ```
+> insert into app_mensagens (conta_id, nutricionista_id, de, texto)
+> values (p_conta_id, auth.uid(), 'nutricionista', ...)
+>                     ^^^^^^^^^^^  aqui devia ser a carteira
+> ```
+
+Para ver o corpo real das três, isto é leitura pura e não muda nada:
+
 ```sql
-insert into app_mensagens (conta_id, nutricionista_id, de, texto)
-values (p_conta_id, auth.uid(), 'nutricionista', ...)
+select p.proname, pg_get_functiondef(p.oid)
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.proname in ('nutri_conversas', 'nutri_marcar_lidas', 'nutri_enviar_mensagem');
 ```
 
 **A terceira é a que importa para o app, e é a pior falha silenciosa das três.**
