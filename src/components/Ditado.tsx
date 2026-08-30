@@ -27,6 +27,13 @@ import { estilosDe, paleta } from '../lib/tema'
 
 type Estado = 'parado' | 'gravando' | 'enviando'
 
+/* A onda. Barra fina e espaçada porque o que importa é o RELEVO — barra grossa
+   colada vira um bloco cheio, e um bloco cheio não mostra sílaba. */
+const LARGURA_BARRA = 3
+const ESPACO_BARRA = 3
+const ALTURA_MIN = 3
+const ALTURA_MAX = 26
+
 export function Ditado({
   onTexto,
   onErro,
@@ -38,7 +45,10 @@ export function Ditado({
 }) {
   const styles = estilos()
   const gravador = useAudioRecorder(OPCOES_DITADO)
-  const estadoDoGravador = useAudioRecorderState(gravador, 250)
+  /* 80 ms, e não os 250 de antes. É a taxa em que a onda é amostrada, e a 4
+     quadros por segundo ela andava aos saltos — parecia travada, que é o
+     oposto do que ela existe para dizer. */
+  const estadoDoGravador = useAudioRecorderState(gravador, 80)
   const [estado, setEstado] = useState<Estado>('parado')
   /* A última gravação que não virou texto.
    *
@@ -78,6 +88,43 @@ export function Ditado({
     return Math.max(0, Math.min(1, (db + 60) / 60))
   })()
 
+  /* ── A onda ───────────────────────────────────────────────────────────────
+   *
+   * O que havia aqui era uma barra de progresso: um trilho cheio, e um pedaço
+   * verde que ia e voltava conforme a voz. Ela mostrava o instante e mais nada
+   * — e uma barra que vai e volta sozinha é o desenho universal de "carregando",
+   * então ela dizia a coisa errada: parecia espera, não escuta.
+   *
+   * A onda mostra os últimos segundos ao mesmo tempo. É a forma que todo
+   * aparelho de gravar usa, e ela responde a pergunta que a pessoa tem — "ele
+   * está me ouvindo?" — sem legenda: a fala tem sílaba, e sílaba tem relevo. Uma
+   * linha reta enquanto ela fala significa que o áudio não está entrando.
+   *
+   * As barras antigas ficam mais apagadas, e isso é o que dá o sentido de
+   * tempo: sem o esmaecimento, o desenho vira um gráfico parado que se
+   * reorganiza sozinho. */
+  const [ondas, setOndas] = useState<number[]>([])
+  /* Quantas barras cabem. Medido, e não fixo: o mesmo componente aparece na
+     tela de escrever refeição e na de contar o plano, com larguras diferentes,
+     e sobra de barra sairia pela direita. */
+  const [quantasBarras, setQuantasBarras] = useState(24)
+
+  /* Uma amostra por leitura do gravador. Depende de `durationMillis` porque é
+     ele que muda a cada tique — `nivel` sozinho repetiria o valor e o efeito
+     não rodaria durante o silêncio, que é justamente quando a linha reta
+     precisa aparecer. */
+  useEffect(() => {
+    if (estado !== 'gravando') return
+    setOndas(atuais => {
+      const proximo = atuais.length >= quantasBarras ? atuais.slice(1) : atuais.slice()
+      proximo.push(nivel)
+      return proximo
+    })
+    /* `nivel` fica de fora de propósito: ele é lido dentro, e listá-lo faria o
+       efeito rodar de novo na renderização que ele mesmo causou. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoDoGravador.durationMillis, estado, quantasBarras])
+
   /* O pico da gravação inteira. Vai para o log ao parar: uma barra que a pessoa
      viu mexer e um número que eu leio dizem a mesma coisa, e o número sobrevive
      à conversa. */
@@ -104,6 +151,7 @@ export function Ditado({
     }
 
     setGravacaoMuda(null)
+    setOndas([])
     pico.current = -160
 
     try {
@@ -179,19 +227,42 @@ export function Ditado({
       >
         <View style={styles.linhaGravando}>
           <View style={styles.ponto} />
-          <Text style={styles.textoGravando}>Ouvindo… {relogio(segundos)}</Text>
+          <Text style={styles.textoGravando}>Ouvindo</Text>
+          <Text style={styles.relogio}>{relogio(segundos)}</Text>
+          <View style={styles.empurra} />
           <Text style={styles.toqueParaParar}>toque para parar</Text>
         </View>
 
-        {/* A barra é a prova de que o microfone está captando: parada com a
-            pessoa falando significa que o áudio não está entrando.
+        {/* A onda é a prova de que o microfone está captando: reta com a pessoa
+            falando significa que o áudio não está entrando.
 
             Em linha PRÓPRIA, e não ao lado do cronômetro. Dividindo a mesma
             linha ela espremia o texto até a palavra quebrar no meio — e o que
             ficou ilegível foi justamente "toque para parar", que é a instrução
             de que a pessoa precisa naquele instante. */}
-        <View style={styles.trilhoNivel}>
-          <View style={[styles.nivel, { width: `${Math.round(nivel * 100)}%` }]} />
+        <View
+          style={styles.onda}
+          onLayout={e => {
+            const cabe = Math.floor(e.nativeEvent.layout.width / (LARGURA_BARRA + ESPACO_BARRA))
+            const limitado = Math.max(10, Math.min(40, cabe))
+            setQuantasBarras(atual => (atual === limitado ? atual : limitado))
+          }}
+        >
+          {ondas.map((n, i) => (
+            <View
+              key={i}
+              style={[
+                styles.barra,
+                {
+                  height: ALTURA_MIN + n * (ALTURA_MAX - ALTURA_MIN),
+                  /* A mais nova cheia, as de trás desbotando. É o que faz o
+                     desenho ter direção — sem isso ele é um gráfico que se
+                     reorganiza sozinho, e não um som que passou. */
+                  opacity: 0.28 + 0.72 * ((i + 1) / ondas.length),
+                },
+              ]}
+            />
+          ))}
         </View>
       </Pressable>
     )
@@ -258,14 +329,19 @@ const estilos = estilosDe(t =>
   },
   textoOuvir: { fontSize: 13.5, fontWeight: '600', color: t.inkMedio },
 
-  trilhoNivel: {
+  onda: {
     alignSelf: 'stretch',
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: t.cores.trilho,
+    flexDirection: 'row',
+    alignItems: 'center',
+    /* Da direita para a esquerda: a amostra nova entra no fim da lista, e é a
+       ponta direita que a pessoa olha. Preenchendo da esquerda, a onda ficaria
+       parada num canto enquanto a metade da faixa continuava vazia. */
+    justifyContent: 'flex-end',
+    gap: ESPACO_BARRA,
+    height: ALTURA_MAX,
     overflow: 'hidden',
   },
-  nivel: { height: 6, borderRadius: 3, backgroundColor: t.cores.limao },
+  barra: { width: LARGURA_BARRA, borderRadius: LARGURA_BARRA / 2, backgroundColor: t.cores.limao },
 
   gravando: {
     borderColor: t.cores.verde,
@@ -281,6 +357,16 @@ const estilos = estilosDe(t =>
   linhaGravando: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   ponto: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.cores.erroTexto },
   textoGravando: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  /* Dígito de largura fixa: sem isto o "1" é mais estreito que o "8" e o
+     cronômetro balança de um lado para o outro a cada segundo, empurrando o
+     "toque para parar" junto. */
+  relogio: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: t.inkMedio,
+    fontVariant: ['tabular-nums'],
+  },
+  empurra: { flex: 1 },
   toqueParaParar: { fontSize: 12, color: t.inkMedio },
 
   pensando: { borderColor: t.cores.borda },
