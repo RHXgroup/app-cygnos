@@ -266,7 +266,34 @@ melhor do que traduzir. Está em `lib/agenda.ts`, na hora de pedir consulta, e �
 Nem toda lib já foi convertida. Ao mexer numa que ainda devolve `error.message`
 cru, converta-a de passagem.
 
-## 13. Antes de dar por pronto
+## 13. As quatro abas existem todas ao mesmo tempo
+
+O carrossel do `App.tsx` monta Início, Relatórios, Mensagens e Mais **de uma
+vez**, no primeiro instante, e nunca desmonta nenhuma. Trocar de aba é rolagem
+lateral, não navegação.
+
+Duas consequências, e as duas já produziram defeito:
+
+- **`useEffect` com `[]` roda UMA vez por sessão do app**, e não uma vez por
+  abertura da aba. O `MaisScreen` tinha um `reagendarSeLigados` para corrigir o
+  horário do lembrete quando o plano mudava, com comentário e tudo — e ele
+  quase nunca rodava. Quem mudasse o almoço das 12:30 para as 13h continuava
+  sendo avisado às 12:30 até fechar o app. Toda aba que depende de algo que
+  muda precisa do contador correspondente na lista de dependências; é para isso
+  que os `versaoX` do `App` existem.
+
+- **Estar montada não é estar na frente.** A aba Mensagens ficava recebendo o
+  realtime e marcando tudo como lido com a pessoa parada na tela inicial — o
+  que apagava o ponto de "mensagem nova" antes de ele aparecer. O que depende
+  de a pessoa estar VENDO a tela precisa de um booleano vindo do App
+  (`visivel={aba === 'mensagens'}`), porque o ciclo de vida do componente não
+  sabe a diferença.
+
+O outro lado disso é uma vantagem, e vale usar: uma inscrição de realtime
+registrada numa aba montada permanentemente vale para o app inteiro. É assim
+que o ponto de mensagem acende na hora, sem esperar a próxima leitura.
+
+## 14. Antes de dar por pronto
 
 - `npx tsc --noEmit` — o principal, e por muito tempo o único.
 - `npm test` — todos os `.teste.mts` de uma vez. Um só:
@@ -301,6 +328,8 @@ cru, converta-a de passagem.
 - Se a tela mostra dado do sistema, mande o app para o segundo plano, mude o
   dado do outro lado, e volte.
 - Se a tela mostra erro, veja se o que aparece é frase de gente ou do Postgres.
+- Se mexeu numa das quatro abas, confira as dependências do efeito: elas montam
+  uma vez só, e `[]` ali quer dizer "uma vez por sessão do app".
 
 ## Como rodar
 
