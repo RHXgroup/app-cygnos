@@ -269,16 +269,26 @@ cru, converta-a de passagem.
 ## 13. Antes de dar por pronto
 
 - `npx tsc --noEmit` — o principal, e por muito tempo o único.
-- `node --experimental-strip-types src/lib/<arquivo>.teste.mts` — os testes que
-  existem. Hoje só `sugestaoParaPlano`, com 52 casos.
+- `npm test` — todos os `.teste.mts` de uma vez. Um só:
+  `node --experimental-strip-types src/lib/<arquivo>.teste.mts`.
+
+  **Não conte os testes aqui.** Esta linha já disse "hoje só um, com 52 casos"
+  por tempo demais, com sete arquivos no repositório — e uma contagem errada num
+  documento de instruções é pior do que contagem nenhuma, porque quem lê acredita
+  e não vai conferir. O comando encontra o que existe.
 
   Lógica pura dá para testar de verdade neste projeto, e vale a pena onde o
   dado vem de fora e chega torto: JSON de IA, texto que a pessoa escreveu,
-  resposta de API. O truque é o arquivo testado não importar NADA de runtime —
-  só `import type`, que some na compilação — porque qualquer import que puxe o
-  Supabase ou o React Native arrasta o aparelho inteiro junto e o Node não roda.
-  Foi por isso que `sugestaoParaPlano` nasceu separado de `planoIA`: lá fica o
-  que fala com a rede, aqui o que decide, e é o que decide que erra.
+  resposta de API, status de uma coluna. O truque é o arquivo testado não
+  importar NADA de runtime — só `import type`, que some na compilação — porque
+  qualquer import que puxe o Supabase ou o React Native arrasta o aparelho
+  inteiro junto e o Node não roda.
+
+  Foi por isso que `sugestaoParaPlano` nasceu separado de `planoIA`, e por isso
+  `montarAvisos` foi separado de `avisos`: lá fica o que fala com a rede, aqui o
+  que decide, e é o que decide que erra. Quando uma lib tiver decisão que valha
+  a pena exercitar, esse é o corte a fazer — e vale fazê-lo na mesma alteração,
+  porque depois ninguém volta.
 
   Os `.teste.mts` ficam FORA do `tsc` (ver `exclude` no tsconfig): o Node exige
   a extensão `.ts` no import e o `tsc` a recusa sem `allowImportingTsExtensions`.
