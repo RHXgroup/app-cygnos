@@ -220,6 +220,40 @@ export async function registrarSessao(
   return { tipo: 'ok', sessao: daSessao(data as LinhaSessao) }
 }
 
+/* Refina uma sessão que já foi registrada.
+ *
+ * Existe por causa da ordem em que a tela pergunta as coisas. Antes ela pedia
+ * tempo e esforço ANTES do botão: nada era obrigatório, mas três campos em cima
+ * e o botão embaixo se leem como formulário, e formulário é o que faz alguém
+ * desistir de anotar que treinou.
+ *
+ * Agora registra primeiro, com um toque, e o tempo e o esforço viram uma linha
+ * opcional DEPOIS — em cima de uma sessão que já existe. Quem não tocar, não
+ * perde nada: a marca de que houve treino é o dado que sustenta a constância, e
+ * ela já está gravada. */
+export async function refinarSessao(
+  id: string,
+  campos: { duracaoMin?: number | null; esforco?: number | null },
+): Promise<{ tipo: 'ok'; sessao: Sessao } | { tipo: 'erro'; mensagem: string }> {
+  const mudanca: Record<string, number | null> = {}
+  if ('duracaoMin' in campos) mudanca.duracao_min = campos.duracaoMin ?? null
+  if ('esforco' in campos) mudanca.esforco = campos.esforco ?? null
+
+  const { data, error } = await supabase
+    .from('app_treino_sessoes')
+    .update(mudanca)
+    .eq('id', id)
+    .select(COLUNAS_SESSAO)
+    .single()
+
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui salvar esse detalhe agora. Verifique a conexão.', error),
+    }
+  return { tipo: 'ok', sessao: daSessao(data as LinhaSessao) }
+}
+
 export async function apagarSessao(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_treino_sessoes').delete().eq('id', id)
   if (!error) return null

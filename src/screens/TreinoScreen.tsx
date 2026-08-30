@@ -14,6 +14,9 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Confirmacao } from '../components/Confirmacao'
+import { RotinaPorIA } from '../components/RotinaPorIA'
+import { carregarCalculoAtivo } from '../lib/energia'
+import { carregarPeso } from '../lib/peso'
 import {
   NOME_DO_ESFORCO,
   adicionarExercicio,
@@ -21,6 +24,7 @@ import {
   apagarSessao,
   carregarRotina,
   carregarSessoes,
+  refinarSessao,
   registrarSessao,
   sequencia,
   sessoesNaSemana,
@@ -29,6 +33,7 @@ import {
 } from '../lib/treino'
 import { DIAS_CURTOS, dataNumerica } from '../lib/formatar'
 import type { DiaSemana } from '../lib/plano'
+import { dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* Treino.
@@ -65,11 +70,37 @@ export function TreinoScreen({
   const [erro, setErro] = useState('')
   const [mudou, setMudou] = useState(false)
   const [apagandoSessao, setApagandoSessao] = useState<Sessao | null>(null)
+  const [iaAberta, setIaAberta] = useState(false)
+  /* O que a IA precisa saber da pessoa. Vem do cálculo energético e do último
+     peso do diário — o mesmo par que a sugestão de plano usa, e pelo mesmo
+     motivo: o peso do cálculo pode ser de meses atrás. Nulo é aceitável; a
+     função do servidor monta rotina sem isso, só monta pior. */
+  const [corpo, setCorpo] = useState<{
+    idade: number | null
+    genero: string | null
+    pesoKg: number | null
+  }>({ idade: null, genero: null, pesoKg: null })
 
   useEffect(() => {
     let vivo = true
-    Promise.all([carregarSessoes(contaId), carregarRotina(contaId)]).then(([rS, rR]) => {
+    Promise.all([
+      carregarSessoes(contaId),
+      carregarRotina(contaId),
+      carregarCalculoAtivo(contaId),
+      carregarPeso(contaId),
+    ]).then(([rS, rR, rC, rP]) => {
       if (!vivo) return
+      /* Falha aqui não atrapalha a tela: sem peso e idade a rotina sai mais
+         genérica, e é só isso. Por isso nada de `setErro` neste trecho. */
+      const calculo = rC?.tipo === 'ok' ? rC.calculo : null
+      const registros = rP?.tipo === 'ok' ? rP.peso.registros : []
+      const ultimo =
+        registros.length > 0 ? registros.reduce((a, b) => (a.data >= b.data ? a : b)).kg : null
+      setCorpo({
+        idade: calculo?.idade ?? null,
+        genero: calculo?.sexo ?? null,
+        pesoKg: ultimo ?? calculo?.peso ?? null,
+      })
       if (rS.tipo === 'erro') setErro(rS.mensagem)
       else {
         setErro('')
@@ -177,10 +208,15 @@ export function TreinoScreen({
             <RegistrarTreino
               contaId={contaId}
               rotina={rotina}
+              sessaoDeHoje={sessoes.find(s => s.data === dataISO(new Date())) ?? null}
               onRegistrou={s => {
                 setSessoes(atuais => [s, ...atuais])
                 setMudou(true)
                 setErro('')
+              }}
+              onRefinou={s => {
+                setSessoes(atuais => atuais.map(x => (x.id === s.id ? s : x)))
+                setMudou(true)
               }}
               onErro={setErro}
             />
@@ -222,9 +258,36 @@ export function TreinoScreen({
             onMudou={setRotina}
             onErro={setErro}
             erro={erro}
+            onPedirIA={() => setIaAberta(true)}
           />
         )}
       </ScrollView>
+
+      <RotinaPorIA
+        visivel={iaAberta}
+        perfil={corpo}
+        onFechar={() => setIaAberta(false)}
+        onUsar={async novos => {
+          setIaAberta(false)
+          /* Grava um por um pelo MESMO caminho de quem monta na mão. Um insert
+             em lote seria mais rápido e criaria um segundo jeito de a rotina
+             nascer — e dois caminhos para o mesmo dado sempre divergem. */
+          const criados: Exercicio[] = []
+          for (const e of novos) {
+            const r = await adicionarExercicio(contaId, e)
+            if (r.tipo === 'erro') {
+              setErro(r.mensagem)
+              break
+            }
+            criados.push(r.exercicio)
+          }
+          if (criados.length > 0) {
+            setRotina(atuais => [...atuais, ...criados])
+            setMudou(true)
+            setAba('rotina')
+          }
+        }}
+      />
 
       <Confirmacao
         visivel={apagandoSessao !== null}
@@ -248,12 +311,18 @@ const DURACOES = [20, 30, 45, 60, 90]
 function RegistrarTreino({
   contaId,
   rotina,
+  sessaoDeHoje,
   onRegistrou,
+  onRefinou,
   onErro,
 }: {
   contaId: string
   rotina: Exercicio[]
+  /* A sessão de hoje, quando já existe. É ela que decide se a tela pergunta
+     "treinou?" ou oferece os detalhes opcionais. */
+  sessaoDeHoje: Sessao | null
   onRegistrou: (s: Sessao) => void
+  onRefinou: (s: Sessao) => void
   onErro: (m: string) => void
 }) {
   const styles = estilos()
@@ -261,9 +330,17 @@ function RegistrarTreino({
   const daRotina = rotina.filter(e => e.dia === hoje)
 
   const [titulo, setTitulo] = useState('')
-  const [duracao, setDuracao] = useState<number | null>(null)
-  const [esforco, setEsforco] = useState<number | null>(null)
   const [salvando, setSalvando] = useState(false)
+
+  /* O foco do dia, tirado da rotina: "Supino · Crucifixo · Tríceps testa" não
+     é nome de treino, é lista de tarefas. O que a pessoa reconhece é o primeiro
+     exercício e quantos são. */
+  const focoDeHoje =
+    daRotina.length === 0
+      ? null
+      : daRotina.length === 1
+        ? daRotina[0].nome
+        : `${daRotina[0].nome} e mais ${daRotina.length - 1}`
 
   async function registrar() {
     setSalvando(true)
@@ -272,8 +349,10 @@ function RegistrarTreino({
          outro nome. É o que liga a sessão ao que estava planejado. */
       dia: daRotina.length > 0 && !titulo.trim() ? hoje : null,
       titulo: titulo.trim() || null,
-      duracaoMin: duracao,
-      esforco,
+      /* Tempo e esforço NÃO são perguntados aqui. Entram depois, se a pessoa
+         quiser, sobre uma sessão que já existe. */
+      duracaoMin: null,
+      esforco: null,
       observacao: null,
     })
     setSalvando(false)
@@ -282,103 +361,137 @@ function RegistrarTreino({
       onErro(r.mensagem)
       return
     }
-
     onRegistrou(r.sessao)
     setTitulo('')
-    setDuracao(null)
-    setEsforco(null)
   }
 
+  async function refinar(campos: { duracaoMin?: number | null; esforco?: number | null }) {
+    if (!sessaoDeHoje) return
+    /* Pinta na hora e conserta se falhar. Esperar a rede para acender um chip
+       de "45 min" faz o toque parecer que não funcionou. */
+    onRefinou({ ...sessaoDeHoje, ...campos })
+    const r = await refinarSessao(sessaoDeHoje.id, campos)
+    if (r.tipo === 'erro') {
+      onRefinou(sessaoDeHoje)
+      onErro(r.mensagem)
+      return
+    }
+    onRefinou(r.sessao)
+  }
+
+  /* ── Já treinou hoje: só os detalhes, e todos opcionais ─────────────────*/
+  if (sessaoDeHoje) {
+    return (
+      <View style={styles.cartao}>
+        <View style={styles.linhaFeito}>
+          <View style={styles.selo}>
+            <Ionicons name="checkmark" size={18} color={paleta().cores.branco} />
+          </View>
+          <Text style={styles.tituloFeito}>
+            {sessaoDeHoje.titulo || focoDeHoje || 'Treino de hoje'} registrado
+          </Text>
+        </View>
+
+        <Text style={styles.rotulo}>Quanto tempo? (opcional)</Text>
+        <View style={styles.chips}>
+          {DURACOES.map(d => (
+            <Pressable
+              key={d}
+              onPress={() => refinar({ duracaoMin: sessaoDeHoje.duracaoMin === d ? null : d })}
+              style={({ pressed }) => [
+                styles.chip,
+                sessaoDeHoje.duracaoMin === d && styles.chipAtivo,
+                pressed && styles.pressionado,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: sessaoDeHoje.duracaoMin === d }}
+            >
+              <Text
+                style={[styles.textoChip, sessaoDeHoje.duracaoMin === d && styles.textoChipAtivo]}
+              >
+                {d} min
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.rotulo}>Como foi? (opcional)</Text>
+        <View style={styles.chips}>
+          {[1, 2, 3, 4, 5].map(n => (
+            <Pressable
+              key={n}
+              onPress={() => refinar({ esforco: sessaoDeHoje.esforco === n ? null : n })}
+              style={({ pressed }) => [
+                styles.chipEsforco,
+                sessaoDeHoje.esforco === n && styles.chipAtivo,
+                pressed && styles.pressionado,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={NOME_DO_ESFORCO[n]}
+              accessibilityState={{ selected: sessaoDeHoje.esforco === n }}
+            >
+              <Text style={[styles.textoChip, sessaoDeHoje.esforco === n && styles.textoChipAtivo]}>
+                {n}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {sessaoDeHoje.esforco !== null && (
+          <Text style={styles.legendaEsforco}>{NOME_DO_ESFORCO[sessaoDeHoje.esforco]}</Text>
+        )}
+      </View>
+    )
+  }
+
+  /* ── Ainda não treinou: um toque, e acabou ──────────────────────────────*/
   return (
     <View style={styles.cartao}>
-      {daRotina.length > 0 ? (
+      {focoDeHoje ? (
         <>
           <Text style={styles.tituloCartao}>Hoje na sua rotina</Text>
-          <Text style={styles.listaRotina} numberOfLines={3}>
-            {daRotina.map(e => e.nome).join(' · ')}
+          <Text style={styles.listaRotina} numberOfLines={2}>
+            {focoDeHoje}
           </Text>
         </>
       ) : (
-        <>
-          <Text style={styles.tituloCartao}>O que você treinou?</Text>
-          <TextInput
-            value={titulo}
-            onChangeText={setTitulo}
-            placeholder="Corrida, natação, academia…"
-            placeholderTextColor={paleta().inkFraco}
-            keyboardAppearance="dark"
-            maxLength={40}
-            style={styles.campo}
-            accessibilityLabel="O que você treinou"
-          />
-        </>
+        <Text style={styles.tituloCartao}>Treinou hoje?</Text>
       )}
-
-      <Text style={styles.rotulo}>Quanto tempo</Text>
-      <View style={styles.chips}>
-        {DURACOES.map(d => (
-          <Pressable
-            key={d}
-            onPress={() => setDuracao(duracao === d ? null : d)}
-            style={({ pressed }) => [
-              styles.chip,
-              duracao === d && styles.chipAtivo,
-              pressed && styles.pressionado,
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: duracao === d }}
-          >
-            <Text style={[styles.textoChip, duracao === d && styles.textoChipAtivo]}>
-              {d} min
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Text style={styles.rotulo}>Quão puxado foi</Text>
-      <View style={styles.chips}>
-        {[1, 2, 3, 4, 5].map(n => (
-          <Pressable
-            key={n}
-            onPress={() => setEsforco(esforco === n ? null : n)}
-            style={({ pressed }) => [
-              styles.chipEsforco,
-              esforco === n && styles.chipAtivo,
-              pressed && styles.pressionado,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={NOME_DO_ESFORCO[n]}
-            accessibilityState={{ selected: esforco === n }}
-          >
-            <Text style={[styles.textoChip, esforco === n && styles.textoChipAtivo]}>{n}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {esforco !== null && <Text style={styles.legendaEsforco}>{NOME_DO_ESFORCO[esforco]}</Text>}
 
       <Pressable
         onPress={registrar}
         disabled={salvando}
-        style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
+        style={({ pressed }) => [styles.botaoGrande, pressed && styles.pressionado]}
         accessibilityRole="button"
       >
         {salvando ? (
           <ActivityIndicator size="small" color={paleta().cores.branco} />
         ) : (
           <>
-            <Ionicons name="checkmark" size={18} color={paleta().cores.branco} />
-            <Text style={styles.textoBotao}>Registrar treino de hoje</Text>
+            <Ionicons name="checkmark" size={20} color={paleta().cores.branco} />
+            <Text style={styles.textoBotaoGrande}>{focoDeHoje ? 'Fiz esse treino' : 'Treinei'}</Text>
           </>
         )}
       </Pressable>
 
-      {/* Nada é obrigatório: registrar que treinou já é o dado principal, e
-          exigir tempo e esforço faria a pessoa pular o registro nos dias em que
-          não lembra. Tempo e esforço refinam; a marca de que houve treino é o
-          que sustenta a constância. */}
-      <Text style={styles.ajuda}>
-        Tempo e esforço são opcionais. O que conta é marcar que você treinou.
-      </Text>
+      {/* O campo de nome só aparece quando não há rotina para hoje, e mesmo
+          assim depois do botão: quem correu no sábado pode dizer o que foi,
+          mas quem só quer marcar presença não precisa passar por aqui. */}
+      {!focoDeHoje && (
+        <>
+          <TextInput
+            value={titulo}
+            onChangeText={setTitulo}
+            placeholder="Foi o quê? Corrida, natação… (opcional)"
+            placeholderTextColor={paleta().inkFraco}
+            maxLength={40}
+            style={styles.campo}
+            accessibilityLabel="O que você treinou"
+          />
+          <Text style={styles.ajuda}>
+            Pode deixar em branco. O que conta é marcar que você treinou.
+          </Text>
+        </>
+      )}
     </View>
   )
 }
@@ -391,12 +504,14 @@ function Rotina({
   onMudou,
   onErro,
   erro,
+  onPedirIA,
 }: {
   contaId: string
   exercicios: Exercicio[]
   onMudou: (e: Exercicio[]) => void
   onErro: (m: string) => void
   erro: string
+  onPedirIA: () => void
 }) {
   const styles = estilos()
   const [dia, setDia] = useState<DiaSemana>(() => new Date().getDay() as DiaSemana)
@@ -473,6 +588,31 @@ function Rotina({
           )
         })}
       </View>
+
+      {exercicios.length === 0 ? (
+        /* Rotina vazia é o momento de desistir: montar sete dias de exercício
+           na mão, um campo por vez, é o degrau mais alto desta tela. Por isso o
+           convite ocupa o lugar todo aqui, e vira um link discreto assim que
+           existe qualquer coisa montada. */
+        <Pressable
+          onPress={onPedirIA}
+          style={({ pressed }) => [styles.convite, pressed && styles.pressionado]}
+          accessibilityRole="button"
+        >
+          <Ionicons name="sparkles-outline" size={22} color={paleta().cores.verde} />
+          <View style={styles.textoConvite}>
+            <Text style={styles.tituloConvite}>Montar minha rotina</Text>
+            <Text style={styles.subConvite}>
+              Diga o que você quer treinar — pode falar — e eu monto a semana. Você confere antes.
+            </Text>
+          </View>
+        </Pressable>
+      ) : (
+        <Pressable onPress={onPedirIA} style={styles.linkIA} accessibilityRole="button">
+          <Ionicons name="sparkles-outline" size={15} color={paleta().cores.verde} />
+          <Text style={styles.textoLinkIA}>Montar outra rotina com IA</Text>
+        </Pressable>
+      )}
 
       {doDia.length === 0 ? (
         <Text style={styles.vazio}>
@@ -646,6 +786,47 @@ const estilos = estilosDe(t =>
   rotuloPlacar: { fontSize: 11.5, color: t.inkSuave, textAlign: 'center', lineHeight: 16 },
   divisor: { width: 1, height: 40, backgroundColor: t.cores.borda },
 
+  convite: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: t.cores.verdeMenta,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
+    padding: 16,
+  },
+  textoConvite: { flex: 1, gap: 4 },
+  tituloConvite: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  subConvite: { fontSize: 13, color: t.inkMedio, lineHeight: 18 },
+  linkIA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  textoLinkIA: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
+  linhaFeito: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  selo: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: t.cores.verde,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tituloFeito: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  botaoGrande: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: t.cores.verde,
+    borderRadius: 14,
+    paddingVertical: 17,
+  },
+  textoBotaoGrande: { color: t.cores.branco, fontSize: 16, fontWeight: '800' },
   cartao: {
     backgroundColor: t.cores.cartao,
     borderRadius: 16,
