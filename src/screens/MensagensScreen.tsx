@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -15,27 +17,38 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
 import {
   carregarCatalogo,
+  conversaNoApp,
   linkDoWhatsapp,
   telefoneFormatado,
   type Nutricionista,
 } from '../lib/nutricionista'
+import {
+  carregarMensagens,
+  ehMinha,
+  enviarMensagem,
+  marcarLidas,
+  ouvirMensagens,
+  type Mensagem,
+} from '../lib/mensagens'
+import { horaCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 
-/* A aba Mensagens, enquanto a conversa dentro do app não existe.
+/* A conversa com a nutricionista.
  *
- * Ela era o EmBreveScreen: uma tela que dizia "está sendo construída" e nada
- * mais. Honesta, e mesmo assim um beco — a pessoa toca na aba querendo falar
- * com a nutricionista e recebe um aviso de obra.
+ * Existe só com vínculo. Antes dele não há conversa — há pedido, que mora no
+ * catálogo. Sem vínculo esta tela convida a procurar alguém, e é só isso que
+ * ela faz.
  *
- * O canal existe hoje, só não é aqui dentro: é o WhatsApp dela, que já está na
- * ficha. Esta tela leva a pessoa até ele e diz, sem enfeite, que a conversa por
- * dentro está a caminho. Mandar quem quer conversar para o lugar onde a conversa
- * acontece é mais útil do que uma placa de obra — e continua sendo verdade, que
- * é o que uma casca vazia não era.
+ * ── O canal é escolha DELA ─────────────────────────────────────────────────
+ * O padrão é conversar aqui dentro. Quem marca WhatsApp no parâmetro do sistema
+ * aparece com o botão verde e o número; quem não marca nem tem número devolvido
+ * pelo banco. A tela não decide isso — ela obedece.
  *
- * Quando a tabela de mensagens existir (ver docs/o-que-o-app-precisa-do-sistema.md,
- * item 3.5), esta tela vira a lista da conversa e o cartão do WhatsApp desce
- * para o rodapé, ou some. */
+ * ── A primeira tela do app que chega sozinha ───────────────────────────────
+ * Todo o resto relê ao voltar do segundo plano, o que serve para plano e
+ * consulta. Não serve aqui: resposta que só aparece quando a pessoa sai do app e
+ * volta não é conversa. Esta tem realtime — e mantém a releitura do segundo
+ * plano como rede, para o caso de a inscrição ter caído sem avisar. */
 export function MensagensScreen({
   onAbrirNutricionistas,
 }: {
@@ -43,16 +56,26 @@ export function MensagensScreen({
 }) {
   const styles = estilos()
   const { top } = useSafeAreaInsets()
+
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
+  const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [carregando, setCarregando] = useState(true)
-  const [atualizando, setAtualizando] = useState(false)
+  const [texto, setTexto] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const rolagem = useRef<ScrollView>(null)
 
   const buscar = useCallback(async () => {
-    const r = await carregarCatalogo()
-    /* Falha vira "sem vínculo", em silêncio: esta tela não tem o que fazer com
-       uma mensagem de erro, e o convite para conhecer as nutricionistas é uma
-       saída melhor do que um aviso vermelho. */
-    setNutri(r.tipo === 'ok' ? r.catalogo.vinculada : null)
+    const [cat, msgs] = await Promise.all([carregarCatalogo(), carregarMensagens()])
+
+    setNutri(cat.tipo === 'ok' ? cat.catalogo.vinculada : null)
+    if (msgs.tipo === 'ok') {
+      setMensagens(msgs.mensagens)
+      /* Marcar como lida é consequência de ter aberto a tela, não de ter
+         carregado: quem chegou aqui viu o que estava escrito. */
+      marcarLidas()
+    }
   }, [])
 
   useEffect(() => {
@@ -63,8 +86,9 @@ export function MensagensScreen({
     }
   }, [buscar])
 
-  /* O vínculo nasce do lado dela, e esta é uma das telas em que a pessoa espera
-     que ele já exista. Ver a armadilha 8 do AGENTS.md. */
+  /* Rede de segurança, e não o caminho principal: se a inscrição do realtime
+     cair sem avisar — sinal ruim, app suspenso por horas —, voltar ao app
+     recompõe a conversa. */
   useEffect(() => {
     const sub = AppState.addEventListener('change', estado => {
       if (estado === 'active') buscar()
@@ -72,78 +96,72 @@ export function MensagensScreen({
     return () => sub.remove()
   }, [buscar])
 
+  /* O que ela escreve entra sem ninguém pedir. Só as dela: o que eu escrevo já
+     entrou na tela no envio, e reagir ao próprio insert duplicaria a linha. */
+  useEffect(() => {
+    if (!nutri) return
+    const desligar = ouvirMensagens(nova => {
+      setMensagens(atuais =>
+        atuais.some(m => m.id === nova.id) ? atuais : [...atuais, nova],
+      )
+      marcarLidas()
+    })
+    return desligar
+  }, [nutri])
+
+  /* Sempre no fim: uma conversa que abre no começo obriga a rolar para ler o que
+     acabou de chegar. */
+  useEffect(() => {
+    if (mensagens.length > 0) {
+      requestAnimationFrame(() => rolagem.current?.scrollToEnd({ animated: false }))
+    }
+  }, [mensagens.length])
+
+  async function enviar() {
+    const limpo = texto.trim()
+    if (!limpo || enviando) return
+
+    setEnviando(true)
+    setErro('')
+    const r = await enviarMensagem(limpo)
+    setEnviando(false)
+
+    if (r.tipo === 'erro') {
+      setErro(r.mensagem)
+      return
+    }
+
+    /* Limpa o campo e relê. Reler em vez de montar a linha aqui: o id e o
+       horário vêm do banco, e uma linha montada na mão apareceria com hora do
+       aparelho e id inventado — que some e reaparece na próxima leitura. */
+    setTexto('')
+    const msgs = await carregarMensagens()
+    if (msgs.tipo === 'ok') setMensagens(msgs.mensagens)
+  }
+
   const whatsapp = nutri?.telefone ? linkDoWhatsapp(nutri.telefone) : null
+  const noApp = nutri ? conversaNoApp(nutri) : true
 
-  return (
-    <ScrollView
-      style={styles.tela}
-      contentContainerStyle={[styles.conteudo, { paddingTop: top + 8 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={atualizando}
-          onRefresh={async () => {
-            setAtualizando(true)
-            await buscar()
-            setAtualizando(false)
-          }}
-          tintColor={paleta().cores.limao}
-        />
-      }
-    >
-      <Text style={styles.titulo}>Mensagens</Text>
+  if (carregando) {
+    return (
+      <View style={[styles.tela, styles.centro, { paddingTop: top + 8 }]}>
+        <ActivityIndicator color={paleta().cores.verde} />
+      </View>
+    )
+  }
 
-      {carregando ? (
-        <View style={styles.centro}>
-          <ActivityIndicator color={paleta().cores.verde} />
-        </View>
-      ) : nutri ? (
-        <>
-          <View style={styles.cartao}>
-            <View style={styles.linhaNutri}>
-              <AvatarNutri nutri={nutri} tamanho={54} />
-              <View style={styles.textoNutri}>
-                <Text style={styles.nome} numberOfLines={2}>
-                  {nutri.nome}
-                </Text>
-                {!!nutri.telefone && (
-                  <Text style={styles.telefone}>{telefoneFormatado(nutri.telefone)}</Text>
-                )}
-              </View>
-            </View>
-
-            {whatsapp ? (
-              <Pressable
-                onPress={() => Linking.openURL(whatsapp)}
-                style={({ pressed }) => [styles.botaoZap, pressed && styles.botaoZapPressionado]}
-                accessibilityRole="button"
-                accessibilityLabel={`Abrir conversa com ${nutri.nome} no WhatsApp`}
-              >
-                <Ionicons name="logo-whatsapp" size={18} color={paleta().cores.branco} />
-                <Text style={styles.textoZap}>Conversar no WhatsApp</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.semTelefone}>
-                A sua nutricionista ainda não cadastrou um telefone de contato.
-              </Text>
-            )}
-          </View>
-
-          {/* Dito uma vez, sem alarde e sem data. Prometer prazo numa tela é a
-              forma mais barata de quebrar a promessa. */}
-          <Text style={styles.rodape}>
-            A conversa por dentro do Cygnos está sendo construída. Até lá, o WhatsApp é o caminho
-            mais rápido até ela.
-          </Text>
-        </>
-      ) : (
+  if (!nutri) {
+    return (
+      <View style={[styles.tela, { paddingTop: top + 8 }]}>
+        <Text style={styles.titulo}>Mensagens</Text>
         <View style={styles.vazio}>
           <View style={styles.circulo}>
             <Ionicons name="chatbubble-ellipses-outline" size={26} color={paleta().cores.verde} />
           </View>
           <Text style={styles.tituloVazio}>Ainda não há com quem conversar</Text>
           <Text style={styles.textoVazio}>
-            Assim que uma nutricionista acompanhar você, o contato dela aparece aqui.
+            A conversa começa quando uma nutricionista aceita o seu pedido. Conheça quem está no
+            Cygnos e mande o primeiro contato.
           </Text>
 
           <Pressable
@@ -156,70 +174,248 @@ export function MensagensScreen({
             <Ionicons name="chevron-forward" size={16} color={paleta().cores.verde} />
           </Pressable>
         </View>
+      </View>
+    )
+  }
+
+  return (
+    /* 'height' no Android, e não indefinido: sem comportamento declarado o
+       componente não faz nada, e o campo fica atrás do teclado. Ver a armadilha
+       2 do AGENTS.md. */
+    <KeyboardAvoidingView
+      style={[styles.tela, { paddingTop: top + 8 }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.cabecalho}>
+        <AvatarNutri nutri={nutri} tamanho={38} />
+        <View style={styles.textoCabecalho}>
+          <Text style={styles.nome} numberOfLines={1}>
+            {nutri.nome}
+          </Text>
+          {!!nutri.crn && <Text style={styles.crn}>CRN {nutri.crn}</Text>}
+        </View>
+
+        {/* Só quando ela escolheu o WhatsApp. No padrão o banco nem devolve o
+            número, e este botão não tem como existir. */}
+        {!noApp && !!whatsapp && (
+          <Pressable
+            onPress={() => Linking.openURL(whatsapp)}
+            style={({ pressed }) => [styles.botaoZap, pressed && styles.botaoZapPressionado]}
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir conversa com ${nutri.nome} no WhatsApp`}
+          >
+            <Ionicons name="logo-whatsapp" size={18} color={paleta().cores.branco} />
+          </Pressable>
+        )}
+      </View>
+
+      {!noApp ? (
+        /* Ela conversa por fora. Dizer isso é melhor do que abrir um campo que
+           escreve para um lugar que ela não lê. */
+        <View style={styles.vazio}>
+          <View style={styles.circulo}>
+            <Ionicons name="logo-whatsapp" size={26} color={paleta().cores.verde} />
+          </View>
+          <Text style={styles.tituloVazio}>Ela prefere conversar pelo WhatsApp</Text>
+          <Text style={styles.textoVazio}>
+            {nutri.telefone
+              ? `Toque no botão acima, ou chame no ${telefoneFormatado(nutri.telefone)}.`
+              : 'Use o botão acima para abrir a conversa.'}
+          </Text>
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            ref={rolagem}
+            style={styles.conversa}
+            contentContainerStyle={styles.conteudoConversa}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {mensagens.length === 0 ? (
+              <Text style={styles.primeira}>
+                Vocês ainda não trocaram mensagens. Escreva a primeira.
+              </Text>
+            ) : (
+              mensagens.map(m => <Balao key={m.id} mensagem={m} />)
+            )}
+          </ScrollView>
+
+          {!!erro && <Text style={styles.erro}>{erro}</Text>}
+
+          <View style={styles.barraEnvio}>
+            <TextInput
+              value={texto}
+              onChangeText={setTexto}
+              placeholder="Escreva uma mensagem"
+              placeholderTextColor={paleta().inkFraco}
+              style={styles.campo}
+              /* Cresce até quatro linhas e para: uma caixa que cresce sem limite
+                 come a conversa inteira em quem escreve muito. */
+              multiline
+              maxLength={4000}
+            />
+            <Pressable
+              onPress={enviar}
+              disabled={!texto.trim() || enviando}
+              style={({ pressed }) => [
+                styles.botaoEnviar,
+                (!texto.trim() || enviando) && styles.botaoEnviarApagado,
+                pressed && styles.botaoZapPressionado,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Enviar mensagem"
+            >
+              {enviando ? (
+                <ActivityIndicator size="small" color={paleta().cores.branco} />
+              ) : (
+                <Ionicons name="arrow-up" size={20} color={paleta().cores.branco} />
+              )}
+            </Pressable>
+          </View>
+        </>
       )}
-    </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}
+
+/* Minhas à direita e cheias, as dela à esquerda e claras — o lado diz de quem é
+   antes de qualquer palavra ser lida. */
+function Balao({ mensagem }: { mensagem: Mensagem }) {
+  const styles = estilos()
+  const minha = ehMinha(mensagem)
+
+  return (
+    <View style={[styles.linhaBalao, minha && styles.linhaBalaoMinha]}>
+      <View style={[styles.balao, minha ? styles.balaoMeu : styles.balaoDela]}>
+        <Text style={[styles.textoBalao, minha && styles.textoBalaoMeu]}>{mensagem.texto}</Text>
+        <Text style={[styles.hora, minha && styles.horaMinha]}>
+          {horaCurta(new Date(mensagem.criadaEm))}
+        </Text>
+      </View>
+    </View>
   )
 }
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
-  tela: { flex: 1, backgroundColor: t.cores.fundo },
-  conteudo: { paddingHorizontal: 20, paddingBottom: 28, gap: 14 },
-  centro: { paddingTop: 60, alignItems: 'center' },
+    tela: { flex: 1, backgroundColor: t.cores.fundo },
+    centro: { alignItems: 'center', justifyContent: 'center' },
+    titulo: {
+      paddingHorizontal: 20,
+      fontSize: 27,
+      fontWeight: '800',
+      color: t.cores.ink,
+      letterSpacing: -0.6,
+    },
 
-  titulo: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
+    cabecalho: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: t.cores.borda,
+    },
+    textoCabecalho: { flex: 1, gap: 1 },
+    nome: { fontSize: 16, fontWeight: '800', color: t.cores.ink },
+    crn: { fontSize: 12, color: t.inkFraco },
 
-  cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: 16, gap: 14 },
-  linhaNutri: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  textoNutri: { flex: 1, gap: 2 },
-  nome: { fontSize: 16, fontWeight: '800', color: t.cores.ink },
-  telefone: { fontSize: 13, color: t.inkSuave },
+    botaoZap: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.verde,
+    },
+    botaoZapPressionado: { backgroundColor: t.cores.verdeEscuro },
 
-  botaoZap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: t.cores.verde,
-  },
-  botaoZapPressionado: { backgroundColor: t.cores.verdeEscuro },
-  textoZap: { fontSize: 14.5, fontWeight: '700', color: t.cores.branco },
+    conversa: { flex: 1 },
+    conteudoConversa: { paddingHorizontal: 16, paddingVertical: 14, gap: 8 },
+    primeira: {
+      marginTop: 40,
+      fontSize: 13.5,
+      lineHeight: 20,
+      color: t.inkFraco,
+      textAlign: 'center',
+      paddingHorizontal: 24,
+    },
 
-  semTelefone: { fontSize: 13, lineHeight: 19, color: t.inkFraco, textAlign: 'center' },
+    linhaBalao: { flexDirection: 'row' },
+    linhaBalaoMinha: { justifyContent: 'flex-end' },
+    balao: { maxWidth: '82%', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 16 },
+    balaoDela: { backgroundColor: t.cores.cartao, borderBottomLeftRadius: 5 },
+    balaoMeu: { backgroundColor: t.cores.verde, borderBottomRightRadius: 5 },
+    textoBalao: { fontSize: 14.5, lineHeight: 20, color: t.cores.ink },
+    textoBalaoMeu: { color: t.cores.branco },
+    hora: { marginTop: 3, fontSize: 10.5, color: t.inkFraco, alignSelf: 'flex-end' },
+    horaMinha: { color: 'rgba(255,255,255,0.75)' },
 
-  rodape: { fontSize: 12.5, lineHeight: 18, color: t.inkFraco, textAlign: 'center', paddingHorizontal: 8 },
+    erro: { paddingHorizontal: 20, paddingBottom: 6, fontSize: 12.5, color: t.cores.erroTexto },
 
-  vazio: { alignItems: 'center', paddingTop: 40, gap: 10 },
-  circulo: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: t.cores.verdeMenta,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  tituloVazio: { fontSize: 17, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
-  textoVazio: {
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: t.inkFraco,
-    textAlign: 'center',
-    paddingHorizontal: 16,
-  },
-  botaoVer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 13,
-    backgroundColor: t.cores.verdeClaro,
-  },
-  botaoVerPressionado: { backgroundColor: t.cores.verdeMenta },
-  textoVer: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
+    barraEnvio: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 10,
+      borderTopWidth: 1,
+      borderTopColor: t.cores.borda,
+    },
+    campo: {
+      flex: 1,
+      minHeight: 44,
+      maxHeight: 120,
+      paddingHorizontal: 14,
+      paddingTop: 11,
+      paddingBottom: 11,
+      borderRadius: 22,
+      backgroundColor: t.cores.cartao,
+      color: t.cores.ink,
+      fontSize: 14.5,
+    },
+    botaoEnviar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.verde,
+    },
+    botaoEnviarApagado: { opacity: 0.4 },
+
+    vazio: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 20, gap: 10 },
+    circulo: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: t.cores.verdeMenta,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 4,
+    },
+    tituloVazio: { fontSize: 17, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
+    textoVazio: {
+      fontSize: 13.5,
+      lineHeight: 20,
+      color: t.inkFraco,
+      textAlign: 'center',
+      paddingHorizontal: 16,
+    },
+    botaoVer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 13,
+      backgroundColor: t.cores.verdeClaro,
+    },
+    botaoVerPressionado: { backgroundColor: t.cores.verdeMenta },
+    textoVer: { fontSize: 14, fontWeight: '700', color: t.cores.verde },
   }),
 )

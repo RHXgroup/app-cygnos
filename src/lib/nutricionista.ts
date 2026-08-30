@@ -25,6 +25,10 @@ export type Nutricionista = {
   crn: string | null
   cidade: string | null
   uf: string | null
+  /* 'sistema' ou 'whatsapp'. Quem escolhe é ela, num parâmetro do sistema, e o
+     padrão é o sistema — a conversa acontece dentro do app e o telefone nem
+     chega aqui. Só com 'whatsapp' o número vem preenchido. */
+  canalDeContato: string
 }
 
 export type Catalogo = {
@@ -48,6 +52,7 @@ type Linha = {
   crn: string | null
   cidade: string | null
   uf: string | null
+  canal_de_contato: string | null
   vinculada: boolean
 }
 
@@ -66,6 +71,7 @@ const daLinha = (l: Linha): Nutricionista => ({
   crn: l.crn,
   cidade: l.cidade,
   uf: l.uf,
+  canalDeContato: l.canal_de_contato ?? 'sistema',
 })
 
 /* ── As fotos ──────────────────────────────────────────────────────────────
@@ -168,3 +174,7 @@ export function iniciais(nome: string): string {
   if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase()
   return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
 }
+
+/* A conversa acontece dentro do app? É o padrão, e só deixa de ser quando ela
+   marca o WhatsApp no parâmetro do sistema. */
+export const conversaNoApp = (n: Nutricionista) => n.canalDeContato !== 'whatsapp'

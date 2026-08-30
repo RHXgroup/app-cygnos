@@ -1,0 +1,116 @@
+import { supabase } from './supabase'
+import { falha } from './erros'
+
+/* A conversa entre o paciente e a nutricionista dele.
+ *
+ * Só existe com vínculo. Antes do aceite não há conversa — há pedido, que é
+ * outra coisa e mora em lib/solicitacoes.ts.
+ *
+ * ── A primeira coisa do app que chega sozinha ──────────────────────────────
+ * Todo o resto do Cygnos descobre o que mudou relendo: ao abrir a tela, ao
+ * voltar do segundo plano, ao puxar. Serve para plano e consulta, que mudam uma
+ * vez por semana. Não serve para conversa: uma resposta que só aparece quando a
+ * pessoa sai do app e volta não é conversa, é caixa de correio.
+ *
+ * Por isso a leitura é direta na tabela, com RLS, em vez de por função: é o que
+ * o realtime do Supabase exige, porque ele entrega o que a política deixa ler.
+ * Escrever continua sendo por função, que é onde o vínculo é conferido e onde se
+ * decide de quem é a mensagem — se `de` viesse do cliente, um lado poderia
+ * escrever se passando pelo outro. */
+
+export type Mensagem = {
+  id: number
+  /* 'paciente' ou 'nutricionista'. Texto cru: o app não decide isto, o banco
+     decide, e um valor novo não pode derrubar a tela. */
+  de: string
+  texto: string
+  criadaEm: string
+  lidaEm: string | null
+}
+
+export type ResultadoMensagens =
+  | { tipo: 'ok'; mensagens: Mensagem[] }
+  | { tipo: 'erro'; mensagem: string }
+
+type Linha = {
+  id: number
+  de: string
+  texto: string
+  criada_em: string
+  lida_em: string | null
+}
+
+const daLinha = (l: Linha): Mensagem => ({
+  id: l.id,
+  de: l.de,
+  texto: l.texto,
+  criadaEm: l.criada_em,
+  lidaEm: l.lida_em,
+})
+
+export const ehMinha = (m: Mensagem) => m.de === 'paciente'
+
+/* Em ordem de calendário, da mais antiga para a mais nova — que é a ordem em
+   que uma conversa se lê. A tela rola para o fim ao abrir. */
+export async function carregarMensagens(): Promise<ResultadoMensagens> {
+  const { data, error } = await supabase
+    .from('app_mensagens')
+    .select('id, de, texto, criada_em, lida_em')
+    .order('criada_em', { ascending: true })
+
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui carregar a conversa agora. Verifique a conexão.', error),
+    }
+
+  return { tipo: 'ok', mensagens: ((data ?? []) as Linha[]).map(daLinha) }
+}
+
+export type ResultadoEnvio = { tipo: 'ok' } | { tipo: 'erro'; mensagem: string }
+
+/* Falha aqui devolve a frase do BANCO. Ele escreve em português para alguém ler
+   — "Você ainda não tem uma nutricionista para conversar." —, e traduzir isso
+   seria perder o motivo. Mesma exceção de lib/agenda.ts. */
+export async function enviarMensagem(texto: string): Promise<ResultadoEnvio> {
+  const { error } = await supabase.rpc('app_enviar_mensagem', { p_texto: texto })
+  if (error) return { tipo: 'erro', mensagem: error.message }
+  return { tipo: 'ok' }
+}
+
+/* Melhor esforço, e em silêncio: falhar em marcar como lida não muda nada para
+   quem está lendo, e um aviso vermelho por causa disso seria pior do que o
+   contador ficar um minuto atrasado do outro lado. */
+export async function marcarLidas(): Promise<void> {
+  try {
+    await supabase.rpc('app_marcar_mensagens_lidas')
+  } catch {
+    /* Ver acima. */
+  }
+}
+
+/* Avisa quando chega mensagem nova, sem a tela precisar perguntar.
+ *
+ * Devolve a função de desligar — e chamá-la no desmonte não é detalhe: uma
+ * inscrição que sobrevive à tela continua recebendo e mirando um componente que
+ * já não existe.
+ *
+ * Só INSERT, e só as dela: o que o paciente escreve já entra na tela pelo envio,
+ * e reagir ao próprio insert faria a mensagem aparecer duas vezes. */
+export function ouvirMensagens(aoChegar: (m: Mensagem) => void): () => void {
+  const canal = supabase
+    .channel('app_mensagens_do_paciente')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'app_mensagens' },
+      carga => {
+        const l = carga.new as Linha
+        if (l && l.de === 'nutricionista') aoChegar(daLinha(l))
+      },
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(canal)
+  }
+}
