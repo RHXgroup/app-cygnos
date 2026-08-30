@@ -2,9 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
-  KeyboardAvoidingView,
   Linking,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -33,7 +31,7 @@ import {
 } from '../lib/mensagens'
 import { horaCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
-import { useRespiroDeBaixo } from '../lib/teclado'
+import { useAlturaTeclado } from '../lib/teclado'
 
 /* A conversa com a nutricionista.
  *
@@ -93,7 +91,22 @@ export function MensagensScreen({
    *
    * E com o teclado aberto vira zero, senão sobra um vão do tamanho de um dedo
    * entre o campo e o teclado. Ver lib/teclado.ts. */
-  const respiro = useRespiroDeBaixo(bottom)
+  /* A altura do teclado, medida — e não um KeyboardAvoidingView.
+   *
+   * Esta tela vive dentro de <Sobreposta>, que é `absoluteFillObject`. O
+   * AGENTS.md separa os dois casos justamente aqui: em tela comum o
+   * KeyboardAvoidingView resolve; em coisa posicionada por absoluto ele erra,
+   * porque com edge-to-edge a janela do Android não encolhe e o componente
+   * desconta a altura do teclado de uma altura que não mudou. O resultado é o
+   * campo saltando para o meio da tela.
+   *
+   * Foi o que aconteceu: a tela nasceu como aba — onde o KAV estava certo —, e
+   * virou sobreposição sem trocar a ferramenta. Mesma raiz do rodapé. */
+  const alturaTeclado = useAlturaTeclado()
+
+  /* Com o teclado aberto a barra encosta nele; fechado, na área segura. Nunca
+     os dois: o teclado já cobre a barra de gestos. */
+  const respiro = alturaTeclado || bottom
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -267,16 +280,11 @@ export function MensagensScreen({
   }
 
   return (
-    /* 'height' no Android, e não indefinido: sem comportamento declarado o
-       componente não faz nada, e o campo fica atrás do teclado. Ver a armadilha
-       2 do AGENTS.md. */
-    <KeyboardAvoidingView
-      /* Sem respiro AQUI de propósito: quem o carrega é o elemento mais de
-         baixo de cada ramo — a barra de escrever numa, o bloco do WhatsApp na
-         outra. Somar no pai e no filho abre o dobro do vão. */
-      style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    /* View comum, e não KeyboardAvoidingView: quem desvia do teclado aqui é a
+       barra de escrever, com a altura medida. Ver o comentário lá em cima.
+       E sem respiro no pai — quem o carrega é o elemento mais de baixo de cada
+       ramo, senão o vão sai em dobro. */
+    <View style={[styles.tela, { paddingTop: top + 8 }]}>
       <View style={styles.cabecalho}>
         <Pressable
           onPress={onFechar}
@@ -357,7 +365,7 @@ export function MensagensScreen({
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
-          <View style={[styles.barraEnvio, { paddingBottom: 10 + respiro }]}>
+          <View style={[styles.barraEnvio, { marginBottom: respiro }]}>
             <TextInput
               value={texto}
               onChangeText={setTexto}
@@ -389,7 +397,7 @@ export function MensagensScreen({
           </View>
         </>
       )}
-    </KeyboardAvoidingView>
+    </View>
   )
 }
 
