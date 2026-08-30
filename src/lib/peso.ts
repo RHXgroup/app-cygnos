@@ -78,8 +78,13 @@ export async function registrarPeso(
     .upsert(
       {
         conta_id: contaId,
-        /* Duas casas, como a balança mostra. */
-        kg: Math.round(kg * 100) / 100,
+        /* Três casas, e não duas.
+         *
+         * Duas era o palpite de que balança de banheiro mostra "83,68". Balança
+         * de bioimpedância mostra 83,685, e cortar a terceira casa é jogar fora
+         * medida que a pessoa tem — sem avisar, o que é pior do que recusar. A
+         * coluna acompanha, em numeric(6,3). */
+        kg: Math.round(kg * 1000) / 1000,
         data: dataISO(quando),
       },
       { onConflict: 'conta_id,data' },
@@ -197,9 +202,27 @@ export function serieDe(registros: RegistroPeso[], quantos = DIAS_DA_CURVA): num
     .map(r => r.kg)
 }
 
-/* "72,4" — uma casa na tela, mesmo com duas guardadas. A segunda casa importa
-   para a conta da variação não acumular erro; para ler, 72,45 é ruído. */
+/* "72,4" — uma casa na tela, mesmo com três guardadas. As outras importam para
+   a conta da variação não acumular erro; para LER, 72,453 é ruído.
+
+   Só que ler não é o único uso. Ver `kgExato` logo abaixo, e a diferença entre
+   as duas é um defeito que já aconteceu. */
 export const kg = (n: number) => n.toFixed(1).replace('.', ',')
+
+/* O peso como foi registrado, sem casa inventada nem casa perdida: 83,685 volta
+ * "83,685", 83,5 volta "83,5", e 83 volta "83".
+ *
+ * Existe porque `kg` acima é formatador de TELA, e ele estava sendo usado para
+ * preencher o CAMPO. O efeito: a pessoa digitava 83,685, o registro voltava do
+ * banco, o campo era reescrito com "83,7" — e o app parecia recusar a casa
+ * decimal que ela tinha acabado de digitar. Ela não estava errada: para quem
+ * olha, aquilo é o campo dizendo "aqui só entra número redondo".
+ *
+ * É a mesma armadilha do AGENTS.md item 3, pelo outro lado: lá o valor entrava
+ * no campo sem passar pelo filtro; aqui ele passa por um formatador que não
+ * tinha nada que estar no caminho da escrita. */
+export const kgExato = (n: number) =>
+  String(Math.round(n * 1000) / 1000).replace('.', ',')
 
 /* "2,3" — o tamanho da variação, sem sinal. Quem diz se subiu ou desceu é a
    palavra ao lado, não o menos: "−2,3 kg" e "perdeu" juntos dizem a mesma coisa

@@ -23,6 +23,7 @@ import {
   carregarPeso,
   evolucaoDe,
   kg,
+  kgExato,
   registrarPeso,
   ritmoSemanal,
   serieDe,
@@ -107,9 +108,14 @@ export function PesoScreen({
   const deHoje = registros?.find(r => r.data === hoje) ?? null
 
   /* O campo nasce com o peso de hoje quando ele já existe: a tela abre mostrando
-     o que está gravado, e quem só quer conferir não precisa digitar nada. */
+     o que está gravado, e quem só quer conferir não precisa digitar nada.
+
+     `kgExato` e não `kg`: o segundo arredonda para uma casa, e como este efeito
+     roda DEPOIS de registrar, ele reescrevia por cima o que a pessoa acabou de
+     digitar. Quem pesou 83,685 via o campo virar "83,7" no mesmo instante — e
+     lia isso como o app não aceitar decimal. */
   useEffect(() => {
-    if (deHoje) setTexto(kg(deHoje.kg))
+    if (deHoje) setTexto(kgExato(deHoje.kg))
   }, [deHoje?.id, deHoje?.kg])
 
   const numero = Number(texto.trim().replace(',', '.'))
@@ -235,7 +241,10 @@ export function PesoScreen({
                 placeholder="72,4"
                 placeholderTextColor={paleta().inkFraco}
                 keyboardAppearance="dark"
-                maxLength={6}
+                /* 7, e não 6: "83,685" cabia em 6 por sorte, e "103,685" não —
+                   quem passa dos cem perdia a última casa sem nada na tela
+                   dizendo por quê. */
+                maxLength={7}
                 style={[styles.campo, texto.trim() !== '' && !valido && styles.campoComErro]}
                 accessibilityLabel="Peso em quilos"
               />
@@ -474,7 +483,11 @@ function Historico({
               </View>
             )}
 
-            <Text style={styles.kgRegistro}>{kg(r.kg)} kg</Text>
+            {/* O histórico mostra o valor REGISTRADO, e não o arredondado: é
+                a lista onde a pessoa confere o que anotou, e conferir contra um
+                número redondo não confere nada. Os resumos e a variação
+                continuam com uma casa, onde a terceira é ruído. */}
+            <Text style={styles.kgRegistro}>{kgExato(r.kg)} kg</Text>
 
             <Pressable
               onPress={() => onApagar(r)}
