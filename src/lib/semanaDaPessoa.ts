@@ -53,6 +53,16 @@ const somando = (iso: string, dias: number) => paraISO(doISO(iso) + dias * DIA)
 const naFaixa = <T extends DiaComData>(itens: T[], de: string, ate: string): T[] =>
   itens.filter(i => ISO.test(i.data) && i.data >= de && i.data <= ate)
 
+/* Número que dá para mostrar.
+ *
+ * `Number()` de um numeric do Postgres devolve NaN quando a coluna vem nula ou
+ * torta, e NaN e Infinity ATRAVESSAM soma e média sem reclamar: o que aparece na
+ * tela é "média de NaN kcal" e "+Infinity kg nesta semana". Uma sonda de entrada
+ * hostil pegou os dois, e é o tipo de coisa que destrói a confiança em todos os
+ * outros números da tela de uma vez. */
+const numeroDeVerdade = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isFinite(n)
+
 /* Um número com vírgula, sem casa quando é redondo. "0,8 kg" e "2 kg". */
 const kg = (n: number) => {
   const arredondado = Math.round(Math.abs(n) * 10) / 10
@@ -104,7 +114,9 @@ export function semanaDaPessoa(entrada: {
   }
 
   /* ── Peso ────────────────────────────────────────────────────────────── */
-  const pesagens = naFaixa(entrada.pesos, de, hoje).sort((a, b) => a.data.localeCompare(b.data))
+  const pesagens = naFaixa(entrada.pesos, de, hoje)
+    .filter(p => numeroDeVerdade(p.kg))
+    .sort((a, b) => a.data.localeCompare(b.data))
   /* Duas pesagens na semana, no mínimo: com uma só não há variação, e mostrar
      "você está com 72 kg" não é devolução — é repetir o que ela digitou. */
   if (pesagens.length >= 2) {
@@ -123,7 +135,9 @@ export function semanaDaPessoa(entrada: {
   }
 
   /* ── Calorias ────────────────────────────────────────────────────────── */
-  const diasComCalorias = naFaixa(entrada.consumo, de, hoje).filter(c => c.calorias !== null)
+  const diasComCalorias = naFaixa(entrada.consumo, de, hoje).filter(c =>
+    numeroDeVerdade(c.calorias),
+  )
   if (diasComCalorias.length >= 3) {
     const media = Math.round(
       diasComCalorias.reduce((a, c) => a + (c.calorias ?? 0), 0) / diasComCalorias.length,
@@ -143,6 +157,7 @@ export function semanaDaPessoa(entrada: {
   if (meta && meta > 0) {
     const porDia = new Map<string, number>()
     for (const g of naFaixa(entrada.agua, de, hoje)) {
+      if (!numeroDeVerdade(g.ml)) continue
       porDia.set(g.data, (porDia.get(g.data) ?? 0) + g.ml)
     }
     const bateu = [...porDia.values()].filter(ml => ml >= meta).length

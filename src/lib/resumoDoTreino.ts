@@ -37,8 +37,18 @@ export type ResumoDoTreino = {
   recordes: number
 }
 
+/* Número que dá para mostrar.
+ *
+ * `Number()` de um numeric do Postgres devolve NaN quando a coluna vem torta, e
+ * NaN e Infinity ATRAVESSAM soma, média e `Math.max` sem reclamar — o que
+ * aparece na tela é "NaN kg levantados". Uma sonda de entrada hostil pegou os
+ * dois, e um número absurdo apresentado com confiança destrói a confiança em
+ * todos os outros da tela. */
+const numeroDeVerdade = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isFinite(n)
+
 const maiorCarga = (series: SerieFeita[]): number | null => {
-  const cargas = series.map(s => s.cargaKg).filter((c): c is number => c !== null)
+  const cargas = series.map(s => s.cargaKg).filter(numeroDeVerdade)
   return cargas.length ? Math.max(...cargas) : null
 }
 
@@ -87,7 +97,9 @@ export function resumoDoTreino(
     /* Só entra no volume o que tem os DOIS números. Série sem carga registrada
        não vale zero: vale desconhecido, e somar zero faria o total mentir para
        baixo sem nada na tela dizendo por quê. */
-    if (s.cargaKg !== null && s.repeticoes !== null) volumeKg += s.cargaKg * s.repeticoes
+    if (numeroDeVerdade(s.cargaKg) && numeroDeVerdade(s.repeticoes)) {
+      volumeKg += s.cargaKg * s.repeticoes
+    }
   }
 
   const comparacoes: ComparacaoDeExercicio[] = []
