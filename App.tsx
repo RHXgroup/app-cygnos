@@ -49,6 +49,7 @@ import { RegistrarScreen } from './src/screens/RegistrarScreen'
 import { ComerScreen } from './src/screens/ComerScreen'
 import { CorpoScreen } from './src/screens/CorpoScreen'
 import { CicloScreen } from './src/screens/CicloScreen'
+import { QuestionarioScreen } from './src/screens/QuestionarioScreen'
 import { SonoScreen } from './src/screens/SonoScreen'
 import type { PlanoCompleto, RefeicaoSalva } from './src/lib/plano'
 import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/tema'
@@ -291,6 +292,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [contadorAberto, setContadorAberto] = useState(false)
   const [sonoAberto, setSonoAberto] = useState(false)
   const [cicloAberto, setCicloAberto] = useState(false)
+  const [questionarioAberto, setQuestionarioAberto] = useState(false)
   /* null = fechada. Aberta, guarda em que opção ela deve nascer: 'plano' quando
      veio do botão da Home, 'energetico' quando veio de Meus cadastros, undefined
      quando veio do + e a grade é o começo. */
@@ -461,6 +463,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         [contadorAberto, () => setContadorAberto(false)],
         [sonoAberto, () => setSonoAberto(false)],
         [cicloAberto, () => setCicloAberto(false)],
+        [questionarioAberto, () => setQuestionarioAberto(false)],
         [metasAbertas !== null, () => setMetasAbertas(null)],
         [comprasDe !== null, () => setComprasDe(null)],
         [aguaAberta, () => setAguaAberta(false)],
@@ -501,6 +504,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     contadorAberto,
     sonoAberto,
     cicloAberto,
+    questionarioAberto,
     metasAbertas,
     comprasDe,
     aguaAberta,
@@ -576,6 +580,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 onAbrirContador={() => setContadorAberto(true)}
                 onAbrirSono={() => setSonoAberto(true)}
                 onAbrirCiclo={() => setCicloAberto(true)}
+                onAbrirQuestionario={() => setQuestionarioAberto(true)}
                 /* Treino não tem tela própria no App: ele mora dentro do "+",
                    e abrir o "+" já naquela opção é o mesmo caminho que o
                    cartão de plano usa para "montar plano". */
@@ -779,6 +784,18 @@ function AreaLogada({ sessao }: { sessao: Session }) {
           </Sobreposta>
         )}
 
+        {questionarioAberto && (
+          <Sobreposta>
+            <QuestionarioScreen
+              onFechar={() => setQuestionarioAberto(false)}
+              /* O contador do vínculo, e não um novo: é ele que faz a aba Mais
+                 reler — e é na mesma leitura que a linha do questionário some
+                 depois de respondido. */
+              onRespondido={() => setVersaoVinculo(v => v + 1)}
+            />
+          </Sobreposta>
+        )}
+
         {cicloAberto && (
           <Sobreposta>
             <CicloScreen
@@ -901,6 +918,7 @@ function TelaDaAba({
   onAbrirContador,
   onAbrirSono,
   onAbrirCiclo,
+  onAbrirQuestionario,
   onAbrirTreino,
   onAbrirReceitas,
   versaoIntencao,
@@ -934,6 +952,7 @@ function TelaDaAba({
   onAbrirContador: () => void
   onAbrirSono: () => void
   onAbrirCiclo: () => void
+  onAbrirQuestionario: () => void
   onAbrirTreino: () => void
   onAbrirReceitas: () => void
   versaoIntencao: number
@@ -1010,6 +1029,7 @@ function TelaDaAba({
           onAbrirCodigo={onAbrirCodigo}
           onAbrirExcluirConta={onAbrirExcluirConta}
           onAbrirMensagens={onAbrirMensagens}
+          onAbrirQuestionario={onAbrirQuestionario}
           naoLidas={naoLidas}
           onAbrirMetas={onAbrirMetas}
         />

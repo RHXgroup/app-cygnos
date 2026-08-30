@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
 import { LINKS, abrirLink } from '../lib/links'
 import { carregarCatalogo, type Catalogo } from '../lib/nutricionista'
+import { carregarQuestionario } from '../lib/questionario'
 import { supabase } from '../lib/supabase'
 import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
 import {
@@ -63,6 +64,7 @@ export function MaisScreen({
   onAbrirCodigo,
   onAbrirExcluirConta,
   onAbrirMensagens,
+  onAbrirQuestionario,
   naoLidas,
   onAbrirMetas,
 }: {
@@ -85,6 +87,7 @@ export function MaisScreen({
      era o ponto sobre o ícone da aba, e sem ele a mensagem dela só seria
      descoberta por quem abrisse este menu por acaso. */
   onAbrirMensagens: () => void
+  onAbrirQuestionario: () => void
   naoLidas: number
   /* O lembrete de água não é nada sem a meta: é dela que saem quantos avisos, a
      que horas, e quanto o botão da notificação registra. Sem este caminho, a
@@ -112,6 +115,13 @@ export function MaisScreen({
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
+  /* Há questionário pré-consulta esperando resposta?
+   *
+   * Quem manda é ela, do sistema dela, e nada avisa o aparelho — item 8 do
+   * AGENTS.md. Esta tela já relê ao voltar do segundo plano, e é por isso que a
+   * verificação mora aqui e não numa tela própria: a linha aparece sozinha
+   * quando a pessoa volta ao app, sem ela ter de procurar em lugar nenhum. */
+  const [temQuestionario, setTemQuestionario] = useState(false)
 
   const buscar = useCallback(async () => {
     const r = await carregarCatalogo()
@@ -120,6 +130,13 @@ export function MaisScreen({
       setErro(null)
       setCatalogo(r.catalogo)
     }
+
+    /* Em silêncio de propósito, e é o único lugar desta tela onde engulo erro.
+       Falhar em saber se há questionário não é motivo para cobrir a tela de
+       Mais com uma mensagem: o que a pessoa veio fazer aqui continua todo
+       disponível, e a linha reaparece na próxima leitura. */
+    const q = await carregarQuestionario()
+    setTemQuestionario(q.tipo === 'ok')
   }, [])
 
   useEffect(() => {
@@ -318,6 +335,30 @@ export function MaisScreen({
         onAbrir={onAbrirNutricionistas}
         onAbrirCodigo={onAbrirCodigo}
       />
+
+      {/* Só aparece quando há algo a responder, e some sozinha depois.
+          Uma linha permanente de "questionário" ensinaria a ignorá-la: quando o
+          dia do questionário chegasse, ela seria mais um item que já estava
+          ali. Assim ela é sempre uma coisa nova. */}
+      {temQuestionario && (
+        <Pressable
+          onPress={onAbrirQuestionario}
+          style={({ pressed }) => [styles.linhaQuestionario, pressed && styles.linhaPressionada]}
+          accessibilityRole="button"
+          accessibilityLabel="Responder o questionário antes da consulta"
+        >
+          <View style={styles.iconeQuestionario}>
+            <Ionicons name="document-text-outline" size={19} color={paleta().cores.verde} />
+          </View>
+          <View style={styles.textoQuestionario}>
+            <Text style={styles.tituloQuestionario}>Responder antes da consulta</Text>
+            <Text style={styles.subQuestionario}>
+              A sua nutricionista mandou algumas perguntas
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+        </Pressable>
+      )}
 
       <Pressable
         onPress={onAbrirMensagens}
@@ -779,6 +820,32 @@ const estilos = estilosDe(t =>
     paddingVertical: 13,
   },
   linhaPressionada: { backgroundColor: t.cores.superficie },
+  linhaQuestionario: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: t.cores.verdeMenta,
+    borderRadius: 14,
+    borderWidth: 1,
+    /* Borda verde e fundo menta, ao contrário das outras linhas desta tela.
+       Não é enfeite: ela aparece por poucos dias, tem prazo (a consulta), e
+       precisa parecer diferente do que já estava aqui — senão o olho de quem
+       abre Mais todo dia passa por cima dela. */
+    borderColor: t.cores.verde,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  iconeQuestionario: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: t.cores.cartao,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textoQuestionario: { flex: 1, gap: 2 },
+  tituloQuestionario: { fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
+  subQuestionario: { fontSize: 12, color: t.inkMedio },
   iconeMensagens: {
     width: 34,
     height: 34,
