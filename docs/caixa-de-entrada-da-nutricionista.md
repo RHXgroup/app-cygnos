@@ -92,6 +92,31 @@ com justificativa opcional é campo que fica vazio.
 
 O app já sabe mostrar isso — diz "Não pôde atender" e convida a procurar outra.
 
+### 4. Ler e responder a conversa
+
+A tabela `app_mensagens` já recebe o que o paciente escreve — o app grava, e o
+realtime entrega ao outro lado na hora. **Não há tela do lado dela**, então a
+mensagem chega ao banco e ninguém lê.
+
+Do lado dela é preciso:
+
+- listar as mensagens do par (`conta_id` + `nutricionista_id`), em ordem de
+  `criada_em`
+- escrever com `de = 'nutricionista'`
+- marcar `lida_em` no que o paciente mandou, quando ela abrir a conversa
+
+**Escrever tem que passar por função `security definer`, e não por INSERT
+direto.** É lá que o vínculo é conferido e que se decide de quem é a mensagem:
+se o `de` viesse do cliente, um lado poderia escrever se passando pelo outro.
+
+**Ler pode ser direto na tabela, com RLS** — e para o realtime funcionar do lado
+dela, precisa ser: o realtime entrega o que a política deixa ler, não o que uma
+função devolve. É assim que o app faz.
+
+O `lida_em` não é enfeite: é ele que apaga o ponto de "mensagem nova" no
+aparelho do paciente, e vale entre aparelhos — o que ele leu no celular não
+pisca de novo no tablet.
+
 ---
 
 ## Três regras que o app já aplica, e que precisam valer dos dois lados
@@ -140,35 +165,6 @@ hora, com o app aberto.
 Se o sistema web ganhar uma tela de parâmetros para isso, é este campo. E o
 padrão continua sendo `'sistema'` — a conversa é parte do acompanhamento e é a
 prova de que o paciente veio pelo aplicativo.
-
----
-
-### 4. Ler e responder a conversa
-
-A tabela `app_mensagens` já recebe o que o paciente escreve — o app grava, e o
-realtime entrega ao outro lado na hora. **Não há tela do lado dela**, então a
-mensagem chega ao banco e ninguém lê.
-
-Do lado dela é preciso:
-
-- listar as mensagens do par (`conta_id` + `nutricionista_id`), em ordem de
-  `criada_em`
-- escrever com `de = 'nutricionista'`
-- marcar `lida_em` no que o paciente mandou, quando ela abrir a conversa
-
-**Escrever tem que passar por função `security definer`, e não por INSERT
-direto.** É lá que o vínculo é conferido e que se decide de quem é a mensagem:
-se o `de` viesse do cliente, um lado poderia escrever se passando pelo outro.
-
-**Ler pode ser direto na tabela, com RLS** — e para o realtime funcionar do lado
-dela, precisa ser: o realtime entrega o que a política deixa ler, não o que uma
-função devolve. É assim que o app faz.
-
-O `lida_em` não é enfeite: é ele que apaga o ponto de "mensagem nova" no
-aparelho do paciente, e vale entre aparelhos — o que ele leu no celular não
-pisca de novo no tablet.
-
----
 
 ## Duas coisas soltas, do mesmo lado
 
