@@ -111,8 +111,78 @@ const PADRAO_NUMERO = /^(\d+(?:[.,]\d+)?)\s*([a-zA-ZçáéíóúâêôãõÁÉÍ
  * mudaria a quantidade. */
 const semPontuacaoNasPontas = (s: string) => s.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, '')
 
+/* O que é FALA e não é alimento.
+ *
+ * Quem digita escreve "arroz, feijão, bife". Quem DITA fala: "na janta eu comi
+ * bastante carne de churrasco, arroz e mandioca". A gramática recebia tudo
+ * isso como nome de alimento e ia procurar "na janta eu comi bastante carne de
+ * churrasco" na base — que obviamente não acha.
+ *
+ * Três famílias, e cada uma veio de um caso real de ditado:
+ *
+ *   · NOME DA REFEIÇÃO  "na janta", "no almoço", "de manhã" — a pessoa está
+ *     dizendo QUANDO comeu, e a tela já sabe disso: ela abriu a refeição.
+ *   · VERBO DE COMER    "eu comi", "tomei", "bebi", "comi bastante" — em
+ *     português falado a frase começa pelo verbo, sempre.
+ *   · ADVÉRBIO DE VAGO  "bastante", "um pouco de", "mais ou menos", "tipo".
+ *     Estes são os mais perigosos, porque parecem quantidade e não são: virar
+ *     "bastante" em 2 ou em 200 g seria inventar um número que entra na soma
+ *     do dia. Saem, e a pessoa ajusta a quantidade na tela, onde ela vê.
+ *
+ * Tudo isso só é tirado do COMEÇO do pedaço. "Carne de sol" tem "de sol" no
+ * meio e não pode perder nada; "bolo de pote" idem. */
+const FALA = new RegExp(
+  '^(?:' +
+    [
+      /* pronome e conector soltos */
+      'eu', 'a gente', 'nois', 'n[oó]s', 'ent[aã]o', 'ai', 'a[ií]', 'da[ií]', 'tipo( assim)?',
+      'acho que', 'foi', 'hoje', 'ontem', 'agora',
+      /* quando */
+      '(n[oa]|de|pel[oa]|no|na) ?(caf[eé] da manh[aã]|manh[aã]|almo[cç]o|janta|jantar|lanche|ceia|tarde|noite|madrugada)',
+      'caf[eé] da manh[aã]', 'almo[cç]o', 'janta', 'jantar', 'lanche( da tarde)?', 'ceia',
+      /* verbo de comer e beber, em todas as formas que aparecem falando */
+      'com[ií]', 'comer', 'comemos', 'comia', 'tom[ei]i?', 'tomar', 'tomei', 'beb[ií]',
+      'beber', 'ingeri', 'consumi', 'almocei', 'jantei', 'lanchei', 'merendei',
+      'me alimentei( de| com)?', 'peguei', 'fiz',
+      /* quanto, mas sem dizer quanto */
+      'bastante', 'muit[oa]s?', 'bem', 'pouc[oa]', 'um pouco( de)?', 'uns?', 'um[a]?s',
+            /* `meio` e `meia` ficaram DE FORA de propósito. Parecem vaguidão mas
+         carregam quantidade — "meia banana" é metade de uma — e ainda abrem
+         nome de comida: "meia lua" é salgado, "meia cura" é queijo. */
+      'mais ou menos', 'umas', 'alguns?', 'algumas?',
+      /* preposição que sobra depois de tirar o resto */
+      'de', 'do', 'da', 'dos', 'das', 'com', 'em', 'no', 'na', 'pra', 'para',
+    ].join('|') +
+    /* `(?![a-zà-ÿ])` e não `\b`. O `\b` do JavaScript é ASCII: entre "ã" e um
+       espaço ele NÃO enxerga fronteira, porque "ã" não é `\w`. Com ele, "de
+       manhã tomei café" perdia só o "de" e sobrava "manhã tomei café" — e o
+       mesmo com "aí". Em português isso não é caso raro, é a metade das
+       palavras. */
+    ')(?![a-zà-ÿ])[\\s,]*',
+  'i',
+)
+
+/* Descasca a fala até sobrar o alimento.
+ *
+ * Em laço porque as camadas se empilham: "então eu comi bastante arroz" tem
+ * quatro. E com teto e guarda de parada — se descascar tudo, o pedaço vira
+ * vazio e o item some, e é melhor procurar um nome torto do que perder o que a
+ * pessoa disse. */
+export function tirarFala(texto: string): string {
+  let s = texto.trim()
+  for (let i = 0; i < 8; i++) {
+    const menor = s.replace(FALA, '').trim()
+    /* Sobrou nada: a última camada era o alimento inteiro ("comi" sozinho não
+       é comida, mas "meia" pode ser o começo de "meia porção"). Volta. */
+    if (!menor) return s
+    if (menor === s) return s
+    s = menor
+  }
+  return s
+}
+
 export function lerItem(pedaco: string): ItemLido | null {
-  const limpo = semPontuacaoNasPontas(pedaco.trim().replace(/\s+/g, ' '))
+  const limpo = tirarFala(semPontuacaoNasPontas(pedaco.trim().replace(/\s+/g, ' ')))
   if (!limpo) return null
 
   let resto = limpo
