@@ -288,7 +288,11 @@ export async function desligarLembretes(): Promise<void> {
  * Também não olha o que já foi bebido: saber que a pessoa bateu a meta às 15h
  * exigiria ler o banco a cada aviso, e notificação local não roda código. O
  * texto assume isso e não acusa ninguém de nada — quem já bebeu ignora. */
-export async function ligarLembretesDeAgua(): Promise<ResultadoLembretes> {
+export async function ligarLembretesDeAgua(
+  /* Os horários vêm de fora, calculados a partir da meta e das noites
+     registradas — ver lib/ritmoDeAgua.ts. Sem eles, cai no ritmo genérico. */
+  horarios?: number[],
+): Promise<ResultadoLembretes> {
   const Notifications = await notificacoes()
   if (!(await temPermissao())) return { tipo: 'negado' }
 
@@ -313,9 +317,20 @@ export async function ligarLembretesDeAgua(): Promise<ResultadoLembretes> {
 
     await cancelarDoTipo(CHAVE_IDS_AGUA)
 
+    /* Em minutos desde a meia-noite. Sem o ritmo da pessoa, o antigo de três em
+       três horas — que continua valendo para quem nunca registrou uma noite. */
+    const emMinutos =
+      horarios && horarios.length > 0
+        ? horarios
+        : (() => {
+            const padrao: number[] = []
+            for (let h = HORA_INICIO; h <= HORA_FIM; h += INTERVALO_HORAS) padrao.push(h * 60)
+            return padrao
+          })()
+
     const ids: string[] = []
 
-    for (let hora = HORA_INICIO; hora <= HORA_FIM; hora += INTERVALO_HORAS) {
+    for (const minuto of emMinutos) {
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Hora de beber água',
@@ -323,8 +338,10 @@ export async function ligarLembretesDeAgua(): Promise<ResultadoLembretes> {
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: hora,
-          minute: 0,
+          /* O horário pode passar da meia-noite quando alguém dorme muito
+             tarde; o módulo espera 0 a 23. */
+          hour: Math.floor(minuto / 60) % 24,
+          minute: minuto % 60,
           channelId: 'agua',
         },
       })
@@ -334,9 +351,11 @@ export async function ligarLembretesDeAgua(): Promise<ResultadoLembretes> {
     await AsyncStorage.setItem(CHAVE_IDS_AGUA, JSON.stringify(ids))
     await AsyncStorage.setItem(CHAVE_AGUA, '1')
 
-    const horas: number[] = []
-    for (let h = HORA_INICIO; h <= HORA_FIM; h += INTERVALO_HORAS) horas.push(h)
-    return { tipo: 'ok', quantos: ids.length, proximo: proximaHora(horas) }
+    return {
+      tipo: 'ok',
+      quantos: ids.length,
+      proximo: proximaHora(emMinutos.map(m => m / 60)),
+    }
   } catch (e) {
     return {
       tipo: 'erro',

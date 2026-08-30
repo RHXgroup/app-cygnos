@@ -37,6 +37,7 @@ import {
   type Tema,
 } from '../lib/tema'
 import { hexDeHsl } from '../lib/cor'
+import { ritmoDeAgua } from '../lib/ritmoDeAgua'
 
 const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'sunny-outline' }[] = [
   { chave: 'escuro', rotulo: 'Escuro', icone: 'moon-outline' },
@@ -189,7 +190,11 @@ export function MaisScreen({
       return
     }
 
-    const r = await ligarLembretesDeAgua()
+    /* O ritmo sai da meta e das noites registradas: quem levanta às 5h30 é
+       avisado a partir das 6h, e não às 9h como todo mundo. Sem sono anotado,
+       a função devolve null e o lembrete cai no genérico. */
+    const ritmo = await ritmoDeAgua(contaId)
+    const r = await ligarLembretesDeAgua(ritmo?.horarios)
     setMexendoAgua(false)
 
     if (r.tipo === 'negado') {
@@ -208,7 +213,7 @@ export function MaisScreen({
        o dia seguinte, e sem essa frase a leitura é "não funcionou". */
     setAvisoAgua(
       r.proximo
-        ? `${r.quantos} avisos por dia. O próximo é às ${r.proximo}.`
+        ? `${r.quantos} avisos por dia${ritmo && !ritmo.daJanelaPadrao ? ', no seu ritmo' : ''}. O próximo é às ${r.proximo}.`
         : `${r.quantos} avisos por dia, das 9h às 21h.`,
     )
   }
@@ -280,7 +285,8 @@ export function MaisScreen({
 
         <Text style={styles.rotuloLembrete}>Água</Text>
         <Text style={styles.explicacaoLembrete}>
-          Um aviso de três em três horas, das 9h às 21h. Não depende de plano.
+          Os horários saem da sua meta e das noites que você registrou — quem levanta cedo é
+          avisado cedo. Sem sono anotado, de três em três horas das 9h às 21h.
         </Text>
 
         <Pressable
