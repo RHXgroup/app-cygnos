@@ -22,6 +22,7 @@ import {
   lembretesDeAguaLigados,
   lembretesLigados,
   reagendarSeLigados,
+  reagendarAguaSeLigada,
   ligarLembretes,
   ligarLembretesDeAgua,
 } from '../lib/lembretes'
@@ -56,6 +57,8 @@ export function MaisScreen({
   contaId,
   email,
   versaoVinculo,
+  versaoPlano,
+  versaoMetas,
   onAbrirNutricionistas,
   onAbrirCodigo,
   onAbrirExcluirConta,
@@ -66,6 +69,12 @@ export function MaisScreen({
      código percebe que ela vinculou. O segundo plano e o puxar-para-atualizar
      já cobriam o caso de a pessoa sair do app; este cobre o de ela ficar. */
   versaoVinculo: number
+  /* Os dois que mexem no horário dos lembretes: o plano dá a hora da refeição,
+     a meta de água e o sono dão o ritmo dos copos. Esta tela fica MONTADA o
+     tempo todo — as quatro abas vivem no mesmo carrossel —, então sem estes
+     contadores o efeito de reagendar nunca rodaria de novo. */
+  versaoPlano: number
+  versaoMetas: number
   onAbrirNutricionistas: () => void
   onAbrirCodigo: () => void
   onAbrirExcluirConta: () => void
@@ -103,16 +112,6 @@ export function MaisScreen({
 
     lembretesLigados().then(l => vivo && setLembretes(l))
     lembretesDeAguaLigados().then(l => vivo && setAgua(l))
-    carregarPlanoAtivo(contaId).then(r => {
-      if (!vivo || r.tipo !== 'ok') return
-      setPlano(r.plano)
-
-      /* Reagenda quando o plano mudou desde a última vez. Quem muda o almoço
-         das 12:30 para as 13h continuaria sendo avisado no horário velho, sem
-         ter como saber por quê — e esta é a tela onde os lembretes moram, então
-         é aqui que a correção acontece sem custar nada a quem não os usa. */
-      reagendarSeLigados(r.plano)
-    })
     buscar().finally(() => {
       if (vivo) setCarregando(false)
     })
@@ -120,6 +119,45 @@ export function MaisScreen({
       vivo = false
     }
   }, [buscar, versaoVinculo])
+
+  /* Reagendar os lembretes quando o horário deles mudou.
+   *
+   * Quem muda o almoço das 12:30 para as 13h continuaria sendo avisado no
+   * horário velho, sem ter como saber por quê. O mesmo vale para a água: o
+   * ritmo dela sai da meta e das noites registradas, e as duas mudam.
+   *
+   * Efeito próprio, e não junto com a carga da tela, porque as dependências são
+   * outras: o catálogo se relê quando o vínculo muda, e o horário do lembrete
+   * quando o plano ou a meta muda. Misturar os dois faria cada mudança de meta
+   * puxar o catálogo de volta do servidor à toa.
+   *
+   * E a conta da água só é feita se o interruptor estiver ligado: perguntar o
+   * ritmo ao banco a cada mudança de meta, para quem nunca ligou lembrete
+   * nenhum, é pagar uma consulta por nada.
+   *
+   * `versaoPlano` também sobe a cada volta do segundo plano — ver o efeito do
+   * AppState no App. É de graça e é o que pega o que não tem contador próprio:
+   * a noite registrada ontem, que mexe na janela de sono de onde saem os
+   * horários da água. */
+  useEffect(() => {
+    let vivo = true
+
+    carregarPlanoAtivo(contaId).then(r => {
+      if (!vivo || r.tipo !== 'ok') return
+      setPlano(r.plano)
+      reagendarSeLigados(r.plano)
+    })
+
+    lembretesDeAguaLigados().then(async ligada => {
+      if (!vivo || !ligada) return
+      const ritmo = await ritmoDeAgua(contaId)
+      if (vivo) reagendarAguaSeLigada(ritmo?.horarios)
+    })
+
+    return () => {
+      vivo = false
+    }
+  }, [contaId, versaoPlano, versaoMetas])
 
   /* O mesmo motivo do puxar-para-atualizar, sem exigir o gesto.
    *

@@ -886,6 +886,10 @@ function TelaDaAba({
       return (
         <MaisScreen
           versaoVinculo={versaoVinculo}
+          /* Os dois contadores que mudam o horário de um lembrete: o plano dá a
+             hora da refeição, a meta de água e o sono dão o ritmo dos copos. */
+          versaoPlano={versaoPlano}
+          versaoMetas={versaoMetas}
           contaId={sessao.user.id}
           email={sessao.user.email ?? ''}
           onAbrirNutricionistas={onAbrirNutricionistas}

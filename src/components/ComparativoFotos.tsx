@@ -53,6 +53,9 @@ export function ComparativoFotos({ sessoes }: { sessoes: SessaoDeFotos[] }) {
   const depois = doAngulo.find(s => s.consultaId === depoisId) ?? doAngulo[doAngulo.length - 1]
 
   const [ampliada, setAmpliada] = useState<{ url: string; legenda: string } | null>(null)
+  /* Qual endereço falhou ao ampliar, e não um booleano: um endereço novo — a
+     mesma foto reassinada — entra tentando de novo. */
+  const [falhouAmpliada, setFalhouAmpliada] = useState<string | null>(null)
 
   if (angulos.length === 0) return null
 
@@ -146,12 +149,27 @@ export function ComparativoFotos({ sessoes }: { sessoes: SessaoDeFotos[] }) {
         <Pressable style={styles.fundoAmpliada} onPress={() => setAmpliada(null)}>
           {!!ampliada && (
             <>
-              <Image
-                source={{ uri: ampliada.url }}
-                style={styles.fotoAmpliada}
-                resizeMode="contain"
-                accessibilityLabel={ampliada.legenda}
-              />
+              {/* A miniatura já tinha o seu `onError`; esta não tinha, e o
+                  endereço assinado é o MESMO — ele vence enquanto a tela está
+                  aberta. Sem isto, tocar numa foto depois de uma hora abria um
+                  retângulo preto dentro de um fundo preto, e a pessoa ficava
+                  tocando na tela sem entender o que estava vendo. */}
+              {ampliada.url !== falhouAmpliada ? (
+                <Image
+                  source={{ uri: ampliada.url }}
+                  style={styles.fotoAmpliada}
+                  resizeMode="contain"
+                  accessibilityLabel={ampliada.legenda}
+                  onError={() => setFalhouAmpliada(ampliada.url)}
+                />
+              ) : (
+                <View style={styles.fotoAmpliada}>
+                  <Text style={styles.falhaAmpliada}>
+                    Não consegui carregar esta foto agora. Feche e abra a tela para tentar de
+                    novo.
+                  </Text>
+                </View>
+              )}
               <Text style={styles.legendaAmpliada}>{ampliada.legenda}</Text>
             </>
           )}
@@ -357,6 +375,14 @@ const estilos = estilosDe(t =>
   },
   fotoAmpliada: { width: '100%', height: '82%' },
   legendaAmpliada: { marginTop: 14, fontSize: 13, fontWeight: '600', color: t.cores.branco },
+  falhaAmpliada: {
+    margin: 'auto',
+    paddingHorizontal: 32,
+    fontSize: 14,
+    lineHeight: 21,
+    color: t.cores.branco,
+    textAlign: 'center',
+  },
   fecharAmpliada: { position: 'absolute', top: 48, right: 20 },
   }),
 )

@@ -382,3 +382,17 @@ export async function reagendarSeLigados(plano: PlanoCompleto | null): Promise<v
   if (!(await lembretesLigados())) return
   await ligarLembretes(plano)
 }
+
+/* O mesmo para a água, que não tinha.
+ *
+ * O ritmo dela sai da meta e das noites registradas, e as duas mudam: a pessoa
+ * dobra a meta de água, ou passa a dormir às onze em vez das duas. Sem isto os
+ * avisos continuavam no ritmo antigo para sempre — e, pior que errado, era
+ * invisível: nada na tela dizia por qual conta os horários tinham saído.
+ *
+ * Os horários vêm de fora pelo mesmo motivo de `ligarLembretesDeAgua`: quem
+ * calcula fala com o banco, e este arquivo não fala. */
+export async function reagendarAguaSeLigada(horarios?: number[]): Promise<void> {
+  if (!(await lembretesDeAguaLigados())) return
+  await ligarLembretesDeAgua(horarios)
+}
