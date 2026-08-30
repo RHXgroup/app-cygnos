@@ -544,3 +544,37 @@ export async function ultimaVezDoExercicio(
     repeticoes: reps.length ? Math.max(...reps) : null,
   }
 }
+
+/* Tudo o que foi feito nestes exercícios ANTES de hoje.
+ *
+ * Uma ida à rede para o resumo inteiro, e não uma por exercício: a tela de fim
+ * de treino aparece quando a pessoa acabou de terminar, e é o pior momento para
+ * ela esperar seis chamadas em fila.
+ *
+ * O teto de 400 linhas cobre meses de histórico de um treino de seis
+ * exercícios. Acima disso o que sobra são séries antigas, e o resumo só olha o
+ * dia mais recente de cada um mesmo. */
+export async function historicoDosExercicios(
+  contaId: string,
+  exercicioIds: string[],
+  hoje: string,
+): Promise<SerieFeita[]> {
+  if (exercicioIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('app_treino_series')
+    .select(COLUNAS_SERIE)
+    .eq('conta_id', contaId)
+    .in('exercicio_id', exercicioIds)
+    .lt('data', hoje)
+    .order('data', { ascending: false })
+    .limit(400)
+
+  if (error) {
+    /* Silêncio: sem histórico o resumo mostra o treino de hoje e não compara.
+       Uma caixa de erro no fim do treino trocaria a recompensa por um aviso. */
+    falha('Não consegui carregar o seu histórico de treino.', error)
+    return []
+  }
+  return ((data ?? []) as LinhaSerie[]).map(daSerie)
+}

@@ -332,6 +332,7 @@ export function TreinoScreen({
       <ModoTreino
         visivel={modoAberto}
         contaId={contaId}
+        pesoKg={corpo.pesoKg}
         exercicios={doHoje}
         /* Persiste na hora. Ajustar o descanso toda semana é exatamente o
            atrito que este modo existe para tirar. */

@@ -15,7 +15,14 @@ import { createAudioPlayer } from 'expo-audio'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
 import { relogio } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
-import { gravarSerie, ultimaVezDoExercicio, type Exercicio, type UltimaVez } from '../lib/treino'
+import {
+  gravarSerie,
+  ultimaVezDoExercicio,
+  type Exercicio,
+  type SerieFeita,
+  type UltimaVez,
+} from '../lib/treino'
+import { FimDoTreino } from './FimDoTreino'
 import { dataISO } from '../lib/formatar'
 
 /* O modo treino: o telefone conduz a sessão, em vez de esperar ser alimentado.
@@ -74,6 +81,7 @@ function primeiroNumero(texto: string | null): number | null {
 export function ModoTreino({
   visivel,
   contaId,
+  pesoKg,
   exercicios,
   onDescansoMudou,
   onTerminar,
@@ -81,6 +89,10 @@ export function ModoTreino({
 }: {
   visivel: boolean
   contaId: string
+  /* Para estimar a caloria do treino. Sem ele a estimativa não sai, e isso é
+     melhor do que chutar 70 kg — quem pesa 55 receberia um número 27% maior e
+     não teria como saber. */
+  pesoKg: number | null
   /* Os do DIA, já na ordem. Vazio é possível — a tela diz o que fazer. */
   exercicios: Exercicio[]
   /* A pessoa ajustou o descanso deste exercício. Persiste, porque ajustar de
@@ -122,6 +134,10 @@ export function ModoTreino({
   /* O que ela fez neste exercício da última vez. É a informação que se procura
      no caderninho, e a que transforma cronômetro em acompanhamento. */
   const [ultima, setUltima] = useState<UltimaVez | null>(null)
+  /* O que foi feito nesta sessão, na ordem. Alimenta a tela de fim de treino
+     sem uma ida à rede: são exatamente as séries que acabaram de ser gravadas. */
+  const [feitasNaSessao, setFeitasNaSessao] = useState<SerieFeita[]>([])
+  const [terminando, setTerminando] = useState(false)
 
   useEffect(() => {
     if (!visivel) return
@@ -137,6 +153,8 @@ export function ModoTreino({
     setInicio(null)
     setFimDoDescanso(null)
     setRestaurado(false)
+    setFeitasNaSessao([])
+    setTerminando(false)
   }, [visivel])
 
   /* O TREINO INTERROMPIDO.
@@ -243,9 +261,13 @@ export function ModoTreino({
     setFase('treinando')
   }
 
+  /* Terminar MOSTRA o que aquele treino valeu, e só depois fecha.
+   *
+   * Fechar direto era o que havia antes, e é o defeito de desenho que este app
+   * tinha inteiro: pedia, guardava, e no fim a pessoa não levava nada. */
   function terminar() {
     void apagarRascunho(RASCUNHO.treino)
-    onTerminar(Math.max(1, minutos))
+    setTerminando(true)
   }
 
   function fizASerie() {
@@ -256,14 +278,22 @@ export function ModoTreino({
     /* Sem `await`: a gravação não pode segurar o começo do descanso. Ela não
        rejeita — o pior caso é uma linha de histórico perdida, e o melhor caso
        de esperar seria um treino travado com a pessoa segurando a barra. */
-    void gravarSerie(contaId, {
+    const feita: SerieFeita = {
       exercicioId: exercicio.id,
       nome: exercicio.nome,
       data: dataISO(new Date()),
       serie: jaFeitas,
       cargaKg: cargaDe(exercicio),
       repeticoes: repsDe(exercicio),
-    })
+    }
+    void gravarSerie(contaId, feita)
+    /* Guardado aqui também: a tela de fim de treino usa isto em vez de reler do
+       banco, e assim ela aparece na hora — que é o único momento em que a
+       devolução vale alguma coisa. */
+    setFeitasNaSessao(atuais => [
+      ...atuais.filter(x => !(x.exercicioId === feita.exercicioId && x.serie === feita.serie)),
+      feita,
+    ])
 
     const alvo = exercicio.series
     const acabou = alvo !== null && jaFeitas >= alvo
@@ -289,6 +319,23 @@ export function ModoTreino({
     /* Ajustar DURANTE o descanso move o fim junto, senão o número muda na tela
        e a contagem continua a antiga — que é a pior combinação possível. */
     if (fimDoDescanso !== null) setFimDoDescanso(Date.now() + novo * 1000)
+  }
+
+  /* A devolução, por cima de tudo. Sem cabeçalho e sem voltar: daqui só se sai
+     pelo "Pronto", porque o que está na tela é o resultado do que ela acabou de
+     fazer, e não uma etapa a atravessar. */
+  if (terminando) {
+    return (
+      <Modal visible={visivel} animationType="slide" onRequestClose={() => onTerminar(Math.max(1, minutos))}>
+        <FimDoTreino
+          contaId={contaId}
+          series={feitasNaSessao}
+          minutos={Math.max(1, minutos)}
+          pesoKg={pesoKg}
+          onPronto={() => onTerminar(Math.max(1, minutos))}
+        />
+      </Modal>
+    )
   }
 
   return (
