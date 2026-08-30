@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
+import { carregarIntencoes } from '../lib/intencao'
+import { valemPara, type Intencao } from '../lib/intencaoDaIA'
 import { AnelCalorias } from '../components/AnelCalorias'
 import { AnelProgresso } from '../components/AnelProgresso'
 import { FaixaDeDias } from '../components/FaixaDeDias'
@@ -105,6 +107,7 @@ export function HomeScreen({
   versaoConsumo,
   versaoSono,
   versaoTreino,
+  versaoIntencao,
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirCadastros,
@@ -136,6 +139,9 @@ export function HomeScreen({
   versaoConsumo: number
   versaoSono: number
   versaoTreino: number
+  /* Sobe quando a pessoa conta um plano. Sem isto, quem avisa que almoça
+     fora e volta para a tela inicial continua sendo cobrado do almoço. */
+  versaoIntencao: number
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirCadastros: () => void
@@ -196,6 +202,9 @@ export function HomeScreen({
   /* Só o anel usa: é a rotina que diz se hoje é dia de treino ou de descanso.
      Sem ela não há como cobrar treino de ninguém — ver lib/metaDoDia. */
   const [rotina, setRotina] = useState<Exercicio[]>([])
+  /* O que a pessoa avisou que vai acontecer. Serve para o próximo passo CALAR
+     sobre o que já foi dito — nunca para criar cobrança nova. */
+  const [intencoes, setIntencoes] = useState<Intencao[]>([])
   const [detalheDoDia, setDetalheDoDia] = useState(false)
 
   useEffect(() => {
@@ -406,6 +415,22 @@ export function HomeScreen({
     }
   }, [sessao.user.id, versaoTreino])
 
+  /* As intenções, num efeito próprio.
+   *
+   * Fora do `Promise.all` das outras de propósito: falhar em lê-las não pode
+   * impedir a tela de desenhar. O pior que acontece sem elas é o app cobrar
+   * algo que a pessoa avisou — chato, mas não quebra nada. Já uma falha que
+   * derrubasse a tela inicial quebraria tudo. */
+  useEffect(() => {
+    let ativo = true
+    carregarIntencoes(sessao.user.id).then(r => {
+      if (ativo && r.tipo === 'ok') setIntencoes(r.intencoes)
+    })
+    return () => {
+      ativo = false
+    }
+  }, [sessao.user.id, versaoIntencao])
+
   /* Um copo, do próprio cartão. Otimista pelo mesmo motivo da tela de Água: o
      gesto é tocar e guardar o telefone, e um número que só sobe depois da ida e
      volta faz a pessoa tocar de novo — e aí são dois copos. */
@@ -478,6 +503,10 @@ export function HomeScreen({
   const janela = janelaAcordada(noites)
   const passo = proximoPasso({
     metas,
+    /* Já filtradas para hoje. Quem sabe qual intenção vale num dia é o
+       `valemPara`, que mora com o resto da conversão e é exercitado lá — o
+       `proximoPasso` só decide PRIORIDADE. */
+    intencoesDeHoje: valemPara(intencoes, dataISO(new Date())),
     aguaAtrasadaMl: (() => {
       if (!agua) return null
       const agoraEmMinutos = new Date().getHours() * 60 + new Date().getMinutes()

@@ -322,6 +322,9 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [versaoConsumo, setVersaoConsumo] = useState(0)
   const [versaoSono, setVersaoSono] = useState(0)
   const [versaoTreino, setVersaoTreino] = useState(0)
+  /* Sobe quando a pessoa conta um plano. A tela inicial relê as intenções e
+     para de cobrar o que foi avisado. */
+  const [versaoIntencao, setVersaoIntencao] = useState(0)
   /* Muda quando a nutricionista vincula o paciente enquanto o app está aberto.
      Quem percebe é a tela do código, que fica perguntando: o vínculo acontece
      do lado dela e nada avisa o aparelho. */
@@ -549,6 +552,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 versaoConsumo={versaoConsumo}
                 versaoSono={versaoSono}
                 versaoTreino={versaoTreino}
+                versaoIntencao={versaoIntencao}
                 versaoVinculo={versaoVinculo}
                 onAbrirPerfil={() => setPerfilAberto(true)}
                 onAbrirCodigo={() => setCodigoAberto(true)}
@@ -816,6 +820,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
               onConsumoMudou={() => setVersaoConsumo(v => v + 1)}
               onSonoMudou={() => setVersaoSono(v => v + 1)}
               onTreinoMudou={() => setVersaoTreino(v => v + 1)}
+              onIntencaoSalva={() => setVersaoIntencao(v => v + 1)}
             />
           </Sobreposta>
         )}
@@ -878,6 +883,7 @@ function TelaDaAba({
   onAbrirSono,
   onAbrirTreino,
   onAbrirReceitas,
+  versaoIntencao,
   onAbrirMensagens,
   naoLidas,
 }: {
@@ -909,6 +915,7 @@ function TelaDaAba({
   onAbrirSono: () => void
   onAbrirTreino: () => void
   onAbrirReceitas: () => void
+  versaoIntencao: number
   onAbrirMensagens: () => void
   naoLidas: number
 }) {
@@ -917,6 +924,7 @@ function TelaDaAba({
       return (
         <HomeScreen
           sessao={sessao}
+          versaoIntencao={versaoIntencao}
           versaoPlano={versaoPlano}
           versaoAgua={versaoAgua}
           versaoMetas={versaoMetas}

@@ -10,6 +10,7 @@ import { MetasScreen } from './MetasScreen'
 import { PesoScreen } from './PesoScreen'
 import { SonoScreen } from './SonoScreen'
 import { TreinoScreen } from './TreinoScreen'
+import { ContarPlanoScreen } from './ContarPlanoScreen'
 import { RefeicoesDoDiaScreen } from './RefeicoesDoDiaScreen'
 import { estilosDe, paleta } from '../lib/tema'
 
@@ -55,6 +56,11 @@ const COMER_MAIS: Opcao[] = [
 
 /* O que se anota em segundos, quase todo dia. */
 const ANOTAR: Opcao[] = [
+  /* Contar um plano NÃO é registrar: é dizer o que vem. Fica no grupo do dia
+     mesmo assim, e em primeiro lugar nele, porque é o gesto que a pessoa faz
+     no mesmo momento — abre o app para anotar o almoço e lembra que amanhã
+     janta fora. Um grupo só para ele seria uma linha sozinha. */
+  { chave: 'plano_futuro', rotulo: 'Contar um plano', icone: 'calendar-outline' },
   { chave: 'agua', rotulo: 'Água', icone: 'water-outline' },
   { chave: 'peso', rotulo: 'Peso', icone: 'speedometer-outline' },
   { chave: 'sono', rotulo: 'Sono', icone: 'moon-outline' },
@@ -104,6 +110,7 @@ export function RegistrarScreen({
   onConsumoMudou,
   onSonoMudou,
   onTreinoMudou,
+  onIntencaoSalva,
 }: {
   contaId: string
   /* Opção já aberta na entrada, quando esta tela foi chamada por um atalho — o
@@ -118,6 +125,9 @@ export function RegistrarScreen({
   onSonoMudou: () => void
   /* Treino mexe na constância que a tela inicial mostra. */
   onTreinoMudou: () => void
+  /* A intenção muda o que a tela inicial COBRA — quem avisou que almoça fora
+     não deve receber "almoço em 45 min". Por isso ela avisa como as outras. */
+  onIntencaoSalva: () => void
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
@@ -149,6 +159,16 @@ export function RegistrarScreen({
            voltar dela ao meio do assistente de plano seria devolver a pessoa a
            um lugar que ela já abandonou. */
         onDefinirMetas={() => setEscolhida(TODAS.find(o => o.chave === 'metas') ?? null)}
+      />
+    )
+  }
+
+  if (escolhida?.chave === 'plano_futuro') {
+    return (
+      <ContarPlanoScreen
+        contaId={contaId}
+        onFechar={voltarDaOpcao}
+        onSalvou={onIntencaoSalva}
       />
     )
   }
