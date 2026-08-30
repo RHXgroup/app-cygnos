@@ -7,13 +7,23 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Confirmacao } from '../components/Confirmacao'
-import { apagarCiclo, carregarCiclos, marcarFim, registrarComeco, type RegistroCiclo } from '../lib/ciclo'
+import {
+  apagarCiclo,
+  carregarCiclos,
+  compartilharCiclo,
+  estadoDoCompartilhamento,
+  marcarFim,
+  registrarComeco,
+  sincronizarCiclo,
+  type RegistroCiclo,
+} from '../lib/ciclo'
 import {
   compararAntesDaMenstruacao,
   situacaoDoCiclo,
@@ -44,9 +54,20 @@ import { estilosDe, paleta } from '../lib/tema'
  * e chamar isso de previsão.
  *
  * ── E quem vê ─────────────────────────────────────────────────────────────
- * Só ela. A tabela tem RLS de dono, e a nutricionista não tem acesso. Dado
- * menstrual é dos mais sensíveis que um app de saúde guarda, e compartilhar por
- * omissão seria a escolha errada para ele. */
+ * Por padrão, só ela: a tabela tem RLS de dono, e a nutricionista não enxerga
+ * nada. Dado menstrual é dos mais sensíveis que um app de saúde guarda, e
+ * compartilhar por omissão seria a escolha errada para ele.
+ *
+ * Mas o sistema DELA já tem controle de ciclo, e faz sentido o dado chegar lá —
+ * quando a pessoa quiser. Então há uma chave nesta tela, desligada de origem, e
+ * ligá-la espelha o que já existe. Desligar apaga o que foi enviado: um
+ * consentimento retirado que só interrompe o fluxo futuro deixa para trás
+ * exatamente o dado que ela decidiu não compartilhar mais.
+ *
+ * Todo caminho que muda um registro chama `sincronizarCiclo()` logo depois —
+ * inclusive o de apagar. Sem isso, a data digitada errada continuaria no
+ * histórico da nutricionista, deslocando a média dela, e o botão de apagar
+ * mentiria. */
 
 const NOME_DA_FASE: Record<Fase, string> = {
   menstrual: 'Menstruação',
@@ -87,6 +108,9 @@ export function CicloScreen({
   const [mudou, setMudou] = useState(false)
   const [apagando, setApagando] = useState<RegistroCiclo | null>(null)
   const [versao, setVersao] = useState(0)
+  const [compartilha, setCompartilha] = useState(false)
+  const [temNutricionista, setTemNutricionista] = useState(false)
+  const [mudandoChave, setMudandoChave] = useState(false)
 
   const hoje = dataISO(new Date())
 
@@ -132,6 +156,14 @@ export function CicloScreen({
        escondido atrás de uma mensagem vencida — item 9 do AGENTS.md. */
     setErro('')
     setRegistros(r.registros)
+
+    /* O estado da chave vem junto da lista. Ele muda do lado de fora desta tela
+       — desvincular da nutricionista desliga a chave por gatilho —, e uma tela
+       que mostra "compartilhando" depois de o vínculo acabar estaria mentindo
+       sobre quem vê o que. */
+    const e = await estadoDoCompartilhamento(contaId)
+    setCompartilha(e.ligado)
+    setTemNutricionista(e.temNutricionista)
 
     /* A comparação com o diário só faz sentido com dois começos ou mais: um
        ciclo não tem "o resto" para comparar contra. */
@@ -189,6 +221,7 @@ export function CicloScreen({
       r.registro,
       ...(atuais ?? []).filter(x => x.comecou !== r.registro.comecou),
     ])
+    void sincronizarCiclo()
     setVersao(v => v + 1)
   }
 
@@ -203,6 +236,7 @@ export function CicloScreen({
     setErro('')
     setMudou(true)
     setRegistros(atuais => (atuais ?? []).map(x => (x.id === alvo.id ? r.registro : x)))
+    void sincronizarCiclo()
   }
 
   async function apagar(alvo: RegistroCiclo) {
@@ -213,7 +247,31 @@ export function CicloScreen({
     if (f) {
       setErro(f.erro)
       setVersao(v => v + 1)
+      return
     }
+    /* Depois de apagar, e não antes: o espelho é refeito a partir do que
+       sobrou, e sincronizar com a linha ainda lá a reenviaria. */
+    void sincronizarCiclo()
+  }
+
+  async function trocarChave(ligar: boolean) {
+    /* Otimista NÃO. Em qualquer outro interruptor do app o otimismo é o certo,
+       porque errar custa um piscar; aqui ele mostraria "a sua nutricionista vê"
+       para quem, no servidor, não está compartilhando nada — ou o contrário, que
+       é pior. Meio segundo de espera é o preço de a tela não mentir sobre isso. */
+    setMudandoChave(true)
+    const r = await compartilharCiclo(ligar)
+    setMudandoChave(false)
+    if (r.tipo === 'erro') {
+      setErro(r.mensagem)
+      return
+    }
+    setErro('')
+    setCompartilha(r.estado.compartilhando)
+    /* O servidor desliga sozinho quando não há vínculo. Se ela pediu para ligar
+       e voltou desligado, é porque não há para quem mandar — e a linha de baixo
+       já explica isso. */
+    if (ligar && !r.estado.compartilhando) setTemNutricionista(false)
   }
 
   return (
@@ -398,8 +456,40 @@ export function CicloScreen({
             </>
           )}
 
+          {/* A chave por ÚLTIMO, depois de registrar e do histórico.
+              Quem abre esta tela veio marcar uma data, não decidir sobre
+              privacidade — e uma pergunta sobre compartilhamento no topo faria
+              a decisão parecer obrigatória para usar a tela. */}
+          <View style={styles.cartaoChave}>
+            <View style={styles.linhaChave}>
+              <View style={styles.textoChave}>
+                <Text style={styles.tituloCartao}>Mostrar para a minha nutricionista</Text>
+                <Text style={styles.ajuda}>
+                  {!temNutricionista
+                    ? 'Você ainda não tem nutricionista vinculada. Quando tiver, esta opção liga.'
+                    : compartilha
+                      ? 'Ela vê as datas que você registra aqui. Desligar apaga o que já foi enviado.'
+                      : 'Hoje ninguém além de você vê isto. Ligando, ela passa a ver as datas — e só elas.'}
+                </Text>
+              </View>
+              {mudandoChave ? (
+                <ActivityIndicator color={paleta().cores.verde} />
+              ) : (
+                <Switch
+                  value={compartilha}
+                  onValueChange={v => void trocarChave(v)}
+                  disabled={!temNutricionista}
+                  trackColor={{ false: paleta().cores.trilho, true: paleta().cores.verde }}
+                  accessibilityLabel="Mostrar o meu ciclo para a minha nutricionista"
+                />
+              )}
+            </View>
+          </View>
+
           <Text style={styles.rodape}>
-            Isto fica só com você. A sua nutricionista não vê esta tela.
+            {compartilha
+              ? 'Só as datas vão para ela. O que você escreve em outras telas do app continua separado disto.'
+              : 'Isto fica só com você. Nem a sua nutricionista vê, a não ser que você ligue a opção acima.'}
           </Text>
         </ScrollView>
       )}
@@ -519,6 +609,17 @@ const estilos = estilosDe(t =>
     dataRegistro: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
     detalheRegistro: { fontSize: 12, color: t.inkFraco },
 
-    rodape: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, marginTop: 14 },
+    cartaoChave: {
+      backgroundColor: t.cores.cartao,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      padding: 15,
+      marginTop: 14,
+    },
+    linhaChave: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    textoChave: { flex: 1, gap: 4 },
+
+    rodape: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, marginTop: 10 },
   }),
 )

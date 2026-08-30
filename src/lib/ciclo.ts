@@ -117,3 +117,95 @@ export async function apagarCiclo(id: string): Promise<{ erro: string } | null> 
   if (!error) return null
   return { erro: falha('Não consegui apagar esse registro agora. Verifique a conexão.', error) }
 }
+
+/* ── Compartilhar com a nutricionista ──────────────────────────────────────*/
+
+/* O sistema dela JÁ TEM controle de ciclo — `ciclos_menstruais`, e a tela dela
+ * já escreve "Paciente, pelo app" quando `origem = 'paciente'`. O outro lado
+ * foi desenhado esperando isto; só nunca chegou nada. Então aqui não há tabela
+ * nem tela nova: há uma chave, e um espelho.
+ *
+ * A chave começa DESLIGADA, e desligar apaga o que já foi enviado. Um
+ * consentimento retirado que só interrompe o fluxo futuro deixa para trás
+ * exatamente o dado que a pessoa decidiu não compartilhar mais.
+ *
+ * Quem decide o que sai é o servidor: as duas funções leem `auth.uid()` e o
+ * vínculo, e não aceitam paciente nem nutricionista por parâmetro. Sem isso o
+ * app escolheria para quem mandar dado menstrual. */
+
+export type Compartilhamento = { compartilhando: boolean; enviados: number }
+
+const doRetorno = (d: unknown): Compartilhamento => {
+  const r = (d ?? {}) as { compartilhando?: unknown; enviados?: unknown }
+  return {
+    compartilhando: r.compartilhando === true,
+    enviados: typeof r.enviados === 'number' ? r.enviados : 0,
+  }
+}
+
+/* Espelha o que mudou, quando a chave está ligada. Desligada, não faz nada —
+ * então a tela pode chamar sempre, sem perguntar antes.
+ *
+ * Nunca rejeita: falhar em espelhar não pode derrubar o registro que a pessoa
+ * acabou de fazer. O ciclo dela já está gravado; o espelho é consequência, e a
+ * próxima chamada refaz tudo do zero. */
+export async function sincronizarCiclo(): Promise<Compartilhamento> {
+  try {
+    const { data, error } = await supabase.rpc('app_ciclo_sincronizar')
+    if (error) {
+      falha('Não consegui atualizar o que a sua nutricionista vê.', error)
+      return { compartilhando: false, enviados: 0 }
+    }
+    return doRetorno(data)
+  } catch {
+    return { compartilhando: false, enviados: 0 }
+  }
+}
+
+export type ResultadoCompartilhar =
+  | { tipo: 'ok'; estado: Compartilhamento }
+  | { tipo: 'erro'; mensagem: string }
+
+/* Liga ou desliga, e já sincroniza na mesma ida. Esta REJEITA para a tela — ao
+ * contrário da de cima —, porque aqui a pessoa acabou de tocar num interruptor
+ * de privacidade: deixá-lo mudar de posição sem ter mudado nada no servidor é o
+ * pior desfecho possível desta tela. */
+export async function compartilharCiclo(ligado: boolean): Promise<ResultadoCompartilhar> {
+  const { data, error } = await supabase.rpc('app_ciclo_compartilhar', { p_ligado: ligado })
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha(
+        ligado
+          ? 'Não consegui ligar o compartilhamento agora. Verifique a conexão.'
+          : 'Não consegui desligar agora. Tente de novo — nada foi enviado a mais.',
+        error,
+      ),
+    }
+  return { tipo: 'ok', estado: doRetorno(data) }
+}
+
+/* Se a conta está compartilhando, e se existe vínculo para isso.
+ *
+ * A leitura é da própria linha em `app_contas`, e o vínculo vem separado porque
+ * a tela precisa saber a diferença entre "desligado" e "não tem para quem
+ * mandar": um interruptor apagado sem explicação faz a pessoa achar que o app
+ * quebrou. */
+export type EstadoDoCompartilhamento = { ligado: boolean; temNutricionista: boolean }
+
+export async function estadoDoCompartilhamento(
+  contaId: string,
+): Promise<EstadoDoCompartilhamento> {
+  const [conta, vinculo] = await Promise.all([
+    supabase.from('app_contas').select('compartilha_ciclo').eq('id', contaId).maybeSingle(),
+    supabase.from('app_vinculos').select('paciente_id').eq('conta_id', contaId).maybeSingle(),
+  ])
+
+  if (conta.error) falha('Não consegui ler a sua preferência de compartilhamento.', conta.error)
+  if (vinculo.error) falha('Não consegui verificar o seu vínculo.', vinculo.error)
+
+  return {
+    ligado: conta.data?.compartilha_ciclo === true,
+    temNutricionista: !!vinculo.data,
+  }
+}
