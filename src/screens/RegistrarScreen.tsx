@@ -261,21 +261,34 @@ export function RegistrarScreen({
             ))}
           </View>
 
-          {maisFormas ? (
+          {/* O controle fica NO LUGAR, aberto ou fechado.
+              Antes ele sumia ao abrir: o toque trocava o botão pela lista, e
+              quem abriu perdia de vista o que tinha tocado e não tinha como
+              fechar de volta. Um controle que desaparece ao ser usado deixa a
+              pessoa sem saber se abriu uma gaveta ou trocou de tela.
+              Agora ele continua ali, a seta vira para cima, e o segundo toque
+              desfaz o primeiro. */}
+          <Pressable
+            onPress={() => setMaisFormas(m => !m)}
+            style={({ pressed }) => [styles.maisFormas, pressed && styles.cartaoPressionado]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: maisFormas }}
+            accessibilityLabel="Outras formas de registrar"
+          >
+            <Text style={styles.textoMaisFormas}>Outras formas de registrar</Text>
+            <Ionicons
+              name={maisFormas ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={paleta().inkSuave}
+            />
+          </Pressable>
+
+          {maisFormas && (
             <View style={styles.lista}>
               {COMER_MAIS.map(o => (
                 <Linha key={o.chave} opcao={o} onPress={() => setEscolhida(o)} styles={styles} />
               ))}
             </View>
-          ) : (
-            <Pressable
-              onPress={() => setMaisFormas(true)}
-              style={({ pressed }) => [styles.maisFormas, pressed && styles.cartaoPressionado]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.textoMaisFormas}>Outras formas de registrar</Text>
-              <Ionicons name="chevron-down" size={16} color={paleta().inkSuave} />
-            </Pressable>
           )}
 
           <Text style={styles.grupo}>Anotar do dia</Text>

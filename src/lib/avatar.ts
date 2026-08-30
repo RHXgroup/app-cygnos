@@ -2,6 +2,7 @@ import { decode } from 'base64-arraybuffer'
 import * as ImagePicker from 'expo-image-picker'
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
 import { supabase } from './supabase'
+import { falha } from './erros'
 
 const BUCKET = 'avatares'
 /* 512px de lado é o suficiente para a maior exibição da foto (o avatar grande
@@ -114,16 +115,35 @@ export async function trocarAvatar(
 
     if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a imagem.' }
 
-    /* Nome novo a cada envio, em vez de sobrescrever "perfil.jpg": com nome
-       fixo a URL não muda e o cache do aparelho continua mostrando a foto
-       antiga. O arquivo velho é apagado logo abaixo. */
-    const path = `${userId}/${Date.now()}.jpg`
+    /* Dentro da pasta `avatares/`, e não na raiz do bucket.
+     *
+     * Todo arquivo que funciona neste bucket está sob um prefixo — as fotos em
+     * `avatares/`, os documentos do sistema em `documentos/` —, e o app era o
+     * único gravando na raiz. A política de escrita do Storage é escrita por
+     * prefixo, então a raiz não estava coberta e o envio voltava recusado.
+     *
+     * Escrever onde o sistema já escreve é também o que faz a foto do paciente e
+     * a da nutricionista viverem no mesmo lugar, em vez de em dois esquemas
+     * paralelos dentro do mesmo bucket.
+     *
+     * Nome novo a cada envio, em vez de sobrescrever "perfil.jpg": com nome fixo
+     * a URL não muda e o cache do aparelho continua mostrando a foto antiga. O
+     * arquivo velho é apagado logo abaixo. */
+    const path = `avatares/${userId}/${Date.now()}.jpg`
 
     const { error: erroUpload } = await supabase.storage
       .from(BUCKET)
       .upload(path, decode(reduzida.base64), { contentType: 'image/jpeg' })
 
-    if (erroUpload) return { tipo: 'erro', mensagem: 'Não consegui enviar a foto. Tente de novo.' }
+    if (erroUpload)
+      return {
+        tipo: 'erro',
+        /* O motivo cru vai para o console. Antes ele era descartado, e a tela
+           dizia "tente de novo" para uma recusa que tentar de novo nunca ia
+           resolver — ver a armadilha 12 do AGENTS.md, que eu mesmo escrevi e
+           deixei de aplicar aqui. */
+        mensagem: falha('Não consegui enviar a foto. Tente de novo.', erroUpload),
+      }
 
     const { error: erroBanco } = await supabase
       .from('app_contas')
@@ -134,7 +154,10 @@ export async function trocarAvatar(
       /* O arquivo subiu mas a conta não aponta para ele: limpa para não deixar
          lixo órfão no bucket. */
       await supabase.storage.from(BUCKET).remove([path])
-      return { tipo: 'erro', mensagem: 'Não consegui salvar a foto no seu perfil.' }
+      return {
+        tipo: 'erro',
+        mensagem: falha('Não consegui salvar a foto no seu perfil.', erroBanco),
+      }
     }
 
     /* Melhor esforço: falhar aqui deixa um arquivo a mais no bucket, o que é
