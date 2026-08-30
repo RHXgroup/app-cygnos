@@ -12,15 +12,31 @@ Este documento é o que falta, e só isso. Nada aqui pede mudança no app.
 
 Tudo isto está no banco e o app já usa:
 
+Os nomes abaixo foram conferidos **coluna por coluna contra o banco**, e não
+tirados da memória de quem escreveu a migração. A primeira versão deste
+documento errou o nome da tabela e o da coluna do paciente; se você leu aquela,
+use esta.
+
 ```
-solicitacoes_de_vinculo
+app_solicitacoes_de_vinculo      -- e NÃO "solicitacoes_de_vinculo"
   id
-  conta_app_id        -- quem pediu (app_contas.id)
+  conta_id                       -- quem pediu; e NÃO "conta_app_id"
   nutricionista_id
-  mensagem            -- a frase que o paciente escreveu, opcional
-  status              -- 'enviada' | 'aceita' | 'recusada' | 'cancelada'
+  mensagem                       -- a frase que o paciente escreveu, opcional
+  status                         -- 'enviada' | 'aceita' | 'recusada' | 'cancelada'
   criada_em
   respondida_em
+```
+
+```
+app_mensagens
+  id
+  conta_id
+  nutricionista_id
+  de                             -- 'paciente' | 'nutricionista'
+  texto
+  criada_em
+  lida_em                        -- null enquanto o outro lado não leu
 ```
 
 Funções que o **app** chama, e que o sistema web não deve usar:
@@ -30,6 +46,15 @@ Funções que o **app** chama, e que o sistema web não deve usar:
 | `app_solicitar_vinculo(p_nutricionista_id, p_mensagem)` | app |
 | `app_minhas_solicitacoes()` | app |
 | `app_cancelar_solicitacao_vinculo(p_id)` | app |
+| `app_enviar_mensagem(p_texto)` | app |
+| `app_marcar_mensagens_lidas()` | app |
+
+Todas recusam `anon`: só respondem a quem está com sessão. O mesmo vale desde
+hoje para `app_nutricionistas`, que era a única porta aberta e foi fechada.
+
+**Do lado dela não existe função nenhuma ainda** — nem para listar os pedidos,
+nem para aceitar, nem para ler ou escrever mensagem. É o que este documento
+pede.
 
 ---
 
@@ -118,6 +143,33 @@ prova de que o paciente veio pelo aplicativo.
 
 ---
 
+### 4. Ler e responder a conversa
+
+A tabela `app_mensagens` já recebe o que o paciente escreve — o app grava, e o
+realtime entrega ao outro lado na hora. **Não há tela do lado dela**, então a
+mensagem chega ao banco e ninguém lê.
+
+Do lado dela é preciso:
+
+- listar as mensagens do par (`conta_id` + `nutricionista_id`), em ordem de
+  `criada_em`
+- escrever com `de = 'nutricionista'`
+- marcar `lida_em` no que o paciente mandou, quando ela abrir a conversa
+
+**Escrever tem que passar por função `security definer`, e não por INSERT
+direto.** É lá que o vínculo é conferido e que se decide de quem é a mensagem:
+se o `de` viesse do cliente, um lado poderia escrever se passando pelo outro.
+
+**Ler pode ser direto na tabela, com RLS** — e para o realtime funcionar do lado
+dela, precisa ser: o realtime entrega o que a política deixa ler, não o que uma
+função devolve. É assim que o app faz.
+
+O `lida_em` não é enfeite: é ele que apaga o ponto de "mensagem nova" no
+aparelho do paciente, e vale entre aparelhos — o que ele leu no celular não
+pisca de novo no tablet.
+
+---
+
 ## Duas coisas soltas, do mesmo lado
 
 **As logos não estão no bucket.** Quatro perfis têm `usar_logo_documentos = true`
@@ -133,13 +185,9 @@ vale conferir onde o sistema web escreve o arquivo antes de reenviar tudo.
 
 Enquanto não resolver, o app desenha as iniciais num círculo — não fica buraco.
 
-**Uma porta aberta demais.** `app_nutricionistas` responde sem login: com a
-chave pública do app, sem sessão nenhuma, voltam todas as nutricionistas com
-nome, CRN e cidade. As funções mais novas já barram o `anon` corretamente.
-
-```sql
-revoke all on function public.app_nutricionistas() from anon;
-```
-
-`revoke ... from public` não basta — o Supabase concede EXECUTE a `anon`
-explicitamente, e o revoke precisa nomeá-lo.
+**A porta aberta foi fechada.** `app_nutricionistas` respondia sem login: com a
+chave pública do app e sem sessão nenhuma, voltavam todas as nutricionistas com
+nome, CRN e cidade. Conferido hoje — agora responde `permission denied`, como as
+outras. Fica registrado porque o padrão vale para toda função nova: `revoke ...
+from public` não basta, o Supabase concede EXECUTE a `anon` explicitamente e o
+revoke precisa nomeá-lo.
