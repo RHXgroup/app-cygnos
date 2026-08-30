@@ -33,6 +33,7 @@ import {
 } from '../lib/mensagens'
 import { horaCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { useRespiroDeBaixo } from '../lib/teclado'
 
 /* A conversa com a nutricionista.
  *
@@ -82,7 +83,17 @@ export function MensagensScreen({
   onChegou: () => void
 }) {
   const styles = estilos()
-  const { top } = useSafeAreaInsets()
+  const { top, bottom } = useSafeAreaInsets()
+  /* A área segura de baixo SÓ com o teclado fechado.
+   *
+   * Esta tela deixou de ser aba e virou sobreposição de tela cheia — ela cobre
+   * a barra de abas, que era quem cuidava do rodapé. Sem isto, a barra de
+   * escrever fica POR BAIXO da barra de gestos do Android e não dá para tocar
+   * nela: foi exatamente o que aconteceu na primeira conversa de verdade.
+   *
+   * E com o teclado aberto vira zero, senão sobra um vão do tamanho de um dedo
+   * entre o campo e o teclado. Ver lib/teclado.ts. */
+  const respiro = useRespiroDeBaixo(bottom)
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -210,7 +221,7 @@ export function MensagensScreen({
 
   if (carregando) {
     return (
-      <View style={[styles.tela, styles.centro, { paddingTop: top + 8 }]}>
+      <View style={[styles.tela, styles.centro, { paddingTop: top + 8, paddingBottom: bottom }]}>
         <ActivityIndicator color={paleta().cores.verde} />
       </View>
     )
@@ -218,7 +229,7 @@ export function MensagensScreen({
 
   if (!nutri) {
     return (
-      <View style={[styles.tela, { paddingTop: top + 8 }]}>
+      <View style={[styles.tela, { paddingTop: top + 8, paddingBottom: bottom }]}>
         <View style={styles.linhaTopo}>
         <Pressable
           onPress={onFechar}
@@ -260,6 +271,9 @@ export function MensagensScreen({
        componente não faz nada, e o campo fica atrás do teclado. Ver a armadilha
        2 do AGENTS.md. */
     <KeyboardAvoidingView
+      /* Sem respiro AQUI de propósito: quem o carrega é o elemento mais de
+         baixo de cada ramo — a barra de escrever numa, o bloco do WhatsApp na
+         outra. Somar no pai e no filho abre o dobro do vão. */
       style={[styles.tela, { paddingTop: top + 8 }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -298,7 +312,7 @@ export function MensagensScreen({
       {!noApp ? (
         /* Ela conversa por fora. Dizer isso é melhor do que abrir um campo que
            escreve para um lugar que ela não lê. */
-        <View style={styles.vazio}>
+        <View style={[styles.vazio, { paddingBottom: bottom }]}>
           <View style={styles.circulo}>
             <Ionicons name="logo-whatsapp" size={26} color={paleta().cores.verde} />
           </View>
@@ -343,7 +357,7 @@ export function MensagensScreen({
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
-          <View style={styles.barraEnvio}>
+          <View style={[styles.barraEnvio, { paddingBottom: 10 + respiro }]}>
             <TextInput
               value={texto}
               onChangeText={setTexto}
@@ -436,7 +450,14 @@ const estilos = estilosDe(t =>
     botaoZapPressionado: { backgroundColor: t.cores.verdeEscuro },
 
     conversa: { flex: 1 },
-    conteudoConversa: { paddingHorizontal: 16, paddingVertical: 14, gap: 8 },
+    conteudoConversa: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      /* Mais embaixo do que em cima: sem folga, o último balão encosta na barra
+         de escrever e a conversa parece cortada bem onde ela está viva. */
+      paddingBottom: 20,
+      gap: 8,
+    },
     primeira: {
       marginTop: 40,
       fontSize: 13.5,

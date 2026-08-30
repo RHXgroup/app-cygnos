@@ -19,6 +19,8 @@ import { mascaraQuantidade, numeroDigitado, soDigitos } from '../lib/formulario'
 import { decimal, milhar } from '../lib/formatar'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { estilosDe, paleta } from '../lib/tema'
+/* Saiu daqui para lib/teclado.ts quando a conversa precisou da mesma medida. */
+import { useAlturaTeclado } from '../lib/teclado'
 
 type Modo = 'gramas' | 'medida'
 
@@ -109,43 +111,6 @@ const QUANTIDADE_PADRAO = '1'
    bastante para parecer imediato, longo o bastante para não disparar uma
    consulta por letra. */
 const ESPERA_BUSCA = 350
-
-/* Altura que o teclado ocupa agora, em pontos.
- *
- * O KeyboardAvoidingView não serve para o painel de quantidade: ele empurra o
- * conteúdo por padding, e um filho posicionado por absoluto ignora esse padding
- * — o painel ficava exatamente onde estava, atrás do teclado. Com a altura na
- * mão, o painel sobe sozinho.
- *
- * Os dois sistemas deslocam. Antes só o iOS o fazia, porque o Android encolhia
- * a janela inteira quando o teclado subia e somar a altura empurraria duas
- * vezes. Essa premissa caiu: o Expo passou a ligar edge-to-edge por padrão, a
- * janela deixou de encolher, e o painel voltou a ficar escondido atrás do
- * teclado — justamente no campo de quantidade, que é onde se digita. */
-function useAlturaTeclado(): number {
-  const [altura, setAltura] = useState(0)
-
-  useEffect(() => {
-    /* Will* no iOS acompanha a animação do teclado; o Android só emite Did*, e
-       lá o painel salta depois que ela termina — feio, mas visível, que é o
-       oposto do que acontecia antes. */
-    const ehIOS = Platform.OS === 'ios'
-
-    const aoAbrir = Keyboard.addListener(ehIOS ? 'keyboardWillShow' : 'keyboardDidShow', e =>
-      setAltura(e.endCoordinates.height),
-    )
-    const aoFechar = Keyboard.addListener(ehIOS ? 'keyboardWillHide' : 'keyboardDidHide', () =>
-      setAltura(0),
-    )
-
-    return () => {
-      aoAbrir.remove()
-      aoFechar.remove()
-    }
-  }, [])
-
-  return altura
-}
 
 export function BuscarAlimentoScreen({
   refeicao,
