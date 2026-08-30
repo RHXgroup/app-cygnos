@@ -104,30 +104,9 @@ export function MensagensScreen({
    * virou sobreposição sem trocar a ferramenta. Mesma raiz do rodapé. */
   const alturaTeclado = useAlturaTeclado()
 
-  /* ── A janela encolhe, ou não? O app MEDE em vez de supor ─────────────────
-   *
-   * Esta é a terceira tentativa de acertar o rodapé desta tela, e as duas
-   * primeiras erraram para lados opostos: uma deixou a barra no meio da tela, a
-   * outra deixou-a atrás do teclado. As duas partiam de uma SUPOSIÇÃO sobre o
-   * que o Android faz com a janela quando o teclado sobe.
-   *
-   * Com edge-to-edge a janela normalmente NÃO encolhe, e aí a barra precisa
-   * subir a altura do teclado. Mas isso depende de versão do Android, de
-   * `windowSoftInputMode` e do que a SDK do Expo configura — e supor errado
-   * produz exatamente os dois defeitos acima, um em cada direção.
-   *
-   * Então: guarda a altura desta View com o teclado FECHADO e compara com a de
-   * agora. Se encolheu, o sistema já abriu espaço e somar de novo empurraria
-   * duas vezes. Se não encolheu, a barra sobe sozinha.
-   *
-   * Medir custa um `onLayout`. Supor já custou duas rodadas de "está torto". */
-  const alturaFechado = useRef(0)
-  const [alturaAgora, setAlturaAgora] = useState(0)
-
-  const janelaEncolheu =
-    alturaTeclado > 0 && alturaFechado.current > 0 && alturaAgora < alturaFechado.current - 40
-
-  const respiro = alturaTeclado > 0 ? (janelaEncolheu ? 0 : alturaTeclado) : bottom
+  /* O respiro de baixo: o teclado quando ele está aberto, a área segura quando
+     não está. Nunca os dois — o teclado já cobre a barra de gestos. */
+  const respiro = alturaTeclado > 0 ? alturaTeclado : bottom
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -302,19 +281,10 @@ export function MensagensScreen({
 
   return (
     /* View comum, e não KeyboardAvoidingView: quem desvia do teclado aqui é a
-       barra de escrever, com a altura medida. Ver o comentário lá em cima.
-       E sem respiro no pai — quem o carrega é o elemento mais de baixo de cada
-       ramo, senão o vão sai em dobro. */
-    <View
-      style={[styles.tela, { paddingTop: top + 8 }]}
-      onLayout={e => {
-        const h = e.nativeEvent.layout.height
-        /* A referência é a altura SEM teclado. Guardar a de agora quando ele
-           está aberto faria a comparação sempre dar "não encolheu". */
-        if (alturaTeclado === 0) alturaFechado.current = h
-        setAlturaAgora(h)
-      }}
-    >
+       barra de escrever, ancorada por absoluto e subindo a altura medida do
+       teclado. Sem respiro no pai — a barra cuida do dela, e o bloco do
+       WhatsApp do dele. */
+    <View style={[styles.tela, { paddingTop: top + 8 }]}>
       <View style={styles.cabecalho}>
         <Pressable
           onPress={onFechar}
@@ -366,7 +336,14 @@ export function MensagensScreen({
           <ScrollView
             ref={rolagem}
             style={styles.conversa}
-            contentContainerStyle={styles.conteudoConversa}
+            /* Reserva embaixo o tamanho da barra de escrever, que está ancorada
+               por absoluto e portanto flutua POR CIMA desta lista. Sem isto as
+               últimas mensagens — as que importam — ficam atrás dela. É o preço
+               de ancorar, e é barato de pagar. */
+            contentContainerStyle={[
+              styles.conteudoConversa,
+              { paddingBottom: 74 + respiro },
+            ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             /* Puxar para tentar de novo é o gesto óbvio de quem viu a conversa
@@ -395,7 +372,7 @@ export function MensagensScreen({
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
-          <View style={[styles.barraEnvio, { marginBottom: respiro }]}>
+          <View style={[styles.barraEnvio, { bottom: respiro }]}>
             <TextInput
               value={texto}
               onChangeText={setTexto}
@@ -517,7 +494,20 @@ const estilos = estilosDe(t =>
 
     erro: { paddingHorizontal: 20, paddingBottom: 6, fontSize: 12.5, color: t.cores.erroTexto },
 
+    /* ANCORADA POR ABSOLUTO, e não empurrada por margem no fim de uma coluna.
+     *
+     * É o mesmo desenho do painel do BuscarAlimentoScreen, que funciona neste
+     * app há semanas com o mesmo problema — campo de digitar dentro de tela
+     * sobreposta. As minhas duas tentativas anteriores mexiam no fluxo da
+     * coluna e erraram para lados opostos; esta ancora no fundo da tela e sobe
+     * exatamente a altura do teclado.
+     *
+     * Copiar o que já funciona no aparelho de quem usa vale mais do que a minha
+     * terceira teoria sobre o Android. */
     barraEnvio: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
       flexDirection: 'row',
       alignItems: 'flex-end',
       gap: 8,
