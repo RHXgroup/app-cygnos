@@ -447,6 +447,15 @@ function Acompanhamento({
       apoio: descricaoDoEnergetico(conteudo.energetico),
       chave: 'energetico',
     },
+    {
+      icone: 'book-outline',
+      rotulo: 'Receitas',
+      /* Logo abaixo do plano, e é o lugar certo: a pergunta que vem depois de
+         "o que eu como" é "como eu faço isso". Sem contagem pelo mesmo motivo
+         dos exames — o resumo do banco não conta receitas. */
+      apoio: 'O que ela sugeriu para você cozinhar',
+      chave: 'receitas',
+    },
   ]
 
   return (

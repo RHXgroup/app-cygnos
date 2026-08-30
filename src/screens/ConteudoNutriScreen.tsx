@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -28,6 +29,12 @@ import {
 } from '../lib/conteudoNutri'
 import { carregarSessoes, type SessaoDeFotos } from '../lib/fotos'
 import { carregarExames, ehImagem, tamanhoLegivel, type Exame } from '../lib/exames'
+import {
+  carregarReceitasDaNutri,
+  porcoesLegivel,
+  tempoLegivel,
+  type ReceitaDaNutri,
+} from '../lib/receitasDaNutri'
 import { ComparativoFotos } from '../components/ComparativoFotos'
 import { decimal, milhar } from '../lib/formatar'
 import { abrirLink } from '../lib/links'
@@ -54,6 +61,7 @@ export type ChaveConteudo =
   | 'plano'
   | 'energetico'
   | 'exames'
+  | 'receitas'
 
 const TITULOS: Record<ChaveConteudo, string> = {
   anamnese: 'Anamnese',
@@ -62,6 +70,7 @@ const TITULOS: Record<ChaveConteudo, string> = {
   plano: 'Planejamento alimentar',
   energetico: 'Cálculo energético',
   exames: 'Exames',
+  receitas: 'Receitas',
 }
 
 type Dados =
@@ -71,6 +80,7 @@ type Dados =
   | { chave: 'plano'; plano: PlanoDaNutri | null }
   | { chave: 'energetico'; energetico: Energetico | null }
   | { chave: 'exames'; exames: Exame[] }
+  | { chave: 'receitas'; receitas: ReceitaDaNutri[] }
 
 export function ConteudoNutriScreen({
   chave,
@@ -195,6 +205,11 @@ async function carregar(chave: ChaveConteudo): Promise<Dados> {
   if (chave === 'antropometria') return { chave, avaliacoes: await carregarAvaliacoes() }
   if (chave === 'fotos') return { chave, sessoes: await carregarSessoes() }
   if (chave === 'plano') return { chave, plano: await carregarPlano() }
+  if (chave === 'receitas') {
+    const r = await carregarReceitasDaNutri()
+    if (r.tipo === 'erro') throw new Error(r.mensagem)
+    return { chave, receitas: r.receitas }
+  }
   if (chave === 'exames') {
     const r = await carregarExames()
     /* As outras funções deste arquivo estouram no erro e a tela trata; esta
@@ -263,7 +278,88 @@ function CartaoExame({ exame }: { exame: Exame }) {
   )
 }
 
+/* Uma receita.
+ *
+ * O modo de preparo vem inteiro, e não cortado com reticências: quem abriu esta
+ * tela está de pé na cozinha, e "ver mais" com a mão suja é o pior toque que se
+ * pode pedir.
+ *
+ * Os macros só aparecem quando existem. Receita sem cálculo é comum — ela pode
+ * ter escrito uma sugestão sem passar pelo somatório —, e mostrar "0 kcal" seria
+ * afirmar que a comida não tem caloria. Null é resposta, zero é mentira. */
+function CartaoReceita({ receita }: { receita: ReceitaDaNutri }) {
+  const styles = estilos()
+  const [fotoFalhou, setFotoFalhou] = useState(false)
+
+  const apoio = [tempoLegivel(receita.tempoPreparoMin), porcoesLegivel(receita.porcoes)]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <View style={styles.cartao}>
+      {!!receita.fotoUrl && !fotoFalhou && (
+        <Image
+          source={{ uri: receita.fotoUrl }}
+          style={styles.fotoReceita}
+          resizeMode="cover"
+          onError={() => setFotoFalhou(true)}
+        />
+      )}
+
+      <View style={styles.linhaTituloReceita}>
+        <Text style={styles.nomeReceita}>{receita.nome}</Text>
+        {!!receita.categoria && (
+          <View style={styles.etiquetaReceita}>
+            <Text style={styles.textoEtiquetaReceita}>{receita.categoria}</Text>
+          </View>
+        )}
+      </View>
+
+      {!!apoio && <Text style={styles.apoioReceita}>{apoio}</Text>}
+      {!!receita.descricao && <Text style={styles.descricaoReceita}>{receita.descricao}</Text>}
+
+      {receita.kcal !== null && (
+        <View style={styles.macrosReceita}>
+          <Macro rotulo="kcal" valor={milhar(receita.kcal)} />
+          {receita.proteinas !== null && <Macro rotulo="P" valor={`${decimal(receita.proteinas)} g`} />}
+          {receita.carboidratos !== null && <Macro rotulo="C" valor={`${decimal(receita.carboidratos)} g`} />}
+          {receita.gorduras !== null && <Macro rotulo="G" valor={`${decimal(receita.gorduras)} g`} />}
+        </View>
+      )}
+
+      {!!receita.modoPreparo && (
+        <>
+          <Text style={styles.rotuloPreparo}>Como fazer</Text>
+          <Text style={styles.preparoReceita}>{receita.modoPreparo}</Text>
+        </>
+      )}
+    </View>
+  )
+}
+
+function Macro({ rotulo, valor }: { rotulo: string; valor: string }) {
+  const styles = estilos()
+  return (
+    <View style={styles.macroReceita}>
+      <Text style={styles.valorMacroReceita}>{valor}</Text>
+      <Text style={styles.rotuloMacroReceita}>{rotulo}</Text>
+    </View>
+  )
+}
+
 function Miolo({ dados }: { dados: Dados }) {
+  if (dados.chave === 'receitas') {
+    if (dados.receitas.length === 0) {
+      return <Aviso texto="A sua nutricionista ainda não publicou nenhuma receita." />
+    }
+    return (
+      <>
+        {dados.receitas.map(r => (
+          <CartaoReceita key={r.id} receita={r} />
+        ))}
+      </>
+    )
+  }
   if (dados.chave === 'exames') {
     if (dados.exames.length === 0) {
       return <Aviso texto="A sua nutricionista ainda não importou nenhum exame." />
@@ -729,6 +825,39 @@ cartaoPressionado: { backgroundColor: t.cores.superficie },
   dataDestaque: { marginTop: 4, fontSize: 12, color: t.inkSuave },
 
   aviso: { marginTop: 16, borderRadius: 16, backgroundColor: t.cores.cartao, padding: 18 },
+fotoReceita: { width: '100%', height: 150, borderRadius: 12, marginBottom: 12 },
+  linhaTituloReceita: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  nomeReceita: { flexShrink: 1, fontSize: 16, fontWeight: '800', color: t.cores.ink },
+  etiquetaReceita: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: t.cores.verdeClaro,
+  },
+  textoEtiquetaReceita: { fontSize: 10.5, fontWeight: '800', color: t.cores.limao },
+  apoioReceita: { marginTop: 3, fontSize: 12.5, color: t.inkFraco },
+  descricaoReceita: { marginTop: 8, fontSize: 13.5, lineHeight: 20, color: t.inkSuave },
+  /* Os macros ficam numa fileira separada por linhas, e não em chips: são
+     quatro números curtos que se leem de uma vez, e chip vira ruído aqui. */
+  macrosReceita: {
+    flexDirection: 'row',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: t.cores.borda,
+  },
+  macroReceita: { flex: 1, alignItems: 'center', gap: 1 },
+  valorMacroReceita: { fontSize: 14, fontWeight: '800', color: t.cores.ink },
+  rotuloMacroReceita: { fontSize: 10.5, color: t.inkFraco },
+  rotuloPreparo: {
+    marginTop: 14,
+    fontSize: 11.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: t.cores.limao,
+  },
+  preparoReceita: { marginTop: 5, fontSize: 13.5, lineHeight: 21, color: t.inkMedio },
   textoAviso: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
   }),
 )
