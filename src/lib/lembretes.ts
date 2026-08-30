@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LogBox, Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 import { falha } from './erros'
+import { ACAO_COPO, copoDoAviso } from './copoDoAviso'
 
 /* Lembretes de refeição e de água.
  *
@@ -48,7 +49,6 @@ const CHAVE_IDS_AGUA = 'lembretes.ids.agua'
  * chegar duas vezes — pelo ouvinte e pela consulta de abertura —, e dois copos
  * por um toque é pior do que nenhum. */
 const CATEGORIA_AGUA = 'cygnos.agua'
-export const ACAO_COPO = 'registrar-copo'
 const CHAVE_ULTIMO_COPO = 'lembretes.ultimoCopo'
 
 /* A faxina única da versão anterior, que agendava sem guardar identificador.
@@ -461,43 +461,41 @@ export async function reagendarAguaSeLigada(
  * gravar meio-dia porque foi quando o app abriu estragaria o gráfico de horário
  * — que é justamente a tela que existe para mostrar como o dia se distribui.
  *
- * A mesma resposta pode chegar pelos dois caminhos, e por isso a chave da
- * última atendida fica gravada: dois copos por um toque é pior do que nenhum. */
+ * A leitura do objeto cru mora em lib/copoDoAviso.ts, que não importa nada de
+ * runtime e tem os casos de mesa: é dado montado pelo Android e pelo iOS, sem
+ * tipo e sem garantia, e um `as` otimista ali registra o copo errado calado. */
 export function ouvirBotaoDeAgua(
   aoRegistrar: (ml: number, quando: Date) => void,
 ): () => void {
   let vivo = true
 
   const atender = async (resposta: unknown) => {
-    if (!vivo || !resposta) return
+    if (!vivo) return
 
-    const r = resposta as {
-      actionIdentifier?: string
-      notification?: { date?: number; request?: { identifier?: string } }
+    /* Quem lê o objeto cru é `copoDoAviso`, que não importa nada de runtime e
+       tem os casos de mesa. Aqui sobra o que precisa do aparelho: o guarda de
+       repetição, porque o mesmo toque chega pelos dois caminhos — o ouvinte e a
+       consulta de abertura — e dois copos por um toque é pior do que nenhum. */
+    const copo = copoDoAviso(resposta, new Date())
+    if (!copo) return
+
+    /* Chave nula quer dizer "não dá para saber se é repetido", e aí registra
+       assim mesmo. O aviso é DIÁRIO e reusa o identificador; sem a data da
+       entrega, conferir repetição faria o botão morrer calado do segundo dia em
+       diante. Um copo a mais aparece na lista do dia e some com um toque — um
+       botão morto não avisa ninguém. */
+    if (copo.chave) {
+      try {
+        if ((await AsyncStorage.getItem(CHAVE_ULTIMO_COPO)) === copo.chave) return
+        await AsyncStorage.setItem(CHAVE_ULTIMO_COPO, copo.chave)
+      } catch {
+        /* Sem armazenamento, o risco vira registrar duas vezes em vez de
+           nenhuma. Segue: um copo a mais é corrigível na tela da água com um
+           toque, e nenhum copo não é corrigível porque ninguém sabe que faltou. */
+      }
     }
-    if (r.actionIdentifier !== ACAO_COPO) return
 
-    const entregue = r.notification?.date
-    const chave = `${r.notification?.request?.identifier ?? '?'}:${entregue ?? '?'}`
-
-    try {
-      if ((await AsyncStorage.getItem(CHAVE_ULTIMO_COPO)) === chave) return
-      await AsyncStorage.setItem(CHAVE_ULTIMO_COPO, chave)
-    } catch {
-      /* Sem armazenamento, o risco vira registrar duas vezes em vez de nenhuma.
-         Segue: um copo a mais é corrigível na tela da água com um toque, e
-         nenhum copo não é corrigível porque ninguém sabe que faltou. */
-    }
-
-    const ml = Number(
-      (r as { notification?: { request?: { content?: { data?: { ml?: unknown } } } } })
-        .notification?.request?.content?.data?.ml,
-    )
-    if (!Number.isFinite(ml) || ml <= 0) return
-
-    /* `date` vem em milissegundos. Ausente — o sistema nem sempre manda —, cai
-       em agora, que é o melhor palpite disponível. */
-    aoRegistrar(ml, entregue ? new Date(entregue) : new Date())
+    aoRegistrar(copo.ml, copo.quando)
   }
 
   const inscricao = notificacoes().then(Notifications => {
