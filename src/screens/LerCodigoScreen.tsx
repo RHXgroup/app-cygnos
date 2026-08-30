@@ -183,6 +183,17 @@ export function LerCodigoScreen({
             <Text style={styles.nomeProduto}>{produto.nome}</Text>
             {!!produto.marca && <Text style={styles.marcaProduto}>{produto.marca}</Text>}
 
+            {/* O código lido, à mostra.
+                A tela dizia o nome do produto e não dizia de qual código ele
+                veio — então uma leitura errada só era descoberta depois, quando
+                o número do dia não fechava. Com o código na tela, quem está com
+                o pacote na mão compara os treze dígitos e vê na hora.
+                Foi preciso depois de uma barra de Milka voltar como biscoito
+                Oreo: as duas são da Mondelez e dividem o prefixo 7622. */}
+            <Text style={styles.codigoLido} selectable>
+              {produto.codigo}
+            </Text>
+
             <View style={styles.numeros}>
               <Numero rotulo="Calorias" valor={kcal === null ? '—' : `${milhar(kcal)} kcal`} />
               <Numero
@@ -477,6 +488,13 @@ const estilos = estilosDe(t =>
   valorNumero: { fontSize: 15, fontWeight: '800', color: t.cores.limao },
   rotuloNumero: { fontSize: 10.5, color: t.inkSuave, textAlign: 'center' },
 
+  codigoLido: {
+    fontSize: 12,
+    color: t.inkFraco,
+    marginTop: 6,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.5,
+  },
   origem: { fontSize: 11.5, color: t.inkFraco, marginTop: 12, lineHeight: 17 },
 
   rotuloQuantidade: { fontSize: 13, fontWeight: '700', color: t.inkMedio },

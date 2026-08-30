@@ -61,6 +61,10 @@ const OFF = 'https://world.openfoodfacts.org/api/v2/product'
 /* Só os campos que usamos. A resposta completa do Open Food Facts passa de
    100 KB por produto, e quem escaneia no supermercado costuma estar no 4G. */
 const CAMPOS = [
+  /* `code` não é usado em lugar nenhum da tela — ele existe só para CONFERIR
+     que o produto que voltou é o do código que foi pedido. Ver a checagem
+     abaixo. */
+  'code',
   'product_name',
   'product_name_pt',
   'brands',
@@ -149,6 +153,28 @@ export async function consultarCodigo(codigo: string): Promise<ResultadoCodigo> 
     if (json.status !== 1 || !json.product) return { tipo: 'nao_encontrado' }
 
     const p = json.product
+
+    /* O produto que voltou é mesmo o do código que eu pedi?
+     *
+     * O Open Food Facts NORMALIZA código: tira zero à esquerda, converte EAN-8
+     * para EAN-13, e às vezes responde com um produto vizinho. Sem esta
+     * conferência o app aceitava calado o que viesse — e um código de barras
+     * que devolve outro produto é pior que um que não devolve nada, porque a
+     * pessoa registra achando que acertou.
+     *
+     * A comparação ignora zeros à esquerda dos dois lados: "07622210" e
+     * "7622210" são o mesmo código, e recusar aí seria inventar um problema.
+     *
+     * Isto foi escrito depois de uma barra de chocolate Milka de 300 g voltar
+     * como "biscoito recheado Oreo, pacote de 29 g". Milka e Oreo são as duas
+     * da Mondelez e dividem o prefixo 7622 — dígito trocado na leitura, ou
+     * cadastro errado na origem, cai no produto vizinho sem nada estranho
+     * aparecer na tela. */
+    const semZeros = (s: string) => s.replace(/^0+/, '')
+    const codigoQueVoltou = typeof p.code === 'string' ? p.code.trim() : ''
+    if (codigoQueVoltou && semZeros(codigoQueVoltou) !== semZeros(codigo.trim())) {
+      return { tipo: 'nao_encontrado' }
+    }
     const n = (p.nutriments ?? {}) as Record<string, unknown>
 
     const nome =
