@@ -1,10 +1,16 @@
 # A caixa de entrada da nutricionista
 
-**Para quem for mexer no sistema web.** O app do paciente já manda pedido de
-contato. Do lado de lá não existe tela que os receba — então o pedido sai do
-aparelho, entra na tabela, e fica lá. O funil inteiro para nesse ponto.
+**Para quem for mexer no sistema web.**
 
-Este documento é o que falta, e só isso. Nada aqui pede mudança no app.
+> **Estado em 30/08/2026:** as seis funções pedidas aqui **já existem** no banco
+> — conferidas uma a uma, com a assinatura exata. O que sobrou de aberto está
+> marcado como tal, e são duas coisas que só se conferem testando de ponta a
+> ponta: se o aceite cria o vínculo, e se a RLS deixa ela ler as mensagens.
+>
+> O resto do documento fica como está: é o contrato, e ele continua valendo
+> para quem for mexer nisso depois.
+
+Nada aqui pede mudança no app.
 
 ---
 
@@ -52,9 +58,37 @@ Funções que o **app** chama, e que o sistema web não deve usar:
 Todas recusam `anon`: só respondem a quem está com sessão. O mesmo vale desde
 hoje para `app_nutricionistas`, que era a única porta aberta e foi fechada.
 
-**Do lado dela não existe função nenhuma ainda** — nem para listar os pedidos,
-nem para aceitar, nem para ler ou escrever mensagem. É o que este documento
-pede.
+### O lado dela — conferido em 30/08/2026, e já existe
+
+Este documento pedia seis coisas e as seis foram entregues. Conferidas uma a
+uma contra o banco, com a assinatura exata (nome do argumento errado é falha em
+tempo de execução, não de compilação):
+
+| função | argumentos |
+| --- | --- |
+| `nutri_solicitacoes_recebidas()` | nenhum |
+| `nutri_aceitar_solicitacao(p_id)` | `p_id` |
+| `nutri_recusar_solicitacao(p_id)` | `p_id` |
+| `nutri_conversas()` | nenhum |
+| `nutri_enviar_mensagem(p_texto, p_conta_id)` | `p_texto`, `p_conta_id` |
+| `nutri_marcar_lidas(p_conta_id)` | `p_conta_id` |
+
+Não há função para LER as mensagens de uma conversa, e isso está certo: a
+leitura é direta na tabela com RLS, porque é o que o realtime exige. Ver o item
+4 abaixo.
+
+**Duas coisas que este documento NÃO consegue conferir de fora**, e que valem
+uma olhada em quem escreveu a migração:
+
+1. **`nutri_aceitar_solicitacao` cria o vínculo na mesma transação?** É o ponto
+   mais caro se ficou de fora — o paciente lê "Pedido aceito" no app e continua
+   sem nutricionista.
+2. **A política de RLS de `app_mensagens` deixa ela ler?** Sem isso, a conversa
+   fica vazia do lado dela e o realtime não entrega nada.
+
+O jeito de conferir os dois é o mesmo: entrar no sistema como nutricionista,
+aceitar um pedido de teste, e ver se o app do paciente passa a mostrar o vínculo
+e a conversa.
 
 ---
 
