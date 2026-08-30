@@ -151,7 +151,7 @@ export function MaisScreen({
     lembretesDeAguaLigados().then(async ligada => {
       if (!vivo || !ligada) return
       const ritmo = await ritmoDeAgua(contaId)
-      if (vivo) reagendarAguaSeLigada(ritmo?.horarios)
+      if (vivo) reagendarAguaSeLigada(ritmo?.horarios, ritmo?.mlPorVez)
     })
 
     return () => {
@@ -232,7 +232,7 @@ export function MaisScreen({
        avisado a partir das 6h, e não às 9h como todo mundo. Sem sono anotado,
        a função devolve null e o lembrete cai no genérico. */
     const ritmo = await ritmoDeAgua(contaId)
-    const r = await ligarLembretesDeAgua(ritmo?.horarios)
+    const r = await ligarLembretesDeAgua(ritmo?.horarios, ritmo?.mlPorVez)
     setMexendoAgua(false)
 
     if (r.tipo === 'negado') {

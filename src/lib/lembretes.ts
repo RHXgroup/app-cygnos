@@ -34,6 +34,23 @@ const CHAVE_AGUA = 'lembretes.agua'
 const CHAVE_IDS_REFEICOES = 'lembretes.ids.refeicoes'
 const CHAVE_IDS_AGUA = 'lembretes.ids.agua'
 
+/* ── O botão dentro do aviso de água ───────────────────────────────────────
+ *
+ * "Toque para registrar um copo" custava: abrir o app, esperar carregar, achar
+ * a água, tocar. Quatro passos para dizer que bebeu — e quem está com as mãos
+ * ocupadas simplesmente não diz, o que faz o número do dia mentir para baixo.
+ *
+ * Com a categoria, o aviso vem com um botão e o copo entra sem o app abrir.
+ * Funciona no Expo Go, porque é notificação LOCAL: o que saiu do Expo Go no SDK
+ * 53 foi o push.
+ *
+ * A chave da última resposta atendida é gravada porque o mesmo toque pode
+ * chegar duas vezes — pelo ouvinte e pela consulta de abertura —, e dois copos
+ * por um toque é pior do que nenhum. */
+const CATEGORIA_AGUA = 'cygnos.agua'
+export const ACAO_COPO = 'registrar-copo'
+const CHAVE_ULTIMO_COPO = 'lembretes.ultimoCopo'
+
 /* A faxina única da versão anterior, que agendava sem guardar identificador.
  *
  * Quem já tinha lembretes ligados antes disto tem avisos no sistema que nenhuma
@@ -292,12 +309,28 @@ export async function ligarLembretesDeAgua(
   /* Os horários vêm de fora, calculados a partir da meta e das noites
      registradas — ver lib/ritmoDeAgua.ts. Sem eles, cai no ritmo genérico. */
   horarios?: number[],
+  /* Quanto o botão "Registrei" grava, também calculado lá fora. Sem ele o botão
+     some: um botão que não sabe quanto registrar registraria um número
+     inventado, e um copo inventado suja a soma do dia para sempre. */
+  mlDoGole?: number,
 ): Promise<ResultadoLembretes> {
   const Notifications = await notificacoes()
   if (!(await temPermissao())) return { tipo: 'negado' }
 
   try {
     await faxinaUnica()
+
+    /* A categoria precisa existir ANTES do agendamento: o aviso guarda o nome
+       dela, e um nome que não corresponde a nada vira aviso sem botão. */
+    await Notifications.setNotificationCategoryAsync(CATEGORIA_AGUA, [
+      {
+        identifier: ACAO_COPO,
+        buttonTitle: 'Registrei',
+        /* Não abre o app. É o ponto inteiro do botão — abrir o app para
+           registrar é o que já dava para fazer tocando no aviso. */
+        options: { opensAppToForeground: false },
+      },
+    ])
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('agua', {
@@ -334,7 +367,14 @@ export async function ligarLembretesDeAgua(
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Hora de beber água',
-          body: 'Toque para registrar um copo.',
+          body: mlDoGole
+            ? `Cerca de ${mlDoGole} ml agora deixa o dia no ritmo.`
+            : 'Toque para registrar um copo.',
+          categoryIdentifier: CATEGORIA_AGUA,
+          /* Quanto o botão registra. Vai no aviso, e não numa conta refeita na
+             hora de responder: quando a pessoa toca, o app pode estar
+             carregando — e o número certo é o de quando o aviso foi montado. */
+          data: { tipo: 'agua', ml: mlDoGole ?? null },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -392,7 +432,77 @@ export async function reagendarSeLigados(plano: PlanoCompleto | null): Promise<v
  *
  * Os horários vêm de fora pelo mesmo motivo de `ligarLembretesDeAgua`: quem
  * calcula fala com o banco, e este arquivo não fala. */
-export async function reagendarAguaSeLigada(horarios?: number[]): Promise<void> {
+export async function reagendarAguaSeLigada(
+  horarios?: number[],
+  mlDoGole?: number,
+): Promise<void> {
   if (!(await lembretesDeAguaLigados())) return
-  await ligarLembretesDeAgua(horarios)
+  await ligarLembretesDeAgua(horarios, mlDoGole)
+}
+
+/* ── Responder ao botão ────────────────────────────────────────────────────
+ *
+ * Dois caminhos, e os dois precisam existir:
+ *
+ *   ouvinte  → o app está de pé (em primeiro plano ou só na memória, que é o
+ *              caso comum no Android). O copo entra na hora.
+ *   abertura → o app tinha sido encerrado. A resposta ficou guardada pelo
+ *              sistema e chega na próxima abertura.
+ *
+ * No segundo caso o copo NÃO entra com a hora de agora: entra com a hora em que
+ * o aviso foi entregue. Quem tocou "Registrei" às dez da manhã bebeu às dez, e
+ * gravar meio-dia porque foi quando o app abriu estragaria o gráfico de horário
+ * — que é justamente a tela que existe para mostrar como o dia se distribui.
+ *
+ * A mesma resposta pode chegar pelos dois caminhos, e por isso a chave da
+ * última atendida fica gravada: dois copos por um toque é pior do que nenhum. */
+export function ouvirBotaoDeAgua(
+  aoRegistrar: (ml: number, quando: Date) => void,
+): () => void {
+  let vivo = true
+
+  const atender = async (resposta: unknown) => {
+    if (!vivo || !resposta) return
+
+    const r = resposta as {
+      actionIdentifier?: string
+      notification?: { date?: number; request?: { identifier?: string } }
+    }
+    if (r.actionIdentifier !== ACAO_COPO) return
+
+    const entregue = r.notification?.date
+    const chave = `${r.notification?.request?.identifier ?? '?'}:${entregue ?? '?'}`
+
+    try {
+      if ((await AsyncStorage.getItem(CHAVE_ULTIMO_COPO)) === chave) return
+      await AsyncStorage.setItem(CHAVE_ULTIMO_COPO, chave)
+    } catch {
+      /* Sem armazenamento, o risco vira registrar duas vezes em vez de nenhuma.
+         Segue: um copo a mais é corrigível na tela da água com um toque, e
+         nenhum copo não é corrigível porque ninguém sabe que faltou. */
+    }
+
+    const ml = Number(
+      (r as { notification?: { request?: { content?: { data?: { ml?: unknown } } } } })
+        .notification?.request?.content?.data?.ml,
+    )
+    if (!Number.isFinite(ml) || ml <= 0) return
+
+    /* `date` vem em milissegundos. Ausente — o sistema nem sempre manda —, cai
+       em agora, que é o melhor palpite disponível. */
+    aoRegistrar(ml, entregue ? new Date(entregue) : new Date())
+  }
+
+  const inscricao = notificacoes().then(Notifications => {
+    /* A resposta que ABRIU o app, para o caso de ele estar encerrado. */
+    Notifications.getLastNotificationResponseAsync().then(atender)
+    return Notifications.addNotificationResponseReceivedListener(atender)
+  })
+
+  return () => {
+    vivo = false
+    inscricao.then(sub => sub.remove()).catch(() => {
+      /* O módulo nem chegou a carregar: não há o que desligar. */
+    })
+  }
 }

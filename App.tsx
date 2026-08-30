@@ -35,6 +35,8 @@ import { ExcluirContaScreen } from './src/screens/ExcluirContaScreen'
 import { MaisScreen } from './src/screens/MaisScreen'
 import { MensagensScreen } from './src/screens/MensagensScreen'
 import { contarNaoLidas } from './src/lib/mensagens'
+import { lembretesDeAguaLigados, ouvirBotaoDeAgua } from './src/lib/lembretes'
+import { registrarAgua } from './src/lib/agua'
 import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
 import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
 import { ReceitasScreen } from './src/screens/ReceitasScreen'
@@ -370,6 +372,37 @@ function AreaLogada({ sessao }: { sessao: Session }) {
    * faziam a resposta atrasada — de antes da marcação — reacender o ponto e
    * deixá-lo aceso sobre uma conversa que a pessoa estava lendo. */
   const [naoLidas, setNaoLidas] = useState(0)
+
+  /* O botão "Registrei" do aviso de água.
+   *
+   * Mora aqui, e não na tela da água, porque o toque acontece com o app fora da
+   * frente — em segundo plano, ou encerrado. Uma tela que talvez nem esteja
+   * montada não pode ser quem escuta.
+   *
+   * Só liga o ouvinte para quem tem o lembrete ligado: registrar o ouvinte
+   * carrega o expo-notifications, e o preço disso — inclusive o aviso vermelho
+   * de push no Expo Go — não deve ser cobrado de quem nunca ligou lembrete
+   * nenhum. Ver o comentário do carregamento em lib/lembretes.ts. */
+  useEffect(() => {
+    let desligar: (() => void) | null = null
+    let vivo = true
+
+    lembretesDeAguaLigados().then(ligada => {
+      if (!vivo || !ligada) return
+      desligar = ouvirBotaoDeAgua(async (ml, quando) => {
+        const r = await registrarAgua(sessao.user.id, ml, quando)
+        /* Falha aqui é silenciosa de propósito: o app está no bolso da pessoa, e
+           não há tela para mostrar erro. O motivo cru vai para o console por
+           dentro de `registrarAgua`. */
+        if (r.tipo === 'ok') setVersaoAgua(v => v + 1)
+      })
+    })
+
+    return () => {
+      vivo = false
+      desligar?.()
+    }
+  }, [sessao.user.id])
 
   useEffect(() => {
     let vivo = true
