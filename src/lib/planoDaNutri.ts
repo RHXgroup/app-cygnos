@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { falha } from './erros'
 import type { DiaSemana, ItemSalvo, PlanoCompleto, RefeicaoSalva } from './plano'
 
 /* O plano alimentar da nutricionista, no formato do plano do app.
@@ -67,7 +68,13 @@ function descricaoDoItem(gramas: number | null, medida: string | null): string {
 
 export async function carregarPlanoDaNutri(): Promise<PlanoCompleto | null> {
   const { data, error } = await supabase.rpc('app_plano_do_paciente')
-  if (error) throw new Error(error.message)
+  /* `falha` pelo motivo do console, e não pelo da tela: os dois lugares que
+     chamam esta função engolem o erro de propósito — sem o plano dela, o app
+     mostra o plano próprio, que é a resposta certa. Só que engolir sem registrar
+     é como o defeito da RPC de conteúdo passou despercebido: a lista
+     simplesmente não aparecia, e nada em lugar nenhum dizia por quê. Ver a
+     armadilha 12 do AGENTS.md, que é sobre os DOIS lados. */
+  if (error) throw new Error(falha('Não consegui carregar o plano da sua nutricionista.', error))
 
   const linhas = (data ?? []) as Linha[]
   if (linhas.length === 0) return null

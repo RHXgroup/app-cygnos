@@ -101,9 +101,26 @@ export async function solicitarVinculo(
   return { tipo: 'ok' }
 }
 
+/* Aqui NÃO se repassa o texto do banco, ao contrário do pedido logo acima.
+ *
+ * A diferença é quem escreveu a frase. `app_solicitar_vinculo` levanta mensagem
+ * para gente ler — é ela que explica por que o toque não virou pedido. Desfazer
+ * é um update: o que chega até aqui é falha de rede, de permissão, ou um pedido
+ * que deixou de estar em aberto porque ela respondeu enquanto a tela estava na
+ * mão da pessoa.
+ *
+ * A frase cobre os três sem chutar qual foi, e manda fazer a única coisa que
+ * resolve os três — reler. Mesma escolha do cancelar de lib/agenda.ts. */
 export async function cancelarSolicitacao(id: number): Promise<ResultadoPedido> {
   const { error } = await supabase.rpc('app_cancelar_solicitacao_vinculo', { p_id: id })
-  if (error) return { tipo: 'erro', mensagem: error.message }
+  if (error)
+    return {
+      tipo: 'erro',
+      mensagem: falha(
+        'Não consegui desfazer este pedido. Ele pode já ter sido respondido — puxe para atualizar.',
+        error,
+      ),
+    }
   return { tipo: 'ok' }
 }
 
