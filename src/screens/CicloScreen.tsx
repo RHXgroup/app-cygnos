@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -13,15 +13,19 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Confirmacao } from '../components/Confirmacao'
+import { CalendarioMes } from '../components/CalendarioMes'
+import { DiaDoCiclo } from '../components/DiaDoCiclo'
 import {
   apagarCiclo,
   carregarCiclos,
+  carregarDias,
   compartilharCiclo,
+  diaTemAlgo,
   estadoDoCompartilhamento,
-  marcarFim,
   registrarComeco,
+  salvarDia,
   sincronizarCiclo,
+  type DiaDoCiclo as Dia,
   type RegistroCiclo,
 } from '../lib/ciclo'
 import {
@@ -29,45 +33,45 @@ import {
   situacaoDoCiclo,
   type Comparacao,
   type Fase,
-  type Situacao,
 } from '../lib/cicloDaPessoa'
+import { diasMenstruada, diasPrevistos, mesVizinho, somandoDias } from '../lib/calendarioDoCiclo'
+import { diasFerteis, janelaFertil } from '../lib/fertilidade'
 import { carregarConsumoPeriodo } from '../lib/consumo'
 import { dataISO, milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 
-/* O ciclo menstrual, do jeito que dá para fazer honestamente.
+/* O ciclo menstrual — calendário, e não formulário.
  *
- * ── O que esta tela NÃO faz, e por quê ─────────────────────────────────────
- * Não dá conselho por fase. "Coma mais carboidrato na lútea", "treine pesado na
- * folicular" — isso é o que os aplicativos de ciclo vendem, e a evidência é
- * fraca: o metabolismo de repouso não muda de forma relevante entre as fases.
+ * ── O que havia antes, e por que estava errado ────────────────────────────
+ * Um botão: "minha menstruação começou HOJE". Quem lembra na quinta que
+ * menstruou na segunda não tinha como dizer isso — e lembrar na quinta é o caso
+ * comum, não a exceção. Um controle de ciclo em que só dá para registrar hoje
+ * não é controle de ciclo.
  *
- * O contrário tem evidência boa: a dieta afeta os sintomas. Então a tela mostra
- * o que ELA registrou e cruza com o diário que ela mesma preencheu — "nos seus
- * últimos três ciclos, você comeu em média 300 kcal a mais nos quatro dias
- * antes". Isso é medida, não palpite de população, e é o que a nutricionista
- * consegue usar.
+ * Agora é um calendário: toca em qualquer dia passado e registra ali. Semana
+ * retrasada inclusive.
+ *
+ * ── Gestão, e não operação ────────────────────────────────────────────────
+ * A tela abre DIZENDO onde ela está — dia do ciclo, fase, quando a próxima deve
+ * vir, janela fértil — em vez de esperar ser alimentada. O calendário vem logo
+ * abaixo, com os dias já pintados, e tudo o que se registra está atrás de um
+ * toque num dia. Uma tela, e não uma lista de botões espalhados.
+ *
+ * ── O que esta tela NÃO faz ───────────────────────────────────────────────
+ * Não dá conselho por fase. "Coma carboidrato na lútea" é o que os aplicativos
+ * de ciclo vendem, e a evidência é fraca — o metabolismo de repouso não muda de
+ * forma relevante entre as fases.
+ *
+ * O contrário tem evidência boa: a dieta afeta os sintomas. Então a tela cruza
+ * o ciclo com o diário que ela já preenche, e isso é medida dela.
+ *
+ * E não desenha "dias seguros". Janela fértil para quem QUER engravidar é
+ * ajuda; a mesma tela lida ao contrário vira anticoncepção, e a margem deste
+ * cálculo tem, aí, consequência que ninguém desfaz.
  *
  * ── Nada de 28 dias ───────────────────────────────────────────────────────
- * Enquanto não houver dois registros, a tela diz que ainda não sabe prever.
- * Ciclo de 28 é média de população: prever com 28 quem tem 34 é errar seis dias
- * e chamar isso de previsão.
- *
- * ── E quem vê ─────────────────────────────────────────────────────────────
- * Por padrão, só ela: a tabela tem RLS de dono, e a nutricionista não enxerga
- * nada. Dado menstrual é dos mais sensíveis que um app de saúde guarda, e
- * compartilhar por omissão seria a escolha errada para ele.
- *
- * Mas o sistema DELA já tem controle de ciclo, e faz sentido o dado chegar lá —
- * quando a pessoa quiser. Então há uma chave nesta tela, desligada de origem, e
- * ligá-la espelha o que já existe. Desligar apaga o que foi enviado: um
- * consentimento retirado que só interrompe o fluxo futuro deixa para trás
- * exatamente o dado que ela decidiu não compartilhar mais.
- *
- * Todo caminho que muda um registro chama `sincronizarCiclo()` logo depois —
- * inclusive o de apagar. Sem isso, a data digitada errada continuaria no
- * histórico da nutricionista, deslocando a média dela, e o botão de apagar
- * mentiria. */
+ * Sem dois registros, a tela diz que ainda não sabe prever. Prever com 28 quem
+ * tem 34 é errar seis dias e chamar isso de previsão. */
 
 const NOME_DA_FASE: Record<Fase, string> = {
   menstrual: 'Menstruação',
@@ -76,9 +80,6 @@ const NOME_DA_FASE: Record<Fase, string> = {
   lutea: 'Fase lútea',
 }
 
-/* Quantos dias de diário puxar para a comparação. Três meses cobrem dois ou
-   três ciclos completos, que é o mínimo para a média não ser ruído — e é o
-   máximo que vale trazer para o aparelho de uma vez. */
 const DIAS_DE_DIARIO = 120
 
 const diaEMes = (iso: string) => {
@@ -92,31 +93,33 @@ export function CicloScreen({
   onFechar,
 }: {
   contaId: string
-  /* Avisa a tela de cima que algo mudou, para ela reler quando voltar. */
   onMudou: () => void
   onFechar: () => void
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
+  const hoje = dataISO(new Date())
 
   const [registros, setRegistros] = useState<RegistroCiclo[] | null>(null)
+  const [dias, setDias] = useState<Dia[]>([])
   const [comparacao, setComparacao] = useState<Comparacao | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [relendo, setRelendo] = useState(false)
   const [erro, setErro] = useState('')
-  const [salvando, setSalvando] = useState(false)
   const [mudou, setMudou] = useState(false)
-  const [apagando, setApagando] = useState<RegistroCiclo | null>(null)
   const [versao, setVersao] = useState(0)
+
+  const [ano, setAno] = useState(() => Number(hoje.slice(0, 4)))
+  const [mes, setMes] = useState(() => Number(hoje.slice(5, 7)))
+  const [diaAberto, setDiaAberto] = useState<string | null>(null)
+  const [salvandoDia, setSalvandoDia] = useState(false)
+
   const [compartilha, setCompartilha] = useState(false)
   const [temNutricionista, setTemNutricionista] = useState(false)
   const [mudandoChave, setMudandoChave] = useState(false)
 
-  const hoje = dataISO(new Date())
-
-  /* Volta do segundo plano relendo. A pessoa marca o começo, sai para o
-     aplicativo do parceiro ou para a agenda, e volta — e o que ela vê tem de
-     ser o que está gravado. */
+  /* Volta do segundo plano relendo: o que mudou noutro aparelho, ou do lado da
+     nutricionista, não chega sozinho — item 8 do AGENTS.md. */
   useEffect(() => {
     const sub = AppState.addEventListener('change', e => {
       if (e === 'active') setVersao(v => v + 1)
@@ -126,12 +129,10 @@ export function CicloScreen({
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      /* A confirmação de apagar é o degrau de dentro, e o voltar desce um por
-         vez. Sem lista de dependências: ver o item 1 do AGENTS.md. */
-      if (apagando) {
-        setApagando(null)
-        return true
-      }
+      /* A folha do dia é um Modal e fecha sozinha pelo `onRequestClose`; devolvo
+         o evento para ela. Aqui só resta o degrau da tela. Sem lista de
+         dependências: item 1 do AGENTS.md. */
+      if (diaAberto) return false
       fechar()
       return true
     })
@@ -146,37 +147,34 @@ export function CicloScreen({
   const carregar = useCallback(async () => {
     const r = await carregarCiclos(contaId)
     if (r.tipo === 'erro') {
-      /* O erro fica, e o conteúdo antigo também: trocar a lista por uma
-         mensagem a cada volta do segundo plano pagaria um susto por uma leitura
-         que quase sempre não muda nada. */
+      /* O erro fica e o conteúdo antigo também: trocar a tela por uma mensagem
+         a cada volta do segundo plano paga um susto por uma leitura que quase
+         sempre não muda nada. */
       setErro(r.mensagem)
       return
     }
-    /* O else limpa. Sem isto, a leitura seguinte dá certo e o conteúdo fica
-       escondido atrás de uma mensagem vencida — item 9 do AGENTS.md. */
+    /* O else limpa — item 9 do AGENTS.md. */
     setErro('')
     setRegistros(r.registros)
 
-    /* O estado da chave vem junto da lista. Ele muda do lado de fora desta tela
-       — desvincular da nutricionista desliga a chave por gatilho —, e uma tela
-       que mostra "compartilhando" depois de o vínculo acabar estaria mentindo
-       sobre quem vê o que. */
     const e = await estadoDoCompartilhamento(contaId)
     setCompartilha(e.ligado)
     setTemNutricionista(e.temNutricionista)
 
-    /* A comparação com o diário só faz sentido com dois começos ou mais: um
-       ciclo não tem "o resto" para comparar contra. */
+    /* Um ano de dias de uma vez. São no máximo 365 linhas curtas, e evita uma
+       ida à rede a cada vez que ela vira o mês do calendário. */
+    const d = await carregarDias(contaId, somandoDias(hoje, -365), hoje)
+    if (d.tipo === 'ok') setDias(d.dias)
+
     if (r.registros.length < 2) {
       setComparacao(null)
       return
     }
-    const de = dataISO(new Date(Date.now() - DIAS_DE_DIARIO * 86400000))
-    const c = await carregarConsumoPeriodo(contaId, de, hoje)
+    const c = await carregarConsumoPeriodo(contaId, somandoDias(hoje, -DIAS_DE_DIARIO), hoje)
     if (c.tipo === 'erro') {
-      /* Silêncio de propósito, e só aqui: a lista de ciclos já apareceu, e
-         falhar em desenhar um bloco extra não é motivo para cobrir a tela com
-         um erro sobre "histórico de refeições". */
+      /* Silêncio, e só aqui: a tela já apareceu, e falhar em desenhar um bloco
+         extra não justifica cobri-la com um erro sobre "histórico de
+         refeições". */
       setComparacao(null)
       return
     }
@@ -203,62 +201,73 @@ export function CicloScreen({
     }
   }, [carregar, versao])
 
-  const situacao: Situacao = situacaoDoCiclo(registros ?? [], hoje)
-  const atual = registros?.[0] ?? null
-  const jaComecouHoje = atual?.comecou === hoje
+  const situacao = situacaoDoCiclo(registros ?? [], hoje)
+  const janela = janelaFertil(situacao.proximaPrevista)
 
-  async function comecouHoje() {
-    setSalvando(true)
-    const r = await registrarComeco(contaId, hoje)
-    setSalvando(false)
-    if (r.tipo === 'erro') {
-      setErro(r.mensagem)
-      return
+  const pintados = useMemo(
+    () => ({
+      menstruada: diasMenstruada(registros ?? []),
+      previstos: diasPrevistos(situacao.proximaPrevista, registros ?? []),
+      ferteis: diasFerteis(janela),
+      anotados: new Set(dias.filter(diaTemAlgo).map(d => d.data)),
+    }),
+    [registros, dias, situacao.proximaPrevista, janela],
+  )
+
+  const doDia = (data: string) => dias.find(d => d.data === data) ?? null
+  const ehComeco = (data: string) => (registros ?? []).some(r => r.comecou === data)
+
+  async function marcarComeco(data: string, ligado: boolean) {
+    setSalvandoDia(true)
+    if (ligado) {
+      const r = await registrarComeco(contaId, data)
+      setSalvandoDia(false)
+      if (r.tipo === 'erro') {
+        setErro(r.mensagem)
+        return
+      }
+      setRegistros(a => [r.registro, ...(a ?? []).filter(x => x.comecou !== data)])
+    } else {
+      const alvo = (registros ?? []).find(r => r.comecou === data)
+      if (!alvo) {
+        setSalvandoDia(false)
+        return
+      }
+      setRegistros(a => (a ?? []).filter(x => x.id !== alvo.id))
+      const f = await apagarCiclo(alvo.id)
+      setSalvandoDia(false)
+      if (f) {
+        setErro(f.erro)
+        setVersao(v => v + 1)
+        return
+      }
     }
     setErro('')
     setMudou(true)
-    setRegistros(atuais => [
-      r.registro,
-      ...(atuais ?? []).filter(x => x.comecou !== r.registro.comecou),
-    ])
-    void sincronizarCiclo()
-    setVersao(v => v + 1)
-  }
-
-  async function terminouHoje(alvo: RegistroCiclo) {
-    setSalvando(true)
-    const r = await marcarFim(alvo.id, alvo.terminou ? null : hoje)
-    setSalvando(false)
-    if (r.tipo === 'erro') {
-      setErro(r.mensagem)
-      return
-    }
-    setErro('')
-    setMudou(true)
-    setRegistros(atuais => (atuais ?? []).map(x => (x.id === alvo.id ? r.registro : x)))
-    void sincronizarCiclo()
-  }
-
-  async function apagar(alvo: RegistroCiclo) {
-    setApagando(null)
-    setRegistros(atuais => (atuais ?? []).filter(x => x.id !== alvo.id))
-    setMudou(true)
-    const f = await apagarCiclo(alvo.id)
-    if (f) {
-      setErro(f.erro)
-      setVersao(v => v + 1)
-      return
-    }
-    /* Depois de apagar, e não antes: o espelho é refeito a partir do que
+    /* Depois de gravar, e não antes: o espelho é refeito a partir do que
        sobrou, e sincronizar com a linha ainda lá a reenviaria. */
     void sincronizarCiclo()
   }
 
+  async function guardarDia(d: Dia) {
+    setSalvandoDia(true)
+    const r = await salvarDia(contaId, d)
+    setSalvandoDia(false)
+    if (r.tipo === 'erro') {
+      setErro(r.mensagem)
+      return
+    }
+    setErro('')
+    setMudou(true)
+    setDias(atuais => [...atuais.filter(x => x.data !== r.dia.data), r.dia])
+    setDiaAberto(null)
+    void sincronizarCiclo()
+  }
+
   async function trocarChave(ligar: boolean) {
-    /* Otimista NÃO. Em qualquer outro interruptor do app o otimismo é o certo,
-       porque errar custa um piscar; aqui ele mostraria "a sua nutricionista vê"
-       para quem, no servidor, não está compartilhando nada — ou o contrário, que
-       é pior. Meio segundo de espera é o preço de a tela não mentir sobre isso. */
+    /* Otimista NÃO: em qualquer outro interruptor errar custa um piscar; aqui
+       mostraria "a sua nutricionista vê" para quem não está compartilhando —
+       ou o contrário, que é pior. */
     setMudandoChave(true)
     const r = await compartilharCiclo(ligar)
     setMudandoChave(false)
@@ -268,9 +277,8 @@ export function CicloScreen({
     }
     setErro('')
     setCompartilha(r.estado.compartilhando)
-    /* O servidor desliga sozinho quando não há vínculo. Se ela pediu para ligar
-       e voltou desligado, é porque não há para quem mandar — e a linha de baixo
-       já explica isso. */
+    /* O servidor desliga sozinho quando não há vínculo claro. Se ela pediu para
+       ligar e voltou desligado, é porque não há para quem mandar. */
     if (ligar && !r.estado.compartilhando) setTemNutricionista(false)
   }
 
@@ -297,9 +305,8 @@ export function CicloScreen({
           contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 32 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            /* Também na ramificação de erro, e é ali que ele mais importa:
-               puxar para tentar de novo é o gesto óbvio de quem leu "verifique
-               a conexão". */
+            /* Também na ramificação de erro, e é ali que mais importa: puxar
+               para tentar de novo é o gesto de quem leu "verifique a conexão". */
             <RefreshControl
               refreshing={relendo}
               onRefresh={() => {
@@ -316,151 +323,102 @@ export function CicloScreen({
             </View>
           ) : null}
 
-          {/* ── Onde ela está ─────────────────────────────────────────────*/}
-          <View style={styles.cartaoAgora}>
+          {/* ── Onde ela está. A tela DIZ, em vez de esperar. ───────────── */}
+          <View style={styles.agora}>
             {situacao.diaDoCiclo === null ? (
               <>
-                <Text style={styles.grande}>Ainda não sei</Text>
+                <Text style={styles.grande}>Toque num dia</Text>
                 <Text style={styles.explicacao}>
-                  Marque o primeiro dia quando ele chegar. Com dois registros eu já consigo dizer a
-                  duração dos SEUS ciclos — e não a média de 28 dias, que é de população e não é a
-                  sua.
+                  Marque no calendário quando a sua menstruação começou — pode ser hoje, semana
+                  passada ou retrasada. Com dois registros eu já digo a duração dos SEUS ciclos, e
+                  não a média de 28 dias, que é de população.
                 </Text>
               </>
             ) : (
               <>
-                <Text style={styles.rotuloAgora}>Dia do ciclo</Text>
-                <Text style={styles.grande}>{situacao.diaDoCiclo}</Text>
-                {situacao.fase ? (
-                  <Text style={styles.fase}>{NOME_DA_FASE[situacao.fase]}</Text>
+                <View style={styles.linhaAgora}>
+                  <View>
+                    <Text style={styles.rotuloAgora}>Dia do ciclo</Text>
+                    <Text style={styles.grande}>{situacao.diaDoCiclo}</Text>
+                  </View>
+                  {situacao.fase && (
+                    <View style={styles.selo}>
+                      <Text style={styles.textoSelo}>{NOME_DA_FASE[situacao.fase]}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {situacao.duracaoTipica !== null ? (
+                  <Text style={styles.linhaInfo}>
+                    Os seus ciclos duram{' '}
+                    <Text style={styles.forte}>{situacao.duracaoTipica} dias</Text>.{' '}
+                    {situacao.irregular
+                      ? 'Eles variam bastante entre si, então não vou arriscar uma data. Um ciclo irregular pode ser normal — e também pode valer uma conversa com quem te acompanha.'
+                      : situacao.atrasoEmDias !== null
+                        ? `A previsão era ${diaEMes(situacao.proximaPrevista ?? '')}, há ${situacao.atrasoEmDias} ${situacao.atrasoEmDias === 1 ? 'dia' : 'dias'} — previsão é estimativa, e atrasar acontece.`
+                        : `A próxima deve começar por volta de ${diaEMes(situacao.proximaPrevista ?? '')}.`}
+                  </Text>
                 ) : (
-                  <Text style={styles.faseIncerta}>
-                    Com mais um ciclo registrado eu consigo dizer a fase.
+                  <Text style={styles.linhaInfo}>
+                    Com mais um começo registrado eu já digo quanto duram os seus ciclos e quando a
+                    próxima deve vir.
+                  </Text>
+                )}
+
+                {janela && !situacao.irregular && (
+                  <Text style={styles.linhaInfo}>
+                    Janela fértil estimada:{' '}
+                    <Text style={styles.forte}>
+                      {diaEMes(janela.de)} a {diaEMes(janela.ate)}
+                    </Text>
+                    .{' '}
+                    <Text style={styles.ressalva}>
+                      Estimativa pelas suas datas, erra por dias, e não serve como método
+                      contraceptivo.
+                    </Text>
                   </Text>
                 )}
               </>
             )}
           </View>
 
-          {/* ── A previsão, quando ela tem base ───────────────────────────*/}
-          {situacao.duracaoTipica !== null && (
-            <View style={styles.cartao}>
-              <Text style={styles.tituloCartao}>Os seus ciclos</Text>
-              <Text style={styles.linhaInfo}>
-                Duram <Text style={styles.forte}>{situacao.duracaoTipica} dias</Text>, tipicamente.
-              </Text>
+          <CalendarioMes
+            ano={ano}
+            mes={mes}
+            hoje={hoje}
+            menstruada={pintados.menstruada}
+            previstos={pintados.previstos}
+            ferteis={pintados.ferteis}
+            anotados={pintados.anotados}
+            selecionado={diaAberto}
+            onSelecionar={setDiaAberto}
+            onTrocarMes={passo => {
+              const v = mesVizinho(ano, mes, passo)
+              setAno(v.ano)
+              setMes(v.mes)
+            }}
+          />
 
-              {situacao.irregular ? (
-                /* A ausência da previsão é a informação honesta. Mostrar uma
-                   data para quem varia doze dias entre um ciclo e outro é criar
-                   susto com um número que nunca teve base. */
-                <Text style={styles.linhaInfo}>
-                  Eles variam bastante entre si, então não vou arriscar uma data. Um ciclo
-                  irregular pode ser normal — e também pode valer uma conversa com quem te
-                  acompanha.
-                </Text>
-              ) : situacao.atrasoEmDias !== null ? (
-                <Text style={styles.linhaInfo}>
-                  A previsão era {diaEMes(situacao.proximaPrevista ?? '')}, há{' '}
-                  <Text style={styles.forte}>
-                    {situacao.atrasoEmDias} {situacao.atrasoEmDias === 1 ? 'dia' : 'dias'}
-                  </Text>
-                  . Previsão é estimativa, e atrasar acontece.
-                </Text>
-              ) : (
-                <Text style={styles.linhaInfo}>
-                  A próxima deve começar por volta de{' '}
-                  <Text style={styles.forte}>{diaEMes(situacao.proximaPrevista ?? '')}</Text>.
-                </Text>
-              )}
-            </View>
-          )}
-
-          {/* ── O cruzamento com o diário: o motivo de isto existir aqui ──*/}
+          {/* ── O cruzamento com o diário ───────────────────────────────── */}
           {comparacao &&
             comparacao.mediaNosDiasAntes !== null &&
             comparacao.mediaNoResto !== null && (
               <View style={styles.cartao}>
                 <Text style={styles.tituloCartao}>Você, nos dias antes</Text>
                 <Text style={styles.linhaInfo}>
-                  Nos {comparacao.ciclosComparados} últimos ciclos, nos{' '}
-                  {comparacao.diasAntes} dias antes da menstruação você comeu em média{' '}
-                  <Text style={styles.forte}>
-                    {milhar(comparacao.mediaNosDiasAntes)} kcal
-                  </Text>{' '}
-                  por dia, contra {milhar(comparacao.mediaNoResto)} no resto do ciclo.
+                  Nos {comparacao.ciclosComparados} últimos ciclos, nos {comparacao.diasAntes} dias
+                  antes da menstruação você comeu em média{' '}
+                  <Text style={styles.forte}>{milhar(comparacao.mediaNosDiasAntes)} kcal</Text> por
+                  dia, contra {milhar(comparacao.mediaNoResto)} no resto do ciclo.
                 </Text>
                 <Text style={styles.ajuda}>
-                  Isto é o que o SEU diário mostra, e não uma regra sobre fases — dessas eu não
-                  tenho nenhuma para te dar. Serve para você reconhecer o padrão, e para levar a
-                  quem te acompanha.
+                  Isto é o que o SEU diário mostra, e não uma regra sobre fases.
                 </Text>
               </View>
             )}
 
-          {/* ── Registrar ─────────────────────────────────────────────────*/}
-          <Pressable
-            onPress={comecouHoje}
-            disabled={salvando || jaComecouHoje}
-            style={({ pressed }) => [
-              styles.botaoPrincipal,
-              (salvando || jaComecouHoje) && styles.botaoDesligado,
-              pressed && styles.pressionado,
-            ]}
-            accessibilityRole="button"
-          >
-            {salvando ? (
-              <ActivityIndicator color={paleta().cores.branco} />
-            ) : (
-              <Text style={styles.textoBotaoPrincipal}>
-                {jaComecouHoje ? 'Começou hoje — anotado' : 'Minha menstruação começou hoje'}
-              </Text>
-            )}
-          </Pressable>
-
-          {atual && !atual.terminou && !jaComecouHoje && (
-            <Pressable
-              onPress={() => void terminouHoje(atual)}
-              disabled={salvando}
-              style={({ pressed }) => [styles.botaoSecundario, pressed && styles.pressionado]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.textoBotaoSecundario}>Terminou hoje</Text>
-            </Pressable>
-          )}
-
-          {/* ── O histórico ───────────────────────────────────────────────*/}
-          {registros && registros.length > 0 && (
-            <>
-              <Text style={styles.tituloSecao}>Registros</Text>
-              {registros.map(r => (
-                <View key={r.id} style={styles.linhaRegistro}>
-                  <View style={styles.textoRegistro}>
-                    <Text style={styles.dataRegistro}>{diaEMes(r.comecou)}</Text>
-                    <Text style={styles.detalheRegistro}>
-                      {r.terminou
-                        ? `até ${diaEMes(r.terminou)}`
-                        : 'sem fim marcado'}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() => setApagando(r)}
-                    hitSlop={10}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Apagar o registro de ${diaEMes(r.comecou)}`}
-                  >
-                    <Ionicons name="close" size={16} color={paleta().inkFraco} />
-                  </Pressable>
-                </View>
-              ))}
-            </>
-          )}
-
-          {/* A chave por ÚLTIMO, depois de registrar e do histórico.
-              Quem abre esta tela veio marcar uma data, não decidir sobre
-              privacidade — e uma pergunta sobre compartilhamento no topo faria
-              a decisão parecer obrigatória para usar a tela. */}
-          <View style={styles.cartaoChave}>
+          {/* ── A chave, por último ─────────────────────────────────────── */}
+          <View style={styles.cartao}>
             <View style={styles.linhaChave}>
               <View style={styles.textoChave}>
                 <Text style={styles.tituloCartao}>Mostrar para a minha nutricionista</Text>
@@ -468,8 +426,8 @@ export function CicloScreen({
                   {!temNutricionista
                     ? 'Você ainda não tem nutricionista vinculada. Quando tiver, esta opção liga.'
                     : compartilha
-                      ? 'Ela vê as datas que você registra aqui. Desligar apaga o que já foi enviado.'
-                      : 'Hoje ninguém além de você vê isto. Ligando, ela passa a ver as datas — e só elas.'}
+                      ? 'Ela vê as datas, o fluxo, os sintomas, o humor e a vontade de comer. Desligar apaga o que já foi enviado.'
+                      : 'Hoje ninguém além de você vê isto.'}
                 </Text>
               </View>
               {mudandoChave ? (
@@ -487,22 +445,23 @@ export function CicloScreen({
           </View>
 
           <Text style={styles.rodape}>
-            {compartilha
-              ? 'Só as datas vão para ela. O que você escreve em outras telas do app continua separado disto.'
-              : 'Isto fica só com você. Nem a sua nutricionista vê, a não ser que você ligue a opção acima.'}
+            Se você teve relação, se foi com proteção e a sua nota privada NUNCA são
+            compartilhados — nem com a opção acima ligada.
           </Text>
         </ScrollView>
       )}
 
-      {apagando && (
-        <Confirmacao
+      {diaAberto && (
+        <DiaDoCiclo
           visivel
-          titulo="Apagar este registro?"
-          mensagem={`O registro de ${diaEMes(apagando.comecou)} sai da conta da duração dos seus ciclos.`}
-          rotuloConfirmar="Apagar"
-          destrutiva
-          onConfirmar={() => void apagar(apagando)}
-          onCancelar={() => setApagando(null)}
+          data={diaAberto}
+          dia={doDia(diaAberto)}
+          carregando={false}
+          ehComecoDeCiclo={ehComeco(diaAberto)}
+          salvando={salvandoDia}
+          onSalvar={d => void guardarDia(d)}
+          onMarcarComeco={ligado => void marcarComeco(diaAberto, ligado)}
+          onFechar={() => setDiaAberto(null)}
         />
       )}
     </View>
@@ -521,7 +480,7 @@ const estilos = estilosDe(t =>
     },
     botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
-    conteudo: { paddingHorizontal: 20, gap: 12 },
+    conteudo: { paddingHorizontal: 20, gap: 14 },
 
     blocoErro: {
       backgroundColor: t.cores.erroFundo,
@@ -532,25 +491,31 @@ const estilos = estilosDe(t =>
     },
     textoErro: { fontSize: 13, color: t.cores.erroTexto, lineHeight: 19 },
 
-    cartaoAgora: {
+    agora: {
       backgroundColor: t.cores.cartao,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: t.cores.borda,
-      padding: 18,
-      gap: 2,
+      padding: 17,
+      gap: 8,
     },
-    rotuloAgora: { fontSize: 12.5, color: t.inkFraco, fontWeight: '600' },
+    linhaAgora: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    rotuloAgora: { fontSize: 12, color: t.inkFraco, fontWeight: '700' },
     grande: {
-      fontSize: 40,
+      fontSize: 38,
       fontWeight: '800',
       color: t.cores.ink,
-      letterSpacing: -1.2,
+      letterSpacing: -1,
       fontVariant: ['tabular-nums'],
     },
-    fase: { fontSize: 15, fontWeight: '700', color: t.cores.verde },
-    faseIncerta: { fontSize: 13, color: t.inkMedio, lineHeight: 19, marginTop: 4 },
-    explicacao: { fontSize: 13.5, color: t.inkMedio, lineHeight: 20, marginTop: 6 },
+    selo: {
+      backgroundColor: t.cores.verdeMenta,
+      borderRadius: 999,
+      paddingHorizontal: 13,
+      paddingVertical: 7,
+    },
+    textoSelo: { fontSize: 12.5, fontWeight: '800', color: t.cores.verde },
+    explicacao: { fontSize: 13.5, color: t.inkMedio, lineHeight: 20 },
 
     cartao: {
       backgroundColor: t.cores.cartao,
@@ -563,63 +528,12 @@ const estilos = estilosDe(t =>
     tituloCartao: { fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
     linhaInfo: { fontSize: 13.5, color: t.inkMedio, lineHeight: 20 },
     forte: { fontWeight: '800', color: t.cores.ink },
+    ressalva: { fontSize: 12, color: t.inkFraco },
     ajuda: { fontSize: 12, color: t.inkFraco, lineHeight: 17 },
 
-    botaoPrincipal: {
-      backgroundColor: t.cores.verde,
-      borderRadius: 14,
-      height: 50,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 4,
-    },
-    botaoDesligado: { opacity: 0.5 },
-    pressionado: { opacity: 0.75 },
-    textoBotaoPrincipal: { color: t.cores.branco, fontSize: 15, fontWeight: '800' },
-    botaoSecundario: {
-      borderRadius: 14,
-      height: 46,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: t.cores.borda,
-    },
-    textoBotaoSecundario: { color: t.inkMedio, fontSize: 14, fontWeight: '700' },
-
-    tituloSecao: {
-      fontSize: 12.5,
-      fontWeight: '800',
-      color: t.inkFraco,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
-      marginTop: 10,
-    },
-    linhaRegistro: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      backgroundColor: t.cores.cartao,
-      borderRadius: 11,
-      borderWidth: 1,
-      borderColor: t.cores.borda,
-      paddingVertical: 11,
-      paddingHorizontal: 13,
-    },
-    textoRegistro: { flex: 1, gap: 1 },
-    dataRegistro: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
-    detalheRegistro: { fontSize: 12, color: t.inkFraco },
-
-    cartaoChave: {
-      backgroundColor: t.cores.cartao,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: t.cores.borda,
-      padding: 15,
-      marginTop: 14,
-    },
     linhaChave: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     textoChave: { flex: 1, gap: 4 },
 
-    rodape: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, marginTop: 10 },
+    rodape: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, marginTop: 4 },
   }),
 )
