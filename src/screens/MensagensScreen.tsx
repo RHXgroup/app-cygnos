@@ -104,9 +104,30 @@ export function MensagensScreen({
    * virou sobreposição sem trocar a ferramenta. Mesma raiz do rodapé. */
   const alturaTeclado = useAlturaTeclado()
 
-  /* Com o teclado aberto a barra encosta nele; fechado, na área segura. Nunca
-     os dois: o teclado já cobre a barra de gestos. */
-  const respiro = alturaTeclado || bottom
+  /* ── A janela encolhe, ou não? O app MEDE em vez de supor ─────────────────
+   *
+   * Esta é a terceira tentativa de acertar o rodapé desta tela, e as duas
+   * primeiras erraram para lados opostos: uma deixou a barra no meio da tela, a
+   * outra deixou-a atrás do teclado. As duas partiam de uma SUPOSIÇÃO sobre o
+   * que o Android faz com a janela quando o teclado sobe.
+   *
+   * Com edge-to-edge a janela normalmente NÃO encolhe, e aí a barra precisa
+   * subir a altura do teclado. Mas isso depende de versão do Android, de
+   * `windowSoftInputMode` e do que a SDK do Expo configura — e supor errado
+   * produz exatamente os dois defeitos acima, um em cada direção.
+   *
+   * Então: guarda a altura desta View com o teclado FECHADO e compara com a de
+   * agora. Se encolheu, o sistema já abriu espaço e somar de novo empurraria
+   * duas vezes. Se não encolheu, a barra sobe sozinha.
+   *
+   * Medir custa um `onLayout`. Supor já custou duas rodadas de "está torto". */
+  const alturaFechado = useRef(0)
+  const [alturaAgora, setAlturaAgora] = useState(0)
+
+  const janelaEncolheu =
+    alturaTeclado > 0 && alturaFechado.current > 0 && alturaAgora < alturaFechado.current - 40
+
+  const respiro = alturaTeclado > 0 ? (janelaEncolheu ? 0 : alturaTeclado) : bottom
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -284,7 +305,16 @@ export function MensagensScreen({
        barra de escrever, com a altura medida. Ver o comentário lá em cima.
        E sem respiro no pai — quem o carrega é o elemento mais de baixo de cada
        ramo, senão o vão sai em dobro. */
-    <View style={[styles.tela, { paddingTop: top + 8 }]}>
+    <View
+      style={[styles.tela, { paddingTop: top + 8 }]}
+      onLayout={e => {
+        const h = e.nativeEvent.layout.height
+        /* A referência é a altura SEM teclado. Guardar a de agora quando ele
+           está aberto faria a comparação sempre dar "não encolheu". */
+        if (alturaTeclado === 0) alturaFechado.current = h
+        setAlturaAgora(h)
+      }}
+    >
       <View style={styles.cabecalho}>
         <Pressable
           onPress={onFechar}
