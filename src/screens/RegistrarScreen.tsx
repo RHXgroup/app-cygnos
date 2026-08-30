@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AguaScreen } from './AguaScreen'
@@ -144,6 +144,33 @@ export function RegistrarScreen({
      não é "de onde se veio", e cair nela seria ir parar numa tela que ninguém
      pediu. Aí voltar fecha tudo. */
   const voltarDaOpcao = inicial ? onFechar : () => setEscolhida(null)
+
+  /* O voltar do Android, descascando: opção aberta volta à lista de opções, e
+   * só então fecha a tela.
+   *
+   * Sem isto, quem escolhia uma opção e apertava voltar perdia a tela INTEIRA:
+   * o tratador central do App só sabe `setRegistrar(null)`, e ele ganha porque
+   * o React roda os efeitos do filho antes dos do pai — quem registra por
+   * último decide primeiro.
+   *
+   * SEM lista de dependências, de propósito. Re-registrar a cada renderização é
+   * o que põe este tratador na frente do central a partir da primeira
+   * re-renderização, que sempre acontece. Ver a armadilha 1 do AGENTS.md — este
+   * comentário existe para o próximo leitor não achar que um dos dois é código
+   * morto e apagar o errado. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      /* `inicial` quer dizer que a tela abriu JÁ dentro de uma opção — veio do
+         cartão de plano ou do de treino. Ali não há lista para onde voltar, e
+         devolver o evento fecha a tela, que é o certo. */
+      if (escolhida && !inicial) {
+        setEscolhida(null)
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
 
   /* Tela pronta traz o próprio cabeçalho, então ela substitui esta inteira em
      vez de aparecer embaixo do cabeçalho daqui — dois voltares empilhados na

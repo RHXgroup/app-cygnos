@@ -555,7 +555,9 @@ function Ficha({
           bastaria — mas o dia em que a coluna voltar a vir preenchida por
           qualquer outro motivo é o dia em que o botão verde aparece para quem
           pediu para não aparecer. A regra fica escrita aqui também. */}
-      {!!nutri.telefone && !conversaNoApp(nutri) && <Contato telefone={nutri.telefone} />}
+      {!!nutri.telefone && (
+        <Contato telefone={nutri.telefone} whatsapp={!conversaNoApp(nutri)} />
+      )}
     </>
   )
 }
@@ -814,6 +816,14 @@ function CartaoDaLista({
 
       {nutri.especialidades.length > 0 && <Chips itens={nutri.especialidades} limite={4} />}
 
+      {/* O número aparece aqui também quando ela o publicou. Eu tinha tirado da
+          lista por conta própria, com o argumento de que antes do aceite não há
+          relação — mas a chave dela diz "visível para qualquer pessoa", e um
+          estranho no catálogo é exatamente qualquer pessoa. A escolha é dela. */}
+      {!!nutri.telefone && (
+        <Contato telefone={nutri.telefone} whatsapp={!conversaNoApp(nutri)} compacto />
+      )}
+
       {pedido && <Text style={styles.jaPedido}>Pedido enviado, aguardando resposta</Text>}
     </Pressable>
   )
@@ -937,9 +947,34 @@ function Chips({ itens, limite }: { itens: string[]; limite?: number }) {
 
 /* O telefone é um botão, e o toque é da PESSOA: o app não manda mensagem
    nenhuma — abre a conversa e sai da frente. */
-function Contato({ telefone, compacto = false }: { telefone: string; compacto?: boolean }) {
+/* O telefone dela, quando ela deixou visível.
+ *
+ * ── Duas chaves, duas perguntas diferentes ─────────────────────────────────
+ * A chavinha "Telefone" nos parâmetros responde **se o número aparece**. O
+ * `canal_de_contato` responde **para onde vai a conversa**. São coisas
+ * separadas, e a tela trata como separadas: ela pode querer o número à mostra
+ * sem mandar as conversas para fora do sistema.
+ *
+ * Antes daqui o app decidia sozinho, e decidia contra ela: escondia o número
+ * sempre que o canal não fosse WhatsApp, mesmo com a chave ligada. A tela de
+ * parâmetros dizia "fica visível para qualquer pessoa" e o aplicativo não
+ * mostrava para ninguém — configuração que promete e não cumpre é pior do que
+ * configuração que não existe.
+ *
+ * Quem decide o que aparece dela é ela. O app obedece. */
+function Contato({
+  telefone,
+  whatsapp: comWhatsapp,
+  compacto = false,
+}: {
+  telefone: string
+  /* O botão verde só existe quando ela escolheu o WhatsApp como canal. Ligar
+     para o número é sempre possível — é um telefone que ela publicou. */
+  whatsapp: boolean
+  compacto?: boolean
+}) {
   const styles = estilos()
-  const whatsapp = linkDoWhatsapp(telefone)
+  const whatsapp = comWhatsapp ? linkDoWhatsapp(telefone) : null
 
   return (
     <View style={[styles.contato, compacto && styles.contatoCompacto]}>
