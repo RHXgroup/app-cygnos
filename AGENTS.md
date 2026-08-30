@@ -72,23 +72,44 @@ Quatro regras que vieram de erro real:
   Descoberto em `MeusCadastrosScreen`: quem entrava em "Metas" para conferir uma
   linha era jogado para fora da tela inteira, porque o central só sabia fechar.
 
-## 2. O teclado cobre o campo se ninguém cuidar
+## 2. O teclado, e a pergunta que vem ANTES de mexer no componente
 
-O Expo liga **edge-to-edge por padrão** no Android, e com ele **a janela não
-encolhe mais** quando o teclado sobe. Duas consequências, e as duas já
-morderam:
+> **Este item estava errado e custou cinco tentativas seguidas numa tela só.**
+> A versão anterior afirmava, sem ressalva, que "a janela não encolhe mais". No
+> Expo Go ela encolhe, e o texto mandava tratar à mão o que o sistema já fazia.
 
-**Campo em tela comum** — `KeyboardAvoidingView` com `behavior` indefinido no
-Android **não faz nada**. Sempre:
+**A pergunta primeiro: quem controla o teclado neste momento?**
 
-```tsx
-behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-```
+No **Expo Go** — que é onde este app roda hoje — as configurações de Android do
+`app.json` **não valem**. O `softwareKeyboardLayoutMode` é ignorado: quem manda é
+o manifesto do próprio Expo Go, que usa `adjustResize`. **A janela encolhe
+sozinha.**
 
-**Painel posicionado por absoluto** — ignora o padding do `KeyboardAvoidingView`
-e precisa medir a altura do teclado **nos dois sistemas**. Ver `useAlturaTeclado`
-em `BuscarAlimentoScreen`. No iOS use `keyboardWillShow`; no Android só existe
-`keyboardDidShow`.
+Com a janela encolhendo, uma coluna com `flex: 1` no meio reflui e o último
+filho fica logo acima do teclado — **sem tratamento nenhum**. Foi assim que a
+conversa ficou certa, depois de cinco tentativas de tratar à mão:
+KeyboardAvoidingView, margem, medição com `onLayout`, âncora absoluta. Todas
+somavam deslocamento em cima do que o sistema já fazia, e o resultado alternava
+entre "campo no meio da tela" e "campo atrás do teclado".
+
+**Então, ao ver campo escondido:**
+
+1. Confira se a tela já está numa coluna com `flex: 1` no meio. Se estiver, o
+   defeito provavelmente é tratamento a MAIS, não a menos — tire e teste.
+2. `KeyboardAvoidingView` com `behavior` indefinido no Android não faz nada. Se
+   for usar, `behavior={Platform.OS === 'ios' ? 'padding' : 'height'}`. Mas
+   pense duas vezes antes de usar: com `adjustResize` ele soma.
+3. Só meça a altura do teclado (`useAlturaTeclado`, em `lib/teclado.ts`) quando
+   houver motivo REAL — coisa posicionada por absoluto que precise acompanhar o
+   teclado. No iOS use `keyboardWillShow`; no Android só existe `keyboardDidShow`.
+
+**Em build de verdade isto pode mudar**, porque aí o `app.json` passa a valer e o
+edge-to-edge entra. No dia do primeiro build, esta é uma das telas para reabrir.
+
+**E há uma pendência aqui:** `BuscarAlimentoScreen` mede o teclado e posiciona o
+painel por absoluto. Se a janela já encolhe, aquele painel está subindo demais e
+ninguém reparou. **Precisa ser testado num aparelho** — não mexa nele por
+dedução, que foi exatamente o erro que este item passou a documentar.
 
 ## 3. Campo numérico e o separador de milhar
 
