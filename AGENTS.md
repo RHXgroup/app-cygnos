@@ -2,10 +2,19 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
-> O projeto está no **SDK 54** (`expo@54.0.36`), não no 57. Ao consultar a
+> O projeto está no **SDK 54** (`expo@54.0.37`), não no 57. Ao consultar a
 > documentação, use a versão que o projeto realmente usa — corrigir contra a
 > documentação de outra versão introduz problema novo. Se a intenção for migrar
 > para o 57, isso é uma decisão à parte, não um detalhe de implementação.
+
+**Instalar pacote é `npx expo install`, nunca `npm install`.** Ele consulta o que
+a SDK do projeto usa; o npm sozinho pega o mais novo do registro. Já aconteceu:
+`expo-audio` declara `expo-asset: "*"` como peer, o npm leu o asterisco e trouxe
+`expo-asset@57` — SDK 57 dentro de um projeto SDK 54 —, arrastando junto um
+segundo `expo-constants`. No Expo Go passava despercebido; num build de verdade
+não passa, porque uma build nativa só aceita uma versão de cada módulo nativo.
+
+`npx expo-doctor` pega isso, e vale rodar depois de mexer em dependência.
 
 ---
 
