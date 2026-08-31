@@ -66,6 +66,45 @@ function descricaoDoItem(gramas: number | null, medida: string | null): string {
   return 'Quantidade a combinar'
 }
 
+/* O estado do acompanhamento: ativo, desde quando, e com quem.
+ *
+ * ── Por que o app precisa saber ────────────────────────────────────────────
+ * O plano dela deixou de sumir quando o vínculo acaba — a pessoa pagou por
+ * aquilo e continua precisando saber o que comer enquanto procura outra. Mas
+ * plano encerrado é HISTÓRICO, não orientação de hoje: ele fica legível e sai
+ * das metas do dia, do cartão da próxima refeição e dos lembretes.
+ *
+ * Receber "hora do almoço do seu plano" de uma prescrição que acabou é pior do
+ * que não ter plano nenhum.
+ *
+ * Falha, ou função ainda não aplicada, responde ATIVO. É o estado de hoje —
+ * zero vínculos encerrados —, e é o menos danoso dos dois erros possíveis:
+ * tratar ativo como encerrado tiraria o plano de quem está sendo acompanhado
+ * agora. */
+export type MeuVinculo = {
+  ativo: boolean
+  desde: string | null
+  encerradoEm: string | null
+  nutricionista: string | null
+}
+
+export async function carregarMeuVinculo(): Promise<MeuVinculo> {
+  const padrao: MeuVinculo = { ativo: true, desde: null, encerradoEm: null, nutricionista: null }
+  try {
+    const { data, error } = await supabase.rpc('app_meu_vinculo')
+    if (error || !data) return padrao
+    const d = data as Record<string, unknown>
+    return {
+      ativo: d.ativo !== false,
+      desde: typeof d.desde === 'string' ? d.desde : null,
+      encerradoEm: typeof d.encerrado_em === 'string' ? d.encerrado_em : null,
+      nutricionista: typeof d.nutricionista === 'string' ? d.nutricionista : null,
+    }
+  } catch {
+    return padrao
+  }
+}
+
 export async function carregarPlanoDaNutri(): Promise<PlanoCompleto | null> {
   const { data, error } = await supabase.rpc('app_plano_do_paciente')
   /* `falha` pelo motivo do console, e não pelo da tela: os dois lugares que

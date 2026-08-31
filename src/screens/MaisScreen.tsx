@@ -17,6 +17,7 @@ import { carregarCatalogo, type Catalogo } from '../lib/nutricionista'
 import { existeQuestionarioPendente } from '../lib/questionario'
 import { supabase } from '../lib/supabase'
 import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
+import { carregarMeuVinculo, carregarPlanoDaNutri } from '../lib/planoDaNutri'
 import {
   desligarLembretes,
   desligarLembretesDeAgua,
@@ -181,11 +182,29 @@ export function MaisScreen({
   useEffect(() => {
     let vivo = true
 
-    carregarPlanoAtivo(contaId).then(r => {
-      if (!vivo || r.tipo !== 'ok') return
-      setPlano(r.plano)
-      reagendarSeLigados(r.plano)
-    })
+    /* O plano dos lembretes é o MESMO que a tela inicial mostra.
+     *
+     * Aqui só entrava `carregarPlanoAtivo`, que é o plano PRÓPRIO. A tela
+     * inicial prefere o da nutricionista quando existe — então quem seguia a
+     * prescrição dela ligava o lembrete e ouvia "seu plano não tem refeições com
+     * horário, não há o que lembrar". O recurso estava morto exatamente para
+     * quem tem profissional, que é quem mais tem horário definido.
+     *
+     * E o plano dela só vale enquanto o acompanhamento estiver de pé: encerrado,
+     * ele continua legível como histórico, mas não dispara aviso. "Hora do
+     * almoço do seu plano" de uma prescrição que acabou é pior do que silêncio. */
+    Promise.all([carregarPlanoAtivo(contaId), carregarPlanoDaNutri().catch(() => null), carregarMeuVinculo()])
+      .then(([r, daNutri, vinculo]) => {
+        if (!vivo) return
+        const proprio = r.tipo === 'ok' ? r.plano : null
+        const paraLembrar = (vinculo.ativo ? daNutri : null) ?? proprio
+        setPlano(paraLembrar)
+        reagendarSeLigados(paraLembrar)
+      })
+      .catch(() => {
+        /* Falhou tudo: fica sem reagendar, e o que já estava agendado continua
+           valendo. Melhor um horário velho do que nenhum. */
+      })
 
     lembretesDeAguaLigados().then(async ligada => {
       if (!vivo || !ligada) return
