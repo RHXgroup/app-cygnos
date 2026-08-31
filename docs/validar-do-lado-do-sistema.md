@@ -1,6 +1,10 @@
 # O que falta no sistema, e como saber que ficou certo
 
-**Para a sessão do `Nutriviet`.** Três itens. Cada um diz o que está errado hoje,
+**Para a sessão do `Nutriviet`.** Três itens, e o 2 já estava feito quando este
+documento foi escrito — fica registrado abaixo em vez de apagado, porque o erro
+de pedir o que existe merece rastro.
+
+Os itens. Cada um diz o que está errado hoje,
 o que precisa acontecer, e **como conferir** — porque nos três o defeito é
 silencioso: nada quebra, ninguém vê erro, e a coisa simplesmente não acontece.
 
@@ -82,55 +86,19 @@ diferença é defeito da prévia**, não do app — o app mostra o que a funçã
 
 ---
 
-## 2. `app_desvincular(p_paciente_id)` ainda apaga em vez de encerrar
+## 2. `app_desvincular(p_paciente_id)` — JÁ ESTAVA FEITO
 
-**Hoje:** o corpo faz `delete`. E `app_vinculos` é uma **view** sobre
-`app_vinculos_historico` filtrando `fim is null` — view simples repassa o delete
-para a tabela, então o `delete` **apaga a linha do histórico**.
+Este item nasceu errado. Quando eu escrevi, a função já não apagava mais: o
+`delete` virou `update ... set fim = now()` na mesma migração que criou a coluna
+`fim`, horas antes. Eu descrevi um estado anterior como se fosse o atual.
 
-Com a linha somem as datas do acompanhamento, e o plano nunca vai conseguir
-congelar como *"prescrito por Fulana, de 12/03 a 28/08 — encerrado"*.
+A cláusula que eu não quis chutar é `conta_id = auth.uid() and paciente_id =
+p_paciente_id and fim is null` — filtra pelos dois. Não chutar continua sendo o
+certo; o erro foi não conferir se ainda havia o que pedir.
 
-**Isto já aconteceu.** A primeira versão da função do lado do paciente fazia o
-mesmo, e apagou histórico antes de ser corrigida.
-
-**O que fazer:** trocar o `delete` por
-
-```sql
-update app_vinculos_historico
-   set fim = now()
- where <a mesma cláusula que o delete usava> and fim is null;
-```
-
-Eu **não escrevi essa cláusula** de propósito: não vi o corpo da função. Ela
-resolve a carteira por `get_nutricionista_id()`, e eu não sei se filtra o
-paciente por `paciente_id` ou por `conta_id`. Um `update` com a cláusula errada
-não apaga e não encerra nada — **falha em silêncio**, que é pior que o defeito
-atual. Quem tem o corpo na mão resolve em dois minutos.
-
-### Como validar
-
-O `delete` na view **já foi revogado**, então a função atual não deve nem
-conseguir apagar:
-
-```sql
--- Antes de mexer: a função de hoje deve FALHAR, não apagar.
--- Se ela ainda apagar, o revoke não pegou e isso é mais urgente que o resto.
-```
-
-Depois de corrigida, encerrando um paciente pelo sistema:
-
-```sql
-select conta_id, nutricionista_id, criado_em, fim, motivo
-  from app_vinculos_historico
- order by criado_em desc limit 5;
-```
-
-- **Certo:** a linha continua lá, com `fim` preenchido.
-- **Errado:** a linha sumiu.
-
-E: `select count(*) from app_vinculos where conta_id = '<o paciente>'` tem que
-voltar zero, porque a view filtra `fim is null`.
+**É a segunda vez que este conjunto de documentos pede o que já existe.** A
+primeira foi a caixa de entrada, cujas seis funções estavam prontas. Antes de
+escrever "falta", conferir.
 
 ---
 
