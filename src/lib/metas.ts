@@ -437,3 +437,83 @@ export function diferencaDeCalorias(metas: Metas): { kcalMacros: number; diferen
 
   return { kcalMacros, diferenca }
 }
+
+/* ── O corpo dela, para as metas se calcularem sozinhas ────────────────────
+ *
+ * A tela de metas pedia onze números, e a pessoa que baixou um aplicativo de
+ * nutrição não sabe quantos gramas de gordura deve comer por dia — é por isso
+ * que ela baixou o aplicativo.
+ *
+ * O app já tinha tudo: peso na última pesagem, altura, nascimento e sexo na
+ * conta, e o alvo do cálculo energético quando ela fez um. Faltava juntar.
+ *
+ * Três leituras em paralelo, e cada uma que falhar vira nulo em vez de derrubar
+ * as outras: com peso e cálculo dá para sugerir; só com peso, não dá; e a tela
+ * precisa saber a diferença sem receber um erro. */
+export async function carregarCorpoDaConta(contaId: string): Promise<{
+  pesoKg: number | null
+  alturaCm: number | null
+  idade: number | null
+  sexo: 'M' | 'F' | null
+  alvoKcalDoCalculo: number | null
+}> {
+  const [conta, peso, calculo] = await Promise.all([
+    supabase
+      .from('app_contas')
+      .select('data_nascimento, genero, altura_cm')
+      .eq('id', contaId)
+      .maybeSingle(),
+    supabase
+      .from('app_peso_registros')
+      .select('kg')
+      .eq('conta_id', contaId)
+      .order('data', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('app_calculos_energeticos')
+      .select('alvo_kcal')
+      .eq('conta_id', contaId)
+      .order('ativo', { ascending: false })
+      .order('criado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (conta.error) falha('Não consegui ler os seus dados para calcular as metas.', conta.error)
+  if (peso.error) falha('Não consegui ler o seu último peso.', peso.error)
+  if (calculo.error) falha('Não consegui ler o seu cálculo energético.', calculo.error)
+
+  const n = (v: unknown): number | null => {
+    const x = typeof v === 'string' ? Number(v) : v
+    return typeof x === 'number' && Number.isFinite(x) && x > 0 ? x : null
+  }
+
+  /* A idade sai do nascimento, e não é `ano de hoje menos ano de nascimento`:
+     quem faz aniversário em dezembro seria envelhecido em onze meses, e a
+     Mifflin conta 5 kcal por ano. */
+  let idade: number | null = null
+  const nasc = conta.data?.data_nascimento
+  if (typeof nasc === 'string' && /^\d{4}-\d{2}-\d{2}/.test(nasc)) {
+    const [a, m, d] = nasc.slice(0, 10).split('-').map(Number)
+    const hoje = new Date()
+    let anos = hoje.getFullYear() - a
+    const jaFez = hoje.getMonth() + 1 > m || (hoje.getMonth() + 1 === m && hoje.getDate() >= d)
+    if (!jaFez) anos--
+    if (anos > 0 && anos < 120) idade = anos
+  }
+
+  /* O gênero da conta é texto livre do cadastro; a fórmula só conhece dois
+     valores. Qualquer outra coisa vira nulo, e aí a sugestão não sai — melhor
+     não sugerir do que sugerir pela fórmula errada. */
+  const g = typeof conta.data?.genero === 'string' ? conta.data.genero.trim().toUpperCase() : ''
+  const sexo = g.startsWith('M') ? 'M' : g.startsWith('F') ? 'F' : null
+
+  return {
+    pesoKg: n(peso.data?.kg),
+    alturaCm: n(conta.data?.altura_cm),
+    idade,
+    sexo,
+    alvoKcalDoCalculo: n(calculo.data?.alvo_kcal),
+  }
+}

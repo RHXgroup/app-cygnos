@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   LIMITES,
   METAS_VAZIAS,
+  carregarCorpoDaConta,
   carregarMetasAtivas,
   diferencaDeCalorias,
   salvarMetas,
@@ -29,6 +30,7 @@ import {
   type MetasPrescritas,
 } from '../lib/metasPrescritas'
 import { milhar } from '../lib/formatar'
+import { comoFoiCalculado, metasSugeridas, type Sugestao } from '../lib/metasSugeridas'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* Onde a pessoa escreve o que ela está perseguindo.
@@ -185,6 +187,48 @@ export function MetasScreen({
      um número, salva, e vê a tela inicial mostrando outro. */
   const [prescricao, setPrescricao] = useState<MetasPrescritas | null>(null)
   const prescritos = camposPrescritos(prescricao)
+
+  /* A SUGESTÃO CALCULADA.
+   *
+   * Esta tela pedia onze números, e quem baixa um aplicativo de nutrição não
+   * sabe quantos gramas de gordura deve comer por dia — é por isso que ela
+   * baixou o aplicativo. O app já sabia calcular (Mifflin-St Jeor, fator de
+   * atividade, ajuste), já usava isso na sugestão de plano e no treino, e não
+   * usava aqui.
+   *
+   * Nula quando falta dado. A tela não mostra o botão nesse caso, em vez de
+   * mostrar um botão que não faz nada. */
+  const [sugestao, setSugestao] = useState<Sugestao | null>(null)
+  const [usouSugestao, setUsouSugestao] = useState(false)
+
+  useEffect(() => {
+    let ativo = true
+    carregarCorpoDaConta(contaId).then(corpo => {
+      if (ativo) setSugestao(metasSugeridas(corpo, corpo.alvoKcalDoCalculo))
+    })
+    return () => {
+      ativo = false
+    }
+  }, [contaId])
+
+  /* Preenche os campos e NÃO salva. A pessoa vê os números, edita o que quiser
+     e salva — uma conta que se impõe sem ser vista é a mesma coisa que pedir o
+     número, só que pior, porque ela não sabe de onde veio.
+
+     A água entra junto porque ela nunca é nula: a tela de Água precisa de um
+     número para desenhar qualquer coisa. */
+  function aplicarSugestao(sg: Sugestao) {
+    setTextos(t => ({
+      ...t,
+      calorias: String(sg.calorias),
+      proteinas: String(sg.proteinas),
+      carboidratos: String(sg.carboidratos),
+      gorduras: String(sg.gorduras),
+      fibras: String(sg.fibras),
+      aguaMl: String(sg.aguaMl),
+    }))
+    setUsouSugestao(true)
+  }
 
   /* Independente da carga das metas, e sem segurar a tela: quem não tem
      nutricionista — a maior parte de quem usa — não pode esperar por uma
@@ -384,6 +428,39 @@ export function MetasScreen({
                   : 'Você pode ter vários conjuntos guardados — um de déficit e um de manutenção, por exemplo — e alternar entre eles. Este passa a ser o que vale.'}
               </Text>
             </Secao>
+
+            {/* O ATALHO, antes dos campos.
+                Depois deles seria decoração: quem já digitou onze números não
+                precisa mais de ajuda. */}
+            {sugestao !== null && (
+              <View style={styles.blocoSugestao}>
+                <View style={styles.tituloSugestao}>
+                  <Ionicons name="sparkles" size={17} color={paleta().cores.verde} />
+                  <Text style={styles.textoTituloSugestao}>
+                    {usouSugestao ? 'Preenchi para você' : 'Não sabe quais números usar?'}
+                  </Text>
+                </View>
+
+                <Text style={styles.explicacaoSugestao}>
+                  {usouSugestao
+                    ? `${comoFoiCalculado(sugestao)} Edite o que quiser antes de salvar.`
+                    : 'Eu calculo a partir do que você já tem cadastrado — peso, altura, idade — e você ajusta o que quiser antes de salvar.'}
+                </Text>
+
+                {!usouSugestao && (
+                  <Pressable
+                    onPress={() => aplicarSugestao(sugestao)}
+                    style={({ pressed }) => [styles.botaoSugestao, pressed && styles.botaoSugestaoPressionado]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Calcular minhas metas"
+                  >
+                    <Text style={styles.textoBotaoSugestao}>
+                      Calcular para mim ({milhar(sugestao.calorias)} kcal)
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
 
             <Secao titulo="Alimentação" icone="restaurant-outline">
               {ALIMENTACAO.map(c => (
@@ -660,6 +737,27 @@ const estilos = estilosDe(t =>
   tituloSecao: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   textoTituloSecao: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
   notaSecao: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+
+  /* O atalho que calcula as metas. Tingido, e nao mais um cartao branco: ele
+     precisa se distinguir dos onze campos que vem logo abaixo, porque a
+     alternativa a ele sao justamente esses onze campos. */
+  blocoSugestao: {
+    gap: 10,
+    backgroundColor: t.cores.verdeClaro,
+    borderRadius: 16,
+    padding: 15,
+  },
+  tituloSugestao: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  textoTituloSugestao: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  explicacaoSugestao: { fontSize: 12.5, color: t.inkMedio, lineHeight: 18 },
+  botaoSugestao: {
+    backgroundColor: t.cores.verde,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  botaoSugestaoPressionado: { backgroundColor: t.cores.verdeEscuro },
+  textoBotaoSugestao: { fontSize: 14.5, fontWeight: '800', color: t.cores.branco },
 
   campoNome: {
     height: 48,
