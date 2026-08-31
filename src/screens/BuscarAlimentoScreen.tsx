@@ -161,9 +161,28 @@ export function BuscarAlimentoScreen({
       .then((cru: string | null) => {
         if (!vivo || !cru) return
         const lido = JSON.parse(cru) as unknown
-        /* Formato torto é tratado como "nunca corrigiu": o pior que acontece é
-           a pessoa digitar de novo, e isso é melhor do que a tela quebrar. */
-        if (lido && typeof lido === 'object') setPesosSalvos(lido as Record<string, string>)
+        /* Conferido ENTRADA POR ENTRADA, e não só "é um objeto".
+         *
+         * O `typeof lido === 'object'` que estava aqui prometia mais do que
+         * cumpria: vetor é objeto, e objeto aninhado também. O que sai daqui
+         * alimenta `setPesoUnidade` direto — e todo `setCampo()` chamado de
+         * fora do `onChangeText` entra sem passar pelo filtro do campo, que é
+         * a segunda metade da armadilha 3 e a que já custou um peso dez vezes
+         * maior sem erro nenhum na tela.
+         *
+         * O que sai daqui tem de ser o que o campo aceitaria digitado: dígitos,
+         * e no máximo os quatro que o `slice` do campo permite. O resto é
+         * tratado como "nunca corrigiu" — o pior que acontece é ela digitar de
+         * novo, e isso é melhor do que a tela quebrar. */
+        if (lido && typeof lido === 'object' && !Array.isArray(lido)) {
+          const bons: Record<string, string> = {}
+          for (const [chave, valor] of Object.entries(lido as Record<string, unknown>)) {
+            if (typeof valor !== 'string') continue
+            const so = soDigitos(valor).slice(0, 4)
+            if (so.length > 0 && so === valor) bons[chave] = valor
+          }
+          setPesosSalvos(bons)
+        }
       })
       .catch(() => {
         /* Sem armazenamento, os palpites de fábrica continuam valendo. */
