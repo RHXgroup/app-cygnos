@@ -116,8 +116,13 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
     lista.push({
       id: `mensagens:${agora.mensagensNaoLidas}`,
       titulo: uma ? 'Mensagem nova' : `${agora.mensagensNaoLidas} mensagens novas`,
-      texto: agora.nutricionista
-        ? `${agora.nutricionista.nome} escreveu para você. Toque para ler e responder.`
+      /* Nome em branco cai no texto sem nome.
+       *
+       * Ele vem do banco por `coalesce(nome_completo, nome)`, e nada garante
+       * que o segundo esteja preenchido. Sem esta guarda a frase saía como
+       * " escreveu para você", com um vão no lugar de quem escreveu. */
+      texto: agora.nutricionista?.nome?.trim()
+        ? `${agora.nutricionista.nome.trim()} escreveu para você. Toque para ler e responder.`
         : 'Você tem mensagem sem ler. Toque para ler e responder.',
       icone: 'chatbubble-ellipses',
       novo: true,

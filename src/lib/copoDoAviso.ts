@@ -44,6 +44,28 @@ type Resposta = {
 
 /* Número que veio de fora. Aceita texto porque o `data` do aviso atravessa uma
    serialização entre o app e o sistema, e um 330 pode voltar como "330". */
+/* Um instante que o `Date` aceita, ou null.
+ *
+ * Duas armadilhas em sequência, as duas achadas por sonda e nenhuma por caso de
+ * mesa:
+ *
+ *   `typeof NaN` é 'number'    — NaN passava e virava Invalid Date
+ *   MAX_SAFE_INTEGER é finito  — mas está FORA do alcance do Date, que para em
+ *                                ±8.64e15, e também vira Invalid Date
+ *
+ * Invalid Date chegava a `registrarAgua`, onde `.toISOString()` estoura com
+ * RangeError — um copo registrado pela notificação derrubaria o app.
+ *
+ * Por isso a conferência é no resultado, e não na entrada: qualquer jeito novo
+ * de produzir data impossível cai aqui também. */
+const LIMITE_DO_DATE = 8.64e15
+
+function instanteValido(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null
+  if (Math.abs(v) > LIMITE_DO_DATE) return null
+  return Number.isNaN(new Date(v).getTime()) ? null : v
+}
+
 function numeroDe(v: unknown): number | null {
   if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : null
   if (typeof v === 'string' && v.trim() !== '') {
@@ -65,7 +87,17 @@ export function copoDoAviso(resposta: unknown, agora: Date): CopoDoAviso | null 
   const ml = numeroDe(r.notification?.request?.content?.data?.ml)
   if (ml === null) return null
 
-  const entregue = typeof r.notification?.date === 'number' ? r.notification.date : null
+  /* `Number.isFinite`, e não `typeof === 'number'`.
+   *
+   * `typeof NaN` é `'number'`, então NaN passava por aqui, virava `new
+   * Date(NaN)` — Invalid Date — e chegava a `registrarAgua`, onde
+   * `.toISOString()` estoura com RangeError. Um copo registrado pela
+   * notificação derrubaria o app.
+   *
+   * Achado por sonda de propriedade, não por caso de mesa: eu escrevi o teste
+   * com data ausente e com data válida, e nunca com NaN — que é justamente o
+   * valor que o sistema operacional pode mandar. */
+  const entregue = instanteValido(r.notification?.date)
   const id = typeof r.notification?.request?.identifier === 'string'
     ? r.notification.request.identifier
     : null
