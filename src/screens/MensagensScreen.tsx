@@ -31,7 +31,7 @@ import {
 } from '../lib/mensagens'
 import { horaCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
-import { useAlturaTeclado } from '../lib/teclado'
+import { useDesvioDoTeclado } from '../lib/teclado'
 
 /* A conversa com a nutricionista.
  *
@@ -98,8 +98,12 @@ export function MensagensScreen({
    *
    * O ouvinte sempre funcionou. O que estava errado era a aritmética, e eu
    * passei seis rodadas mexendo no COMO em vez de conferir o QUANTO. */
-  const alturaTeclado = useAlturaTeclado()
-  const respiro = alturaTeclado > 0 ? alturaTeclado + bottom : bottom
+  /* A altura desta tela, medida. Serve para uma coisa só: perceber se o Android
+     encolheu a janela quando o teclado subiu. No Expo Go ele não encolhe; num
+     build de verdade pode encolher, e aí somar o teclado de novo empurraria o
+     campo para o meio da tela. Ver useDesvioDoTeclado. */
+  const [alturaDaTela, setAlturaDaTela] = useState(0)
+  const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -276,7 +280,10 @@ export function MensagensScreen({
     /* View comum: quem desvia do teclado é o sistema, encolhendo a janela. Sem
        respiro no pai — a barra de escrever cuida do dela, e o bloco do WhatsApp
        do dele. */
-    <View style={[styles.tela, { paddingTop: top + 8 }]}>
+    <View
+      style={[styles.tela, { paddingTop: top + 8 }]}
+      onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}
+    >
       <View style={styles.cabecalho}>
         <Pressable
           onPress={onFechar}
