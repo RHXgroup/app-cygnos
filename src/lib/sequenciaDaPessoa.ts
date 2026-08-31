@@ -191,3 +191,27 @@ export function fraseDaSequencia(s: Sequencia): string {
 
   return s.dias === 1 ? 'Primeiro dia registrado.' : `${s.dias} dias seguidos.`
 }
+
+/* O texto do aviso das 20h.
+ *
+ * Mora aqui, e não em `lembretes`, pela mesma razão de `fraseDaSequencia`: é
+ * DECISÃO — o que ele pode dizer depende do que o número sustenta —, e aqui ele
+ * pode ser exercitado por teste. Lá ele viveria ao lado do AsyncStorage e do
+ * módulo de notificação, e nenhum teste alcançaria.
+ *
+ * ── E ele não pode mentir se escapar ──────────────────────────────────────
+ * O aviso é agendado à noite e cancelado quando ela registra alguma coisa. Mas
+ * se ela registrar sem abrir o app — pelo botão dentro do próprio aviso de
+ * água, por exemplo — o das 20h ainda toca.
+ *
+ * Por isso o texto NUNCA afirma "você não registrou hoje". Ele fala do número
+ * que ela tem, que é verdade nos dois casos. Um app que acusa errado uma vez
+ * perde as próximas dez em que estiver certo. */
+export function textoDaSequencia(dias: number): { title: string; body: string } {
+  return {
+    title: dias === 1 ? 'Você começou ontem' : `${dias} dias seguidos`,
+    /* Convite e caminho barato, nunca ameaça. Quem está prestes a pular um dia
+       não vai preencher formulário — então o que se oferece é um copo. */
+    body: 'Um copo de água já fecha o dia de hoje.',
+  }
+}

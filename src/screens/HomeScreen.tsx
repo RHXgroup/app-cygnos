@@ -49,6 +49,7 @@ import {
 import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
 import { carregarAvisos, quantosNovos } from '../lib/avisos'
 import { carregarDiasComRegistro } from '../lib/sequencia'
+import { reagendarSequencia } from '../lib/lembretes' 
 import { sequenciaDaPessoa } from '../lib/sequenciaDaPessoa' 
 import {
   METAS_VAZIAS,
@@ -522,6 +523,18 @@ export function HomeScreen({
      função pura das datas que já estão carregadas — guardar criaria um segundo
      lugar onde o número pode ficar velho. */
   const sequencia = sequenciaDaPessoa(diasComRegistro, dataISO(new Date()))
+
+  /* O lembrete da sequência acompanha o número.
+   *
+   * Reagendado a cada mudança, e é isso que impede o aviso de tocar num dia que
+   * ela já resolveu: registrou -> `hojeFeito` vira verdadeiro -> o aviso da
+   * noite é cancelado na hora. Notificação local não sabe, sozinha, o que
+   * aconteceu no dia; quem sabe é o app, e só enquanto está aberto.
+   *
+   * Não faz nada se o interruptor estiver desligado — a checagem mora lá. */
+  useEffect(() => {
+    void reagendarSequencia(sequencia.dias, sequencia.hojeFeito)
+  }, [sequencia.dias, sequencia.hojeFeito])
 
   const doDia = calcularMetaDoDia({
     metas,

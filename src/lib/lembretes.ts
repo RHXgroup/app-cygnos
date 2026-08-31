@@ -3,6 +3,7 @@ import { LogBox, Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 import { falha } from './erros'
 import { ACAO_COPO, copoDoAviso } from './copoDoAviso'
+import { textoDaSequencia } from './sequenciaDaPessoa' 
 
 /* Lembretes de refeição e de água.
  *
@@ -34,6 +35,20 @@ const CHAVE_AGUA = 'lembretes.agua'
  * avisada. Guardando o que cada tipo agendou, cada um cancela o seu. */
 const CHAVE_IDS_REFEICOES = 'lembretes.ids.refeicoes'
 const CHAVE_IDS_AGUA = 'lembretes.ids.agua'
+const CHAVE_IDS_SEQUENCIA = 'lembretes.ids.sequencia'
+const CHAVE_SEQUENCIA = 'lembretes.sequencia'
+
+/* Os três tipos que o app agenda. O tipo viaja dentro de `data` da notificação
+   e é o que permite cancelar um sem calar os outros — ver `cancelarDoTipo`. */
+type TipoDeLembrete = 'refeicao' | 'agua' | 'sequencia'
+
+/* A que horas o lembrete da sequência toca.
+ *
+ * Vinte horas. É tarde o bastante para o dia ter acontecido — quem ia registrar
+ * o almoço já registrou — e cedo o bastante para ainda dar tempo de fazer
+ * alguma coisa. Um aviso às 23h chega quando a pessoa não tem mais o que fazer
+ * com ele, e aí só resta a culpa. */
+const HORA_DA_SEQUENCIA = 20
 
 /* ── O botão dentro do aviso de água ───────────────────────────────────────
  *
@@ -127,11 +142,24 @@ async function lerIds(chave: string): Promise<string[]> {
   }
 }
 
+/* O par de `lerIds`. Existe para o agendamento da sequência não repetir o
+   `JSON.stringify` solto que os outros dois fazem — e para falhar em silêncio
+   do mesmo jeito: sem armazenamento, o cancelamento pelo SISTEMA ainda funciona
+   (é ele que `cancelarDoTipo` consulta), então perder a lista não deixa aviso
+   preso para sempre. */
+async function guardarIds(chave: string, ids: string[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(chave, JSON.stringify(ids))
+  } catch {
+    /* Ver acima: o sistema continua sabendo, pela marca em `data.tipo`. */
+  }
+}
+
 /* Cancela só o que este tipo agendou, e esquece os identificadores.
  *
  * Falhar em cancelar um não impede os outros: o que sobra é um aviso a mais,
  * e parar no meio deixaria a lista inteira pendurada. */
-async function cancelarDoTipo(chave: string, tipo?: 'refeicao' | 'agua'): Promise<void> {
+async function cancelarDoTipo(chave: string, tipo?: TipoDeLembrete): Promise<void> {
   const Notifications = await notificacoes()
 
   /* Os identificadores guardados MAIS o que o sistema tiver com esta marca.
@@ -239,7 +267,7 @@ function proximaHora(horas: number[]): string | null {
  *
  * O custo é carregar o expo-notifications, e por isso ele só é pago quando a
  * resposta rápida diz "não" — que é raro depois do primeiro uso. */
-async function ligadoDeVerdade(chave: string, tipo: 'refeicao' | 'agua'): Promise<boolean> {
+async function ligadoDeVerdade(chave: string, tipo: TipoDeLembrete): Promise<boolean> {
   let guardado: string | null = null
   try {
     guardado = await AsyncStorage.getItem(chave)
@@ -591,5 +619,126 @@ export function ouvirBotaoDeAgua(
     inscricao.then(sub => sub.remove()).catch(() => {
       /* O módulo nem chegou a carregar: não há o que desligar. */
     })
+  }
+}
+
+/* ── O lembrete da sequência ───────────────────────────────────────────────
+ *
+ * ── O problema que ele resolve, e por que os outros dois não resolvem ─────
+ * Os lembretes de refeição e de água tocam por HORÁRIO: 12:30 é 12:30 tenha
+ * ela almoçado ou não. Isso serve para "está na hora", e não serve para "o seu
+ * dia vai fechar vazio" — que é a hora em que um empurrão vale alguma coisa.
+ *
+ * A medida diz que aviso na hora em que dá para AGIR abre muito mais do que
+ * aviso genérico. Às 20h, quem não registrou nada ainda tem a noite; e quem já
+ * registrou não precisa ouvir nada.
+ *
+ * ── A dificuldade de verdade ──────────────────────────────────────────────
+ * Notificação local é agendada com antecedência e NÃO SABE, na hora de tocar,
+ * o que aconteceu no dia. Um `DAILY` às 20h tocaria também nos dias em que ela
+ * já registrou — e é exatamente assim que lembrete vira chateação e a pessoa
+ * desliga tudo, inclusive o que servia.
+ *
+ * A saída é não usar `DAILY`: agenda-se UM aviso por vez, para a próxima noite
+ * em que ele pode importar, e ele é reagendado toda vez que o app abre ou que
+ * ela registra alguma coisa. Registrou? O da noite é cancelado na hora.
+ *
+ * ── E o texto não pode mentir se ele escapar ──────────────────────────────
+ * Se ela registrar e não abrir mais o app, o aviso da noite ainda toca. Por
+ * isso o texto NUNCA afirma "você não registrou hoje": fala do número que ela
+ * tem, que é verdade nos dois casos. Um app que acusa errado perde a próxima
+ * dez vezes que estiver certo.
+ *
+ * ── Quem não tem sequência não é lembrado ─────────────────────────────────
+ * Com zero dias, nada é agendado. Não há o que proteger, e cutucar quem ainda
+ * não começou é o começo de virar o app que a pessoa silencia. */
+
+export const lembreteDaSequenciaLigado = () => ligadoDeVerdade(CHAVE_SEQUENCIA, 'sequencia')
+
+/* Agenda (ou reagenda) o único aviso da sequência.
+ *
+ * Chamada em toda abertura da tela inicial e a cada registro. É barata: cancela
+ * o que havia e agenda no máximo um. */
+export async function reagendarSequencia(
+  dias: number,
+  hojeFeito: boolean,
+  agora = new Date(),
+): Promise<void> {
+  if (!(await lembreteDaSequenciaLigado())) return
+
+  const Notifications = await notificacoes()
+  await cancelarDoTipo(CHAVE_IDS_SEQUENCIA, 'sequencia')
+
+  /* Sem sequência não há o que proteger. E se ela já registrou hoje, o aviso de
+     hoje deixa de existir: o de amanhã será agendado quando ela abrir o app
+     amanhã, ou pelo próprio registro de amanhã. */
+  if (dias <= 0 || hojeFeito) {
+    await guardarIds(CHAVE_IDS_SEQUENCIA, [])
+    return
+  }
+
+  /* Já passou das 20h: não adianta agendar para hoje — o gatilho de data no
+     passado dispara na hora, e um aviso que chega no mesmo instante em que a
+     pessoa fecha o app é ruído. */
+  const alvo = new Date(agora)
+  alvo.setHours(HORA_DA_SEQUENCIA, 0, 0, 0)
+  if (alvo.getTime() <= agora.getTime()) {
+    await guardarIds(CHAVE_IDS_SEQUENCIA, [])
+    return
+  }
+
+  try {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('sequencia', {
+        name: 'Sequência',
+        importance: Notifications.AndroidImportance.DEFAULT,
+      })
+    }
+
+    const { title, body } = textoDaSequencia(dias)
+    const id = await Notifications.scheduleNotificationAsync({
+      content: { title, body, data: { tipo: 'sequencia' } },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: alvo,
+        channelId: 'sequencia',
+      },
+    })
+    await guardarIds(CHAVE_IDS_SEQUENCIA, [id])
+  } catch (e) {
+    /* Falhar em agendar não pode derrubar a tela inicial: o console fica com o
+       motivo e a pessoa continua usando o app sem o lembrete. */
+    falha('Não consegui agendar o lembrete da sequência.', e)
+  }
+}
+
+export async function ligarLembreteDaSequencia(): Promise<ResultadoLembretes> {
+  const Notifications = await notificacoes()
+  if (!(await temPermissao())) return { tipo: 'negado' }
+  try {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('sequencia', {
+        name: 'Sequência',
+        importance: Notifications.AndroidImportance.DEFAULT,
+      })
+    }
+    await AsyncStorage.setItem(CHAVE_SEQUENCIA, '1')
+    /* O agendamento em si acontece na próxima abertura da tela inicial, que é
+       quem sabe o número de dias. Ligar aqui só abre a porta. */
+    return { tipo: 'ok', quantos: 1, proximo: `${HORA_DA_SEQUENCIA}:00` }
+  } catch (e) {
+    return {
+      tipo: 'erro',
+      mensagem: falha('Não consegui ligar o lembrete da sequência.', e),
+    }
+  }
+}
+
+export async function desligarLembreteDaSequencia(): Promise<void> {
+  await cancelarDoTipo(CHAVE_IDS_SEQUENCIA, 'sequencia')
+  try {
+    await AsyncStorage.setItem(CHAVE_SEQUENCIA, '0')
+  } catch {
+    /* Sem armazenamento, o cancelamento acima já tirou o que estava agendado. */
   }
 }

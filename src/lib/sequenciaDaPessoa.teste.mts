@@ -8,6 +8,7 @@ import {
   MARCOS,
   fraseDaSequencia,
   sequenciaDaPessoa,
+  textoDaSequencia,
   type Sequencia,
 } from './sequenciaDaPessoa.ts'
 
@@ -237,6 +238,51 @@ console.log('\n7. os marcos estao em ordem e comecam no 7')
 {
   ok('o primeiro marco e 7, que e o previsor', MARCOS[0] === 7)
   ok('estao em ordem crescente', MARCOS.every((m, i) => i === 0 || m > MARCOS[i - 1]))
+}
+
+console.log('\n8. o texto do aviso das 20h')
+
+{
+  /* Este chega a pessoa sem ela pedir, e no fim do dia. E o texto do app com
+     mais chance de ser lido como cobranca -- por isso tem teste proprio. */
+  const proibidas = [
+    'falhou', 'perdeu', 'perigo', 'nao perca', 'nao perca',
+    'cuidado', 'alerta', 'errou', 'ultima chance', 'acabando', 'expira',
+    'voce vai perder',
+  ]
+  let limpos = 0
+  const nums = [1, 2, 6, 7, 30, 365]
+  for (const d of nums) {
+    const t = textoDaSequencia(d)
+    const inteiro = (t.title + ' ' + t.body).toLowerCase()
+    const suja = proibidas.find(x => inteiro.includes(x))
+    if (suja) {
+      falharam++
+      console.log(`  FALHA aviso com ameaca ("${suja}"): ${t.title} / ${t.body}`)
+    } else limpos++
+  }
+  ok(`os ${nums.length} avisos sao convite, e nenhum ameaca`, limpos === nums.length)
+
+  /* NUNCA afirma que ela nao registrou hoje.
+     O aviso e agendado a noite e cancelado quando ela registra -- mas se ela
+     registrar pelo botao do PROPRIO aviso de agua, sem abrir o app, o das 20h
+     ainda toca. Um app que acusa errado uma vez perde as proximas dez em que
+     estiver certo. */
+  const afirmacoes = ['nao registrou', 'esqueceu', 'nada hoje', 'dia vazio', 'esquecido']
+  const t5 = textoDaSequencia(5)
+  const inteiro5 = (t5.title + ' ' + t5.body).toLowerCase()
+  ok('nao acusa a pessoa de nao ter registrado',
+    !afirmacoes.some(a => inteiro5.includes(a)), t5.title + ' / ' + t5.body)
+
+  ok('o titulo traz o numero', textoDaSequencia(12).title.includes('12'))
+  ok('um dia fala no singular', !textoDaSequencia(1).title.includes('dias'),
+    textoDaSequencia(1).title)
+  ok('o corpo oferece o caminho mais barato',
+    textoDaSequencia(5).body.toLowerCase().includes('agua')
+      || textoDaSequencia(5).body.toLowerCase().includes('\u00e1gua'))
+  ok('nenhum texto sai vazio',
+    [1, 5, 100].every(d =>
+      textoDaSequencia(d).title.length > 3 && textoDaSequencia(d).body.length > 10))
 }
 
 console.log(`\n${passaram} passaram, ${falharam} falharam`)

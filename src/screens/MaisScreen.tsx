@@ -20,6 +20,9 @@ import { carregarPlanoAtivo, type PlanoCompleto } from '../lib/plano'
 import {
   desligarLembretes,
   desligarLembretesDeAgua,
+  lembreteDaSequenciaLigado,
+  desligarLembreteDaSequencia,
+  ligarLembreteDaSequencia,
   lembretesDeAguaLigados,
   lembretesLigados,
   reagendarSeLigados,
@@ -109,6 +112,10 @@ export function MaisScreen({
   const [agua, setAgua] = useState(false)
   const [mexendoAgua, setMexendoAgua] = useState(false)
   const [avisoAgua, setAvisoAgua] = useState('')
+
+  const [sequencia, setSequencia] = useState(false)
+  const [mexendoSequencia, setMexendoSequencia] = useState(false)
+  const [avisoSequencia, setAvisoSequencia] = useState('')
   /* Ligado quando o aviso acima é sobre a meta faltando: aí ele ganha um
      caminho, em vez de mandar a pessoa procurar. */
   const [faltaMeta, setFaltaMeta] = useState(false)
@@ -143,6 +150,7 @@ export function MaisScreen({
 
     lembretesLigados().then(l => vivo && setLembretes(l))
     lembretesDeAguaLigados().then(l => vivo && setAgua(l))
+    lembreteDaSequenciaLigado().then(l => vivo && setSequencia(l))
     buscar().finally(() => {
       if (vivo) setCarregando(false)
     })
@@ -248,6 +256,50 @@ export function MaisScreen({
      na mão do paciente. Não há evento nenhum avisando o aparelho disso — então
      o puxar-para-atualizar é o caminho, e por isso ele existe numa tela que de
      resto quase não muda. */
+  /* O terceiro lembrete, e o único que não fala de horário.
+   *
+   * Os outros dois tocam por relógio: 12:30 é 12:30 tenha ela almoçado ou não.
+   * Este toca às 20h só quando o dia ainda está vazio E há sequência a
+   * proteger — e é cancelado no instante em que ela registra qualquer coisa.
+   *
+   * Quem não tem sequência nunca é avisado. Cutucar quem ainda não começou é o
+   * caminho mais curto para o app ser silenciado inteiro, junto com os
+   * lembretes que serviam. */
+  async function alternarSequencia() {
+    setAvisoSequencia('')
+    setMexendoSequencia(true)
+
+    if (sequencia) {
+      await desligarLembreteDaSequencia()
+      setSequencia(false)
+      setMexendoSequencia(false)
+      return
+    }
+
+    const r = await ligarLembreteDaSequencia()
+    setMexendoSequencia(false)
+
+    if (r.tipo === 'negado') {
+      setAvisoSequencia(
+        'O Android não autorizou as notificações. Você pode liberar em Configurações → Aplicativos → Cygnos → Notificações.',
+      )
+      return
+    }
+    if (r.tipo === 'erro') {
+      setAvisoSequencia(r.mensagem)
+      return
+    }
+
+    setSequencia(true)
+    /* Diz o que vai acontecer E o que NÃO vai. A segunda metade é a que evita a
+       leitura de "mais um app me enchendo": sem ela, a pessoa liga esperando
+       aviso todo dia e desliga no terceiro. */
+    setAvisoSequencia(
+      'Ligado. Um aviso às 20h, e só nos dias em que você ainda não tiver registrado nada. ' +
+        'Registrou? Ele nem chega.',
+    )
+  }
+
   async function alternarAgua() {
     setAvisoAgua('')
     setFaltaMeta(false)
@@ -447,6 +499,39 @@ export function MaisScreen({
         </Pressable>
 
         {!!avisoAgua && <Text style={styles.avisoLembrete}>{avisoAgua}</Text>}
+
+        <View style={styles.divisor} />
+
+        <Text style={styles.rotuloLembrete}>Sequência</Text>
+        <Text style={styles.explicacaoLembrete}>
+          Um aviso às 20h, e só quando o dia ainda estiver vazio e você tiver uma sequência para
+          manter. Se já tiver registrado alguma coisa, ele não chega.
+        </Text>
+
+        <Pressable
+          onPress={alternarSequencia}
+          disabled={mexendoSequencia}
+          style={({ pressed }) => [
+            styles.botaoLembrete,
+            sequencia && styles.botaoLembreteAtivo,
+            mexendoSequencia && styles.botaoLembreteDesligado,
+            pressed && styles.botaoSairPressionado,
+          ]}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: sequencia }}
+          accessibilityLabel="Lembrete da sequência"
+        >
+          <Ionicons
+            name={sequencia ? 'flame' : 'flame-outline'}
+            size={17}
+            color={sequencia ? paleta().cores.sobreLimao : paleta().cores.verde}
+          />
+          <Text style={[styles.textoBotaoSair, sequencia && styles.textoBotaoLembreteAtivo]}>
+            {mexendoSequencia ? 'Um instante…' : sequencia ? 'Lembrete ligado' : 'Ligar lembrete'}
+          </Text>
+        </Pressable>
+
+        {!!avisoSequencia && <Text style={styles.avisoLembrete}>{avisoSequencia}</Text>}
         {faltaMeta && (
           <Pressable
             onPress={onAbrirMetas}
