@@ -1,3 +1,5 @@
+import { lerItem } from './interpretador.ts'
+import { pesoDoItem } from './pesoDoItem.ts'
 import type { Alimento } from './alimentos'
 
 /* O núcleo puro da sugestão da IA: JSON que veio da rede vira plano do app.
@@ -125,10 +127,33 @@ export function montar(bruto: PlanoDaIA, achados: (Alimento | null)[][]): Conver
       const medida = typeof i.medida_caseira === 'string' ? i.medida_caseira.trim() : ''
       const achado = achados[iR]?.[iI] ?? null
 
+      /* Quando a IA manda medida caseira e NÃO manda o peso — "2 unidades",
+         "1 pote" —, o item entrava no plano sem gramas e ficava fora da soma do
+         dia. A base sabe o peso da porção em 95% dos alimentos, e bastava usar.
+         Ver `pesoDoItem`, que é onde a regra mora e onde ela é testada.
+         `lerItem` é a mesma gramática da tela de escrever, reaproveitada para
+         tirar "2" e "unidade" de dentro de "2 unidades". Ela precisa de um nome
+         depois da medida para não devolver nulo, e por isso a busca vai junto.*/
+      const lido = medida ? lerItem(`${medida} ${nome}`) : null
+      const peso = pesoDoItem({
+        escrito: gramas,
+        quantidade: lido?.quantidade,
+        medida: lido?.medida,
+        medidaDaBase: achado?.medidaCaseira,
+        porcaoG: achado?.porcaoG,
+      })
+      const gramasFinais = peso?.gramas ?? null
+      /* O "≈" não é enfeite: separa o peso que a IA afirmou do que a base supôs
+         a partir de uma porção. Sem ele, os dois números têm a mesma cara e a
+         pessoa não sabe qual conferir. */
+      const comoEscrever = peso?.origem === 'porcao' ? `≈${gramasFinais} g` : `${gramasFinais} g`
+
       /* A descrição é o que a pessoa lê: "2 unidades (100 g)" diz mais do que
          qualquer um dos dois sozinho. Sem medida caseira, só o peso. */
       const descricao =
-        medida && gramas ? `${medida} (${gramas} g)` : medida || (gramas ? `${gramas} g` : '')
+        medida && gramasFinais
+          ? `${medida} (${comoEscrever})`
+          : medida || (gramasFinais ? comoEscrever : '')
 
       if (achado) {
         itens.push({
@@ -136,7 +161,7 @@ export function montar(bruto: PlanoDaIA, achados: (Alimento | null)[][]): Conver
           nome: achado.nome,
           marca: achado.marca,
           descricao,
-          gramasTotais: gramas,
+          gramasTotais: gramasFinais,
           caloriasPor100g: achado.calorias,
           proteinasPor100g: achado.proteinas,
           carboidratosPor100g: achado.carboidratos,
@@ -157,6 +182,8 @@ export function montar(bruto: PlanoDaIA, achados: (Alimento | null)[][]): Conver
         nome,
         marca: null,
         descricao,
+        /* Fora do catálogo não há porção da base para supor: aqui só vale o que
+           a IA mandou em peso. */
         gramasTotais: gramas,
         caloriasPor100g: numero(e?.kcal),
         proteinasPor100g: numero(e?.proteina_g),

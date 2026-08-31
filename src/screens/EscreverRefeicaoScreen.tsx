@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BuscarAlimentoScreen } from './BuscarAlimentoScreen'
 import { buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
 import { descricaoDe, gramasDe, lerRefeicao, type ItemLido } from '../lib/interpretador'
+import { ehEstimado, pesoDoItem, type PesoDoItem } from '../lib/pesoDoItem'
 import { Ditado } from '../components/Ditado'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { milhar } from '../lib/formatar'
@@ -133,23 +134,24 @@ export function EscreverRefeicaoScreen({
     setProcurando(false)
   }
 
-  /* Quantos gramas este item representa.
+  /* Quantos gramas este item representa, e de onde o número veio.
    *
-   * Três fontes, nesta ordem: o peso que a pessoa escreveu ("200 g"), o peso da
-   * medida caseira que a base conhece ("1 fatia = 25 g") e, faltando os dois,
-   * nada — que é honesto. Inventar o peso de uma fatia colocaria na soma do dia
-   * um número que ninguém mediu. */
-  function gramasDaLinha(l: Linha): number | null {
-    if (l.gramasEscolhidos !== undefined && l.gramasEscolhidos !== null) return l.gramasEscolhidos
-
-    const escrito = gramasDe(l.lido)
-    if (escrito !== null) return escrito
-
-    const a = l.alimento
-    if (a?.porcaoG && a.medidaCaseira && ehMesmaMedida(a.medidaCaseira, l.lido.medida)) {
-      return l.lido.quantidade * a.porcaoG
-    }
-    return null
+   * A decisão mora em `pesoDoItem`, que é puro e tem teste: ela erra de um
+   * jeito que ninguém percebe olhando a tela — o item entra no plano, some da
+   * soma, e o total do dia fica menor sem avisar.
+   *
+   * Aqui já custou uma passada: a versão anterior exigia `medida_caseira` para
+   * usar `porcao_g`. A base tem porção em 95% dos alimentos e medida caseira em
+   * 9%, então "2 pão e 1 ovo, iogurte" entrava com os três "sem peso". */
+  function pesoDaLinha(l: Linha): PesoDoItem {
+    return pesoDoItem({
+      escolhido: l.gramasEscolhidos,
+      escrito: gramasDe(l.lido),
+      quantidade: l.lido.quantidade,
+      medida: l.lido.medida,
+      medidaDaBase: l.alimento?.medidaCaseira,
+      porcaoG: l.alimento?.porcaoG,
+    })
   }
 
   /* Troca o alimento escolhido por uma das alternativas, e devolve o antigo
@@ -184,7 +186,7 @@ export function EscreverRefeicaoScreen({
         nome: l.alimento.nome,
         marca: l.alimento.marca,
         descricao: descricaoDe(l.lido),
-        gramasTotais: gramasDaLinha(l),
+        gramasTotais: pesoDaLinha(l)?.gramas ?? null,
         caloriasPor100g: l.alimento.calorias,
         proteinasPor100g: l.alimento.proteinas,
         carboidratosPor100g: l.alimento.carboidratos,
@@ -339,7 +341,11 @@ export function EscreverRefeicaoScreen({
             <Text style={styles.tituloSecao}>O que eu entendi</Text>
 
             {linhas.map((l, i) => {
-              const gramas = gramasDaLinha(l)
+              const peso = pesoDaLinha(l)
+              const gramas = peso?.gramas ?? null
+              /* Estimado é só a porção suposta da base. O que ela escreveu, o
+                 que ela escolheu e o que a base confirma não levam o "≈". */
+              const estimado = ehEstimado(peso)
               const kcal =
                 l.alimento && gramas !== null ? porcao(l.alimento.calorias, gramas) : null
 
@@ -374,8 +380,8 @@ export function EscreverRefeicaoScreen({
 
                     <Text style={styles.detalheLinha} numberOfLines={1}>
                       {descricaoDe(l.lido)}
-                      {gramas !== null && ` · ${milhar(gramas)} g`}
-                      {kcal !== null && ` · ${milhar(kcal)} kcal`}
+                      {gramas !== null && ` · ${estimado ? '≈' : ''}${milhar(gramas)} g`}
+                      {kcal !== null && ` · ${estimado ? '≈' : ''}${milhar(kcal)} kcal`}
                     </Text>
 
                     {/* Não achar deixou de ser um beco.
@@ -396,10 +402,42 @@ export function EscreverRefeicaoScreen({
                         </Text>
                       </Pressable>
                     )}
+                    {/* Sem peso deixou de ser um beco, pelo mesmo motivo que
+                        "não achei" já tinha deixado: a pessoa lia que o item
+                        ficava fora da soma e não tinha o que fazer com isso. A
+                        busca à mão pede o peso e escreve de volta NESTA linha,
+                        então ela é a saída — e agora está a um toque. */}
                     {l.alimento && gramas === null && (
-                      <Text style={styles.semPeso}>
-                        Sem peso: entra no plano, mas fora da soma.
-                      </Text>
+                      <Pressable
+                        onPress={() => setProcurandoNaMao(i)}
+                        style={({ pressed }) => [styles.procurar, pressed && styles.pressionado]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Informar o peso de ${l.alimento.nome}`}
+                      >
+                        <Ionicons name="scale-outline" size={14} color={paleta().cores.verde} />
+                        <Text style={styles.textoProcurar}>
+                          Não sei o peso disto. Toque para informar.
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {/* Estimativa DITA, e não escondida. O número entra na soma
+                        porque um peso plausível que ela pode corrigir vale mais
+                        do que um buraco no total que ela não sabe preencher —
+                        mas ela precisa saber que é suposição, senão a correção
+                        nunca acontece. */}
+                    {l.alimento && estimado && (
+                      <Pressable
+                        onPress={() => setProcurandoNaMao(i)}
+                        style={({ pressed }) => [styles.procurar, pressed && styles.pressionado]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Ajustar o peso de ${l.alimento.nome}`}
+                      >
+                        <Ionicons name="scale-outline" size={14} color={paleta().inkFraco} />
+                        <Text style={styles.textoEstimado}>
+                          Peso de uma porção da base. Toque se a sua for diferente.
+                        </Text>
+                      </Pressable>
                     )}
 
                     {/* As outras opções da mesma busca, abertas sob a linha em
@@ -467,21 +505,6 @@ export function EscreverRefeicaoScreen({
       </ScrollView>
     </KeyboardAvoidingView>
   )
-}
-
-/* "fatia" da base e "fatia" do texto são a mesma medida; "colher de sopa" e
-   "colher" também. Comparação frouxa de propósito: exigir igualdade exata
-   descartaria o peso conhecido por uma diferença de plural. */
-function ehMesmaMedida(daBase: string, doTexto: string): boolean {
-  const n = (s: string) =>
-    s
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim()
-  const a = n(daBase)
-  const b = n(doTexto)
-  return a === b || a.startsWith(b) || b.startsWith(a)
 }
 
 const estilos = estilosDe(t =>
@@ -595,7 +618,9 @@ const estilos = estilosDe(t =>
     borderColor: t.cores.borda,
   },
   textoProcurar: { fontSize: 12, fontWeight: '600', color: t.cores.verde },
-  semPeso: { fontSize: 12, color: t.inkSuave },
+  /* `semPeso` sumiu com o texto que ele vestia: sem peso virou um toque que
+     leva a busca, e nao mais um aviso sem saida. */
+  textoEstimado: { flex: 1, fontSize: 12, color: t.inkFraco, lineHeight: 16 },
   remover: { padding: 4 },
 
   vazio: { fontSize: 13.5, color: t.inkSuave, lineHeight: 20 },

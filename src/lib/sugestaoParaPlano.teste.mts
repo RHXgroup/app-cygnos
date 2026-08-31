@@ -186,5 +186,88 @@ const alimento = (id: number, nome: string, kcal: number | null = 100) => ({
   ok('kcal zero continua zero', r.refeicoes[0].itens[0].caloriasPor100g === 0)
 }
 
+// -- 10. Medida caseira SEM peso: a porcao da base entra na soma --------------
+//
+// Era o defeito que a tela mostrou: "2 pao e 1 ovo, iogurte" entrava com os
+// tres dizendo "sem peso, fora da soma". A IA manda "2 unidades" e nao manda
+// gramas; a base sabe o peso da porcao em 95% dos alimentos, e o codigo exigia
+// medida_caseira -- que existe em 9% -- para poder usar.
+console.log('\n10. medida caseira sem peso usa a porcao da base')
+
+{
+  const comPorcao = (id: number, nome: string, porcaoG: number) =>
+    ({ ...alimento(id, nome, 250), porcaoG, medidaCaseira: null }) as any
+
+  const r = montar(
+    {
+      refeicoes: [
+        {
+          nome: 'Cafe',
+          horario: '07:00',
+          itens: [
+            { tipo: 'alimento', busca: 'pao frances', medida_caseira: '2 unidades' },
+            { tipo: 'alimento', busca: 'iogurte', medida_caseira: null },
+            { tipo: 'alimento', busca: 'arroz', medida_caseira: '2 colheres de sopa' },
+          ],
+        },
+      ],
+    } as any,
+    [[comPorcao(1, 'Pao frances', 50), comPorcao(2, 'Iogurte', 150), comPorcao(3, 'Arroz', 150)]],
+  )!
+
+  const itens = r.refeicoes[0].itens
+  ok('2 unidades de pao viram 100 g', itens[0].gramasTotais === 100, String(itens[0].gramasTotais))
+  ok('e a descricao marca a estimativa', itens[0].descricao === '2 unidades (\u2248100 g)',
+    itens[0].descricao)
+  ok('iogurte sem medida nenhuma pega 1 porcao', itens[1].gramasTotais === 150,
+    String(itens[1].gramasTotais))
+  /* Medida NOMEADA que a base nao confirma continua sem peso: duas colheres de
+     arroz nao sao duas porcoes de 150 g. */
+  ok('2 colheres nao viram 2 porcoes', itens[2].gramasTotais === null,
+    String(itens[2].gramasTotais))
+}
+
+{
+  /* A base CONFIRMANDO a medida nao e estimativa, e nao leva o til. */
+  const comMedida = (id: number, nome: string, porcaoG: number, medidaCaseira: string) =>
+    ({ ...alimento(id, nome, 250), porcaoG, medidaCaseira }) as any
+  const r = montar(
+    { refeicoes: [{ nome: 'R', itens: [
+      { tipo: 'alimento', busca: 'pao de forma', medida_caseira: '2 fatias' },
+    ] }] } as any,
+    [[comMedida(1, 'Pao de forma', 25, 'Fatia')]],
+  )!
+  ok('2 fatias confirmadas pela base', r.refeicoes[0].itens[0].gramasTotais === 50,
+    String(r.refeicoes[0].itens[0].gramasTotais))
+  ok('sem til, porque as duas pontas concordam',
+    r.refeicoes[0].itens[0].descricao === '2 fatias (50 g)', r.refeicoes[0].itens[0].descricao)
+}
+
+{
+  /* Peso mandado pela IA vence a porcao da base. */
+  const comPorcao = (id: number, nome: string, porcaoG: number) =>
+    ({ ...alimento(id, nome, 250), porcaoG, medidaCaseira: null }) as any
+  const r = montar(
+    { refeicoes: [{ nome: 'R', itens: [
+      { tipo: 'alimento', busca: 'pao', quantidade_g: 80, medida_caseira: '2 unidades' },
+    ] }] } as any,
+    [[comPorcao(1, 'Pao', 50)]],
+  )!
+  ok('o peso da IA vence', r.refeicoes[0].itens[0].gramasTotais === 80)
+  ok('e sem o til de estimativa', r.refeicoes[0].itens[0].descricao === '2 unidades (80 g)',
+    r.refeicoes[0].itens[0].descricao)
+}
+
+{
+  /* Fora do catalogo nao ha porcao para supor. */
+  const r = montar(
+    { refeicoes: [{ nome: 'R', itens: [
+      { tipo: 'alimento', busca: 'bolo da vovo', medida_caseira: '1 fatia' },
+    ] }] } as any,
+    [[null]],
+  )!
+  ok('item fora da base continua sem peso', r.refeicoes[0].itens[0].gramasTotais === null)
+}
+
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')
 process.exit(falhou > 0 ? 1 : 0)
