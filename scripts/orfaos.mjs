@@ -99,6 +99,12 @@ if (falsos.length > 0) {
 const EXPLICADOS = new Map([
   /* Exportados só para os .teste.mts, que ficam fora desta varredura porque
      testar é justamente onde uma função sem chamador ainda tem razão de ser. */
+  [
+    'mediaDeSono',
+    'Chamada DENTRO de prontidaoDeHoje.ts, para a noite que a pessoa não ' +
+      'anotou. Exportada porque o teste exercita a média separado da prontidão ' +
+      '— são duas decisões, e uma delas depende da ordem em que a lista chega.',
+  ],
 ])
 
 const pendentes = achados.filter(a => !EXPLICADOS.has(a.nome))

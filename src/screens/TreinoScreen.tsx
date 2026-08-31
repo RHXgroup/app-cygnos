@@ -304,8 +304,17 @@ export function TreinoScreen({
                   prontidao.nivel === 'baixa' && styles.prontidaoBaixa,
                 ]}
               >
+                {/* `sem_hoje` e a noite que ela nao anotou: o app diz a media
+                    e nenhum conselho. Icone de interrogacao, e nao de lua: lua
+                    diria que ele sabe como ela dormiu, e ele nao sabe. */}
                 <Ionicons
-                  name={prontidao.nivel === 'boa' ? 'sunny-outline' : 'moon-outline'}
+                  name={
+                    prontidao.nivel === 'boa'
+                      ? 'sunny-outline'
+                      : prontidao.nivel === 'sem_hoje'
+                        ? 'help-circle-outline'
+                        : 'moon-outline'
+                  }
                   size={17}
                   color={prontidao.nivel === 'boa' ? paleta().cores.verde : paleta().inkMedio}
                 />

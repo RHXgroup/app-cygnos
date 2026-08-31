@@ -48,7 +48,9 @@ export type NoiteCurta = {
 }
 
 export type Prontidao = {
-  nivel: 'boa' | 'media' | 'baixa'
+  /* `sem_hoje` é a noite que ela NÃO anotou: o app não sabe como ela chegou, e
+     diz isso em vez de sumir. Ver a frase lá embaixo. */
+  nivel: 'boa' | 'media' | 'baixa' | 'sem_hoje'
   /* A frase para a tela. Nula quando não há o que dizer — sem noite registrada
      o app fica calado, em vez de inventar disposição. */
   frase: string | null
@@ -74,6 +76,12 @@ const NOITE_BOA = 7 * 60
 const numero = (v: number | null | undefined): number | null =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null
 
+const comoHoras = (minutos: number): string => {
+  const horas = Math.floor(minutos / 60)
+  const min = minutos % 60
+  return min === 0 ? `${horas}h` : `${horas}h${String(min).padStart(2, '0')}`
+}
+
 /* A noite de HOJE, e a prontidão que ela sugere.
  *
  * A noite é indexada pelo dia em que ela ACABOU — é assim que `app_sono_noites`
@@ -83,13 +91,31 @@ export function prontidaoDeHoje(noites: NoiteCurta[], hoje: string): Prontidao {
 
   const dela = noites.find(n => n.data === hoje)
   const minutos = dela ? numero(dela.minutos) : null
-  /* Sem noite registrada, o app fica calado. Não há de onde tirar disposição, e
-     supor que ela dormiu bem seria inventar o dado mais importante da frase. */
-  if (minutos === null) return SEM_PRONTIDAO
 
-  const horas = Math.floor(minutos / 60)
-  const min = minutos % 60
-  const quanto = min === 0 ? `${horas}h` : `${horas}h${String(min).padStart(2, '0')}`
+  /* ── A noite que ela não anotou ────────────────────────────────────────
+   *
+   * O bloco inteiro sumia da tela, e quem registra sono três vezes por semana
+   * não recebia nada nos outros quatro dias — justamente os dias em que ela já
+   * está com menos disposição para anotar.
+   *
+   * O que aparece é um FATO, e nenhuma instrução. "Você dormiu pouco, pegue
+   * leve" seria inventar a noite que não foi medida; "anote o seu sono" seria
+   * cobrança na tela de quem veio treinar. A média é o que o app sabe de
+   * verdade, e a conclusão fica com ela.
+   *
+   * A média não vira `minutos` no retorno: aquele campo é a noite de HOJE, e
+   * pôr a média ali faria a tela dizer um número de ontem com a cara de hoje. */
+  if (minutos === null) {
+    const media = mediaDeSono(noites)
+    if (media === null) return SEM_PRONTIDAO
+    return {
+      nivel: 'sem_hoje',
+      minutos: null,
+      frase: `Você não anotou esta noite. Nas últimas, ${comoHoras(media)} por noite.`,
+    }
+  }
+
+  const quanto = comoHoras(minutos)
 
   if (minutos < NOITE_MUITO_CURTA) {
     return {
@@ -123,14 +149,29 @@ export function prontidaoDeHoje(noites: NoiteCurta[], hoje: string): Prontidao {
 
 /* A média de sono dos últimos dias, para quando a noite de hoje não existe.
  *
- * Não entra na prontidão — prontidão é sobre HOJE. Existe para a tela poder
- * dizer alguma coisa a quem registra sono às vezes, sem fingir que sabe da
- * madrugada que não foi anotada. */
+ * Não é a prontidão: prontidão é sobre HOJE, e a média não sabe de hoje. É o
+ * que o app pode dizer a quem registra sono às vezes, sem fingir que sabe da
+ * madrugada que não foi anotada — e é por isso que a frase dela não traz
+ * conselho junto.
+ *
+ * Três noites no mínimo. Com duas, "média" é uma palavra grande demais para o
+ * que se sabe, e o número mudaria de vulto a cada noite nova. */
 export function mediaDeSono(noites: NoiteCurta[], dias = 7): number | null {
-  const uteis = noites
+  if (!Array.isArray(noites)) return null
+
+  /* Ordena aqui, e não confia em quem chama.
+   *
+   * `carregarNoites` devolve da mais recente para a mais antiga, e o `slice`
+   * dependia disso sem dizer. Uma lista na ordem contrária faria a "média das
+   * últimas sete" ser a média das sete PRIMEIRAS — e o número sairia plausível,
+   * que é o jeito de esse tipo de engano sobreviver. */
+  const uteis = [...noites]
+    .filter(n => !!n && ehDataReal(n.data))
+    .sort((a, b) => b.data.localeCompare(a.data))
+    .slice(0, dias)
     .map(n => numero(n.minutos))
     .filter((m): m is number => m !== null)
-    .slice(0, dias)
+
   if (uteis.length < 3) return null
   return Math.round(uteis.reduce((s, m) => s + m, 0) / uteis.length)
 }

@@ -131,5 +131,105 @@ console.log('\n5. a media de sono, para quem registra as vezes')
     String(mediaDeSono(comLixo)))
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+   A noite que ela NAO anotou
+   ──────────────────────────────────────────────────────────────────────────
+
+   O bloco inteiro sumia da tela. Quem registra sono tres vezes por semana nao
+   recebia nada nos outros quatro dias -- justamente os dias em que ela ja esta
+   com menos disposicao para anotar. */
+console.log('\nSem a noite de hoje, mas com historico')
+
+{
+  const semHoje: NoiteCurta[] = [
+    { data: '2026-08-30', minutos: 7 * 60, qualidade: null },
+    { data: '2026-08-29', minutos: 7 * 60, qualidade: null },
+    { data: '2026-08-28', minutos: 7 * 60, qualidade: null },
+  ]
+  const p = prontidaoDeHoje(semHoje, HOJE)
+  ok('agora diz alguma coisa', p.frase !== null)
+  ok('e o nivel diz que hoje falta', p.nivel === 'sem_hoje')
+  ok('a media aparece na frase', (p.frase ?? '').includes('7h'))
+  /* `minutos` e a noite de HOJE. Por a media ali faria a tela mostrar um numero
+     de ontem com a cara de hoje. */
+  ok('e nao finge que a noite de hoje existe', p.minutos === null)
+}
+
+{
+  /* FATO, e nenhuma instrucao. Inventar conselho sobre uma noite que nao foi
+     medida e o contrario do que este arquivo existe para fazer. */
+  const semHoje: NoiteCurta[] = [
+    { data: '2026-08-30', minutos: 4 * 60, qualidade: null },
+    { data: '2026-08-29', minutos: 4 * 60, qualidade: null },
+    { data: '2026-08-28', minutos: 4 * 60, qualidade: null },
+  ]
+  const f = prontidaoDeHoje(semHoje, HOJE).frase ?? ''
+  ok('nao manda diminuir carga', !f.includes('carga'))
+  ok('nao manda aquecer', !f.toLowerCase().includes('aquecimento'))
+  ok('e nao cobra o registro', !f.toLowerCase().includes('anote'))
+}
+
+{
+  /* Com menos de tres noites, "media" e palavra grande demais para o que se
+     sabe -- e o app volta a ficar calado, que e o certo. */
+  const duas: NoiteCurta[] = [
+    { data: '2026-08-30', minutos: 7 * 60, qualidade: null },
+    { data: '2026-08-29', minutos: 7 * 60, qualidade: null },
+  ]
+  ok('duas noites ainda deixam o app calado', prontidaoDeHoje(duas, HOJE).frase === null)
+}
+
+{
+  /* A noite de HOJE continua vencendo a media: quem anotou tem a medida, e
+     medida nao perde para media. */
+  const comHoje: NoiteCurta[] = [
+    { data: HOJE, minutos: 4 * 60, qualidade: null },
+    { data: '2026-08-30', minutos: 8 * 60, qualidade: null },
+    { data: '2026-08-30', minutos: 8 * 60, qualidade: null },
+    { data: '2026-08-29', minutos: 8 * 60, qualidade: null },
+  ]
+  const p = prontidaoDeHoje(comHoje, HOJE)
+  ok('a noite de hoje vence a media', p.nivel === 'baixa')
+  ok('e o numero e o de hoje', p.minutos === 4 * 60)
+}
+
+console.log('\nA media nao depende da ordem em que a lista chega')
+
+{
+  /* `carregarNoites` devolve da mais recente para a mais antiga, e o `slice`
+     dependia disso SEM DIZER. Na ordem contraria, "as ultimas sete" viravam as
+     sete PRIMEIRAS -- e o numero sairia plausivel. */
+  const oito: NoiteCurta[] = Array.from({ length: 8 }, (_, i) => ({
+    data: `2026-08-${String(24 + i).padStart(2, '0')}`,
+    /* As antigas com 4h, as recentes com 8h. */
+    minutos: i < 4 ? 4 * 60 : 8 * 60,
+    qualidade: null,
+  }))
+  const antigaPrimeiro = [...oito]
+  const recentePrimeiro = [...oito].reverse()
+  ok(
+    'a ordem nao muda a media',
+    mediaDeSono(antigaPrimeiro) === mediaDeSono(recentePrimeiro),
+    `${mediaDeSono(antigaPrimeiro)} vs ${mediaDeSono(recentePrimeiro)}`,
+  )
+  ok(
+    'e a media e das SETE mais recentes',
+    mediaDeSono(antigaPrimeiro) === Math.round((4 * 60 * 3 + 8 * 60 * 4) / 7),
+    String(mediaDeSono(antigaPrimeiro)),
+  )
+}
+
+{
+  const comDataTorta: NoiteCurta[] = [
+    { data: 'ontem', minutos: 8 * 60, qualidade: null },
+    { data: '2026-02-31', minutos: 8 * 60, qualidade: null },
+    { data: '2026-08-31', minutos: 7 * 60, qualidade: null },
+    { data: '2026-08-30', minutos: 7 * 60, qualidade: null },
+    { data: '2026-08-29', minutos: 7 * 60, qualidade: null },
+  ]
+  ok('data torta nao entra na media', mediaDeSono(comDataTorta) === 7 * 60)
+  ok('e nao estoura', mediaDeSono(null as unknown as NoiteCurta[]) === null)
+}
+
 console.log(`\n${passaram} passaram, ${falharam} falharam`)
 if (falharam > 0) process.exit(1)
