@@ -74,34 +74,56 @@ Quatro regras que vieram de erro real:
 
 ## 2. O teclado, e a pergunta que vem ANTES de mexer no componente
 
-> **Este item estava errado e custou cinco tentativas seguidas numa tela só.**
-> A versão anterior afirmava, sem ressalva, que "a janela não encolhe mais". No
-> Expo Go ela encolhe, e o texto mandava tratar à mão o que o sistema já fazia.
+> **Este item já esteve errado DUAS vezes, e a segunda versão errada durou
+> horas e quase entrou num build.** Ela afirmava que "no Expo Go a janela
+> encolhe sozinha" e mandava TIRAR o tratamento. Era a sexta teoria de uma
+> sequência de seis, escrita antes de alguém medir.
+>
+> **A medição desmentiu.** Uma foto da tela com o teclado aberto mostrou a barra
+> de escrever completamente FORA da tela, abaixo do teclado. Se a janela
+> encolhesse, ela estaria visível. Não encolhe.
+>
+> Fica registrado porque o dano foi real: outra sessão citou esta seção de volta,
+> como autoridade, para questionar a correção certa — horas antes de um build de
+> produção. **Documento errado não fica parado; ele argumenta.**
 
 **A pergunta primeiro: quem controla o teclado neste momento?**
 
 No **Expo Go** — que é onde este app roda hoje — as configurações de Android do
-`app.json` **não valem**. O `softwareKeyboardLayoutMode` é ignorado: quem manda é
-o manifesto do próprio Expo Go, que usa `adjustResize`. **A janela encolhe
-sozinha.**
+`app.json` **não valem**: `softwareKeyboardLayoutMode` e `edgeToEdgeEnabled` são
+ignorados, e quem manda é o manifesto do próprio Expo Go.
 
-Com a janela encolhendo, uma coluna com `flex: 1` no meio reflui e o último
-filho fica logo acima do teclado — **sem tratamento nenhum**. Foi assim que a
-conversa ficou certa, depois de cinco tentativas de tratar à mão:
-KeyboardAvoidingView, margem, medição com `onLayout`, âncora absoluta. Todas
-somavam deslocamento em cima do que o sistema já fazia, e o resultado alternava
-entre "campo no meio da tela" e "campo atrás do teclado".
+**E ali a janela NÃO encolhe.** Medido no aparelho, não deduzido.
+
+**Num build de verdade isso pode mudar**, porque o `app.json` passa a valer.
+Nenhuma tela de teclado deste app foi testada em build — as duas são as
+primeiras a reabrir no primeiro APK.
+
+**A conta, com os números medidos:**
+
+```
+teclado 306 · área segura 48 · e faltavam exatamente 48
+```
+
+`endCoordinates.height` devolve a altura do teclado **sem** a barra de navegação
+que fica por baixo dele. **As duas somam.** Quem desviar só pela altura do
+teclado fica 48 por baixo — em painel alto isso esconde a borda e ninguém
+reclama; em barra baixa some a barra inteira.
+
+**Use `useDesvioDoTeclado(areaSegura, alturaDaTela?)`, de `lib/teclado.ts`.** Ele
+já faz a soma e, se receber a altura da tela, detecta o caso em que a janela
+encolhe e devolve zero — o que protege o build sem mexer no que funciona hoje.
 
 **Então, ao ver campo escondido:**
 
-1. Confira se a tela já está numa coluna com `flex: 1` no meio. Se estiver, o
-   defeito provavelmente é tratamento a MAIS, não a menos — tire e teste.
-2. `KeyboardAvoidingView` com `behavior` indefinido no Android não faz nada. Se
-   for usar, `behavior={Platform.OS === 'ios' ? 'padding' : 'height'}`. Mas
-   pense duas vezes antes de usar: com `adjustResize` ele soma.
-3. Só meça a altura do teclado (`useAlturaTeclado`, em `lib/teclado.ts`) quando
-   houver motivo REAL — coisa posicionada por absoluto que precise acompanhar o
-   teclado. No iOS use `keyboardWillShow`; no Android só existe `keyboardDidShow`.
+1. **Meça antes de teorizar.** Imprima teclado, área segura e deslocamento numa
+   faixa na tela e peça uma foto. Uma foto encerrou o que seis deduções não
+   encerraram, e cada dedução custou uma rodada de quem estava usando o app.
+2. `KeyboardAvoidingView` com `behavior` indefinido no Android não faz nada — e
+   dentro de `<Sobreposta>`, que é `absoluteFillObject`, ele erra de qualquer
+   jeito. Prefira o deslocamento medido.
+3. No iOS use `keyboardWillShow`; no Android só existe `keyboardDidShow`. Isso
+   já está dentro de `useAlturaTeclado`.
 
 **A conta é `teclado + área segura`, e as duas SOMAM.**
 
@@ -129,7 +151,8 @@ edge-to-edge entra. No dia do primeiro build, esta é uma das telas para reabrir
 **A pendência que estava anotada aqui foi resolvida**, e do jeito contrário do
 que eu supunha: `BuscarAlimentoScreen` não subia DEMAIS, subia de MENOS — os
 mesmos 48 da barra de navegação. Ninguém tinha reclamado porque o painel é alto e
-o que sumia era a borda, não o campo. Corrigido junto com a conversa.
+o que sumia era a borda, não o campo. Corrigido junto com a conversa, e as duas
+telas continuam sendo as primeiras a reabrir no primeiro build.
 
 ## 3. Campo numérico e o separador de milhar
 
