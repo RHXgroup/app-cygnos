@@ -3,6 +3,22 @@ import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
 import { dataISO } from './formatar'
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { type Estimativa, itensDaEstimativa } from './estimativaDaFoto'
+
+/* Reexportado para as telas: elas pedem a foto por aqui, e ter de importar o
+   tipo de um arquivo e a função de outro é o tipo de detalhe que faz alguém
+   copiar o import errado. */
+export {
+  type Estimativa,
+  type ItemDaFoto,
+  type LinhaEscolhida,
+  FRACOES_DA_PORCAO,
+  comFator,
+  escolhidos,
+  paraGravar,
+  linhasIniciais,
+  totaisDaFoto,
+} from './estimativaDaFoto'
 
 /* O contador de calorias: o que a pessoa realmente comeu.
  *
@@ -41,6 +57,11 @@ export type ItemParaGravar = Omit<ItemConsumo, 'id' | 'comidoEm' | 'fotoPath'> &
   alimentoId?: number | null
   /* Opcional: quase todo item entra sem foto. */
   fotoPath?: string | null
+  /* Quanto a pessoa corrigiu a estimativa da foto: 0,5 quando disse metade, 2
+     quando disse o dobro. Nulo quando aceitou como veio — e a diferença
+     importa, porque é a média das correções DE VERDADE que calibra a próxima
+     foto (`app_vies_da_foto`). */
+  fatorCorrecao?: number | null
 }
 
 /* As refeições que o app oferece. São sugestões, não uma lista fechada: quem
@@ -254,6 +275,7 @@ export async function registrarConsumo(
         confianca: i.confianca,
         alimento_id: i.alimentoId ?? null,
         foto_path: i.fotoPath ?? null,
+        fator_correcao: i.fatorCorrecao ?? null,
       })),
     )
     .select(COLUNAS)
@@ -515,23 +537,9 @@ export async function carregarUltimaRefeicao(
 
 /* ── A foto ────────────────────────────────────────────────────────────────*/
 
-export type Estimativa = {
-  descricao: string
-  porcaoEstimada: string
-  calorias: number | null
-  proteinas: number | null
-  carboidratos: number | null
-  gorduras: number | null
-  fibras: number | null
-  confianca: 'alta' | 'media' | 'baixa'
-  /* A IA declarou que o hábito dela mudou a resposta — desempatou um alimento
-     parecido ou calibrou a porção.
-   *
-   * Existe para a TELA DIZER. Contexto que age escondido e erra é o pior dos
-   * dois mundos: sem contexto o erro é aleatório e a pessoa desconfia; com
-   * contexto o erro fica PLAUSÍVEL, bate com o plano dela, e passa. */
-  usouContexto: boolean
-}
+/* `Estimativa`, `ItemDaFoto` e o que se faz com eles moram em
+   `estimativaDaFoto.ts` — só lógica, sem nada de runtime, e por isso testável
+   fora do aparelho (item 14). Aqui fica o que fala com a rede. */
 
 /* O que o app conta à IA sobre esta pessoa antes de ela olhar a foto.
  *
@@ -546,6 +554,45 @@ export type ContextoDaFoto = {
   refeicao: string
   /* O que ela costuma comer NESTA refeição, do mais frequente para o menos. */
   costuma: string[]
+  /* E o que o PLANO da nutricionista tem para esta refeição.
+   *
+   * Sujeito às mesmas travas do hábito, e o servidor diz isso em uma frase: o
+   * plano é o que ela DEVERIA comer, não o que está no prato. Quem come
+   * diferente do plano é justamente quem mais precisa do registro certo — e é
+   * o único jeito de a nutricionista descobrir. */
+  doPlano?: string[]
+  /* Para que lado ela costuma corrigir a estimativa. Vem de
+     `app_vies_da_foto()`, e é nulo até haver correção suficiente. */
+  fatorMedioDeCorrecao?: number | null
+}
+
+/* Para que lado esta pessoa costuma corrigir a estimativa da foto.
+ *
+ * ── Por que isto existe ───────────────────────────────────────────────────
+ * A tecnologia de foto erra ±28% na porção; é o limite conhecido dela, e vale
+ * para todo mundo. O que NÃO vale para todo mundo é a DIREÇÃO do erro numa
+ * pessoa específica: quem serve o prato cheio e come metade tem um viés
+ * consistente, e o modelo não tem como saber disso olhando a foto.
+ *
+ * ── Devolve null, e nunca rejeita ─────────────────────────────────────────
+ * Item 11: função de apoio de UI não pode rejeitar. Sem sinal, isto seria uma
+ * rejeição não tratada dentro do fluxo da câmera — e a foto inteira morreria
+ * por causa de um número que só serve para calibrar. Sem o viés a estimativa
+ * sai como saía antes, que é o comportamento aceitável.
+ *
+ * `auth.uid()` do lado do banco, e por isso sem parâmetro: hábito alimentar é
+ * dado de saúde, e por parâmetro qualquer autenticado leria o de outro. */
+export async function viesDaFoto(): Promise<number | null> {
+  const { data, error } = await supabase.rpc('app_vies_da_foto')
+  if (error) {
+    falha('viés da foto', error)
+    return null
+  }
+  const n = Number(data)
+  /* A função devolve nulo com menos de cinco correções em noventa dias. E a
+     faixa é conferida aqui também: um número fora dela empurraria todas as
+     estimativas seguintes na direção errada, calado. */
+  return Number.isFinite(n) && n > 0.3 && n < 3 ? n : null
 }
 
 export type ResultadoFoto =
@@ -626,8 +673,13 @@ export async function analisarFoto(
            pela metade, e frase pela metade o modelo completa sozinho — que é
            pior do que não mandar nada. */
         contexto:
-          contexto && contexto.costuma.length > 0
-            ? { refeicao: contexto.refeicao, costuma: contexto.costuma.slice(0, 8) }
+          contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)
+            ? {
+                refeicao: contexto.refeicao,
+                costuma: contexto.costuma.slice(0, 8),
+                plano: (contexto.doPlano ?? []).slice(0, 8),
+                fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
+              }
             : undefined,
       },
     })
@@ -642,17 +694,25 @@ export async function analisarFoto(
 
     if (data?.error) return { tipo: 'erro', mensagem: data.error }
 
+    /* Lê a lista, e entende a resposta da função ANTIGA também: sem isso, a
+       foto só voltaria a funcionar depois de a função nova subir, e o app
+       passaria a depender de os dois lados subirem no mesmo minuto. */
+    const itens = itensDaEstimativa(data)
+
+    /* Vazia é foto sem alimento. Não há o que confirmar, e uma folha vazia com
+       botão "Registrar" seria pior do que a frase. */
+    if (itens.length === 0)
+      return {
+        tipo: 'erro',
+        mensagem: 'Não consegui identificar alimento nesta foto. Tente de mais perto, com luz.',
+      }
+
     return {
       tipo: 'ok',
       base64: reduzida.base64,
       estimativa: {
         descricao: data.descricao ?? 'Alimento',
-        porcaoEstimada: data.porcao_estimada ?? '',
-        calorias: data.calorias ?? null,
-        proteinas: data.proteinas ?? null,
-        carboidratos: data.carboidratos ?? null,
-        gorduras: data.gorduras ?? null,
-        fibras: data.fibras ?? null,
+        itens,
         confianca: data.confianca ?? 'baixa',
         /* `=== true` e nao `??`: a funcao antiga nao devolve o campo, e um
            app novo falando com a versao anterior da funcao veria `undefined`.
@@ -663,55 +723,5 @@ export async function analisarFoto(
     }
   } catch {
     return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente outra.' }
-  }
-}
-
-/* ── Ajustar a porção de uma estimativa ────────────────────────────────────
- *
- * A IA acerta razoavelmente O QUE é o prato e erra bastante QUANTO tem nele: a
- * medida pública do melhor app de foto do mercado é ±28% de erro na porção.
- *
- * Esta tela não deixava corrigir — era aceitar ou descartar. Aceitar sabendo que
- * está errado envenena a soma do dia; descartar joga fora um reconhecimento que
- * estava certo. As duas saídas eram ruins.
- *
- * ── Por que frações, e não um controle deslizante ─────────────────────────
- * Um deslizante devolve 87%, e 87% de um número que já é aproximado é precisão
- * inventada. Ninguém olha um prato e pensa "comi 87%": pensa "comi metade".
- *
- * As quatro frações são as que se usam falando, e é a mesma escada do `ajustar`
- * que já existe para item registrado — duas telas com escalas diferentes para a
- * mesma ideia fariam a pessoa aprender duas vezes. */
-export const FRACOES_DA_PORCAO = [
-  { fator: 0.5, rotulo: 'metade' },
-  { fator: 1, rotulo: 'tudo' },
-  { fator: 1.5, rotulo: 'uma vez e meia' },
-  { fator: 2, rotulo: 'o dobro' },
-] as const
-
-/* A estimativa reescalada.
- *
- * `null` continua `null`: o que a IA não soube dizer não vira número por ser
- * multiplicado. Item 6 do AGENTS.md — zero no lugar do desconhecido soma como
- * se fosse verdade.
- *
- * A DESCRIÇÃO da porção também muda, e é ela que a pessoa relê depois no
- * diário: "1 prato" que virou metade precisa dizer "metade de 1 prato", senão o
- * item guarda um texto que contradiz os próprios números. */
-export function comFator(e: Estimativa, fator: number): Estimativa {
-  if (!Number.isFinite(fator) || fator <= 0 || fator === 1) return e
-
-  const x = (v: number | null) => (v === null ? null : Math.round(v * fator))
-  const nome = FRACOES_DA_PORCAO.find(f => f.fator === fator)?.rotulo
-
-  return {
-    ...e,
-    calorias: x(e.calorias),
-    proteinas: x(e.proteinas),
-    carboidratos: x(e.carboidratos),
-    gorduras: x(e.gorduras),
-    fibras: x(e.fibras),
-    porcaoEstimada:
-      e.porcaoEstimada && nome ? `${nome} de ${e.porcaoEstimada}` : e.porcaoEstimada,
   }
 }

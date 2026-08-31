@@ -27,12 +27,18 @@ import {
   carregarUltimaRefeicao,
   FRACOES_DA_PORCAO,
   comFator,
+  linhasIniciais,
+  paraGravar,
+  totaisDaFoto,
+  viesDaFoto,
   moverDeRefeicao,
   porRefeicao,
   refeicaoPelaHora,
   registrarConsumo,
   totaisConsumidos,
   type Estimativa,
+  type ItemDaFoto,
+  type LinhaEscolhida,
   type ItemConsumo,
   type ItemFrequente,
   type ItemParaGravar,
@@ -221,9 +227,13 @@ export function ContadorCaloriasScreen({
         setAcoesDe(null)
         return true
       }
-      /* A estimativa da foto vem por cima de tudo, inclusive das portas. */
+      /* A estimativa da foto vem por cima de tudo, inclusive das portas.
+         A imagem sai junto: sao centenas de quilobytes em memoria, e voltar
+         precisa deixar a tela como o "Descartar" deixa -- dois caminhos de
+         saida que limpam coisas diferentes e como um deles vira defeito. */
       if (estimativa) {
         setEstimativa(null)
+        setFotoEmBase64(null)
         return true
       }
       if (porta) {
@@ -446,9 +456,26 @@ export function ContadorCaloriasScreen({
      * verdade, a lista e so pista. Uma feijoada continua sendo feijoada mesmo
      * que o habito dela seja salada -- e a tela DIZ quando o habito foi usado,
      * para ela poder desmentir. */
+    /* E o PLANO dela para esta refeicao, quando existe.
+     *
+     * Sinal mais forte que o habito: o habito diz o que ela repetiu, o plano
+     * diz o que a nutricionista montou. As travas contra a ancoragem sao as
+     * mesmas, e moram na funcao do servidor. */
+    const doPlano =
+      plano?.refeicoes.find(r => r.rotulo === refeicao)?.itens.map(i => i.nome) ?? []
+
+    /* E para que lado ela costuma corrigir.
+     *
+     * Devolve null sem sinal e com menos de cinco correcoes -- e sem ele a
+     * estimativa sai como saia antes, que e o comportamento aceitavel. Por isso
+     * nao vale segurar a foto esperando: vai junto, e pronto. */
+    const fatorMedioDeCorrecao = await viesDaFoto()
+
     const r = await analisarFoto(origem, {
       refeicao,
       costuma: frequentes.map(f => f.nome),
+      doPlano,
+      fatorMedioDeCorrecao,
     })
     setAnalisando(false)
 
@@ -875,28 +902,38 @@ export function ContadorCaloriasScreen({
             setEstimativa(null)
             setFotoEmBase64(null)
           }}
-          onRegistrar={e => {
+          onRegistrar={linhas => {
             const imagem = fotoEmBase64
+            const confianca = estimativa.confianca
             setEstimativa(null)
             setFotoEmBase64(null)
-            /* A imagem viaja para `gravar`, que a sobe antes do insert -- o
-               caminho dela e uma coluna da linha.
-               A pessoa nao espera por isso: a lista otimista ja mostrou o
-               item antes de a rede responder. */
-            gravar([
-              {
+            /* UMA linha por alimento, e nao um bloco.
+               Todas dividem a MESMA foto: `gravar` sobe a imagem uma vez e
+               carimba o caminho em todo item de origem 'foto'. E o que faz a
+               nutricionista poder comentar o arroz sem mexer no frango.
+               A pessoa nao espera por isso: a lista otimista ja mostrou os
+               itens antes de a rede responder. */
+            gravar(
+              paraGravar(linhas).map(({ item, fatorCorrecao }) => ({
                 refeicao,
-                nome: e.descricao,
-                descricao: e.porcaoEstimada || null,
-                calorias: e.calorias,
-                proteinas: e.proteinas,
-                carboidratos: e.carboidratos,
-                gorduras: e.gorduras,
-                fibras: e.fibras,
-                origem: 'foto',
-                confianca: e.confianca,
-              },
-            ], imagem)
+                nome: item.nome,
+                descricao: item.porcaoEstimada || null,
+                calorias: item.calorias,
+                proteinas: item.proteinas,
+                carboidratos: item.carboidratos,
+                gorduras: item.gorduras,
+                fibras: item.fibras,
+                origem: 'foto' as const,
+                /* A confianca e do CONJUNTO: a IA olhou uma foto so, e dividir
+                   a duvida por item seria inventar uma precisao que ela nao
+                   declarou. */
+                confianca,
+                /* O sinal mais valioso que existe, e que ia fora: quanto ela
+                   corrigiu a estimativa DESTE item. */
+                fatorCorrecao,
+              })),
+              imagem,
+            )
           }}
         />
       )}
@@ -1259,8 +1296,22 @@ function LinhaItem({
 }
 
 /* ── Confirmar a foto ──────────────────────────────────────────────────────
-   Nada é gravado antes de a pessoa ver o número. A IA erra em prato composto,
-   e um item errado no diário estraga o total do dia até alguém notar. */
+ *
+ * Nada é gravado antes de a pessoa ver os números. A IA erra em prato composto,
+ * e um item errado no diário estraga o total do dia até alguém notar.
+ *
+ * ── Por que uma LISTA, e não um bloco ─────────────────────────────────────
+ * Esta folha mostrava um item só: "Arroz, feijão e frango — 620 kcal". As duas
+ * saídas eram ruins — aceitar o bloco inteiro sabendo que o feijão não estava
+ * ali, ou descartar a foto e digitar tudo à mão.
+ *
+ * Com a lista, ela mexe no que está errado e aceita o resto. E a nutricionista,
+ * do lado dela, passa a ver "Arroz branco, 4 colheres" em vez de um bloco que
+ * não dá para comentar.
+ *
+ * ── E cada correção é guardada ────────────────────────────────────────────
+ * Quando ela diz "comi metade", isso é uma medida dela contra a leitura do
+ * modelo, e vira o viés que calibra a próxima foto. Ver `paraGravar`. */
 function ConfirmarFoto({
   estimativa,
   refeicao,
@@ -1269,22 +1320,27 @@ function ConfirmarFoto({
 }: {
   estimativa: Estimativa
   refeicao: string
-  /* Recebe a estimativa JÁ reescalada. A folha é quem sabe qual fração está
-     escolhida, e mandar o fator para fora faria a tela de cima repetir a conta
-     — dois lugares multiplicando o mesmo número é como eles divergem. */
-  onRegistrar: (e: Estimativa) => void
+  /* Recebe as LINHAS, e não os itens já prontos: quem monta o que vai para o
+     banco é `paraGravar`, num lugar só. A folha decide o que a pessoa escolheu;
+     a conta de reescalar mora na lib, e dois lugares multiplicando o mesmo
+     número é como eles divergem. */
+  onRegistrar: (linhas: LinhaEscolhida[]) => void
   onDescartar: () => void
 }) {
   const styles = estilos()
   const { bottom } = useSafeAreaInsets()
-  /* Quanto do prato ela comeu.
-   *
-   * A IA acerta razoavelmente O QUE é e erra bastante QUANTO tem: o melhor app
-   * de foto do mercado erra ±28% na porção. Esta tela era aceitar ou descartar,
-   * e as duas saídas eram ruins — aceitar sabendo que está errado envenena a
-   * soma do dia, descartar joga fora um reconhecimento que estava certo. */
-  const [fator, setFator] = useState(1)
-  const mostrada = comFator(estimativa, fator)
+
+  /* Todos entram marcados, e inteiros. É o caminho comum — a pessoa fotografou
+     o que comeu — e obrigá-la a marcar item por item cobraria seis toques de
+     quem não tinha nada a corrigir. */
+  const [linhas, setLinhas] = useState<LinhaEscolhida[]>(() => linhasIniciais(estimativa))
+
+  const mexer = (indice: number, muda: (l: LinhaEscolhida) => LinhaEscolhida) =>
+    setLinhas(atuais => atuais.map((l, i) => (i === indice ? muda(l) : l)))
+
+  const dentro = linhas.filter(l => l.dentro)
+  const totais = totaisDaFoto(dentro.map(l => comFator(l.item, l.fator)))
+  const nenhum = dentro.length === 0
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -1292,53 +1348,57 @@ function ConfirmarFoto({
       <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
         <View style={styles.puxador} />
 
-        <Text style={styles.tituloFolha}>{mostrada.descricao}</Text>
-        {!!mostrada.porcaoEstimada && (
-          <Text style={styles.porcaoFolha}>{mostrada.porcaoEstimada}</Text>
-        )}
+        <Text style={styles.tituloFolha}>{estimativa.descricao}</Text>
+        <Text style={styles.porcaoFolha}>
+          {estimativa.itens.length === 1
+            ? 'Confira antes de registrar.'
+            : `${estimativa.itens.length} alimentos. Tire o que você não comeu e ajuste o resto.`}
+        </Text>
 
-        {/* Número solto, e não um arco: um arco mede progresso contra alguma
-            coisa, e aqui não há contra o quê — é um item, não o dia. */}
+        {/* A LISTA rola; o total e os botões ficam parados embaixo.
+            Sem isso, um prato de oito itens empurraria o "Registrar" para fora
+            da folha — e o botão que some é o botão que não existe. */}
+        <ScrollView
+          style={styles.listaDaFoto}
+          contentContainerStyle={styles.listaDaFotoConteudo}
+          keyboardShouldPersistTaps="handled"
+        >
+          {linhas.map((l, i) => (
+            <LinhaDaFoto
+              key={`${l.item.nome}-${i}`}
+              linha={l}
+              onFracao={fator => mexer(i, x => ({ ...x, fator }))}
+              onAlternar={() => mexer(i, x => ({ ...x, dentro: !x.dentro }))}
+            />
+          ))}
+        </ScrollView>
+
+        {/* O TOTAL do que sobrou marcado. Muda a cada toque, e é ele que
+            responde à pergunta que a pessoa realmente tem. */}
         <View style={styles.arcoFolha}>
           <Text style={styles.kcalFolha}>
-            {mostrada.calorias === null ? '—' : milhar(mostrada.calorias)}
+            {totais.calorias === null ? '—' : milhar(totais.calorias)}
           </Text>
-          <Text style={styles.unidadeFolha}>kcal</Text>
+          <Text style={styles.unidadeFolha}>kcal no total</Text>
         </View>
 
         <View style={styles.macrosFolha}>
-          <MacroFolha rotulo="Proteínas" valor={mostrada.proteinas} />
-          <MacroFolha rotulo="Carboidratos" valor={mostrada.carboidratos} />
-          <MacroFolha rotulo="Gorduras" valor={mostrada.gorduras} />
+          <MacroFolha rotulo="Proteínas" valor={totais.proteinas} />
+          <MacroFolha rotulo="Carboidratos" valor={totais.carboidratos} />
+          <MacroFolha rotulo="Gorduras" valor={totais.gorduras} />
         </View>
 
-        {/* QUANTO DO PRATO ELA COMEU.
-            Frações, e não um controle deslizante: um deslizante devolve 87%, e
-            87% de um número que já é aproximado é precisão inventada. Ninguém
-            olha um prato e pensa "comi 87%" — pensa "comi metade". */}
-        <Text style={styles.rotuloPorcao}>Quanto você comeu?</Text>
-        <View style={styles.fracoes}>
-          {FRACOES_DA_PORCAO.map(f => (
-            <Pressable
-              key={f.fator}
-              onPress={() => setFator(f.fator)}
-              style={({ pressed }) => [
-                styles.fracao,
-                fator === f.fator && styles.fracaoAtiva,
-                pressed && styles.chipPressionado,
-              ]}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: fator === f.fator }}
-            >
-              <Text style={[styles.textoFracao, fator === f.fator && styles.textoFracaoAtiva]}>
-                {f.rotulo}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        {/* Item 6: o que a IA não soube dizer fica de fora da soma, e a folha
+            DIZ isso. Um total que parece completo e está por baixo é pior do
+            que um total que se explica. */}
+        {totais.semCalorias > 0 && (
+          <Text style={styles.rodapeFolha}>
+            {totais.semCalorias === 1
+              ? 'Um item ficou sem caloria — o total sai por baixo.'
+              : `${totais.semCalorias} itens ficaram sem caloria — o total sai por baixo.`}
+          </Text>
+        )}
 
-        {/* A confiança vem da IA e é mostrada como ela respondeu. Esconder um
-            "baixa" faria a pessoa tratar o chute como medida. */}
         {/* O que foi CONSIDERADO, e nao so o que foi respondido.
             Contexto que age escondido e erra e o pior dos dois mundos: sem ele
             o erro e aleatorio e a pessoa desconfia; com ele o erro fica
@@ -1353,13 +1413,15 @@ function ConfirmarFoto({
           </View>
         )}
 
-        {mostrada.confianca !== 'alta' && (
+        {/* A confiança vem da IA e é mostrada como ela respondeu. Esconder um
+            "baixa" faria a pessoa tratar o chute como medida. */}
+        {estimativa.confianca !== 'alta' && (
           <View style={styles.avisoFolha}>
             <Ionicons name="information-circle-outline" size={16} color={paleta().cores.verdeEscuro} />
             <Text style={styles.textoAvisoFolha}>
-              {mostrada.confianca === 'baixa'
+              {estimativa.confianca === 'baixa'
                 ? 'A imagem ficou difícil de ler — esses números são um palpite grosseiro.'
-                : 'Há dúvida sobre o prato ou a porção. Confira antes de registrar.'}
+                : 'Há dúvida sobre os alimentos ou as porções. Confira antes de registrar.'}
             </Text>
           </View>
         )}
@@ -1377,15 +1439,121 @@ function ConfirmarFoto({
             <Text style={styles.textoDescartar}>Descartar</Text>
           </Pressable>
 
+          {/* Desligado quando ela tirou tudo: registrar nada gravaria uma foto
+              sem alimento nenhum, e a folha fecharia como se tivesse dado
+              certo. */}
           <Pressable
-            onPress={() => onRegistrar(mostrada)}
-            style={({ pressed }) => [styles.botaoRegistrar, pressed && styles.botaoRegistrarPress]}
+            onPress={() => !nenhum && onRegistrar(linhas)}
+            disabled={nenhum}
+            style={({ pressed }) => [
+              styles.botaoRegistrar,
+              nenhum && styles.botaoRegistrarDesligado,
+              pressed && !nenhum && styles.botaoRegistrarPress,
+            ]}
             accessibilityRole="button"
+            accessibilityState={{ disabled: nenhum }}
           >
-            <Text style={styles.textoRegistrar}>Registrar</Text>
+            <Text style={styles.textoRegistrar}>
+              {nenhum
+                ? 'Nada marcado'
+                : dentro.length === 1
+                  ? 'Registrar'
+                  : `Registrar ${dentro.length} itens`}
+            </Text>
           </Pressable>
         </View>
       </View>
+    </View>
+  )
+}
+
+/* Uma linha da foto: o alimento, quanto dele, e o botão de tirar.
+ *
+ * As frações ficam SEMPRE visíveis, e não escondidas atrás de um toque na
+ * linha. Controle que só aparece depois de descoberto é controle que a maioria
+ * nunca encontra — e aqui ele é justamente o que corrige o erro conhecido da
+ * tecnologia (±28% na porção). */
+function LinhaDaFoto({
+  linha,
+  onFracao,
+  onAlternar,
+}: {
+  linha: LinhaEscolhida
+  onFracao: (fator: number) => void
+  onAlternar: () => void
+}) {
+  const styles = estilos()
+  const t = paleta()
+  const mostrado = comFator(linha.item, linha.fator)
+
+  return (
+    <View style={[styles.itemDaFoto, !linha.dentro && styles.itemDaFotoFora]}>
+      <View style={styles.linhaTopoItem}>
+        <View style={styles.textosDoItem}>
+          <Text style={styles.nomeDoItem} numberOfLines={2}>
+            {mostrado.nome}
+          </Text>
+          {!!mostrado.porcaoEstimada && (
+            <Text style={styles.porcaoDoItem} numberOfLines={1}>
+              {mostrado.porcaoEstimada}
+            </Text>
+          )}
+        </View>
+
+        <Text style={styles.kcalDoItem}>
+          {linha.dentro ? (mostrado.calorias === null ? '—' : `${milhar(mostrado.calorias)} kcal`) : ''}
+        </Text>
+
+        {/* Tirar, e devolver. Um item removido continua na lista, apagado: some-lo
+            faria a pessoa que errou o toque perder o alimento sem ter como
+            voltar, e a foto não pode ser analisada de novo. */}
+        <Pressable
+          onPress={onAlternar}
+          hitSlop={8}
+          style={({ pressed }) => [styles.tirarItem, pressed && styles.chipPressionado]}
+          accessibilityRole="button"
+          accessibilityLabel={linha.dentro ? `Não comi ${linha.item.nome}` : `Devolver ${linha.item.nome}`}
+        >
+          <Ionicons
+            name={linha.dentro ? 'close' : 'add'}
+            size={17}
+            color={linha.dentro ? t.inkFraco : t.cores.verdeEscuro}
+          />
+        </Pressable>
+      </View>
+
+      {linha.dentro ? (
+        /* QUANTO DESTE ITEM ela comeu.
+           Frações, e não um controle deslizante: um deslizante devolve 87%, e
+           87% de um número que já é aproximado é precisão inventada. Ninguém
+           olha um prato e pensa "comi 87%" — pensa "comi metade". */
+        <View style={styles.fracoesDoItem}>
+          {FRACOES_DA_PORCAO.map(f => (
+            <Pressable
+              key={f.fator}
+              onPress={() => onFracao(f.fator)}
+              style={({ pressed }) => [
+                styles.fracaoPequena,
+                linha.fator === f.fator && styles.fracaoAtiva,
+                pressed && styles.chipPressionado,
+              ]}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: linha.fator === f.fator }}
+            >
+              <Text
+                style={[
+                  styles.textoFracaoPequena,
+                  linha.fator === f.fator && styles.textoFracaoAtiva,
+                ]}
+              >
+                {f.rotulo}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.foraDoItem}>Não entra no registro.</Text>
+      )}
     </View>
   )
 }
@@ -1968,6 +2136,61 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.cartao,
   },
   fracaoAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+
+  /* ── A lista da foto ──
+     Um alimento por linha, e não um bloco. A lista rola; o total e os botões
+     ficam parados embaixo, senão um prato de oito itens empurraria o
+     "Registrar" para fora da folha. */
+  listaDaFoto: { marginTop: 12, flexGrow: 0, flexShrink: 1 },
+  listaDaFotoConteudo: { gap: 8, paddingBottom: 2 },
+  itemDaFoto: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  /* Tirado, mas ainda visível: sumir com a linha faria quem errou o toque
+     perder o alimento sem ter como voltar, e a foto não é analisada de novo. */
+  itemDaFotoFora: { backgroundColor: t.cores.fundo, opacity: 0.6 },
+  linhaTopoItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  textosDoItem: { flex: 1 },
+  nomeDoItem: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  porcaoDoItem: { marginTop: 2, fontSize: 11.5, color: t.inkSuave },
+  kcalDoItem: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: t.inkMedio,
+    /* Os números de linhas diferentes alinham pela direita — é o que deixa a
+       coluna legível de relance, que é como ela vai ser lida. */
+    textAlign: 'right',
+    minWidth: 62,
+  },
+  tirarItem: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.superficie,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  fracoesDoItem: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9 },
+  /* Menor que a `fracao` da folha de item único: aqui são quatro por linha,
+     repetidas em até oito linhas. O alvo do dedo continua acima de 40 pontos de
+     altura contando o vão entre as linhas. */
+  fracaoPequena: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.superficie,
+  },
+  textoFracaoPequena: { fontSize: 11.5, fontWeight: '600', color: t.inkMedio },
+  foraDoItem: { marginTop: 7, fontSize: 11.5, color: t.inkFraco },
   textoFracao: { fontSize: 13, fontWeight: '600', color: t.inkMedio },
   textoFracaoAtiva: { color: t.cores.branco, fontWeight: '800' },
   /* O "+" no titulo do grupo: ele e o que diz que dali da para adicionar.
@@ -2227,6 +2450,9 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.verde,
   },
   botaoRegistrarPress: { backgroundColor: t.cores.verdeEscuro },
+  /* Desligado quando ela tirou todos os itens. Cinza, e com o texto dizendo o
+     motivo: um botão verde que não faz nada ao toque se lê como app quebrado. */
+  botaoRegistrarDesligado: { backgroundColor: t.cores.trilho },
   textoRegistrar: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
 
   listaPlano: { marginTop: 12 },
