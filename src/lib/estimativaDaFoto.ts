@@ -56,11 +56,20 @@ export type Estimativa = {
  * oito números errados em vez de um. */
 export const MAXIMO_DE_ITENS = 8
 
+/* O teto do que é número, e não do que é comida.
+ *
+ * Não é regra de nutrição: é o corte entre "valor" e "lixo". Um item de prato
+ * com cem mil calorias não é um prato grande, é a resposta corrompida — e sem
+ * teto ela atravessa a soma, o `comFator` e a tela sem ninguém reparar.
+ *
+ * Longe o bastante de qualquer alimento real para não recusar nada legítimo. */
+const TETO = 100_000
+
 const numero = (v: unknown): number | null => {
   const n = typeof v === 'string' ? Number(v) : v
   /* Negativo é dado torto, e não "menos alimento": somar um negativo derruba o
      total do prato abaixo do que ele tem. Vira desconhecido, como o nulo. */
-  return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= TETO ? n : null
 }
 
 const texto = (v: unknown, limite: number): string =>
@@ -174,7 +183,21 @@ export const FRACOES_DA_PORCAO = [
 export function comFator(item: ItemDaFoto, fator: number): ItemDaFoto {
   if (!Number.isFinite(fator) || fator <= 0 || fator === 1) return item
 
-  const x = (v: number | null) => (v === null ? null : Math.round(v * fator))
+  /* Confere o RESULTADO, e não só a entrada.
+   *
+   * Duas entradas válidas produzem lixo: um número grande vezes um fator grande
+   * estoura para Infinity, e `Math.round(Infinity)` continua Infinity — que
+   * atravessa a soma e chega à tela como "Infinity kcal". Validar só o que
+   * entra deixa isso passar, porque nada do que entrou era inválido.
+   *
+   * A lição é do fuzz da app-cygnos-6b, que achou o mesmo padrão do outro lado:
+   * `MAX_SAFE_INTEGER` é finito, passa por `Number.isFinite`, e mesmo assim
+   * produz `Invalid Date` — e o botão da notificação derrubava o app. */
+  const x = (v: number | null) => {
+    if (v === null) return null
+    const r = Math.round(v * fator)
+    return Number.isFinite(r) ? r : null
+  }
   const nome = FRACOES_DA_PORCAO.find(f => f.fator === fator)?.rotulo
 
   return {
@@ -214,7 +237,11 @@ function somar(itens: ItemDaFoto[], campo: Campo): number | null {
     total += v
     houve = true
   }
-  return houve ? Math.round(total) : null
+  if (!houve) return null
+  /* O mesmo cuidado na soma: oito itens no teto ainda cabem num double, mas
+     quem soma sem olhar o resultado é quem descobre o contrário na tela. */
+  const r = Math.round(total)
+  return Number.isFinite(r) ? r : null
 }
 
 export const totaisDaFoto = (itens: ItemDaFoto[]): TotaisDaFoto => ({
@@ -262,10 +289,34 @@ export const escolhidos = (linhas: LinhaEscolhida[]): ItemDaFoto[] =>
  * seria puxada para o meio por quem nunca olhou. */
 export type ItemConferido = { item: ItemDaFoto; fatorCorrecao: number | null }
 
+/* A faixa que a COLUNA aceita: `check (fator_correcao between 0.1 and 5)`.
+ *
+ * Repetida aqui porque o que acontece fora dela não é um dado torto gravado em
+ * silêncio — é o INSERT inteiro recusado. E o insert é o da refeição: a pessoa
+ * perderia o registro do almoço por causa de um número que só serve para
+ * calibrar a próxima foto.
+ *
+ * Item 11, na sua versão de dado: o acessório não pode derrubar o essencial.
+ * Fora da faixa, a correção vira nula e o alimento entra.
+ *
+ * Achado pela sonda, e não por caso de mesa: hoje o fator só vem da escada fixa
+ * de quatro degraus, então nada disso acontece. Mas `LinhaEscolhida.fator` é um
+ * número comum num tipo exportado, e a primeira tela que oferecer outra coisa
+ * — um campo digitado, um deslizante — descobriria isso perdendo refeição de
+ * gente. */
+const CORRECAO_MINIMA = 0.1
+const CORRECAO_MAXIMA = 5
+
 export const paraGravar = (linhas: LinhaEscolhida[]): ItemConferido[] =>
   linhas
     .filter(l => l.dentro)
     .map(l => ({
       item: comFator(l.item, l.fator),
-      fatorCorrecao: l.fator !== 1 ? l.fator : null,
+      fatorCorrecao:
+        Number.isFinite(l.fator) &&
+        l.fator !== 1 &&
+        l.fator >= CORRECAO_MINIMA &&
+        l.fator <= CORRECAO_MAXIMA
+          ? l.fator
+          : null,
     }))

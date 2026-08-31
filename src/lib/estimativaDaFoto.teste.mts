@@ -255,6 +255,58 @@ console.log('\nO total do prato')
 console.log('\nA escolha, e o que vai para o diario')
 
 {
+  /* `totaisDaFoto` e exportada e recebe `ItemDaFoto[]` -- ela nao pode supor
+     que quem chama ja passou pela validacao da resposta. Hoje a tela passa,
+     mas uma tela que monte o item a mao (valores digitados, por exemplo) nao
+     passaria, e um Infinity aqui chegaria a tela como "Infinity kcal".
+
+     Este caso existe para a guarda do RESULTADO nao virar codigo morto: sem
+     ele, ninguem consegue dizer se ela esta viva. */
+  const forjado = { ...item('Forjado', Number.MAX_VALUE), proteinas: Number.MAX_VALUE }
+  const t = totaisDaFoto([forjado, item('Outro', Number.MAX_VALUE)])
+  ok('soma que estoura vira desconhecido, e nao Infinity', t.calorias === null)
+  ok('e nao escapa como Infinity', t.calorias !== Infinity)
+}
+
+{
+  /* A coluna tem `check (fator_correcao between 0.1 and 5)`. Fora da faixa nao
+     e dado torto gravado calado: e o INSERT recusado -- e o insert e o da
+     refeicao. A pessoa perderia o almoco por causa de um numero que so serve
+     para calibrar a proxima foto. */
+  const fora: LinhaEscolhida[] = [
+    { item: item('A', 100), fator: 9, dentro: true },
+    { item: item('B', 100), fator: 0.01, dentro: true },
+    { item: item('C', 100), fator: Infinity, dentro: true },
+    { item: item('D', 100), fator: NaN, dentro: true },
+  ]
+  const g = paraGravar(fora)
+  ok('fator alto demais nao vira correcao', g[0].fatorCorrecao === null)
+  ok('fator baixo demais tambem nao', g[1].fatorCorrecao === null)
+  ok('Infinity tambem nao', g[2].fatorCorrecao === null)
+  ok('NaN tambem nao', g[3].fatorCorrecao === null)
+  ok('e o alimento entra do mesmo jeito', g.length === 4)
+}
+
+{
+  /* As bordas da faixa ENTRAM: o `check` do banco e inclusivo, e recusar aqui
+     o que o banco aceita jogaria fora correcao boa. */
+  const borda: LinhaEscolhida[] = [
+    { item: item('A', 100), fator: 0.1, dentro: true },
+    { item: item('B', 100), fator: 5, dentro: true },
+  ]
+  const g = paraGravar(borda)
+  ok('a borda de baixo entra', g[0].fatorCorrecao === 0.1)
+  ok('a borda de cima entra', g[1].fatorCorrecao === 5)
+}
+
+{
+  /* Um numero grande vezes um fator grande estoura, e as DUAS entradas eram
+     validas -- e o motivo de conferir o resultado, e nao so a entrada. */
+  const grande = comFator(item('Grande', Number.MAX_VALUE), 2)
+  ok('reescalar o que estouraria vira desconhecido', grande.calorias === null)
+}
+
+{
   const linhas = linhasIniciais(est([item('Arroz'), item('Feijao')]))
   ok('todos comecam marcados', linhas.every(l => l.dentro))
   ok('e inteiros', linhas.every(l => l.fator === 1))

@@ -243,6 +243,10 @@ export type Sessao = {
      escalas diferentes no mesmo app seriam duas chances de ler errado. */
   esforco: number | null
   observacao: string | null
+  /* A foto do treino, quando ela tirou uma. CAMINHO no bucket privado, e nao
+     endereco: endereco assinado vence em uma hora, e guardar um na linha faria
+     a foto quebrar depois do almoco (item 7 do AGENTS.md). */
+  fotoPath: string | null
 }
 
 export type ResultadoSessoes =
@@ -257,6 +261,7 @@ type LinhaSessao = {
   duracao_min: number | null
   esforco: number | null
   observacao: string | null
+  foto_path?: string | null
 }
 
 const daSessao = (l: LinhaSessao): Sessao => ({
@@ -267,9 +272,11 @@ const daSessao = (l: LinhaSessao): Sessao => ({
   duracaoMin: numero(l.duracao_min),
   esforco: numero(l.esforco),
   observacao: l.observacao,
+  fotoPath: l.foto_path ?? null,
 })
 
-const COLUNAS_SESSAO = 'id, data, dia, titulo, duracao_min, esforco, observacao'
+const COLUNAS_SESSAO =
+  'id, data, dia, titulo, duracao_min, esforco, observacao, foto_path'
 
 /* As últimas sessões, da mais recente para a mais antiga. */
 export async function carregarSessoes(
@@ -340,11 +347,14 @@ export async function registrarSessao(
  * ela já está gravada. */
 export async function refinarSessao(
   id: string,
-  campos: { duracaoMin?: number | null; esforco?: number | null },
+  campos: { duracaoMin?: number | null; esforco?: number | null; fotoPath?: string | null },
 ): Promise<{ tipo: 'ok'; sessao: Sessao } | { tipo: 'erro'; mensagem: string }> {
-  const mudanca: Record<string, number | null> = {}
+  const mudanca: Record<string, number | string | null> = {}
   if ('duracaoMin' in campos) mudanca.duracao_min = campos.duracaoMin ?? null
   if ('esforco' in campos) mudanca.esforco = campos.esforco ?? null
+  /* CAMINHO, e não endereço: endereço assinado vence em uma hora, e guardar um
+     na linha faria a foto quebrar depois do almoço (item 7). */
+  if ('fotoPath' in campos) mudanca.foto_path = campos.fotoPath ?? null
 
   const { data, error } = await supabase
     .from('app_treino_sessoes')

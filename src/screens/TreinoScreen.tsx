@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -21,6 +22,12 @@ import { carregarCalculoAtivo } from '../lib/energia'
 import { carregarNoites, tempoDormindo } from '../lib/sono'
 import { prontidaoDeHoje, SEM_PRONTIDAO, type Prontidao } from '../lib/prontidaoDeHoje'
 import { carregarPeso } from '../lib/peso'
+import {
+  apagarFotoDoDiario,
+  enderecoDaFoto,
+  escolherFoto,
+  guardarFotoDoDiario,
+} from '../lib/fotoDoDiario'
 import {
   NOME_DO_ESFORCO,
   adicionarExercicio,
@@ -508,6 +515,150 @@ export function TreinoScreen({
   )
 }
 
+/* A foto do treino: tirar, ver, trocar, tirar de novo.
+ *
+ * ── Por que o endereço é estado, e não conta no render ────────────────────
+ * O bucket é privado. `getPublicUrl` devolveria um endereço com cara de válido
+ * que o servidor recusa, e SEM ERRO NENHUM do lado do app — item 7, e ele já
+ * custou meses de foto de perfil quebrada. Assinar é `async`, então o endereço
+ * vira estado, refeito quando o caminho muda.
+ *
+ * ── E o endereço vence ────────────────────────────────────────────────────
+ * Uma hora. Por isso o `onError` guarda QUAL endereço falhou, e não um
+ * booleano: um endereço novo entra tentando de novo. Sem ele, a imagem que
+ * falha não desenha nada e sobra um buraco do tamanho dela, que se lê como app
+ * quebrado — pior do que nunca ter tido foto. */
+function FotoDoTreino({
+  contaId,
+  caminho,
+  onMudou,
+  onErro,
+}: {
+  contaId: string
+  caminho: string | null
+  onMudou: (caminho: string | null) => void
+  onErro: (m: string) => void
+}) {
+  const styles = estilos()
+  const [endereco, setEndereco] = useState<string | null>(null)
+  const [falhou, setFalhou] = useState<string | null>(null)
+  const [subindo, setSubindo] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    if (!caminho) {
+      setEndereco(null)
+      return
+    }
+    void enderecoDaFoto(caminho).then(u => {
+      if (vivo) setEndereco(u)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [caminho])
+
+  async function tirar(origem: 'camera' | 'galeria') {
+    const escolha = await escolherFoto(origem)
+    /* 'cancelado' não é erro: ela desistiu, e a tela fica como estava. */
+    if (escolha.tipo === 'cancelado') return
+    if (escolha.tipo === 'erro') {
+      onErro(escolha.mensagem)
+      return
+    }
+
+    setSubindo(true)
+    const novo = await guardarFotoDoDiario(contaId, escolha.base64)
+    setSubindo(false)
+
+    if (!novo) {
+      onErro('Não consegui guardar a foto agora. O treino continua registrado.')
+      return
+    }
+
+    /* A anterior sai do bucket. Foto órfã ocupa espaço para sempre e ninguém
+       vai procurá-la depois — e a linha só guarda um caminho. */
+    if (caminho) void apagarFotoDoDiario(caminho)
+    setFalhou(null)
+    onMudou(novo)
+  }
+
+  function remover() {
+    const antigo = caminho
+    onMudou(null)
+    if (antigo) void apagarFotoDoDiario(antigo)
+  }
+
+  return (
+    <>
+      <Text style={styles.rotulo}>Foto do treino (opcional)</Text>
+
+      {caminho && endereco && endereco !== falhou ? (
+        <View style={styles.fotoDoTreino}>
+          <Image
+            source={{ uri: endereco }}
+            style={styles.imagemDoTreino}
+            onError={() => setFalhou(endereco)}
+            accessibilityLabel="Foto do seu treino de hoje"
+          />
+          <View style={styles.acoesDaFoto}>
+            <Pressable
+              onPress={() => tirar('camera')}
+              disabled={subindo}
+              style={({ pressed }) => [styles.chip, pressed && styles.pressionado]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.textoChip}>Trocar</Text>
+            </Pressable>
+            <Pressable
+              onPress={remover}
+              disabled={subindo}
+              style={({ pressed }) => [styles.chip, pressed && styles.pressionado]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.textoChip}>Tirar a foto</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.chips}>
+          {/* Duas portas, e as duas ditas. A galeria importa: quem fotografou a
+              ficha da academia ontem já tem a imagem no aparelho, e obrigá-la a
+              fotografar de novo é pedir para ela desistir. */}
+          <Pressable
+            onPress={() => tirar('camera')}
+            disabled={subindo}
+            style={({ pressed }) => [styles.chip, pressed && styles.pressionado]}
+            accessibilityRole="button"
+          >
+            {subindo ? (
+              <ActivityIndicator size="small" color={paleta().inkMedio} />
+            ) : (
+              <Text style={styles.textoChip}>Tirar foto</Text>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => tirar('galeria')}
+            disabled={subindo}
+            style={({ pressed }) => [styles.chip, pressed && styles.pressionado]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.textoChip}>Escolher da galeria</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Só quando ela JÁ tem foto: dizer para que serve antes de existir uma
+          seria explicar um recurso que ninguém pediu. */}
+      {caminho && (
+        <Text style={styles.ajuda}>
+          Sua nutricionista consegue ver esta foto junto com o treino.
+        </Text>
+      )}
+    </>
+  )
+}
+
 /* ── Registrar o treino de hoje ────────────────────────────────────────────*/
 
 /* Durações que cobrem quase tudo. Números redondos porque ninguém cronometra o
@@ -575,7 +726,11 @@ function RegistrarTreino({
     setTitulo('')
   }
 
-  async function refinar(campos: { duracaoMin?: number | null; esforco?: number | null }) {
+  async function refinar(campos: {
+    duracaoMin?: number | null
+    esforco?: number | null
+    fotoPath?: string | null
+  }) {
     if (!sessaoDeHoje) return
     /* Pinta na hora e conserta se falhar. Esperar a rede para acender um chip
        de "45 min" faz o toque parecer que não funcionou. */
@@ -649,6 +804,18 @@ function RegistrarTreino({
         {sessaoDeHoje.esforco !== null && (
           <Text style={styles.legendaEsforco}>{nomeDoEsforco(sessaoDeHoje.esforco)}</Text>
         )}
+
+        {/* A FOTO do treino.
+            A coluna existia no banco e nada escrevia nela. E ela é uma das
+            duas coisas que a nutricionista pediria para ver — a outra é o
+            prato. Fica aqui, entre os opcionais, e não antes do botão: quem
+            só quer marcar presença não passa por nada disto. */}
+        <FotoDoTreino
+          contaId={contaId}
+          caminho={sessaoDeHoje.fotoPath}
+          onMudou={fotoPath => refinar({ fotoPath })}
+          onErro={onErro}
+        />
       </View>
     )
   }
@@ -1271,6 +1438,14 @@ const estilos = estilosDe(t =>
   chipAtivo: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
   textoChip: { fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
   textoChipAtivo: { color: t.cores.sobreLimao },
+  fotoDoTreino: { marginTop: 8, gap: 8 },
+  imagemDoTreino: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    backgroundColor: t.cores.superficie,
+  },
+  acoesDaFoto: { flexDirection: 'row', gap: 7 },
   legendaEsforco: { fontSize: 12, color: t.inkSuave },
 
   botao: {

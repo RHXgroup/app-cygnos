@@ -1,3 +1,5 @@
+import * as ImagePicker from 'expo-image-picker'
+import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
 import { decode } from 'base64-arraybuffer'
 import { falha } from './erros'
 import { supabase } from './supabase'
@@ -50,6 +52,76 @@ const VALIDADE_SEGUNDOS = 3600
    milissegundo, e o caminho já é único por conta. */
 const nomeUnico = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.jpg`
+
+/* ── Escolher a foto, sem IA no meio ───────────────────────────────────────
+ *
+ * `analisarFoto` de `consumo.ts` também abre a câmera, mas ela existe para
+ * mandar a imagem à IA e voltar com nutrientes. A foto do TREINO não é
+ * analisada: ela é o registro visual que a nutricionista vai olhar.
+ *
+ * Separado, e não um parâmetro `analisar: boolean` na outra: uma função com um
+ * booleano que muda metade do que ela faz é duas funções fingindo ser uma. E
+ * repetir a escolha da imagem em cada tela é como as duas divergem no dia em
+ * que alguém mexer no tamanho ou na compressão. */
+export type FotoEscolhida =
+  | { tipo: 'ok'; base64: string }
+  | { tipo: 'cancelado' }
+  | { tipo: 'erro'; mensagem: string }
+
+/* 1024 no lado maior, os mesmos do prato. Aqui ninguém precisa distinguir arroz
+   de quinoa, mas a ficha da academia é letra pequena fotografada de longe — e
+   é justamente ela que não pode sair ilegível. */
+const LADO_MAIOR = 1024
+
+export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEscolhida> {
+  const { granted } =
+    origem === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+  if (!granted)
+    return {
+      tipo: 'erro',
+      mensagem:
+        origem === 'camera'
+          ? 'Preciso de acesso à câmera. Você pode liberar nos ajustes do aparelho.'
+          : 'Preciso de acesso às suas fotos. Você pode liberar nos ajustes do aparelho.',
+    }
+
+  const escolha =
+    origem === 'camera'
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1,
+          /* Tela cheia, e não o padrão: apresentação em folha por cima de outra
+             apresentação é o que fazia a promise da câmera nunca resolver. */
+          presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1,
+          presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
+        })
+
+  if (escolha.canceled || !escolha.assets?.[0]) return { tipo: 'cancelado' }
+
+  try {
+    /* Só a largura: passar as duas dimensões esticaria uma foto retangular para
+       um quadrado. */
+    const reduzida = await manipulateAsync(
+      escolha.assets[0].uri,
+      [{ resize: { width: LADO_MAIOR } }],
+      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+    )
+    if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
+    return { tipo: 'ok', base64: reduzida.base64 }
+  } catch (e) {
+    falha('Não consegui preparar a foto.', e)
+    return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente outra.' }
+  }
+}
 
 /* Sobe a foto e devolve o caminho, ou null se falhar.
  *
