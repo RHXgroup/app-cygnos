@@ -28,8 +28,26 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+/* ── O que a varredura enxerga, e por que é o projeto INTEIRO ─────────────
+ *
+ * Esta ferramenta já errou três vezes, sempre no mesmo sentido: conferir de
+ * menos e parecer que conferiu. A segunda vez foi porque ela varria só `src/` e
+ * o `App.tsx` mora na RAIZ — e é ele que registra o ouvinte do botão de água e
+ * o do tema, então os dois saíram como órfãos.
+ *
+ * O remendo de então foi somar a raiz à mão. Isso conserta o caso e deixa a
+ * FORMA de pé: no dia em que alguém criar uma pasta de código nova, ela nasce
+ * invisível aqui, e o efeito é o mesmo — órfão falso, ou pior, um de verdade
+ * escondido.
+ *
+ * Por isso a lista sai do projeto todo, e o que fica de fora é enumerado. Pasta
+ * nova entra sozinha; pasta que não é código sai por nome, e o nome está aqui à
+ * vista para quem precisar acrescentar. */
+const FORA = new Set(['node_modules', '.git', '.expo', 'dist', 'build', 'android', 'ios', 'assets'])
+
 function varrer(dir, saco = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (FORA.has(e.name)) continue
     const p = path.join(dir, e.name)
     if (e.isDirectory()) varrer(p, saco)
     else if (/\.tsx?$/.test(e.name) && !/\.teste\./.test(e.name)) saco.push(p)
@@ -37,19 +55,7 @@ function varrer(dir, saco = []) {
   return saco
 }
 
-/* A raiz entra junto, e não é detalhe: `App.tsx` mora fora do `src/` e é o
-   maior consumidor de lib do projeto — é ele que registra o ouvinte do botão de
-   água, o do tema, e monta as quatro abas.
- *
- * A primeira versão varria só `src/` e por isso acusou `ouvirBotaoDeAgua` e
- * `escutarTema` de órfãos. Foi o SEGUNDO defeito seguido nesta ferramenta, os
- * dois no mesmo sentido: conferir de menos e parecer que conferiu. */
-const naRaiz = fs
-  .readdirSync('.', { withFileTypes: true })
-  .filter(e => e.isFile() && /\.tsx?$/.test(e.name) && !/\.teste\./.test(e.name))
-  .map(e => e.name)
-
-const arquivos = [...varrer('src'), ...naRaiz]
+const arquivos = varrer('.').map(f => f.replace(/^\.[\\/]/, ''))
 const fonte = new Map(arquivos.map(f => [f, fs.readFileSync(f, 'utf8')]))
 
 /* ── O CAMINHO do import não é uso ────────────────────────────────────────
