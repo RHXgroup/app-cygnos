@@ -222,5 +222,28 @@ console.log('\n5. a distancia entre a balanca e a linha')
   ok('a frase da balanca alta nao culpa', suja === undefined, suja ?? '')
 }
 
+{
+  /* O TETO, e ele apareceu rodando contra dado de producao de verdade.
+     A frase explica a distancia dizendo que e agua e sal -- verdade ate uns
+     tres quilos. Com 16 kg de diferenca, dizer "e normal" e mentira, e ensina
+     a pessoa a ignorar a propria balanca. */
+  const longe = tendenciaDoPeso([
+    ...Array.from({ length: 10 }, (_, i) => ({ data: dia(i + 1), kg: 70 })),
+    { data: dia(11), kg: 86 },
+  ])
+  const f = fraseDaDistancia(resumoDaTendencia(longe))!
+  ok('acima de 3 kg a frase muda', !f.includes('agua') && !f.includes('\u00e1gua'), f)
+  ok('e manda conferir o numero', f.toLowerCase().includes('conferir'), f)
+  ok('sem dizer que e normal', !f.toLowerCase().includes('normal'), f)
+
+  /* Ate 3 kg continua explicando. */
+  const dentro = tendenciaDoPeso([
+    ...Array.from({ length: 10 }, (_, i) => ({ data: dia(i + 1), kg: 70 })),
+    { data: dia(11), kg: 72 },
+  ])
+  const g = fraseDaDistancia(resumoDaTendencia(dentro))!
+  ok('ate 3 kg continua explicando que e agua', g.includes('\u00e1gua'), g)
+}
+
 console.log(`\n${passaram} passaram, ${falharam} falharam`)
 if (falharam > 0) process.exit(1)

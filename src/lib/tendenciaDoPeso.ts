@@ -145,6 +145,14 @@ export type ResumoDaTendencia = {
   distanciaDeHoje: number | null
 }
 
+/* Até que distância a explicação "é água e sal" continua sendo verdade.
+ *
+ * Três quilos. É o limite do que um corpo oscila em um dia — água, sal,
+ * intestino, ciclo. Acima disso a causa provável é outra: digitação errada,
+ * outra balança, outra pessoa. E o app não pode dizer "é normal" sobre um
+ * número que não é, porque isso ensina a ignorar a própria balança. */
+const DISTANCIA_EXPLICAVEL_KG = 3
+
 /* Mínimo de dias para a variação valer alguma coisa.
  *
  * Dez. Abaixo disso a linha ainda está se acomodando na primeira pesagem, e
@@ -190,6 +198,22 @@ export function fraseDaDistancia(r: ResumoDaTendencia | null): string | null {
   /* Meio quilo. Abaixo disso é a variação de uma ida ao banheiro, e ninguém se
      assusta com 300 g. */
   if (Math.abs(d) < 0.5) return null
+
+  /* E um TETO, que faltava e apareceu rodando contra dado de verdade.
+   *
+   * A frase explica a distância dizendo que é água, sal e intestino. Isso é
+   * verdade até uns três quilos — que é o limite do que o corpo oscila em um
+   * dia. Acima disso a explicação passa a ser FALSA: 16 kg de diferença não é
+   * retenção de líquido, é digitação errada, outra balança, ou outra pessoa.
+   *
+   * Dizer "é normal" para um número que não é normal é pior do que ficar
+   * calado, porque ensina a pessoa a ignorar a própria balança. */
+  if (Math.abs(d) > DISTANCIA_EXPLICAVEL_KG) {
+    return (
+      `A balança marcou ${Math.abs(d).toFixed(1).replace('.', ',')} kg de diferença da sua ` +
+      'tendência hoje. Isso é muito para um dia — vale conferir se o número foi digitado certo.'
+    )
+  }
 
   const kg = Math.abs(d).toFixed(1).replace('.', ',')
   return d > 0

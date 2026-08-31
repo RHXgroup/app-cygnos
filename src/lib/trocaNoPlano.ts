@@ -62,11 +62,23 @@ export type Totais = {
 }
 
 /* Nutriente por 100 g aplicado à porção. Nulo continua nulo: item 6 do
-   AGENTS.md — zero no lugar do desconhecido soma como se fosse verdade. */
-const porPorcao = (por100g: number | null, gramas: number | null): number | null =>
-  por100g === null || gramas === null || !Number.isFinite(por100g) || !Number.isFinite(gramas)
-    ? null
-    : (por100g * gramas) / 100
+   AGENTS.md — zero no lugar do desconhecido soma como se fosse verdade.
+ *
+ * NEGATIVO TAMBÉM É NULO, e isto veio de sonda: a versão anterior só recusava
+ * não-finito, e um nutriente negativo passava e era SOMADO — o total da folha
+ * podia sair menor que zero. "−120 kcal" numa tela de comida é o tipo de coisa
+ * que ninguém testa e todo mundo vê.
+ *
+ * Caloria negativa não existe. Se ela chegar, o dado está torto, e dado torto é
+ * desconhecido — não é um número para entrar na conta. */
+const valorUtil = (v: number | null): number | null =>
+  v === null || !Number.isFinite(v) || v < 0 ? null : v
+
+const porPorcao = (por100g: number | null, gramas: number | null): number | null => {
+  const p = valorUtil(por100g)
+  const g = valorUtil(gramas)
+  return p === null || g === null ? null : (p * g) / 100
+}
 
 /* A opção escolhida de cada item, com trava de índice.
  *

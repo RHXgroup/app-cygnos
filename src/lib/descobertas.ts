@@ -233,9 +233,18 @@ function proteinaNoDeficit(
   pesos: DiaDePeso[],
   dias: DiaDeCalorias[],
 ): Descoberta | null {
+  /* Peso de GENTE, e nao so "um numero".
+   *
+   * Isto veio de sonda: o filtro aceitava zero e negativo, e a divisao por
+   * `ultimo` produzia "-Infinity g por quilo" na frase -- que chegaria a tela
+   * de alguem. Os outros dois cruzamentos ja exigiam > 0; este nao.
+   *
+   * A faixa e a mesma de `tendenciaDoPeso`: 20 a 400 kg. Duas faixas
+   * diferentes para a mesma grandeza fariam um peso entrar numa conta e sair
+   * da outra, sem ninguem entender por que. */
   const comPeso = pesos
     .map(p => ({ data: p.data, kg: numero(p.kg) }))
-    .filter((p): p is { data: string; kg: number } => p.kg !== null)
+    .filter((p): p is { data: string; kg: number } => p.kg !== null && p.kg >= 20 && p.kg <= 400)
     .sort((a, b) => a.data.localeCompare(b.data))
   if (comPeso.length < MINIMO_POR_GRUPO) return null
 
