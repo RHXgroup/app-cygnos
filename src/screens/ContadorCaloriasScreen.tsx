@@ -47,6 +47,7 @@ import {
 import { enviarPendentes, guardarPendentes, quantosPendentes } from '../lib/pendentes'
 import { METAS_VAZIAS, carregarMetas, type Metas } from '../lib/metas'
 import { carregarPlanoAtivo, type PlanoCompleto, type RefeicaoSalva } from '../lib/plano'
+import { refeicaoDoPlano } from '../lib/refeicaoDoPlano'
 import { porcao } from '../lib/alimentos'
 import type { AlimentoEscolhido, Nutrientes } from '../lib/plano'
 import { horaCurta, milhar } from '../lib/formatar'
@@ -461,8 +462,14 @@ export function ContadorCaloriasScreen({
      * Sinal mais forte que o habito: o habito diz o que ela repetiu, o plano
      * diz o que a nutricionista montou. As travas contra a ancoragem sao as
      * mesmas, e moram na funcao do servidor. */
-    const doPlano =
-      plano?.refeicoes.find(r => r.rotulo === refeicao)?.itens.map(i => i.nome) ?? []
+    /* Comparacao NORMALIZADA, e nao `rotulo === refeicao`.
+     *
+     * Os dois lados vem de lugares diferentes: `refeicao` sai da lista fechada
+     * de seis que a tela oferece, e `rotulo` e texto livre que a nutricionista
+     * escreveu no sistema dela. "Almoco " com espaco, "almoco" em minuscula,
+     * "Almoco 12h" -- nenhum casava, e falhava CALADO: a foto continuava
+     * funcionando, so que sem o sinal mais forte que o app tinha. */
+    const doPlano = refeicaoDoPlano(plano?.refeicoes, refeicao)?.itens.map(i => i.nome) ?? []
 
     /* E para que lado ela costuma corrigir.
      *

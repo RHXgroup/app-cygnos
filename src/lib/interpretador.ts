@@ -15,6 +15,8 @@
  * é a base de alimentos. Um interpretador que chuta o alimento erra calado, e
  * um erro calado num diário alimentar vira número errado que ninguém questiona. */
 
+import { semAcento } from './texto.ts'
+
 export type ItemLido = {
   /* O texto original deste pedaço, para a tela poder mostrar o que foi entendido
      de onde. */
@@ -90,8 +92,9 @@ const NUMEROS_ESCRITOS: Record<string, number> = Object.assign(Object.create(nul
   meia: 0.5,
 })
 
-const semAcento = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+/* Uma cópia só, em `texto.ts`. Esta e a de `pesoDoItem` já tinham divergido —
+   uma aparava os espaços das pontas, a outra não — que é a previsão exata do
+   item 5 do AGENTS.md. */
 
 /* Onde uma linha termina e outra começa. Vírgula, ponto e vírgula, quebra de
    linha e " e " separam itens; o " e " precisa dos espaços para não partir

@@ -42,6 +42,8 @@
  * ── Só `import type` ──────────────────────────────────────────────────────
  * Roda fora do aparelho, e é exercitado com os casos que quebraram. */
 
+import { semAcento } from './texto.ts'
+
 /* De onde o número veio, do mais confiável para o menos. A tela usa para
    escolher a frase, e a diferença importa: 200 g digitados por ela e 150 g
    supostos de uma porção não merecem a mesma cara. */
@@ -88,8 +90,7 @@ const ESCRITOS: Record<string, number> = Object.assign(Object.create(null), {
   meia: 0.5, meio: 0.5,
 })
 
-const semAcento = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+/* Uma cópia só, em `texto.ts` — ver o comentário de lá. */
 
 /* O radical de uma palavra, para "colheres" e "colher" se encontrarem.
  *
