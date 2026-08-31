@@ -446,3 +446,45 @@ o espaço antes do `&&` no valor, e o Expo cai para `localhost`.
 Ao diagnosticar o endereço, peça o manifest **pelo IP da rede**, não por
 `127.0.0.1`: a URL do bundle espelha o cabeçalho `Host` da requisição, então
 consultar por localhost devolve localhost — e isso não é bug.
+
+### Quando o QR sai com `127.0.0.1` e o celular não conecta
+
+`--lan` **não garante** o IP da rede. O Expo descobre qual placa usar
+procurando o **gateway IPv4**; nesta máquina o roteador entrega gateway só em
+IPv6 (`fe80::…`), a busca falha e ele cai para `localhost` — de forma
+intermitente, o que é pior, porque às vezes funciona e a pessoa acha que
+consertou. `127.0.0.1` no aparelho é o próprio aparelho, e não há o que
+conectar.
+
+Não adianta trocar de flag. Diga o IP na mão, em **duas linhas separadas**:
+
+```bat
+set "REACT_NATIVE_PACKAGER_HOSTNAME=192.168.15.51"
+npx expo start --lan
+```
+
+As aspas não são enfeite: são elas que impedem o espaço de entrar no valor,
+que é a armadilha do parágrafo acima.
+
+E a saída de emergência, que não depende de descoberta nenhuma: no Expo Go,
+"Enter URL manually" e digitar `exp://<IP>:8081`. Se o aparelho já falou com o
+servidor alguma vez, a rede está boa e só o endereço do QR está errado.
+
+**`--offline` não serve para isso.** Ele recusa `--lan` na mesma linha
+("Specify at most one of"), e sozinho **força localhost** — é o contrário do
+que se quer. Custou uma rodada aqui.
+
+### Depois de mexer em muitos arquivos de uma vez
+
+Trocar um import em dezenas de arquivos invalida o cache do Metro inteiro, e o
+primeiro empacotamento seguinte leva perto de um minuto (1052 módulos, ~9 MB no
+modo de desenvolvimento). Isso é normal e acontece **uma vez**: o pedido
+seguinte do mesmo pacote volta em menos de meio segundo.
+
+Duas coisas que fazem parecer travamento e são autoinfligidas:
+
+- **Não peça o bundle em paralelo** (`curl` no `/index.ts.bundle`) enquanto
+  alguém espera o aparelho carregar. É um segundo empacotamento completo
+  disputando a mesma CPU, e dobra a espera que você está tentando diagnosticar.
+- **Apague o `dist/`** depois de rodar `expo export`. São ~5 MB de cópia do app
+  dentro da pasta que o Metro observa.
