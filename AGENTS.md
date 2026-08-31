@@ -432,6 +432,20 @@ select encode(convert_to(pg_get_functiondef(oid), 'UTF8'), 'base64')
 e decodificar do outro lado. Vale sempre que for LER corpo de função para
 reescrever — que é justamente quando o dano se torna permanente.
 
+**Para procurar dano já feito**, o sinal é `Ã` seguido de minúscula:
+
+```bash
+grep -rlP "Ã[a-zç]" --include=*.ts --include=*.tsx --include=*.sql .
+```
+
+`Ã` sozinho não serve como sinal: ele aparece legitimamente em "NÃO" maiúsculo.
+E o que sobra ainda tem falso positivo — uma classe de caracteres de regex
+listando acentos (`[a-zA-ZçáéíóúâêôãõÁÉÍÓÚÂÊÔÃÕÇ]`) casa e está correta. Olhe a
+linha antes de consertar.
+
+Rodado nos dois repositórios em 31/08/2026: **nenhum dano**, só aquele falso
+positivo em `lib/interpretador.ts`.
+
 ## 16. Antes de dar por pronto
 
 - `npx tsc --noEmit` — o principal, e por muito tempo o único.
