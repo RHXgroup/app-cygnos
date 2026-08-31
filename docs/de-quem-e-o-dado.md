@@ -57,6 +57,15 @@ o próprio Helton definiu: o plano deveria congelar como *"prescrito por Fulana,
 de 12/03 a 28/08 — encerrado"*, e depois do `delete` não sobra nem o 12/03 nem
 o 28/08.
 
+**E a que existe é DELA, não dele.** O corpo resolve a profissional pela sessão
+(`v_nutri`) e apaga o vínculo de um paciente da carteira — serve para ela
+dispensar alguém. Procurados quatro nomes plausíveis do lado do paciente
+(`app_sair_do_acompanhamento`, `app_encerrar_acompanhamento`,
+`app_desvincular_minha_nutricionista`, `app_remover_meu_vinculo`): **nenhum
+existe**.
+
+Hoje o paciente entra e não sai. Ele relatou isso como falta ao usar o app.
+
 Então o pedido não é uma função nova. É:
 
 - **`fim timestamptz`** em `app_vinculos`, nulo enquanto ativo
@@ -74,6 +83,31 @@ esqueça o `fim is null` volta a mostrar como atual um acompanhamento encerrado.
 existindo e legíveis para ele. O plano congela como "prescrito por Fulana, de
 12/03 a 28/08 — encerrado", fora das metas do dia e fora do cartão da próxima
 refeição.
+
+### 1b. O catálogo some assim que ele vincula
+
+`app_nutricionistas` devolve **todas** quando não há vínculo e **só a dele**
+quando há. O app não escolhe — recebe uma linha só e mostra uma só.
+
+O efeito, no relato de quem usou: *"quando eu escolhi o nutricionista não
+aparece os outros, tinha que aparecer os outros também"*.
+
+E ele tem razão por dois motivos, um de produto e um de mecânica:
+
+- **A vitrine some junto com a escolha.** O catálogo é o que faz o app parecer
+  uma rede de profissionais; depois do vínculo ele vira um app de um contato só.
+  Quem quiser saber quem mais existe precisa desvincular para poder olhar.
+- **Trocar fica impossível na prática.** Mesmo com o desvincular do item 1
+  pronto, ele desvincula ÀS CEGAS: só depois de sair é que a lista volta, e aí
+  ele já está sem ninguém. Escolher antes de sair é o caminho natural, e ele
+  está fechado.
+
+**Pedido:** a função devolve sempre todas as ativas, com a flag `vinculada`
+marcando qual é a dele. A flag já existe e o app já a lê — hoje ela vem
+verdadeira na única linha devolvida.
+
+Não é mudança de regra: continua **um paciente, uma nutricionista ativa**. É a
+diferença entre "não pode ter duas" e "não pode nem ver as outras".
 
 ### 2. O exame passa a pendurar na PESSOA
 
@@ -231,8 +265,11 @@ quer **trocar**, e trocar já estará resolvido.
 
 ## Ordem sugerida
 
-1. **`fim` no vínculo** — `app_desvincular` já existe, mas apaga a linha; sem o
-   fim não há como o plano congelar com as datas do acompanhamento
+1. **`fim` no vínculo, e uma função de desvincular PARA O PACIENTE** — a
+   `app_desvincular` que existe é dela, e apaga a linha. Hoje ele entra e não
+   sai.
+1b. **o catálogo continuar completo depois do vínculo** — pequeno, e é o que
+   torna trocar possível em vez de às cegas
 2. **`conta_id` no exame, e `data_exame` obrigatória** — é a correção de fundo
 3. **análise como registro à parte**
 4. **compartilhamento por item**
