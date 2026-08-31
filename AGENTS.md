@@ -457,6 +457,60 @@ e executa sem sessão".
 - Se mexeu numa das quatro abas, confira as dependências do efeito: elas montam
   uma vez só, e `[]` ali quer dizer "uma vez por sessão do app".
 
+## Gerar o .aab para a Play Store
+
+```bash
+npx eas-cli login          # uma vez; abre o navegador, nao pede senha no terminal
+npx eas-cli build --platform android --profile production
+```
+
+O perfil `production` do `eas.json` ja produz `app-bundle`, o `versionCode` sobe
+sozinho (`autoIncrement`), e a chave de assinatura mora na conta do EAS e bate
+com o certificado de upload do Play. **Nunca responda "sim" a "Generate a new
+Android Keystore?"** — gerar outra faz o Play recusar o arquivo com "assinado
+com a chave errada".
+
+### O EAS resolve o commit na hora de EMPACOTAR, nao na hora da chamada
+
+Isto nao esta escrito na documentacao deles e custou uma conclusao errada aqui.
+Entre `eas build` sair do teclado e o upload comecar passam segundos ou minutos;
+o commit que vai para o build e o HEAD **desse** instante.
+
+Aconteceu nos dois sentidos no mesmo dia: um build disparado esperando o commit
+A saiu com o B, que outra sessao commitou no meio — por sorte, o resultado
+certo. Podia ter sido o contrario.
+
+**Confira o HEAD no instante de disparar, e confira de novo depois** com
+`eas build:list --limit 1`, que mostra o commit que de fato entrou. Para saber
+se um commit especifico esta dentro, pergunte ao grafo em vez de deduzir:
+
+```bash
+git merge-base --is-ancestor <commit> <commit-do-build> && echo dentro
+```
+
+### Antes de disparar
+
+`npx eas-cli env:list production` — as duas variaveis do Supabase precisam
+existir NO EAS. O `.env` local nao sobe (esta no `.gitignore`), e elas sao
+embutidas no pacote em tempo de build: faltando, o `.aab` compila normal e o app
+morre na primeira tela, sem erro de compilacao nenhum.
+
+### O que PARA de acontecer no build, e nao e defeito novo
+
+Tres comportamentos que o Expo Go impoe e que somem no APK. Ja foram
+diagnosticados como bug do app uma vez; se sumirem, esta certo:
+
+- a caixa em ingles pedindo permissao de notificacao (era do Expo Go, que
+  compartilha uma permissao entre projetos);
+- a sessao se perder quando outro app se atualiza (o armazenamento passa a ser
+  do app, e nao do Expo Go);
+- os interruptores de lembrete aparecerem desmarcados, pelo mesmo motivo.
+
+E o contrario tambem vale: **nenhuma tela de teclado deste app rodou em build**,
+so no Expo Go. Conversa e buscar alimento sao as duas primeiras a reabrir no
+primeiro APK — por isso o primeiro envio vai para o teste FECHADO, e nao para
+producao.
+
 ## Como rodar
 
 ```bash
