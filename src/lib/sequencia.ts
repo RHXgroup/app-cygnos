@@ -23,30 +23,43 @@ import { supabase } from './supabase'
    máximo 365 datas de 10 caracteres — menos do que uma foto de perfil. */
 const DIAS_DE_HISTORICO = 400
 
-/* Devolve as datas, ou uma lista VAZIA quando falha.
+/* As datas, `null` quando NÃO DEU PARA LER, e lista vazia quando ela não
+ * registrou nada.
  *
- * Vazio, e não erro, de propósito: item 11 do AGENTS.md. Isto alimenta um
- * pedaço da tela inicial, e uma sequência que não carregou não pode derrubar a
- * tela inteira nem cobri-la com uma mensagem. Sem os dias, o cartão da
- * sequência simplesmente não aparece — que é o comportamento certo para quem
- * ainda não tem sequência nenhuma.
+ * ── Por que os dois casos são separados ───────────────────────────────────
+ * Eram a mesma coisa — falha devolvia vazio —, e passaram a não poder ser.
+ *
+ * Para a SEQUÊNCIA, tanto faz: os dois escondem o cartão, e uma sequência que
+ * não carregou não pode dizer que a pessoa perdeu a dela.
+ *
+ * Para o cartão do PRIMEIRO DIA é o contrário: lista vazia é o motivo de ele
+ * aparecer. Com os dois indistinguíveis, uma falha de rede mostraria "Falta um
+ * número" a quem usa o app há meses — e é o pior momento possível para o app
+ * parecer que esqueceu quem ela é.
+ *
+ * ── E continua sem rejeitar ───────────────────────────────────────────────
+ * Item 11 do AGENTS.md: isto alimenta um pedaço da tela inicial, e não pode
+ * derrubá-la nem cobri-la com uma mensagem. Quem decide o que fazer com a
+ * ausência é a tela.
  *
  * O erro continua indo para o console, porque engolir em silêncio já custou uma
  * sessão inteira de investigação neste projeto. */
-export async function carregarDiasComRegistro(): Promise<string[]> {
+export async function carregarDiasComRegistro(): Promise<string[] | null> {
   const { data, error } = await supabase.rpc('app_dias_com_registro', {
     p_dias: DIAS_DE_HISTORICO,
   })
 
   if (error) {
     falha('Não consegui carregar a sua sequência.', error)
-    return []
+    return null
   }
 
   /* A função devolve `setof date`, que chega como lista de strings ISO. Mas
      `rpc` tipa como `unknown`, e um `as string[]` cru deixaria passar o dia em
      que alguém mudar o retorno para objeto — e aí a sequência contaria
-     "[object Object]" como um dia. */
-  if (!Array.isArray(data)) return []
+     "[object Object]" como um dia.
+
+     Formato inesperado é falha nossa, e não conta vazia: também vira nulo. */
+  if (!Array.isArray(data)) return null
   return data.filter((d): d is string => typeof d === 'string' && d.length === 10)
 }

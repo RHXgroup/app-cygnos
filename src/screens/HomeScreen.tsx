@@ -50,6 +50,9 @@ import {
 import { carregarMeuVinculo, carregarPlanoDaNutri, type MeuVinculo } from '../lib/planoDaNutri'
 import { carregarAvisos, quantosNovos } from '../lib/avisos'
 import { carregarDiasComRegistro } from '../lib/sequencia'
+import { passoInicial } from '../lib/primeirosDias'
+import { metasSugeridas } from '../lib/metasSugeridas'
+import { carregarCorpoDaConta } from '../lib/metas'
 import { carregarRecadoDaNutri, type RecadoDaNutri } from '../lib/recadoDaNutri'
 import { tendenciaDoPeso } from '../lib/tendenciaDoPeso' 
 import { reagendarSequencia } from '../lib/lembretes' 
@@ -222,6 +225,11 @@ export function HomeScreen({
   /* Os dias em que ela registrou alguma coisa, para a sequência. Vem de uma
      chamada só, que junta as cinco tabelas no servidor. */
   const [diasComRegistro, setDiasComRegistro] = useState<string[]>([])
+  /* Se a leitura acima já VOLTOU. Sem isto, a lista nasce vazia e o cartão do
+     primeiro dia pisca na tela de todo mundo enquanto a rede responde — e o
+     `carregando` da tela não serve, porque ele é da consulta do nome, que
+     termina antes desta. Item 8: releitura não pode piscar. */
+  const [diasCarregados, setDiasCarregados] = useState(false)
   /* O recado da nutricionista. Só é buscado quando esta aba está NA FRENTE —
      ver o efeito abaixo, e `naFrente` em App.tsx. */
   const [recado, setRecado] = useState<RecadoDaNutri | null>(null)
@@ -232,6 +240,14 @@ export function HomeScreen({
      sobre o que já foi dito — nunca para criar cobrança nova. */
   const [intencoes, setIntencoes] = useState<Intencao[]>([])
   const [detalheDoDia, setDetalheDoDia] = useState(false)
+  /* O que o app consegue calcular do corpo dela, para ter o que DEVOLVER no
+     primeiro dia. Nulo enquanto não houver peso registrado — e é justamente
+     esse nulo que faz o cartão pedir o peso em vez de mostrar um número.
+
+     Só é buscado enquanto o cartão de boas-vindas pode aparecer: depois de três
+     dias de uso, seria uma ida à rede por abertura da tela para alimentar um
+     cartão que não desenha. */
+  const [kcalSugerida, setKcalSugerida] = useState<number | null>(null)
 
   useEffect(() => {
     let ativo = true
@@ -382,10 +398,19 @@ export function HomeScreen({
     let ativo = true
 
     carregarDiasComRegistro().then(dias => {
-      /* Falha vira lista vazia lá dentro, e lista vazia esconde o cartão. Uma
-         sequência que não carregou não pode dizer que a pessoa perdeu a dela —
-         item 11: função de apoio de UI devolve o vazio e a tela decide. */
-      if (ativo && dias.length > 0) setDiasComRegistro(dias)
+      if (!ativo) return
+      /* Nulo é "não deu para ler", e aí NADA muda: nem a sequência, que não
+         pode dizer que a pessoa perdeu a dela, nem o cartão do primeiro dia,
+         que sem esta distinção apareceria para quem usa o app há meses toda
+         vez que a rede falhasse — item 11, a tela é que decide o que fazer com
+         a ausência. */
+      if (dias === null) return
+      setDiasCarregados(true)
+      /* Sem guarda de tamanho: agora que a falha e nula, lista vazia e um FATO
+         -- ela nao registrou nada, ou apagou tudo. A guarda antiga existia para
+         proteger contra a falha que vinha vazia, e mantida aqui impediria a
+         sequencia de voltar a zero para quem apagasse os registros. */
+      setDiasComRegistro(dias)
     })
 
     return () => {
@@ -591,6 +616,44 @@ export function HomeScreen({
      lugar onde o número pode ficar velho. */
   const sequencia = sequenciaDaPessoa(diasComRegistro, dataISO(new Date()))
 
+  /* ── O primeiro dia ───────────────────────────────────────────────────────
+   *
+   * Todo retorno deste app tem mínimo de dados: a sequência precisa de um
+   * registro, a tendência do peso de três semanas, as descobertas de quatro
+   * dias por grupo, o gasto medido de catorze. No primeiro dia a pessoa só DÁ,
+   * e não recebe — e é o dia em que mais gente desiste.
+   *
+   * Aqui o app devolve antes: calcula a meta com o que ela já contou ao criar a
+   * conta e MOSTRA o número. Quando não dá para calcular, pede um dado só, e
+   * diz o que ele destrava. */
+  const boasVindas = !diasCarregados
+    ? null
+    : passoInicial({
+        diasComRegistro,
+        hoje: dataISO(new Date()),
+        hora: new Date().getHours(),
+        temMeta: metas.calorias !== null,
+        kcalSugerida,
+      })
+
+  useEffect(() => {
+    /* Menos de três dias de registro é a janela em que o cartão pode aparecer.
+       Fora dela não há motivo para a ida à rede, e ela sairia por abertura da
+       tela — quatro vezes por dia, para todo mundo, para sempre. */
+    if (!diasCarregados || diasComRegistro.length >= 3) return
+    let ativo = true
+    void carregarCorpoDaConta(sessao.user.id).then(corpo => {
+      if (!ativo) return
+      /* O gasto MEDIDO não entra: ele precisa de catorze dias registrados, e
+         quem está no primeiro não tem nenhum. Passar `undefined` é dizer isso,
+         em vez de fazer a chamada e receber nulo. */
+      setKcalSugerida(metasSugeridas(corpo, corpo.alvoKcalDoCalculo)?.calorias ?? null)
+    })
+    return () => {
+      ativo = false
+    }
+  }, [sessao.user.id, diasCarregados, diasComRegistro.length])
+
   /* O lembrete da sequência acompanha o número.
    *
    * Reagendado a cada mudança, e é isso que impede o aviso de tocar num dia que
@@ -760,7 +823,35 @@ export function HomeScreen({
         />
       )}
 
-      {ehHoje(diaSelecionado) && (
+      {/* ── O PRIMEIRO DIA ──
+          Substitui o próximo passo enquanto aparece, e não se soma a ele: dois
+          blocos verdes dizendo "faça isto agora" é o mesmo que nenhum.
+
+          E é o próximo passo que sai, e não este, porque no primeiro dia a
+          frase dele é uma cobrança — "Você ainda não anotou nada hoje", que
+          depois das onze da manhã vale para quem instalou o app às dez da
+          noite. */}
+      {ehHoje(diaSelecionado) && boasVindas && (
+        <Pressable
+          onPress={() => {
+            if (boasVindas.destino === 'peso') onAbrirPeso()
+            else if (boasVindas.destino === 'metas') onAbrirMetas()
+            else if (boasVindas.destino === 'contador') onAbrirContador()
+          }}
+          style={({ pressed }) => [styles.boasVindas, pressed && styles.cartaoPressionado]}
+          accessibilityRole="button"
+          accessibilityLabel={`${boasVindas.titulo}. ${boasVindas.texto}`}
+        >
+          <Text style={styles.tituloBoasVindas}>{boasVindas.titulo}</Text>
+          <Text style={styles.textoBoasVindas}>{boasVindas.texto}</Text>
+          <View style={styles.botaoBoasVindas}>
+            <Text style={styles.textoBotaoBoasVindas}>{boasVindas.botao}</Text>
+            <Ionicons name="arrow-forward" size={16} color={paleta().cores.branco} />
+          </View>
+        </Pressable>
+      )}
+
+      {ehHoje(diaSelecionado) && !boasVindas && (
         <Pressable
           onPress={() => {
             if (passo.destino === 'contador') onAbrirContador()
@@ -1966,6 +2057,36 @@ const estilos = estilosDe(t =>
   saudacao: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
   blocoAnel: { alignItems: 'center', gap: 5 },
   rotuloAnel: { fontSize: 11.5, color: t.inkSuave },
+
+  /* ── O cartão do primeiro dia ──
+     Coluna, e não linha como o próximo passo: aqui há um número para ler e uma
+     explicação de onde ele saiu, e isso não cabe numa linha de uma frase. */
+  boasVindas: {
+    gap: 7,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
+    backgroundColor: t.cores.verdeMenta,
+  },
+  tituloBoasVindas: {
+    fontSize: 16.5,
+    fontWeight: '800',
+    color: t.cores.verdeEscuro,
+    letterSpacing: -0.3,
+  },
+  textoBoasVindas: { fontSize: 13, lineHeight: 18.5, color: t.inkMedio },
+  botaoBoasVindas: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 4,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: t.cores.verde,
+  },
+  textoBotaoBoasVindas: { fontSize: 14.5, fontWeight: '700', color: t.cores.branco },
 
   passo: {
     flexDirection: 'row',
