@@ -1,5 +1,10 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { carregarConsumoPeriodo } from './consumo'
+import { carregarPeso } from './peso'
+import { gastoReal } from './gastoReal'
+import { tendenciaDoPeso } from './tendenciaDoPeso'
+import { dataISO } from './formatar'
 import {
   aplicarPrescricao,
   carregarMetasPrescritas,
@@ -516,4 +521,60 @@ export async function carregarCorpoDaConta(contaId: string): Promise<{
     sexo,
     alvoKcalDoCalculo: n(calculo.data?.alvo_kcal),
   }
+}
+
+/* O gasto MEDIDO dela, quando há registro suficiente.
+ *
+ * ── Por que isto vale mais que a fórmula ──────────────────────────────────
+ * A análise pública do MacroFactor mostra que fórmula estática erra de 15 a 25%
+ * por pessoa. Errar 20% em 2.000 kcal são 400 kcal por dia — quem come 400 a
+ * mais do que pensa não emagrece, conclui que "dieta não funciona comigo", e
+ * larga.
+ *
+ * A conta que substitui é aritmética simples: o que ela comeu, mais o que o
+ * peso perdido valia. Mora em `gastoReal`, que é puro e tem teste; aqui só se
+ * busca o que ela precisa.
+ *
+ * ── Oito semanas ──────────────────────────────────────────────────────────
+ * Longo o bastante para a média ter chão e curto o bastante para o número
+ * descrever o corpo de AGORA. Metabolismo se adapta em déficit prolongado, e um
+ * gasto medido em seis meses de histórico descreveria uma pessoa que já mudou.
+ *
+ * Devolve null em qualquer falha — item 11. A tela cai na fórmula, que é o que
+ * ela já fazia. */
+export async function carregarGastoMedido(contaId: string): Promise<number | null> {
+  const DIAS = 56
+
+  const ate = new Date()
+  const de = new Date()
+  de.setDate(de.getDate() - DIAS)
+
+  const [consumo, pesos] = await Promise.all([
+    carregarConsumoPeriodo(contaId, dataISO(de), dataISO(ate)),
+    carregarPeso(contaId),
+  ])
+
+  if (consumo.tipo !== 'ok' || pesos.tipo !== 'ok') return null
+
+  /* Calorias somadas por dia. Itens sem caloria não entram — item 6: zero no
+     lugar do desconhecido somaria como se fosse verdade, e aqui isso puxaria a
+     média para baixo e inflaria o gasto. */
+  const porDia = new Map<string, number>()
+  for (const i of consumo.itens) {
+    if (i.calorias === null) continue
+    porDia.set(i.data, (porDia.get(i.data) ?? 0) + i.calorias)
+  }
+
+  return (
+    gastoReal(
+      [...porDia].map(([data, calorias]) => ({ data, calorias: Math.round(calorias) })),
+      /* A LINHA DE TENDÊNCIA, e não a balança: dois quilos entre duas pesagens
+         podem ser água, e um gasto calculado em cima disso erraria por
+         centenas de calorias. */
+      tendenciaDoPeso(pesos.peso.registros).map(t => ({
+        data: t.data,
+        tendencia: t.tendencia,
+      })),
+    )?.kcal ?? null
+  )
 }

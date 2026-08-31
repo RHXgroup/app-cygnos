@@ -16,6 +16,7 @@ import {
   LIMITES,
   METAS_VAZIAS,
   carregarCorpoDaConta,
+  carregarGastoMedido,
   carregarMetasAtivas,
   diferencaDeCalorias,
   salvarMetas,
@@ -203,9 +204,18 @@ export function MetasScreen({
 
   useEffect(() => {
     let ativo = true
-    carregarCorpoDaConta(contaId).then(corpo => {
-      if (ativo) setSugestao(metasSugeridas(corpo, corpo.alvoKcalDoCalculo))
-    })
+    /* As duas em paralelo: o gasto medido le oito semanas de diario e o peso
+       inteiro, e segurar o corpo esperando por ele atrasaria o botao sem
+       necessidade -- ele so aparece depois que as duas voltam de qualquer
+       jeito. */
+    Promise.all([carregarCorpoDaConta(contaId), carregarGastoMedido(contaId)]).then(
+      ([corpo, medido]) => {
+        /* A escada: o MEDIDO vence o calculo dela, que vence a formula.
+           Formula estatica erra de 15 a 25% por pessoa, e o medido sai do que
+           ela realmente comeu contra o que o peso fez. */
+        if (ativo) setSugestao(metasSugeridas(corpo, corpo.alvoKcalDoCalculo, medido))
+      },
+    )
     return () => {
       ativo = false
     }

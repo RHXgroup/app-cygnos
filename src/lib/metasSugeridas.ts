@@ -55,10 +55,17 @@ export type Sugestao = {
   gorduras: number
   fibras: number
   aguaMl: number
-  /* De onde saiu o número das calorias. A tela DIZ isto — uma conta que a
-     pessoa não sabe de onde veio ela não corrige, e não corrigir é o mesmo que
-     não ter. */
-  origem: 'calculo' | 'corpo'
+  /* De onde saiu o número das calorias, do melhor para o pior.
+   *
+   *   'medido'   o gasto calculado do que ela COMEU e de como o peso andou.
+   *              É o único que não é fórmula, e vence todos.
+   *   'calculo'  o cálculo energético que ela mesma fez, com o nível de
+   *              atividade e o ajuste que ela escolheu.
+   *   'corpo'    Mifflin-St Jeor com atividade leve. O palpite de partida.
+   *
+   * A tela DIZ isto — uma conta que a pessoa não sabe de onde veio ela não
+   * corrige, e não corrigir é o mesmo que não ter. */
+  origem: 'medido' | 'calculo' | 'corpo'
 }
 
 /* ── As constantes, e de onde saiu cada uma ────────────────────────────────*/
@@ -128,6 +135,13 @@ const FATOR_PADRAO = 1.375
 export function metasSugeridas(
   corpo: DadosDoCorpo,
   alvoKcalDoCalculo?: number | null,
+  /* O gasto MEDIDO, quando já houver registro suficiente para calculá-lo.
+   *
+   * Vence tudo, e a razão está na análise pública do melhor aplicativo da
+   * categoria: fórmula estática erra de 15 a 25% por pessoa. Errar 20% em 2.000
+   * kcal são 400 kcal por dia — quem come 400 a mais do que pensa não emagrece,
+   * conclui que "dieta não funciona comigo", e larga. */
+  gastoMedido?: number | null,
 ): Sugestao | null {
   const peso = numero(corpo.pesoKg)
   if (peso === null || peso > 400) return null
@@ -135,8 +149,13 @@ export function metasSugeridas(
   let calorias: number
   let origem: Sugestao['origem']
 
+  const medido = numero(gastoMedido)
   const doCalculo = numero(alvoKcalDoCalculo)
-  if (doCalculo !== null) {
+
+  if (medido !== null) {
+    calorias = Math.round(medido)
+    origem = 'medido'
+  } else if (doCalculo !== null) {
     calorias = Math.round(doCalculo)
     origem = 'calculo'
   } else {
@@ -181,6 +200,12 @@ export function metasSugeridas(
  * Existe porque uma conta que a pessoa não sabe de onde veio ela não corrige — e
  * não corrigir é o mesmo que não ter meta. Ela precisa poder discordar. */
 export function comoFoiCalculado(s: Sugestao): string {
+  /* O medido primeiro, e ele é o único que não usa a palavra "calculado" no
+     sentido de fórmula: aqui o número saiu do que ela registrou, e dizer isso é
+     o que separa este app dos outros. */
+  if (s.origem === 'medido') {
+    return 'Este número saiu do que você registrou comer e de como o seu peso andou — e não de uma fórmula. Ele fica mais certo a cada semana.'
+  }
   return s.origem === 'calculo'
     ? 'Calculado a partir do seu cálculo energético — o nível de atividade e o ajuste que você escolheu lá.'
     : 'Calculado a partir do seu peso, altura, idade e sexo, com atividade leve. Se você treina mais que isso, aumente as calorias.'
