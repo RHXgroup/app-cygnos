@@ -27,6 +27,8 @@ import {
   type Periodo,
   type Relatorio,
 } from '../lib/relatorio'
+import { carregarCiclos } from '../lib/ciclo'
+import { descobertas, type Descoberta } from '../lib/descobertas'
 import { estilosDe, paleta } from '../lib/tema'
 
 const MARGEM = 20
@@ -66,6 +68,11 @@ export function RelatoriosScreen({
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
+  /* Os começos de ciclo, para a descoberta do peso. Vêm separados porque o
+     relatório não lê ciclo — e não deveria: quem não acompanha ciclo não pode
+     pagar essa consulta em toda abertura. Aqui é uma tela que se abre de
+     propósito, e a falha vira lista vazia. */
+  const [comecosDeCiclo, setComecosDeCiclo] = useState<string[]>([])
 
   const buscar = useCallback(async () => {
     const r = await carregarRelatorio(contaId, periodo)
@@ -77,6 +84,18 @@ export function RelatoriosScreen({
       setRelatorio(r.relatorio)
     }
   }, [contaId, periodo])
+
+  useEffect(() => {
+    let vivo = true
+    carregarCiclos(contaId).then(r => {
+      /* Erro vira lista vazia, e lista vazia só some com uma descoberta. Item
+         11: isto alimenta um pedaço da tela e não pode derrubá-la. */
+      if (vivo && r.tipo === 'ok') setComecosDeCiclo(r.registros.map(x => x.comecou))
+    })
+    return () => {
+      vivo = false
+    }
+  }, [contaId, versao])
 
   useEffect(() => {
     let vivo = true
@@ -132,7 +151,7 @@ export function RelatoriosScreen({
       )}
 
       {relatorio && !carregando && (
-        <Conteudo relatorio={relatorio} onAbrirMetas={onAbrirMetas} />
+        <Conteudo relatorio={relatorio} comecosDeCiclo={comecosDeCiclo} onAbrirMetas={onAbrirMetas} />
       )}
     </ScrollView>
   )
@@ -140,9 +159,13 @@ export function RelatoriosScreen({
 
 function Conteudo({
   relatorio,
+  comecosDeCiclo,
   onAbrirMetas,
 }: {
   relatorio: Relatorio
+  /* Só para a descoberta do peso no ciclo. Vem de fora porque o relatório não
+     lê ciclo — quem não acompanha ciclo não pode pagar essa consulta. */
+  comecosDeCiclo: string[]
   onAbrirMetas: () => void
 }) {
   const styles = estilos()
@@ -152,6 +175,23 @@ function Conteudo({
 
   return (
     <>
+      {/* Antes do anel: e o unico conteudo da tela que ela nao poderia ter
+          obtido de outro jeito. */}
+      <CartaoDescoberta
+        achados={descobertas({
+          /* `tempoDormindo` e nao um campo: a noite guarda deitou/levantou, e
+             o tempo DORMINDO ja desconta a latencia -- que e o que interessa
+             aqui, e nao quanto tempo ela ficou na cama. */
+          noites: relatorio.dias.map(d => ({
+            data: d.data,
+            minutos: d.noite ? tempoDormindo(d.noite) : null,
+          })),
+          dias: relatorio.dias.map(d => ({ data: d.data, calorias: d.calorias })),
+          pesos: relatorio.dias.map(d => ({ data: d.data, kg: d.pesoKg })),
+          comecosDeCiclo,
+        })}
+      />
+
       <CartaoAnel relatorio={relatorio} />
       <CartaoCalorias relatorio={relatorio} onAbrirMetas={onAbrirMetas} />
       <CartaoAgua relatorio={relatorio} />
@@ -199,6 +239,44 @@ function SeletorDePeriodo({
 }
 
 /* ── Cartões ───────────────────────────────────────────────────────────────*/
+
+/* A DESCOBERTA.
+ *
+ * "Depois que ele fez tudo, e aí? O que ele ganhou com isso?" — foi essa
+ * pergunta que fez este cartão existir. O resto da tela devolve a mesma
+ * informação organizada: soma, média, barra, percentual. Organizar não é
+ * descobrir.
+ *
+ * Aqui o app diz uma frase que ela não conseguiria escrever sozinha, porque
+ * exige cruzar dois assuntos que só moram juntos neste app.
+ *
+ * Fica no TOPO, acima do anel: é o único conteúdo da tela que ela não poderia
+ * ter obtido de outro jeito. E some inteiro quando não há o que dizer — o
+ * silêncio é o que faz a frase valer no dia em que ela aparece. */
+function CartaoDescoberta({ achados }: { achados: Descoberta[] }) {
+  const styles = estilos()
+  if (achados.length === 0) return null
+
+  return (
+    <View style={[styles.cartao, styles.cartaoDescoberta]}>
+      <View style={styles.tituloDescoberta}>
+        <Ionicons name="bulb-outline" size={17} color={paleta().cores.verde} />
+        <Text style={styles.tituloCartao}>O que os seus dados mostram</Text>
+      </View>
+      {achados.map((d, i) => (
+        <Text key={d.chave} style={[styles.textoDescoberta, i > 0 && styles.descobertaSeguinte]}>
+          {d.texto}
+        </Text>
+      ))}
+      {/* A ressalva vem junto, e não numa nota de rodapé que ninguém lê. O app
+          leu dois números do mesmo dia; ele não sabe qual empurrou qual. */}
+      <Text style={styles.ressalvaDescoberta}>
+        São os seus próprios registros, comparados entre si. Não é diagnóstico, e não quer dizer
+        que uma coisa causou a outra.
+      </Text>
+    </View>
+  )
+}
 
 function CartaoAnel({ relatorio }: { relatorio: Relatorio }) {
   const styles = estilos()
@@ -667,6 +745,12 @@ const estilos = estilosDe(t =>
   textoPeriodoEscolhido: { color: t.cores.verde, fontWeight: '800' },
 
   cartao: { borderRadius: 20, backgroundColor: t.cores.cartao, padding: PADDING_CARTAO },
+  cartaoDescoberta: { gap: 9, borderWidth: 1, borderColor: t.cores.verde },
+  tituloDescoberta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  textoDescoberta: { fontSize: 14, color: t.cores.ink, lineHeight: 20 },
+  descobertaSeguinte: { marginTop: 2 },
+  /* A ressalva junto, e nao numa nota de rodape que ninguem le. */
+  ressalvaDescoberta: { fontSize: 11.5, color: t.inkFraco, lineHeight: 16 },
   cabecalhoCartao: {
     flexDirection: 'row',
     alignItems: 'center',

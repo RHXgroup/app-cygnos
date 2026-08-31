@@ -43,7 +43,7 @@
  * ── Só `import type` ──────────────────────────────────────────────────────
  * Roda fora do aparelho. */
 
-import { ehDataReal, emDias, somandoDias } from './datas.ts'
+import { ehDataReal, somandoDias } from './datas.ts'
 
 /* Quantos dias seguidos sem registro a sequência aguenta.
  *
