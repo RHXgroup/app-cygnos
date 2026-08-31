@@ -30,6 +30,7 @@ import {
   type Mensagem,
 } from '../lib/mensagens'
 import { horaCurta, rotuloDoDia } from '../lib/formatar'
+import { comoElaResponde } from '../lib/ritmoDaConversa'
 import { estilosDe, paleta } from '../lib/tema'
 import { useDesvioDoTeclado } from '../lib/teclado'
 
@@ -117,6 +118,11 @@ export function MensagensScreen({
   const [atualizando, setAtualizando] = useState(false)
 
   const rolagem = useRef<ScrollView>(null)
+
+  /* Ele mandou a última e ainda não teve resposta? É o único momento em que a
+     frase do ritmo ajuda. */
+  const esperando = mensagens.length > 0 && ehMinha(mensagens[mensagens.length - 1])
+  const ritmo = comoElaResponde(mensagens)
 
   /* As funções de avisar ficam FORA das dependências de propósito: são
      recriadas a cada renderização do App, e incluí-las faria `buscar` mudar de
@@ -376,6 +382,19 @@ export function MensagensScreen({
             )}
           </ScrollView>
 
+          {/* Quanto ela costuma demorar, e SÓ enquanto ele está esperando.
+           *
+           * Sem push, quem manda uma mensagem fica sem referência: duas horas de
+           * silêncio podem ser normais ou esquecimento, e a pessoa não tem como
+           * saber — então reabre o app, remanda, ou desiste.
+           *
+           * A conta sai da própria conversa (mediana das respostas anteriores),
+           * sem dado novo. E some assim que ela responde: com a resposta na
+           * tela, dizer quanto ela costuma demorar seria ruído. */}
+          {esperando && !!ritmo && (
+            <Text style={styles.ritmo}>Ela costuma responder em {ritmo}.</Text>
+          )}
+
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
           <View style={[styles.barraEnvio, { marginBottom: respiro }]}>
@@ -436,9 +455,20 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
     <View style={[styles.linhaBalao, minha && styles.linhaBalaoMinha]}>
       <View style={[styles.balao, minha ? styles.balaoMeu : styles.balaoDela]}>
         <Text style={[styles.textoBalao, minha && styles.textoBalaoMeu]}>{mensagem.texto}</Text>
-        <Text style={[styles.hora, minha && styles.horaMinha]}>
-          {horaCurta(new Date(mensagem.criadaEm))}
-        </Text>
+        <View style={styles.rodapeBalao}>
+          <Text style={[styles.hora, minha && styles.horaMinha]}>
+            {horaCurta(new Date(mensagem.criadaEm))}
+          </Text>
+          {/* Só nas dele, e só quando ela leu.
+           *
+           * "Enviada" não entra: a mensagem estar na tela já diz que saiu, e uma
+           * marca a mais em cada balão vira ruído. O que ele não tinha como
+           * saber é se ela ABRIU — e é essa a informação que muda o que ele
+           * conclui do silêncio. */}
+          {minha && !!mensagem.lidaEm && (
+            <Ionicons name="checkmark-done" size={13} color="rgba(255,255,255,0.75)" />
+          )}
+        </View>
       </View>
     </View>
   )
@@ -520,7 +550,21 @@ const estilos = estilosDe(t =>
     balaoMeu: { backgroundColor: t.cores.verde, borderBottomRightRadius: 5 },
     textoBalao: { fontSize: 14.5, lineHeight: 20, color: t.cores.ink },
     textoBalaoMeu: { color: t.cores.branco },
-    hora: { marginTop: 3, fontSize: 10.5, color: t.inkFraco, alignSelf: 'flex-end' },
+    rodapeBalao: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 3,
+      alignSelf: 'flex-end',
+    },
+    hora: { fontSize: 10.5, color: t.inkFraco },
+    ritmo: {
+      paddingHorizontal: 20,
+      paddingBottom: 8,
+      fontSize: 12,
+      color: t.inkFraco,
+      textAlign: 'center',
+    },
     horaMinha: { color: 'rgba(255,255,255,0.75)' },
 
     erro: { paddingHorizontal: 20, paddingBottom: 6, fontSize: 12.5, color: t.cores.erroTexto },

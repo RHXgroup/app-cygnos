@@ -35,8 +35,8 @@ import { ExcluirContaScreen } from './src/screens/ExcluirContaScreen'
 import { MaisScreen } from './src/screens/MaisScreen'
 import { MensagensScreen } from './src/screens/MensagensScreen'
 import { contarNaoLidas } from './src/lib/mensagens'
-import { lembretesDeAguaLigados, ouvirBotaoDeAgua } from './src/lib/lembretes'
-import { registrarAgua } from './src/lib/agua'
+import { confirmarCopo, lembretesDeAguaLigados, ouvirBotaoDeAgua } from './src/lib/lembretes'
+import { carregarAgua, registrarAgua } from './src/lib/agua'
 import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
 import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
 import { ReceitasScreen } from './src/screens/ReceitasScreen'
@@ -403,7 +403,20 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         /* Falha aqui é silenciosa de propósito: o app está no bolso da pessoa, e
            não há tela para mostrar erro. O motivo cru vai para o console por
            dentro de `registrarAgua`. */
-        if (r.tipo === 'ok') setVersaoAgua(v => v + 1)
+        if (r.tipo !== 'ok') return
+
+        setVersaoAgua(v => v + 1)
+
+        /* Confirma na gaveta de notificações, com o total do dia.
+         *
+         * O botão grava sem abrir o app — e sem confirmação a pessoa abre o app
+         * para conferir, que é exatamente o que o botão existia para evitar.
+         * A leitura do dia é feita DEPOIS de gravar, para o número já incluir o
+         * copo que acabou de entrar. */
+        const agua = await carregarAgua(sessao.user.id)
+        if (agua.tipo !== 'ok') return
+        const total = agua.agua.hoje.reduce((soma, g) => soma + g.ml, 0)
+        confirmarCopo(ml, total, agua.agua.hoje.length)
       })
     })
 

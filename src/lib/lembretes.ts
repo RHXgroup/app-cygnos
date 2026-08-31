@@ -557,6 +557,51 @@ export async function reagendarAguaSeLigada(
   await ligarLembretesDeAgua(horarios, mlDoGole)
 }
 
+/* Confirma na tela do celular que o copo entrou.
+ *
+ * ── Por que é preciso, e por que é uma notificação ────────────────────────
+ * O botão "Registrei" grava sem abrir o app. Isso é o valor dele — e é também o
+ * problema: a pessoa toca, o aviso some, e nada diz se funcionou. Ela abre o app
+ * para conferir, que é exatamente o que o botão existia para evitar.
+ *
+ * Foi levantado que confirmar transformaria um toque em DUAS notificações. Por
+ * isso esta some sozinha em segundos e entra num canal de importância mínima —
+ * sem som, sem vibrar, sem saltar na tela. Ela aparece na gaveta, é lida de
+ * relance, e vai embora.
+ *
+ * ── Ela diz o TOTAL, não só "ok" ──────────────────────────────────────────
+ * "Copo registrado" confirma o toque. "3º copo de hoje · 990 ml" confirma o
+ * toque E responde a pergunta seguinte, que é a que faria a pessoa abrir o app.
+ * Uma notificação que evita uma abertura paga o próprio incômodo. */
+export async function confirmarCopo(ml: number, totalDoDia: number, copoDoDia: number): Promise<void> {
+  try {
+    const Notifications = await notificacoes()
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('agua-confirma', {
+        name: 'Confirmações de água',
+        /* MIN, e não DEFAULT como a do lembrete: aquela precisa interromper,
+           esta precisa apenas existir. Som ou vibração aqui seria cobrar
+           atenção por uma coisa que a pessoa acabou de fazer. */
+        importance: Notifications.AndroidImportance.MIN,
+      })
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${copoDoDia}º copo de hoje`,
+        body: `${ml} ml registrados. ${totalDoDia} ml no dia.`,
+        ...(Platform.OS === 'android' ? { autoDismiss: true } : {}),
+      },
+      /* Imediata. `null` dispara na hora. */
+      trigger: null,
+    })
+  } catch {
+    /* Falhar em confirmar não desfaz o copo, que já está gravado. Ficar sem a
+       confirmação é o comportamento de antes — chato, e não errado. */
+  }
+}
+
 /* ── Responder ao botão ────────────────────────────────────────────────────
  *
  * Dois caminhos, e os dois precisam existir:
