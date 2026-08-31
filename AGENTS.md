@@ -362,9 +362,43 @@ O outro lado disso é uma vantagem, e vale usar: uma inscrição de realtime
 registrada numa aba montada permanentemente vale para o app inteiro. É assim
 que o ponto de mensagem acende na hora, sem esperar a próxima leitura.
 
-## 14. Antes de dar por pronto
+## 14. `revoke` que roda com sucesso e não fecha nada
+
+O Supabase concede EXECUTE de função a **`PUBLIC`** por padrão, e `anon` herda
+dessa concessão. Isso faz as duas formas óbvias falharem, cada uma de um jeito:
+
+```sql
+revoke all on function public.f() from public;  -- não bloqueia o anon
+revoke all on function public.f() from anon;    -- não tira o que veio do PUBLIC
+```
+
+**As duas rodam com "Success" e a porta continua aberta.** Aconteceu duas vezes
+no mesmo dia, uma em cada direção.
+
+O que fecha, com a assinatura e tirando dos dois:
+
+```sql
+revoke all on function public.f(text) from public, anon;
+grant execute on function public.f(text) to authenticated;
+```
+
+**A assinatura importa** quando a função tem argumento: sem ela, o Postgres
+recusa se houver mais de uma com o mesmo nome — e mudar a assinatura de uma
+função sem `drop` da anterior deixa **duas**, o que faz o PostgREST recusar as
+duas por ambiguidade (`PGRST203`). Ver a armadilha 5: ao substituir, apague a
+antiga na mesma alteração.
+
+E **conferir não é opcional**, porque a única evidência que o editor SQL dá é o
+"Success" que apareceu nas duas tentativas erradas. `npm run contrato` chama toda
+função que o app usa com a chave pública e separa "existe e barrada" de "existe
+e executa sem sessão".
+
+## 15. Antes de dar por pronto
 
 - `npx tsc --noEmit` — o principal, e por muito tempo o único.
+- `npm run contrato` — confere que toda RPC que o app chama existe no banco com
+  a assinatura exata, e lista as que executam sem sessão. Precisa de rede, e por
+  isso fica fora do `npm test`.
 - `npm test` — todos os `.teste.mts` de uma vez. Um só:
   `node --experimental-strip-types src/lib/<arquivo>.teste.mts`.
 
