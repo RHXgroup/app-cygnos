@@ -32,6 +32,25 @@ export const DORME_PADRAO = 23 * 60
    fim de semana de quem dorme tarde só no sábado. */
 export const NOITES_NA_MEDIANA = 7
 
+/* Quantas noites bastam para chamar de rotina.
+ *
+ * Três. Duas madrugadas não são uma rotina, e montar o dia de alguém em cima
+ * delas é inventar — a regra vinha da outra implementação desta mesma janela e
+ * é a mais conservadora das duas, por isso ficou.
+ *
+ * Abaixo disso a janela é a PADRÃO e vem marcada como suposta, em vez de nula:
+ * a tela precisa da diferença entre "é o horário dela" e "é um horário
+ * genérico", e um nulo obrigaria cada chamador a inventar o padrão de novo. */
+const NOITES_PARA_ROTINA = 3
+
+/* O mínimo que uma janela precisa ter para ser acreditada.
+ *
+ * Seis horas. Uma janela de três horas não quer dizer que a pessoa fica
+ * acordada três horas — quer dizer que os horários estão trocados, ou que só
+ * uma ponta foi anotada. Cobrar dois litros de água em três horas é o tipo de
+ * conta que o app faz e ninguém consegue seguir. */
+const JANELA_MINIMA = 6 * 60
+
 export type NoiteComHorarios = {
   data: string
   /* 'HH:MM'. */
@@ -72,7 +91,11 @@ function mediana(valores: number[]): number | null {
  * maioria das rotinas. "23:30" e "00:30" viram 1410 e 30, e a mediana crua dos
  * dois dá 30 — meio-dia e meio de diferença do certo. Somar 24 h nos valores da
  * madrugada põe os dois na mesma reta antes de comparar. */
+const SUPOSTA: Janela = { acordaEm: ACORDA_PADRAO, dormeEm: DORME_PADRAO, suposta: true }
+
 export function janelaAcordada(noites: NoiteComHorarios[]): Janela {
+  if (!Array.isArray(noites)) return SUPOSTA
+
   const recentes = [...noites]
     .sort((a, b) => b.data.localeCompare(a.data))
     .slice(0, NOITES_NA_MEDIANA)
@@ -89,17 +112,77 @@ export function janelaAcordada(noites: NoiteComHorarios[]): Janela {
     if (deitou !== null) deitares.push(deitou < 12 * 60 ? deitou + 24 * 60 : deitou)
   }
 
+  /* As duas pontas precisam ter rotina. Com cinco levantares e um deitar, a
+     hora de dormir é a de uma noite só — e é ela que decide onde o dia acaba. */
+  if (levantares.length < NOITES_PARA_ROTINA || deitares.length < NOITES_PARA_ROTINA)
+    return SUPOSTA
+
   const acorda = mediana(levantares)
   const dorme = mediana(deitares)
+  if (acorda === null || dorme === null) return SUPOSTA
 
-  if (acorda === null || dorme === null) {
-    return { acordaEm: ACORDA_PADRAO, dormeEm: DORME_PADRAO, suposta: true }
-  }
+  /* Janela curta demais não é rotina, é dado torto — ver JANELA_MINIMA. */
+  if (dorme - acorda < JANELA_MINIMA) return SUPOSTA
 
   /* Volta para dentro do relógio. O consumidor compara com a hora de agora, que
-     também está em 0..1439. */
+     também está em 0..1439, e `ritmoDaAgua` estica de novo quando a janela
+     cruza a meia-noite. */
   return { acordaEm: acorda, dormeEm: dorme % (24 * 60), suposta: false }
 }
+
+/* ── Os horários do dia, para o lembrete ───────────────────────────────────
+ *
+ * Moravam em `ritmoDeAgua.ts`, junto com uma SEGUNDA implementação da janela
+ * acima. As duas discordavam em quatro de sete casos medidos — mediana par,
+ * mínimo de noites, hora impossível e janela curta —, e o efeito era a mesma
+ * pessoa recebendo o cartão da tela inicial por uma janela e o lembrete por
+ * outra. Item 5 do AGENTS.md, e um dos poucos casos em que ele produziu
+ * discordância visível em vez de só risco.
+ *
+ * Ficaram aqui, e não lá, porque aqui não há import de runtime: é o que permite
+ * exercitá-los fora do aparelho. Lá ficou só a ida à rede. */
+
+/* Nem no primeiro minuto acordado, nem colado na hora de dormir.
+ *
+ * A folga do fim não é estética: água na última hora antes de deitar acorda a
+ * pessoa de madrugada, e o app que mede o sono dela não pode ser o mesmo que
+ * atrapalha o sono dela. */
+const APOS_ACORDAR = 30
+const ANTES_DE_DORMIR = 90
+
+/* Menos que três avisos não é ritmo, é lembrete solto. Mais que seis a pessoa
+   desliga a notificação — e junto vai a da refeição, que é a que importa. */
+const MINIMO_DE_AVISOS = 3
+const MAXIMO_DE_AVISOS = 6
+
+/* Quantos: o que a meta pede em copos, limitado entre três e seis. Meta de
+   quatro litros com copo de duzentos não vira vinte avisos — vira seis goles
+   maiores, porque o que falha não é a conta, é a paciência de quem recebe. */
+export function horariosDeAgua(metaMl: number, copoMl: number, janela: Janela): number[] {
+  if (!(metaMl > 0) || !(copoMl > 0)) return []
+
+  /* A janela que cruza a meia-noite é esticada, como em `ritmoDaAgua`: quem
+     acorda às 22h e dorme às 6h tem oito horas, e não menos vinte e quatro. */
+  const fimCru = janela.dormeEm > janela.acordaEm ? janela.dormeEm : janela.dormeEm + 24 * 60
+
+  const inicio = janela.acordaEm + APOS_ACORDAR
+  const fim = fimCru - ANTES_DE_DORMIR
+  if (fim <= inicio) return []
+
+  const copos = Math.ceil(metaMl / copoMl)
+  const quantos = Math.min(Math.max(copos, MINIMO_DE_AVISOS), MAXIMO_DE_AVISOS)
+
+  const passo = (fim - inicio) / (quantos - 1)
+  /* De volta para dentro do relógio: quem agenda compara com a hora do
+     aparelho, e 25:30 não existe lá. */
+  return Array.from({ length: quantos }, (_, i) =>
+    Math.round(inicio + passo * i) % (24 * 60),
+  )
+}
+
+/* Quanto beber em cada um desses horários, para a soma fechar a meta. */
+export const mlPorGole = (metaMl: number, quantos: number) =>
+  quantos <= 0 || !(metaMl > 0) ? 0 : Math.round(metaMl / quantos / 10) * 10
 
 export type Ritmo = {
   /* Quanto já era para ter bebido a esta hora, arredondado ao copo mais

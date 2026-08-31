@@ -2,7 +2,9 @@ import {
   ACORDA_PADRAO,
   DORME_PADRAO,
   daquiA,
+  horariosDeAgua,
   janelaAcordada,
+  mlPorGole,
   relogio,
   ritmoDaAgua,
   type Janela,
@@ -201,6 +203,156 @@ const noite = (data: string, deitou: string, levantou: string) => ({ data, deito
   ok('relógio de 7h', relogio(h(7)) === '07:00', relogio(h(7)))
   ok('relógio de 23h30', relogio(h(23, 30)) === '23:30', relogio(h(23, 30)))
   ok('relógio dá a volta', relogio(h(25)) === '01:00', relogio(h(25)))
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   A janela UNIFICADA
+   ──────────────────────────────────────────────────────────────────────────
+
+   Existiam duas implementacoes desta janela: `janelaAcordada`, aqui, e
+   `janelaDe`, em ritmoDeAgua.ts. Medidas lado a lado com os mesmos dados, elas
+   discordavam em quatro de sete casos -- e o efeito era a MESMA pessoa
+   recebendo o cartao do Inicio por uma janela e o lembrete de agua por outra.
+
+   Cada bloco abaixo e uma dessas discordancias, com a regra que ficou. */
+console.log('\nA janela, depois de as duas virarem uma')
+
+{
+  /* DISCORDAVAM: uma aceitava uma noite so; a outra exigia tres.
+     Ficou a de tres -- duas madrugadas nao sao uma rotina, e montar o dia de
+     alguem em cima delas e inventar. */
+  const duas = [noite('2026-08-30', '23:00', '07:00'), noite('2026-08-31', '23:00', '07:00')]
+  const j = janelaAcordada(duas)
+  ok('duas noites nao fazem rotina', j.suposta === true)
+  ok('e cai no padrao, em vez de nulo', j.acordaEm === ACORDA_PADRAO && j.dormeEm === DORME_PADRAO)
+
+  const tres = [...duas, noite('2026-08-29', '23:00', '07:00')]
+  ok('tres noites ja fazem', janelaAcordada(tres).suposta === false)
+}
+
+{
+  /* As DUAS pontas precisam de rotina. Com cinco levantares e um deitar, a hora
+     de dormir sai de uma noite so -- e e ela que decide onde o dia acaba. */
+  const so_levantar = [
+    noite('2026-08-29', '', '07:00'),
+    noite('2026-08-30', '', '07:00'),
+    noite('2026-08-31', '23:00', '07:00'),
+  ]
+  ok('so uma hora de deitar nao basta', janelaAcordada(so_levantar).suposta === true)
+}
+
+{
+  /* DISCORDAVAM: uma aceitava qualquer janela; a outra recusava abaixo de 6h.
+     Ficou a que recusa -- tres horas acordada nao e rotina, e um numero desses
+     faria o app cobrar dois litros de agua numa tarde. */
+  const curta = [
+    noite('2026-08-29', '23:00', '20:00'),
+    noite('2026-08-30', '23:00', '20:00'),
+    noite('2026-08-31', '23:00', '20:00'),
+  ]
+  ok('janela de tres horas nao e acreditada', janelaAcordada(curta).suposta === true)
+
+  const seis = [
+    noite('2026-08-29', '23:00', '17:00'),
+    noite('2026-08-30', '23:00', '17:00'),
+    noite('2026-08-31', '23:00', '17:00'),
+  ]
+  ok('seis horas exatas ja valem', janelaAcordada(seis).suposta === false)
+
+  /* E a borda, um minuto abaixo. Sem este caso, o piso podia ser 5h ou 6h e
+     nenhum teste notaria -- foi o que a mutacao mostrou. */
+  const quase = [
+    noite('2026-08-29', '23:00', '17:01'),
+    noite('2026-08-30', '23:00', '17:01'),
+    noite('2026-08-31', '23:00', '17:01'),
+  ]
+  ok('um minuto abaixo de seis horas nao vale', janelaAcordada(quase).suposta === true)
+}
+
+{
+  /* DISCORDAVAM: uma validava a hora, a outra nao -- "99:99" virava 6039
+     minutos e entrava na mediana. Ficou a que valida. */
+  const torta = [
+    noite('2026-08-29', '23:00', '99:99'),
+    noite('2026-08-30', '23:00', '99:99'),
+    noite('2026-08-31', '23:00', '99:99'),
+  ]
+  const j = janelaAcordada(torta)
+  ok('hora impossivel nao entra na conta', j.suposta === true)
+  ok('e nao vira um horario absurdo', j.acordaEm === ACORDA_PADRAO)
+}
+
+{
+  /* Quem dorme depois da meia-noite: o resultado volta para dentro do relogio,
+     porque e assim que `ritmoDaAgua` e o agendador comparam com a hora de
+     agora. A outra devolvia 1470, que nao existe num relogio. */
+  const madrugada = [
+    noite('2026-08-29', '00:30', '07:00'),
+    noite('2026-08-30', '00:30', '07:00'),
+    noite('2026-08-31', '00:30', '07:00'),
+  ]
+  const j = janelaAcordada(madrugada)
+  ok('deitar 00:30 vira 30, e nao 1470', j.dormeEm === 30)
+  ok('e a janela continua sendo dela', j.suposta === false)
+}
+
+{
+  ok('lista vazia cai no padrao', janelaAcordada([]).suposta === true)
+  ok(
+    'e o que nem e lista tambem',
+    janelaAcordada(null as unknown as ReturnType<typeof noite>[]).suposta === true,
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Os horarios do lembrete, que moravam no outro arquivo
+   ──────────────────────────────────────────────────────────────────────────*/
+console.log('\nOs horarios do lembrete de agua')
+
+const comum: Janela = { acordaEm: h(7), dormeEm: h(23), suposta: false }
+
+{
+  const hs = horariosDeAgua(2000, 250, comum)
+  ok('meta de 2 L em copo de 250 da seis avisos', hs.length === 6)
+  ok('o primeiro sai meia hora depois de acordar', hs[0] === h(7, 30))
+  ok('e o ultimo hora e meia antes de deitar', hs[hs.length - 1] === h(21, 30))
+  ok('em ordem', hs.every((x, i) => i === 0 || x >= hs[i - 1]))
+}
+
+{
+  ok('meta pequena ainda da o minimo de tres', horariosDeAgua(400, 250, comum).length === 3)
+  ok('meta enorme para no maximo de seis', horariosDeAgua(6000, 200, comum).length === 6)
+}
+
+{
+  ok('meta zerada nao gera aviso', horariosDeAgua(0, 250, comum).length === 0)
+  ok('copo zerado tambem nao', horariosDeAgua(2000, 0, comum).length === 0)
+  ok('meta negativa tambem nao', horariosDeAgua(-2000, 250, comum).length === 0)
+  ok('NaN tambem nao', horariosDeAgua(NaN, 250, comum).length === 0)
+}
+
+{
+  /* Janela apertada demais para caber a folga das duas pontas. */
+  const apertada: Janela = { acordaEm: h(7), dormeEm: h(8), suposta: false }
+  ok('janela de uma hora nao gera aviso', horariosDeAgua(2000, 250, apertada).length === 0)
+}
+
+{
+  /* Quem trabalha a noite: acorda 22h, dorme 6h. A janela cruza a meia-noite, e
+     sem esticar o fim ela sairia negativa e o lembrete nao existiria. */
+  const virada: Janela = { acordaEm: h(22), dormeEm: h(6), suposta: false }
+  const hs = horariosDeAgua(2000, 250, virada)
+  ok('a janela que cruza a meia-noite gera avisos', hs.length === 6)
+  ok('o primeiro e as 22:30', hs[0] === h(22, 30))
+  ok('e todos cabem num relogio de verdade', hs.every(m => m >= 0 && m < 24 * 60))
+  ok('e o ultimo passa da meia-noite', hs[hs.length - 1] === h(4, 30))
+}
+
+{
+  ok('divide a meta pelos avisos, ao decimo', mlPorGole(2000, 6) === 330)
+  ok('sem aviso nenhum, nao manda beber nada', mlPorGole(2000, 0) === 0)
+  ok('meta zerada tambem', mlPorGole(0, 6) === 0)
+  ok('quantidade negativa tambem', mlPorGole(2000, -1) === 0)
 }
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')

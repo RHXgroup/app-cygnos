@@ -1,7 +1,8 @@
-import { carregarNoites, type Noite } from './sono'
+import { carregarNoites } from './sono'
 import { carregarMetasAtivas } from './metas'
+import { horariosDeAgua, janelaAcordada, mlPorGole, type Janela } from './ritmoAgua'
 
-/* Quando beber, e não só quanto.
+/* Quando beber, e não só quanto — a ida à rede.
  *
  * A meta de água diz dois litros e para por aí. Quem abre o app às dez da noite
  * com zero registrado não tem como recuperar o dia — e quem bebeu tudo de manhã
@@ -13,102 +14,16 @@ import { carregarMetasAtivas } from './metas'
  * Usar isso é a diferença entre "beba às 9h" para quem levanta às 5h30 e um
  * ritmo que cabe no dia dela.
  *
- * Sem noite registrada, o padrão é 7h às 23h — e é padrão declarado, não
- * palpite escondido: a tela diz que está usando um horário genérico enquanto
- * não houver sono anotado. */
-
-/* Minutos desde a meia-noite. */
-export type Janela = { acorda: number; dorme: number }
-
-export const JANELA_PADRAO: Janela = { acorda: 7 * 60, dorme: 23 * 60 }
-
-/* Nem no primeiro minuto acordado, nem colado na hora de dormir.
+ * ── E a conta NÃO mora mais aqui ───────────────────────────────────────────
+ * Este arquivo tinha a sua própria `janelaDe`, os seus próprios horários e a sua
+ * própria hora-padrão — uma segunda implementação de tudo que `ritmoAgua.ts` já
+ * fazia para a tela inicial. As duas discordavam em quatro de sete casos
+ * medidos, e o resultado era a MESMA pessoa recebendo o cartão do Início por uma
+ * janela e o lembrete por outra.
  *
- * A folga do fim não é estética: água na última hora antes de deitar acorda a
- * pessoa de madrugada, e o app que mede o sono dela não pode ser o mesmo que
- * atrapalha o sono dela. */
-const APOS_ACORDAR = 30
-const ANTES_DE_DORMIR = 90
-
-/* Menos que três avisos não é ritmo, é lembrete solto. Mais que seis a pessoa
-   desliga a notificação — e junto vai a da refeição, que é a que importa. */
-const MINIMO = 3
-const MAXIMO = 6
-
-const minutosDe = (hora: string): number | null => {
-  const [h, m] = hora.split(':').map(Number)
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null
-  return h * 60 + m
-}
-
-/* A mediana, e não a média: uma virada até as quatro da manhã num sábado
-   deslocaria a média do mês inteiro, e a mediana ignora o caso isolado. */
-function mediana(ns: number[]): number {
-  const ordenados = [...ns].sort((a, b) => a - b)
-  const meio = Math.floor(ordenados.length / 2)
-  return ordenados.length % 2 === 1
-    ? ordenados[meio]
-    : Math.round((ordenados[meio - 1] + ordenados[meio]) / 2)
-}
-
-/* A janela de quem está acordado, tirada das noites registradas.
- *
- * Null com menos de três noites: duas madrugadas não são uma rotina, e montar
- * o dia de alguém em cima delas seria inventar. */
-export function janelaDe(noites: Noite[]): Janela | null {
-  if (noites.length < 3) return null
-
-  const acordou = noites.map(n => minutosDe(n.levantou)).filter((m): m is number => m !== null)
-  const deitou = noites.map(n => minutosDe(n.deitou)).filter((m): m is number => m !== null)
-  if (acordou.length < 3 || deitou.length < 3) return null
-
-  const acorda = mediana(acordou)
-  /* Deitar depois da meia-noite conta como fim do dia anterior: 00:30 é 24:30,
-     e não meia hora da manhã. Sem isto, quem dorme tarde teria uma janela
-     negativa e o ritmo sairia ao contrário. */
-  const dorme = mediana(deitou.map(m => (m < 12 * 60 ? m + 24 * 60 : m)))
-
-  if (dorme - acorda < 6 * 60) return null
-
-  return { acorda, dorme }
-}
-
-/* Os horários do dia, em minutos, para bater a meta sem correria.
- *
- * Quantos: o que a meta pede em copos, limitado entre três e seis. Meta de
- * quatro litros com copo de duzentos não vira vinte avisos — vira seis goles
- * maiores, porque o que falha não é a conta, é a paciência de quem recebe. */
-export function horariosDeAgua(
-  metaMl: number,
-  copoMl: number,
-  janela: Janela = JANELA_PADRAO,
-): number[] {
-  if (metaMl <= 0 || copoMl <= 0) return []
-
-  const inicio = janela.acorda + APOS_ACORDAR
-  const fim = janela.dorme - ANTES_DE_DORMIR
-  if (fim <= inicio) return []
-
-  const copos = Math.ceil(metaMl / copoMl)
-  const quantos = Math.min(Math.max(copos, MINIMO), MAXIMO)
-
-  /* O primeiro logo depois de acordar e o último bem antes de deitar, com o
-     resto espalhado entre eles. Com um só, fica no meio da janela. */
-  if (quantos === 1) return [Math.round((inicio + fim) / 2)]
-
-  const passo = (fim - inicio) / (quantos - 1)
-  return Array.from({ length: quantos }, (_, i) => Math.round(inicio + passo * i))
-}
-
-/* Quanto beber em cada um desses horários, para a soma fechar a meta. */
-export const mlPorGole = (metaMl: number, quantos: number) =>
-  quantos <= 0 ? 0 : Math.round(metaMl / quantos / 10) * 10
-
-/* "07:30" */
-export const comoHora = (minutos: number) => {
-  const m = ((minutos % 1440) + 1440) % 1440
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-}
+ * Agora sobrou só o que fala com a rede. Quem decide está em `ritmoAgua.ts`,
+ * que não importa runtime nenhum e por isso é exercitável fora do aparelho —
+ * item 16 do AGENTS.md, e a razão de o corte ser este e não outro. */
 
 /* ── O ritmo de quem está usando o app ──────────────────────────────────────
  *
@@ -136,8 +51,10 @@ export async function ritmoDeAgua(contaId: string): Promise<RitmoDeAgua | null> 
   if (!metas?.aguaMl || !metas.copoMl) return null
 
   const noites = rNoites?.tipo === 'ok' ? rNoites.noites : []
-  const daJanela = janelaDe(noites)
-  const janela = daJanela ?? JANELA_PADRAO
+  /* Uma janela só, a mesma da tela inicial. `suposta` diz se ela veio do sono
+     dela ou do padrão — e é o que a tela usa para convidar a registrar sono em
+     vez de fingir que adivinhou a rotina. */
+  const janela = janelaAcordada(noites)
 
   const horarios = horariosDeAgua(metas.aguaMl, metas.copoMl, janela)
   if (horarios.length === 0) return null
@@ -146,6 +63,6 @@ export async function ritmoDeAgua(contaId: string): Promise<RitmoDeAgua | null> 
     horarios,
     mlPorVez: mlPorGole(metas.aguaMl, horarios.length),
     janela,
-    daJanelaPadrao: daJanela === null,
+    daJanelaPadrao: janela.suposta,
   }
 }
