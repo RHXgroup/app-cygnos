@@ -47,7 +47,7 @@ import {
   type PlanoCompleto,
   type RefeicaoSalva,
 } from '../lib/plano'
-import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
+import { carregarMeuVinculo, carregarPlanoDaNutri, type MeuVinculo } from '../lib/planoDaNutri'
 import { carregarAvisos, quantosNovos } from '../lib/avisos'
 import { carregarDiasComRegistro } from '../lib/sequencia'
 import { carregarRecadoDaNutri, type RecadoDaNutri } from '../lib/recadoDaNutri'
@@ -188,6 +188,11 @@ export function HomeScreen({
      mostrar — apagar um por causa do outro impediria voltar atrás quando o
      vínculo acabar. */
   const [planoDaNutri, setPlanoDaNutri] = useState<PlanoCompleto | null>(null)
+  /* Ativo por padrão: é o estado de quase todo mundo, e errar para cá não tira
+     o plano de quem está sendo acompanhado agora. */
+  const [vinculo, setVinculo] = useState<MeuVinculo>({
+    ativo: true, desde: null, encerradoEm: null, nutricionista: null,
+  })
   const [carregandoPlano, setCarregandoPlano] = useState(true)
   /* Só para saber se o sino acende. A lista mora na tela de avisos; aqui a
      pergunta é de sim ou não. */
@@ -279,7 +284,13 @@ export function HomeScreen({
          nada de qualquer forma, e uma queda dela não pode derrubar o plano
          próprio, que é o que sobra. */
       carregarPlanoDaNutri().catch(() => null),
-    ]).then(([r, daNutri]) => {
+      /* O plano dela agora chega mesmo depois de o vínculo acabar — a pessoa
+         pagou por aquilo e continua precisando saber o que comer enquanto
+         procura outra. Mas plano encerrado é HISTÓRICO, e a tela precisa saber
+         a diferença. */
+      carregarMeuVinculo(),
+    ]).then(([r, daNutri, meuVinculo]) => {
+      setVinculo(meuVinculo)
       if (!ativo) return
 
       /* Falhou: fica com o que já estava na tela. Trocar um plano carregado
@@ -555,7 +566,22 @@ export function HomeScreen({
    * O plano próprio não é apagado nem esquecido: continua em `plano`, continua
    * na tela de Planos, e volta sozinho para cá se o vínculo acabar ou se ela
    * desativar o plano dela. */
-  const planoNaTela = planoDaNutri ?? plano
+  /* ── O que VALE hoje, e o que apenas continua legível ────────────────────
+   *
+   * `planoVigente` é o que conta: entra nas metas do dia, no cartão de calorias
+   * e no de próxima refeição. Com o vínculo encerrado, o plano dela sai daqui e
+   * o próprio volta — que é o que o comentário acima já prometia.
+   *
+   * Receber "hora do almoço do seu plano" de uma prescrição encerrada é pior do
+   * que não ter plano nenhum, e somar as calorias dela na meta de hoje é dizer
+   * que a pessoa está seguindo algo que acabou. */
+  const planoVigente = (vinculo.ativo ? planoDaNutri : null) ?? plano
+
+  /* O que o cartão MOSTRA. Prefere o vigente; sem nenhum vigente, mostra o
+     encerrado como histórico — que é o caso comum de quem acabou de sair, e
+     estava seguindo só a prescrição dela. */
+  const planoNaTela = planoVigente ?? planoDaNutri
+  const planoEncerrado = !vinculo.ativo && planoNaTela === planoDaNutri && planoDaNutri !== null
 
   /* O anel da saudação: a média dos pilares que o app realmente mede hoje.
      Ver lib/metaDoDia.ts — as regras de o que entra e o que fica de fora estão
@@ -583,7 +609,7 @@ export function HomeScreen({
     /* De HOJE, e não do dia que a faixa mostra: ver o comentário do estado. */
     consumo: consumoDeHoje,
     noites,
-    plano: planoNaTela,
+    plano: planoVigente,
     rotina,
     sessoes,
   })
@@ -617,7 +643,7 @@ export function HomeScreen({
       return r.situacao === 'atrasado' ? -r.diferencaMl : null
     })(),
     consumo: consumoDeHoje,
-    plano: planoNaTela,
+    plano: planoVigente,
     noites,
     rotina,
     sessoes,
@@ -775,7 +801,7 @@ export function HomeScreen({
       {/* ── Calorias ── */}
       <CartaoCalorias
         consumo={consumo}
-        plano={planoNaTela}
+        plano={planoVigente}
         metas={metas}
         dia={diaSelecionado}
         onAbrirMetas={onAbrirMetas}
@@ -785,6 +811,7 @@ export function HomeScreen({
       {/* ── Plano alimentar ── */}
       <BlocoPlano
         plano={planoNaTela}
+        encerrado={planoEncerrado ? vinculo : null}
         carregando={carregandoPlano}
         onMontarPlano={onMontarPlano}
         onEditarPlano={onEditarPlano}
@@ -794,7 +821,9 @@ export function HomeScreen({
       {/* ── Água + próxima refeição ── */}
       <View style={styles.linhaDupla}>
         <CartaoAgua agua={agua} onAbrir={onAbrirAgua} onRegistrar={registrarCopo} />
-        <CartaoProximaRefeicao plano={planoNaTela} onAbrir={onAbrirRefeicao} />
+        {/* Sem próxima refeição de plano encerrado: o horário dela não é
+            orientação de hoje. */}
+        <CartaoProximaRefeicao plano={planoVigente} onAbrir={onAbrirRefeicao} />
       </View>
 
       {/* ── Progresso ── */}
@@ -862,12 +891,18 @@ export function HomeScreen({
  * não montou. */
 function BlocoPlano({
   plano,
+  encerrado,
   carregando,
   onMontarPlano,
   onEditarPlano,
   onAbrirCompras,
 }: {
   plano: PlanoCompleto | null
+  /* Quando o plano na tela é o de um acompanhamento que ACABOU. Ele continua
+     legível — a pessoa pagou por aquilo e ainda precisa saber o que comer
+     enquanto procura outra —, mas para de contar nas metas do dia e de
+     aparecer no cartão da próxima refeição. */
+  encerrado: MeuVinculo | null
   carregando: boolean
   onMontarPlano: () => void
   onEditarPlano: (plano: PlanoCompleto) => void
@@ -918,10 +953,24 @@ function BlocoPlano({
       <View style={styles.linhaTituloPlano}>
         <Ionicons name="nutrition-outline" size={16} color={paleta().cores.verde} />
         <Text style={[styles.tituloCartao, styles.tituloPlano]}>
-          {daNutri ? 'Plano da sua nutricionista' : 'Plano alimentar'}
+          {encerrado ? 'Plano encerrado' : daNutri ? 'Plano da sua nutricionista' : 'Plano alimentar'}
         </Text>
         {!daNutri && <Ionicons name="create-outline" size={17} color={paleta().inkFraco} />}
       </View>
+
+      {/* Quem prescreveu e por quanto tempo.
+       *
+       * Sem esta linha o plano encerrado se lê como o plano de agora, e a
+       * pessoa segue orientação de quem não a acompanha mais. Com ela, continua
+       * servindo para consultar — que é o motivo de ele não ter sido apagado. */}
+      {!!encerrado && (
+        <Text style={styles.planoEncerrado}>
+          {encerrado.nutricionista ? `Prescrito por ${encerrado.nutricionista}` : 'Prescrito'}
+          {encerrado.desde ? `, de ${dataNumerica(new Date(encerrado.desde))}` : ''}
+          {encerrado.encerradoEm ? ` a ${dataNumerica(new Date(encerrado.encerradoEm))}` : ''} — não
+          conta mais nas suas metas do dia.
+        </Text>
+      )}
 
       <Text style={styles.nomePlano} numberOfLines={2}>
         {plano.nome}
@@ -2032,6 +2081,13 @@ const estilos = estilosDe(t =>
   },
   botaoPlanoPressionado: { backgroundColor: t.cores.verdeEscuro },
   textoBotaoPlano: { fontSize: 14.5, fontWeight: '700', color: t.cores.branco },
+  planoEncerrado: {
+    marginTop: 2,
+    marginBottom: 6,
+    fontSize: 12,
+    lineHeight: 17,
+    color: t.inkFraco,
+  },
   nomePlano: { marginTop: 10, fontSize: 18, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
   linhaRepeticao: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   textoRepeticao: { flexShrink: 1, fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
