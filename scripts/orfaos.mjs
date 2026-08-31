@@ -57,14 +57,12 @@ const fonte = new Map(arquivos.map(f => [f, fs.readFileSync(f, 'utf8')]))
 const usadoEm = (nome, texto) =>
   new RegExp('(^|[^A-Za-z0-9_$])' + nome + '($|[^A-Za-z0-9_$])').test(texto)
 
-function orfaos() {
+function orfaos(dentroDe, padrao) {
   const achados = []
   for (const [arq, txt] of fonte) {
-    if (!arq.includes(`${path.sep}lib${path.sep}`)) continue
+    if (!dentroDe(arq)) continue
 
-    const nomes = [...txt.matchAll(/^export (?:async )?function (\w+)|^export const (\w+)/gm)].map(
-      m => m[1] || m[2],
-    )
+    const nomes = [...txt.matchAll(padrao)].map(m => m[1] || m[2])
 
     for (const nome of nomes) {
       let usos = 0
@@ -78,7 +76,23 @@ function orfaos() {
   return achados
 }
 
-const achados = orfaos()
+const achados = orfaos(
+  a => a.includes(`${path.sep}lib${path.sep}`),
+  /^export (?:async )?function (\w+)|^export const (\w+)/gm,
+)
+
+/* A mesma pergunta um nível acima: componente construído e nunca montado.
+ *
+ * Vale separado porque a resposta é diferente. Função de lib sem chamador
+ * costuma ser sobra de refatoração — apagar é o certo. Componente sem chamador
+ * costuma ser peça PRONTA que ninguém ligou, e aí a decisão é de produto: quem
+ * desenhou pode estar esperando a tela que vai usá-la.
+ *
+ * Só nomes com maiúscula, que é o que o JSX consegue montar. */
+const componentes = orfaos(
+  a => /components|screens/.test(a),
+  /^export (?:default )?function ([A-Z]\w+)|^export const ([A-Z]\w+)/gm,
+)
 
 /* ── A conferência do próprio script ──────────────────────────────────────
  * Três nomes que o app inteiro usa. Se algum deles aparecer na lista, o regex
@@ -123,4 +137,10 @@ if (pendentes.length === 0) {
     console.log(`      ${a.nome}`)
   }
   console.log('\n  Órfão não é erro. É uma pergunta: quem devia chamar isto?\n')
+}
+
+if (componentes.length > 0) {
+  console.log(`  ── componentes que ninguém monta ──\n`)
+  for (const c of componentes) console.log(`  ${c.arq}      ${c.nome}`)
+  console.log('\n  Aqui a pergunta é de produto: era para aparecer em que tela?\n')
 }
