@@ -32,10 +32,19 @@ export type Nutricionista = {
 }
 
 export type Catalogo = {
-  /* Preenchida quando o paciente já está vinculado — e então a lista tem essa
-     mesma pessoa e só ela. */
-  vinculada: Nutricionista | null
+  /* Todas as ativas. Hoje o banco devolve só a vinculada quando existe vínculo,
+     mas isso vai mudar: esconder a vitrine depois da escolha faz trocar de
+     profissional virar um salto no escuro — a lista só volta depois de sair, e
+     aí já se está sem ninguém. */
   lista: Nutricionista[]
+
+  /* Quem acompanha a pessoa. Lista, e não uma só, porque dois vínculos ativos
+     estão no plano — e porque o custo de já ler assim é zero. */
+  vinculadas: Nutricionista[]
+
+  /* A primeira das vinculadas, para as telas que hoje falam no singular. Some no
+     dia em que elas souberem lidar com duas. */
+  vinculada: Nutricionista | null
 }
 
 export type ResultadoCatalogo =
@@ -128,14 +137,20 @@ export async function carregarCatalogo(): Promise<ResultadoCatalogo> {
   const linhas = (data ?? []) as Linha[]
   const lista = await comFotosAssinadas(linhas.map(daLinha))
 
+  /* A flag é lida LINHA A LINHA, e não da primeira.
+   *
+   * Enquanto o banco devolve só a vinculada, dá no mesmo. Mas ele vai passar a
+   * devolver todas com a flag marcando qual é a dela — e aí ler a primeira
+   * quebraria em silêncio: as nutricionistas vêm em ordem de nome, a dela
+   * dificilmente é a primeira, e o app concluiria que ela não tem nenhuma.
+   *
+   * Dizer a alguém que ela não tem profissional é a pior coisa que esta tela
+   * pode dizer errado, e não custa nada evitar antes. */
+  const vinculadas = lista.filter((_, i) => linhas[i]?.vinculada)
+
   return {
     tipo: 'ok',
-    catalogo: {
-      /* A flag vem em toda linha e é a mesma em todas — é uma propriedade da
-         resposta, não de cada nutricionista. Ler da primeira basta. */
-      vinculada: linhas[0]?.vinculada ? lista[0] : null,
-      lista,
-    },
+    catalogo: { lista, vinculadas, vinculada: vinculadas[0] ?? null },
   }
 }
 
