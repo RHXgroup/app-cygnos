@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -18,6 +18,7 @@ import { valemPara, type Intencao } from '../lib/intencaoDaIA'
 import { AnelCalorias } from '../components/AnelCalorias'
 import { CartaoDaSemana } from '../components/CartaoDaSemana'
 import { CartaoDaSequencia } from '../components/CartaoDaSequencia'
+import { CartaoDoRecado } from '../components/CartaoDoRecado'
 import { AnelProgresso } from '../components/AnelProgresso'
 import { FaixaDeDias } from '../components/FaixaDeDias'
 import { MenuTopo } from '../components/MenuTopo'
@@ -49,6 +50,7 @@ import {
 import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
 import { carregarAvisos, quantosNovos } from '../lib/avisos'
 import { carregarDiasComRegistro } from '../lib/sequencia'
+import { carregarRecadoDaNutri, type RecadoDaNutri } from '../lib/recadoDaNutri'
 import { tendenciaDoPeso } from '../lib/tendenciaDoPeso' 
 import { reagendarSequencia } from '../lib/lembretes' 
 import { sequenciaDaPessoa } from '../lib/sequenciaDaPessoa' 
@@ -125,6 +127,8 @@ export function HomeScreen({
   onAbrirCompras,
   onAbrirMetas,
   onAbrirPeso,
+  naFrente,
+  onAbrirMensagens,
   onAbrirContador,
   onAbrirSono,
   onAbrirTreino,
@@ -163,6 +167,11 @@ export function HomeScreen({
   onAbrirCompras: (plano: PlanoCompleto) => void
   onAbrirMetas: () => void
   onAbrirPeso: () => void
+  /* Se a aba Inicio esta NA FRENTE. So o recado usa -- ele e marcado como
+     lido quando buscado, entao buscar de aba escondida faria o retorno mentir
+     para a nutricionista. */
+  naFrente: boolean
+  onAbrirMensagens: () => void
   onAbrirContador: () => void
   onAbrirSono: () => void
   onAbrirTreino: () => void
@@ -208,6 +217,9 @@ export function HomeScreen({
   /* Os dias em que ela registrou alguma coisa, para a sequência. Vem de uma
      chamada só, que junta as cinco tabelas no servidor. */
   const [diasComRegistro, setDiasComRegistro] = useState<string[]>([])
+  /* O recado da nutricionista. Só é buscado quando esta aba está NA FRENTE —
+     ver o efeito abaixo, e `naFrente` em App.tsx. */
+  const [recado, setRecado] = useState<RecadoDaNutri | null>(null)
   /* Só o anel usa: é a rotina que diz se hoje é dia de treino ou de descanso.
      Sem ela não há como cobrar treino de ninguém — ver lib/metaDoDia. */
   const [rotina, setRotina] = useState<Exercicio[]>([])
@@ -317,6 +329,34 @@ export function HomeScreen({
       ativo = false
     }
   }, [sessao.user.id, versaoPlano])
+
+  /* O RECADO DA NUTRICIONISTA.
+   *
+   * ── Por que este efeito depende de `naFrente` ────────────────────────────
+   * Buscar o recado MARCA COMO LIDO: o servidor grava `lido_em` na primeira
+   * leitura, e isso existe para ela — saber que foi lido é o que faz uma
+   * profissional continuar escrevendo. Sem esse retorno ela escreve duas vezes
+   * e para.
+   *
+   * A consequência é que buscar é um ATO, e não uma consulta. Quem abre o app
+   * na aba Mensagens tem esta aba montada por trás (item 13 do AGENTS.md), e
+   * sem a guarda o recado seria marcado como lido sem ninguém ter visto —
+   * fazendo o retorno mentir para ela.
+   *
+   * `jaBuscou` evita repetir a cada volta para a aba: uma vez por abertura do
+   * app basta, e o recado não muda de minuto em minuto. */
+  const jaBuscouRecado = useRef(false)
+  useEffect(() => {
+    if (!naFrente || jaBuscouRecado.current) return
+    jaBuscouRecado.current = true
+    let vivo = true
+    carregarRecadoDaNutri().then(r => {
+      if (vivo) setRecado(r)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [naFrente])
 
   /* A SEQUÊNCIA.
    *
@@ -659,6 +699,15 @@ export function HomeScreen({
 
           Não aparece quando a pessoa está olhando outro dia: "almoço em 40
           min" não faz sentido em cima da terça passada. */}
+
+      {/* O RECADO DELA, acima de tudo.
+          É o único conteúdo desta tela que veio de uma PESSOA, e não de uma
+          conta. Some sozinho quando não há recado — nada de moldura dizendo
+          "sua nutricionista ainda não escreveu", que é cobrança do profissional
+          na cara da paciente. */}
+      {ehHoje(diaSelecionado) && (
+        <CartaoDoRecado recado={recado} onAbrirMensagens={onAbrirMensagens} />
+      )}
 
       {/* A SEQUÊNCIA, antes de tudo.
           Acima do próximo passo de propósito: ela é o MOTIVO de fazer, e o

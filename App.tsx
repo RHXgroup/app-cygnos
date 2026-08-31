@@ -565,6 +565,17 @@ function AreaLogada({ sessao }: { sessao: Session }) {
             <View key={chave} style={{ width }}>
               <TelaDaAba
                 chave={chave}
+                /* Se esta aba está NA FRENTE, e não apenas montada.
+                 *
+                 * Item 13 do AGENTS.md: o carrossel monta as quatro de uma vez
+                 * e nunca desmonta. Para quase tudo isso é irrelevante — mas o
+                 * recado da nutricionista é LIDO quando o app o busca, e o
+                 * servidor grava `lido_em` na primeira leitura.
+                 *
+                 * Sem isto, o recado seria marcado como lido para quem abriu o
+                 * app na aba Mensagens e nunca olhou o Início — e aí o retorno
+                 * que a nutricionista recebe passa a mentir para ela. */
+                naFrente={aba === chave}
                 sessao={sessao}
                 versaoPlano={versaoPlano}
                 versaoAgua={versaoAgua}
@@ -906,6 +917,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
 function TelaDaAba({
   chave,
+  naFrente,
   sessao,
   versaoPlano,
   versaoAgua,
@@ -939,6 +951,9 @@ function TelaDaAba({
   naoLidas,
 }: {
   chave: Aba
+  /* Se esta aba esta NA FRENTE. So o Inicio usa, e para uma coisa so: o
+     recado da nutricionista e LIDO ao ser buscado. */
+  naFrente: boolean
   sessao: Session
   versaoPlano: number
   versaoAgua: number
@@ -976,6 +991,8 @@ function TelaDaAba({
     case 'hoje':
       return (
         <HomeScreen
+          naFrente={naFrente}
+          onAbrirMensagens={onAbrirMensagens}
           sessao={sessao}
           versaoIntencao={versaoIntencao}
           versaoPlano={versaoPlano}
