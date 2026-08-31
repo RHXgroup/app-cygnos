@@ -16,37 +16,53 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   diaVazio,
-  type Cabeca,
   type Digestao,
   type DiaDoCiclo as Dia,
   type Energia,
   type Fluxo,
   type Humor,
-  type Pele,
-  type Secrecao,
 } from '../lib/ciclo'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* Um dia do calendário do ciclo.
  *
- * ── O desenho, e por que ele mudou ────────────────────────────────────────
- * A primeira versão era um FORMULÁRIO: oito blocos de etiquetas que quebravam
- * em duas e três linhas, uma parede de rolagem. Quem usou disse "está péssima",
- * e estava — a tela pedia trabalho em vez de aceitar uma marcação.
+ * ── Duas versões erradas antes desta ──────────────────────────────────────
+ * A PRIMEIRA era um formulário de nove blocos, e as etiquetas quebravam em duas
+ * e três linhas: vinte linhas de rolagem para marcar uma cólica.
  *
- * Agora cada categoria é UMA LINHA que rola de lado. Oito categorias viram oito
- * linhas em vez de vinte, e a tela inteira cabe quase sem rolar. É o que os
- * aplicativos de ciclo fazem, e é o que faz marcar um dia levar três toques em
- * vez de uma expedição.
+ * A SEGUNDA trocou cada bloco por uma fileira que rolava de lado. Coube na
+ * tela, e ficou pior — quem usou não achava mais nada: "fluxo aparece até
+ * moderado, se eu quiser ver intenso tenho que arrastar; dor não cabe tudo,
+ * lombar, cansaço e insônia eu não consigo ver". Rolagem lateral ESCONDE, e o
+ * que está escondido não existe. Numa tela em que a pessoa passa três segundos,
+ * a opção fora do quadro nunca é marcada.
  *
- * E o selecionado é PREENCHIDO, não contornado. Contorno fino de 1px some no
- * meio de doze etiquetas iguais — a pessoa marcava e não via o que marcou.
+ * ── O que estava errado nas duas era a QUANTIDADE ─────────────────────────
+ * Nove categorias não cabem de jeito nenhum: quebrando linha viram uma parede,
+ * e em fileira viram um esconderijo. O conserto não era de desenho, era de
+ * conteúdo — e a pergunta certa era "isto tudo precisa estar aqui?".
  *
- * ── O vermelho que voltou ─────────────────────────────────────────────────
- * O botão de "minha menstruação começou" era um bloco vermelho de alarme
- * ocupando o topo da tela. É o mesmo erro que o calendário tinha: vermelho de
- * ERRO para menstruação. Virou uma linha com a cor do ciclo, do tamanho do que
- * ela é.
+ * Saíram três, e a tela passou a caber quebrando linha, que é o jeito que
+ * mostra tudo de uma vez:
+ *
+ *   PELE      não muda conselho de nutrição nenhum. Era registro por registro.
+ *   CABEÇA    dizia o mesmo que humor — "estressada" e "ansiosa" são a mesma
+ *             marcação feita duas vezes, e duas perguntas para uma resposta é
+ *             como se ensina alguém a parar de responder.
+ *   SECREÇÃO  é o marcador de fertilidade de verdade, e só interessa a quem
+ *             está tentando engravidar. Para todo o resto era uma pergunta
+ *             íntima sem retorno nenhum. Volta no dia em que a intenção de
+ *             engravidar estiver ligada na tela — a coluna continua no banco
+ *             esperando por isso.
+ *
+ * Sobraram seis, e cada uma se justifica sozinha: FLUXO e DOR são o ciclo;
+ * ENERGIA muda treino; DIGESTÃO e VONTADE DE COMER são nutrição pura, e são
+ * onde este app tem o que os aplicativos de ciclo não têm; HUMOR é o que mais
+ * se registra em qualquer um deles.
+ *
+ * As colunas que saíram da tela continuam indo e voltando do banco intactas —
+ * o dia carregado entra no estado inteiro e é gravado inteiro. Quem já tinha
+ * marcado "pele oleosa" não perde nada por a pergunta ter saído.
  *
  * ── A separação é a tela ──────────────────────────────────────────────────
  * Dois blocos, e a distância entre eles é o desenho todo:
@@ -55,23 +71,16 @@ import { estilosDe, paleta } from '../lib/tema'
  *   O DE BAIXO nunca sai — relação, proteção, nota privada. Não existe chave
  *   para ligar isso, e no banco a função que espelha não lê essas colunas.
  *
- * Cada bloco DIZ isso antes de a pessoa escrever, e não numa nota de rodapé.
- *
  * ── Por que nada é obrigatório ────────────────────────────────────────────
  * O objetivo é ela registrar, não preencher um formulário. Um dia com só
  * "cólica" marcado já vale, e é o que a maioria vai fazer. */
 
 /* ── As categorias ─────────────────────────────────────────────────────────
  *
- * Vieram de comparar com o Clue, que registra em 12 categorias de ~4 opções, e
- * não em 200 campos soltos. A lição maior daquela comparação não é a
- * quantidade: é que TODA categoria tem a opção positiva.
- *
- * Sem ela, só quem está mal registra — e o padrão que o app devolve sai sempre
- * negativo. A pessoa abre e lê que fica mal todo mês, porque os dias bons ela
- * nunca teve onde marcar.
- *
- * Por isso a primeira opção de cada lista é a boa, e não a queixa. */
+ * Cada uma delas tem a opção POSITIVA primeiro, e isso não é enfeite: sem ela,
+ * só quem está mal registra, e o padrão que o app devolve sai sempre negativo.
+ * A pessoa abre e lê que fica mal todo mês, porque os dias bons ela nunca teve
+ * onde marcar. */
 
 /* 'escape' não é fluxo leve: é sangramento fora do período, é outra coisa, e é
    justamente o que faz alguém procurar ajuda. Chamá-lo de leve some com a
@@ -84,8 +93,8 @@ const FLUXOS: { valor: Fluxo; rotulo: string }[] = [
   { valor: 'intenso', rotulo: 'intenso' },
 ]
 
-/* Só DOR. Inchaço, náusea e intestino saíram daqui e viraram "digestão" — a
-   mesma informação em dois lugares apareceria duas vezes na ficha dela. */
+/* Só DOR. Inchaço, náusea e intestino ficam em "digestão" — a mesma informação
+   em dois lugares apareceria duas vezes na ficha dela. */
 const SINTOMAS = [
   'cólica',
   'dor de cabeça',
@@ -94,15 +103,6 @@ const SINTOMAS = [
   'dor lombar',
   'cansaço',
   'insônia',
-]
-
-const HUMORES: { valor: Humor; rotulo: string }[] = [
-  { valor: 'bem', rotulo: 'bem' },
-  { valor: 'feliz', rotulo: 'feliz' },
-  { valor: 'irritada', rotulo: 'irritada' },
-  { valor: 'triste', rotulo: 'triste' },
-  { valor: 'ansiosa', rotulo: 'ansiosa' },
-  { valor: 'oscilando', rotulo: 'oscilando' },
 ]
 
 const ENERGIAS: { valor: Energia; rotulo: string }[] = [
@@ -121,29 +121,13 @@ const DIGESTOES: { valor: Digestao; rotulo: string }[] = [
   { valor: 'solta', rotulo: 'solta' },
 ]
 
-/* O marcador de fertilidade que ela observa sem depender de exame. Os nomes são
-   os que se usam de verdade — "clara de ovo" é o termo, e traduzi-lo para algo
-   mais formal faria quem procura por ele não encontrar. */
-const SECRECOES: { valor: Secrecao; rotulo: string }[] = [
-  { valor: 'seca', rotulo: 'seca' },
-  { valor: 'pegajosa', rotulo: 'pegajosa' },
-  { valor: 'cremosa', rotulo: 'cremosa' },
-  { valor: 'clara_de_ovo', rotulo: 'clara de ovo' },
-  { valor: 'atipica', rotulo: 'diferente' },
-]
-
-const CABECAS: { valor: Cabeca; rotulo: string }[] = [
-  { valor: 'focada', rotulo: 'focada' },
-  { valor: 'calma', rotulo: 'calma' },
-  { valor: 'dispersa', rotulo: 'dispersa' },
-  { valor: 'estressada', rotulo: 'estressada' },
-]
-
-const PELES: { valor: Pele; rotulo: string }[] = [
-  { valor: 'boa', rotulo: 'boa' },
-  { valor: 'oleosa', rotulo: 'oleosa' },
-  { valor: 'seca', rotulo: 'seca' },
-  { valor: 'acne', rotulo: 'acne' },
+const HUMORES: { valor: Humor; rotulo: string }[] = [
+  { valor: 'bem', rotulo: 'bem' },
+  { valor: 'feliz', rotulo: 'feliz' },
+  { valor: 'irritada', rotulo: 'irritada' },
+  { valor: 'triste', rotulo: 'triste' },
+  { valor: 'ansiosa', rotulo: 'ansiosa' },
+  { valor: 'oscilando', rotulo: 'oscilando' },
 ]
 
 const DESEJOS = ['doce', 'salgado', 'carboidrato', 'chocolate', 'gordura', 'sem fome']
@@ -188,7 +172,7 @@ export function DiaDoCiclo({
   const alternar = (lista: string[], item: string) =>
     lista.includes(item) ? lista.filter(x => x !== item) : [...lista, item]
 
-  /* Uma categoria de escolha única, em UMA linha que rola de lado.
+  /* Uma categoria de escolha única.
      Tocar no que já está marcado desmarca — é o único jeito de voltar atrás num
      campo opcional, e "marquei sem querer" acontece. */
   const umaEscolha = <T extends string>(
@@ -197,7 +181,7 @@ export function DiaDoCiclo({
     atual: T | null,
     ao: (v: T | null) => void,
   ) => (
-    <Linha titulo={titulo} styles={styles}>
+    <Categoria titulo={titulo} styles={styles}>
       {opcoes.map(o => (
         <Etiqueta
           key={o.valor}
@@ -208,7 +192,7 @@ export function DiaDoCiclo({
           {o.rotulo}
         </Etiqueta>
       ))}
-    </Linha>
+    </Categoria>
   )
 
   return (
@@ -253,10 +237,10 @@ export function DiaDoCiclo({
             showsVerticalScrollIndicator={false}
           >
             {/* O começo do ciclo, primeiro e sozinho: é o único campo que muda o
-                cálculo inteiro, e é o que a pessoa veio marcar quando abriu um
+                cálculo inteiro, e é o que a pessoa veio marcar quando abre um
                 dia do passado.
 
-                Uma LINHA, e não um bloco vermelho ocupando o topo. O bloco era
+                Uma LINHA, e não o bloco vermelho que ocupava o topo. O bloco era
                 o mesmo erro do calendário — vermelho de alarme para uma coisa
                 que não é alarme. */}
             <Pressable
@@ -279,9 +263,8 @@ export function DiaDoCiclo({
             </Pressable>
 
             {umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
-            {umaEscolha('Energia', ENERGIAS, d.energia, v => setD(x => ({ ...x, energia: v })))}
 
-            <Linha titulo="Dor" styles={styles}>
+            <Categoria titulo="Dor" styles={styles}>
               {SINTOMAS.map(s => (
                 <Etiqueta
                   key={s}
@@ -292,17 +275,15 @@ export function DiaDoCiclo({
                   {s}
                 </Etiqueta>
               ))}
-            </Linha>
+            </Categoria>
 
+            {umaEscolha('Energia', ENERGIAS, d.energia, v => setD(x => ({ ...x, energia: v })))}
             {umaEscolha('Digestão', DIGESTOES, d.digestao, v => setD(x => ({ ...x, digestao: v })))}
             {umaEscolha('Humor', HUMORES, d.humor, v => setD(x => ({ ...x, humor: v })))}
-            {umaEscolha('Cabeça', CABECAS, d.cabeca, v => setD(x => ({ ...x, cabeca: v })))}
-            {umaEscolha('Pele', PELES, d.pele, v => setD(x => ({ ...x, pele: v })))}
-            {umaEscolha('Secreção', SECRECOES, d.secrecao, v => setD(x => ({ ...x, secrecao: v })))}
 
             {/* O campo que nenhum app de ciclo tem e nenhum app de nutrição tem.
                 Só faz sentido onde os dois moram juntos. */}
-            <Linha titulo="Vontade de comer" styles={styles}>
+            <Categoria titulo="Vontade de comer" styles={styles}>
               {DESEJOS.map(v => (
                 <Etiqueta
                   key={v}
@@ -315,7 +296,7 @@ export function DiaDoCiclo({
                   {v}
                 </Etiqueta>
               ))}
-            </Linha>
+            </Categoria>
 
             <TextInput
               value={d.observacao ?? ''}
@@ -418,12 +399,13 @@ export function DiaDoCiclo({
   )
 }
 
-/* Uma categoria em UMA linha que rola de lado.
+/* Uma categoria, com as etiquetas QUEBRANDO LINHA.
  *
- * Era um bloco com quebra de linha, e oito deles viravam vinte linhas de
- * rolagem — a parede que fez a tela ser chamada de péssima. Em linha, oito
- * categorias são oito linhas, e a tela cabe quase inteira. */
-function Linha({
+ * Já foi fileira que rolava de lado, e foi pior: cabia na tela e escondia
+ * metade das opções. Quebrar linha mostra tudo de uma vez, que é o que uma tela
+ * de marcação precisa fazer — e só ficou possível porque três categorias
+ * saíram. */
+function Categoria({
   titulo,
   children,
   styles,
@@ -435,14 +417,7 @@ function Linha({
   return (
     <View style={styles.categoria}>
       <Text style={styles.tituloCategoria}>{titulo}</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.fileira}
-        keyboardShouldPersistTaps="handled"
-      >
-        {children}
-      </ScrollView>
+      <View style={styles.etiquetas}>{children}</View>
     </View>
   )
 }
@@ -482,18 +457,17 @@ const estilos = estilosDe(t =>
     },
     botaoVoltar: { width: 60, height: 44, justifyContent: 'center' },
     tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
-    /* Salvar no cabeçalho, e não no fim de uma rolagem de dez telas: quem marcou
-       uma coisa não devia rolar até o fim para guardá-la. */
+    /* Salvar no cabeçalho, e não no fim de uma rolagem: quem marcou uma coisa
+       não devia rolar até o fim para guardá-la. */
     botaoSalvar: { width: 60, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
     textoSalvar: { fontSize: 15, fontWeight: '800', color: t.cores.verde },
 
-    conteudo: { paddingVertical: 6, gap: 14 },
+    conteudo: { paddingHorizontal: 20, paddingVertical: 6, gap: 16 },
 
     comeco: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 11,
-      marginHorizontal: 20,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: t.cores.borda,
@@ -507,21 +481,16 @@ const estilos = estilosDe(t =>
     textoComeco: { flex: 1, fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
     textoComecoLigado: { color: t.cores.cicloForte },
 
-    categoria: { gap: 7 },
-    tituloCategoria: {
-      fontSize: 13,
-      fontWeight: '800',
-      color: t.cores.ink,
-      paddingHorizontal: 20,
-    },
-    /* O padding fica no CONTEÚDO, e não na rolagem: no container, a primeira
-       etiqueta seria cortada ao rolar de volta. */
-    fileira: { paddingHorizontal: 20, gap: 8 },
+    categoria: { gap: 8 },
+    tituloCategoria: { fontSize: 13, fontWeight: '800', color: t.cores.ink },
+    etiquetas: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
 
+    /* Compactas de propósito: sete etiquetas de dor precisam caber em duas
+       linhas, e cada pixel de padding aqui vira uma linha a mais lá embaixo. */
     etiqueta: {
-      paddingHorizontal: 15,
-      paddingVertical: 10,
-      borderRadius: 11,
+      paddingHorizontal: 13,
+      paddingVertical: 8,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor: t.cores.borda,
       backgroundColor: t.cores.cartao,
@@ -529,11 +498,10 @@ const estilos = estilosDe(t =>
     /* PREENCHIDA, e não contornada. Um contorno de 1px some no meio de doze
        etiquetas iguais, e a pessoa marcava sem ver o que marcou. */
     etiquetaAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
-    textoEtiqueta: { fontSize: 13.5, color: t.inkMedio, fontWeight: '600' },
+    textoEtiqueta: { fontSize: 13, color: t.inkMedio, fontWeight: '600' },
     textoEtiquetaAtiva: { color: t.cores.branco, fontWeight: '800' },
 
     campo: {
-      marginHorizontal: 20,
       backgroundColor: t.cores.cartao,
       borderRadius: 12,
       borderWidth: 1,
@@ -546,22 +514,21 @@ const estilos = estilosDe(t =>
       lineHeight: 21,
     },
 
-    nota: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingHorizontal: 20 },
+    nota: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
     textoNota: { flex: 1, fontSize: 11.5, color: t.inkFraco, lineHeight: 16 },
 
     privado: {
-      marginHorizontal: 20,
-      marginTop: 6,
+      marginTop: 2,
       gap: 10,
       backgroundColor: t.cores.verdeClaro,
       borderRadius: 16,
-      paddingVertical: 15,
+      padding: 15,
     },
-    tituloPrivado: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 15 },
+    tituloPrivado: { flexDirection: 'row', alignItems: 'center', gap: 7 },
     textoTituloPrivado: { fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
-    explicacaoPrivado: { fontSize: 12, color: t.inkMedio, lineHeight: 17, paddingHorizontal: 15 },
-    linhaSwitch: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15 },
+    explicacaoPrivado: { fontSize: 12, color: t.inkMedio, lineHeight: 17 },
+    linhaSwitch: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     rotuloSwitch: { flex: 1, fontSize: 14.5, color: t.cores.ink },
-    chipsPrivado: { flexDirection: 'row', gap: 8, paddingHorizontal: 15 },
+    chipsPrivado: { flexDirection: 'row', gap: 8 },
   }),
 )

@@ -1,4 +1,5 @@
 import { diaDaSemana, doISO, ehDataReal, paraISO, somandoDias } from './datas.ts'
+import { DIAS_DE_FLUXO_PADRAO } from './cicloDaPessoa.ts'
 import type { Ciclo } from './cicloDaPessoa'
 
 export { somandoDias }
@@ -32,6 +33,15 @@ export type DiaDoMes = {
 
 const DIA = 86400000
 
+/* Teto e chão do tamanho da faixa.
+ *
+ * O número vem de `situacaoDoCiclo`, que já valida — mas ele também chega de
+ * chamadas antigas e de teste, e um valor absurdo aqui não dá erro: ele desenha
+ * uma faixa de trezentos dias e o laço percorre todos eles. Um `Math.min` custa
+ * nada e fecha a porta. */
+const faixaDeFluxo = (n: number): number =>
+  Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 15) : DIAS_DE_FLUXO_PADRAO
+
 /* Quantos dias tem o mês. `new Date(Date.UTC(ano, mes, 0))` devolve o último dia
    do mês ANTERIOR ao índice — com mes já 1-based, isso é o último deste. É a
    forma que acerta fevereiro de ano bissexto sem regra escrita à mão. */
@@ -64,14 +74,46 @@ export function mesDe(ano: number, mes: number, hoje: string): DiaDoMes[] {
  * 31 vezes por mês, e percorrer os ciclos em cada pergunta é o tipo de conta que
  * ninguém nota até o calendário ficar lento no aparelho ruim.
  *
- * Ciclo sem fim marcado conta só o primeiro dia. Pintar cinco por suposição
- * mostraria como fato uma coisa que ela não disse — e ela é quem sabe. */
-export function diasMenstruada(ciclos: Ciclo[]): Set<string> {
+ * ── Ciclo sem fim marcado, e por que a regra mudou ────────────────────────
+ * Esta função pintava UM DIA quando ela não marcava o fim, com o argumento de
+ * que pintar cinco mostraria como fato uma coisa que ela não disse.
+ *
+ * O argumento estava certo e o calendário estava errado. Quase ninguém volta
+ * para marcar o fim — o gesto é marcar o começo e seguir a vida —, então na
+ * prática TODO ciclo virava um quadradinho solto. Um calendário de ciclo com
+ * marcas de um dia não se lê como período nenhum: parecia que ela menstruou
+ * cinco vezes por um dia.
+ *
+ * Agora pinta os cinco, e a honestidade fica onde ela cabe: só até HOJE. O que
+ * já passou e não foi corrigido, ela viveu; o que ainda não chegou é previsão,
+ * e sai por `fluxoAindaEsperado` no tom mais fraco. Assim o app nunca afirma
+ * que ela menstruou num dia que ainda não aconteceu.
+ *
+ * E `terminou` continua mandando quando existe: o que ela disse vence os cinco,
+ * para mais e para menos. */
+export function diasMenstruada(
+  ciclos: Ciclo[],
+  hoje?: string,
+  /* Quantos dias dura o fluxo dela — o que ela informou, ou cinco. Vem de
+     `situacaoDoCiclo`, que já resolveu essa escada. Sem este parâmetro, quem
+     respondeu "6 dias" via uma faixa de 5 e não entendia por quê: o número
+     dela mudava a previsão e não mudava o desenho. */
+  diasDeFluxo: number = DIAS_DE_FLUXO_PADRAO,
+): Set<string> {
   const dias = new Set<string>()
+  const limite = hoje && ehDataReal(hoje) ? hoje : null
+  const quantosDeFluxo = faixaDeFluxo(diasDeFluxo)
+
   for (const c of ciclos) {
     if (!ehDataReal(c.comecou)) continue
     if (!c.terminou || !ehDataReal(c.terminou) || c.terminou < c.comecou) {
-      dias.add(c.comecou)
+      for (let i = 0; i < quantosDeFluxo; i++) {
+        const d = somandoDias(c.comecou, i)
+        /* Nada além de hoje. O resto do fluxo estimado é previsão, e previsão
+           tem tom próprio. */
+        if (limite && d > limite) break
+        dias.add(d)
+      }
       continue
     }
     /* Teto de segurança: um fim digitado com o mês errado daria centenas de
@@ -92,6 +134,7 @@ export function diasMenstruada(ciclos: Ciclo[]): Set<string> {
 export function diasPrevistos(
   proximaPrevista: string | null,
   ciclos: Ciclo[],
+  diasDeFluxo: number = DIAS_DE_FLUXO_PADRAO,
 ): Set<string> {
   const dias = new Set<string>()
   if (!proximaPrevista || !ehDataReal(proximaPrevista)) return dias
@@ -104,8 +147,42 @@ export function diasPrevistos(
     .filter(d => d >= 1 && d <= 15)
     .sort((a, b) => a - b)
 
-  const quantos = fluxos.length === 0 ? 5 : fluxos[Math.floor(fluxos.length / 2)]
+  /* O que ela MARCOU vence o que informou, que vence cinco — a mesma escada da
+     duração do ciclo, pela mesma razão: medir vence lembrar. */
+  const quantos =
+    fluxos.length === 0 ? faixaDeFluxo(diasDeFluxo) : fluxos[Math.floor(fluxos.length / 2)]
   for (let i = 0; i < quantos; i++) dias.add(somandoDias(proximaPrevista, i))
+  return dias
+}
+
+/* O resto do fluxo que ainda deve vir, no ciclo que está acontecendo agora.
+ *
+ * Existe para o calendário fechar a faixa sem mentir. Ela marca o começo hoje e
+ * vê uma faixa de cinco dias: os dias até hoje no tom cheio, porque aconteceram,
+ * e os que faltam no tom fraco, porque são estimativa. Sem isto, a faixa nascia
+ * com um dia e ia crescendo sozinha ao longo da semana, o que se lê como app
+ * incompleto.
+ *
+ * Só para o ciclo mais recente, e só quando ela não marcou o fim: nos antigos, o
+ * que passou já está pintado, e o que ela marcou vence. */
+export function fluxoAindaEsperado(
+  ciclos: Ciclo[],
+  hoje: string,
+  diasDeFluxo: number = DIAS_DE_FLUXO_PADRAO,
+): Set<string> {
+  const dias = new Set<string>()
+  if (!ehDataReal(hoje)) return dias
+
+  const emAndamento = ciclos
+    .filter(c => ehDataReal(c.comecou) && c.comecou <= hoje && !c.terminou)
+    .sort((a, b) => a.comecou.localeCompare(b.comecou))
+    .pop()
+  if (!emAndamento) return dias
+
+  for (let i = 0; i < faixaDeFluxo(diasDeFluxo); i++) {
+    const d = somandoDias(emAndamento.comecou, i)
+    if (d > hoje) dias.add(d)
+  }
   return dias
 }
 

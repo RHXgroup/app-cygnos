@@ -14,16 +14,59 @@
  * três ciclos, você comeu em média 300 kcal a mais nos quatro dias antes".
  * Isso é o dado dela, e é o que a nutricionista precisa ver.
  *
- * ── Nada de 28 dias por omissão ───────────────────────────────────────────
- * Ciclo de 28 dias é média de população, não a dela. Prever a próxima
- * menstruação com 28 quando ela tem 34 é errar seis dias e chamar isso de
- * previsão. Sem dois registros, este arquivo diz que NÃO SABE.
+ * ── A escada: PERGUNTAR, depois MEDIR ─────────────────────────────────────
+ * Este arquivo dizia "sem dois registros eu NÃO SEI", e não previa nada. Quem
+ * marcava o primeiro dia abria o calendário e via um quadradinho solto: sem
+ * faixa, sem janela fértil, sem próxima data. O app pedia dois meses de fé
+ * antes de devolver qualquer coisa, e ninguém dá dois meses de fé para um
+ * aplicativo grátis.
+ *
+ * A saída não é chutar 28 e chamar de previsão. É PERGUNTAR. A mulher sabe
+ * quanto dura o ciclo dela — é a primeira coisa que qualquer médico pergunta —,
+ * e o app pergunta uma vez, no começo, e usa o número DELA desde o dia um.
+ *
+ * Daí em diante ele fica mais certo sozinho, e a fonte muda de degrau:
+ *
+ *   'padrao'     28 dias. Só enquanto ela não respondeu e não registrou nada.
+ *                Não é previsão, é ponto de partida, e a tela diz isso.
+ *   'informada'  o que ela mesma respondeu. Vale mais que qualquer média de
+ *                população, e vale desde o primeiro dia.
+ *   'medida'     o intervalo entre os começos que ELA registrou. Substitui a
+ *                resposta dela assim que existe, porque medir vence lembrar —
+ *                a estimativa de cabeça costuma ser o número redondo que a
+ *                pessoa ouviu falar, e o registrado é o que aconteceu.
+ *
+ * `origemDaDuracao` sai daqui para a tela escrever a frase certa em cada
+ * degrau. Uma previsão sem a procedência dela vira afirmação, e é aí que o app
+ * passa a mentir sem querer.
+ *
+ * O que a regra antiga protegia continua protegido: `duracaoTipica` só existe
+ * quando foi MEDIDA, e `atrasoEmDias` só sai contra previsão medida. Dizer
+ * "sua menstruação está atrasada" apoiado em 28 dias de população é criar susto
+ * sem base — quem tem ciclo de 31 leria isso todo santo mês.
  *
  * ── Só tipo, nenhum import de execução ─────────────────────────────────────
  * Regra do projeto. Datas entram e saem como texto ISO, que é como o banco
  * guarda e como a comparação funciona igual em qualquer fuso. */
 
 export type Fase = 'menstrual' | 'folicular' | 'ovulatoria' | 'lutea'
+
+/* De onde saiu a duração usada na previsão. Três degraus, do pior para o
+   melhor: a média de população, o que ela informou, e o que foi medido no que
+   ela registrou. */
+export type OrigemDaDuracao = 'padrao' | 'informada' | 'medida'
+
+/* O que ela respondeu quando o app perguntou.
+ *
+ * Existe para o app não precisar de dois meses antes de servir para alguma
+ * coisa. Os dois campos são independentes: dá para saber a duração do ciclo e
+ * não lembrar quantos dias de fluxo, e o contrário também. */
+export type CicloInformado = {
+  /* Duração média do ciclo, em dias, como ela mesma diz. */
+  duracao: number | null
+  /* Quantos dias costuma durar o fluxo. */
+  diasDeFluxo: number | null
+}
 
 export type Ciclo = {
   /* Primeiro dia da menstruação, em ISO. É o único marco que a pessoa observa
@@ -39,17 +82,28 @@ export type Situacao = {
      quando não há registro nenhum. */
   diaDoCiclo: number | null
   fase: Fase | null
-  /* A duração TÍPICA dos ciclos dela, em dias. Nula com menos de dois
-     registros — e aí o app não prevê nada. */
+  /* A duração MEDIDA dos ciclos dela, em dias. Nula enquanto não há dois
+     começos registrados: sem dois não há intervalo nenhum para medir, e a tela
+     não pode escrever "seus ciclos duram X". */
   duracaoTipica: number | null
+  /* A duração que a previsão de fato usou. Nunca nula: é a medida, ou a que ela
+     informou, ou 28 — nesta ordem. */
+  duracaoUsada: number
+  /* De onde `duracaoUsada` veio. A tela escreve uma frase diferente para cada
+     degrau, e é essa frase que separa prever de afirmar. */
+  origemDaDuracao: OrigemDaDuracao
+  /* Quantos dias de fluxo a previsão assume — o que ela marcou, o que informou,
+     ou cinco. */
+  diasDeFluxo: number
   /* Quando a próxima deve começar. Nula quando não dá para prever: sem
      histórico, ou com ciclos irregulares demais. */
   proximaPrevista: string | null
   /* Verdadeiro quando os ciclos dela variam demais para previsão valer.
      Existe para a tela DIZER isso, em vez de mostrar uma data que vai errar. */
   irregular: boolean
-  /* Quantos dias passaram da data prevista. Nulo quando não há previsão ou a
-     data ainda não chegou. */
+  /* Quantos dias passaram da data prevista. Nulo quando não há previsão, quando
+     a data ainda não chegou, e TAMBÉM quando a previsão é estimada: alarmar com
+     atraso apoiado em 28 dias de população é susto sem base. */
   atrasoEmDias: number | null
 }
 
@@ -70,6 +124,17 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/
    outro assunto e não se resolve prevendo. */
 const MINIMO = 15
 const MAXIMO = 45
+
+/* A duração usada enquanto os ciclos dela não dizem outra coisa.
+ *
+ * 28 é média de população, e continua não sendo a dela — a diferença é que
+ * agora o app usa e AVISA, em vez de não mostrar nada. Um mês de uso já
+ * substitui isto pela mediana dos ciclos dela. */
+export const DURACAO_PADRAO = 28
+
+/* Quantos dias de fluxo assumir quando ela não marcou o fim. Cinco é o mais
+   comum, e o erro de um dia só muda o tamanho da faixa no calendário. */
+export const DIAS_DE_FLUXO_PADRAO = 5
 
 /* Quanto os ciclos podem variar antes de a previsão deixar de valer.
  *
@@ -134,13 +199,30 @@ export function faseDoDia(
 export function situacaoDoCiclo(
   ciclos: Ciclo[],
   hoje: string,
+  informado: CicloInformado | null = null,
 ): Situacao {
+  /* O que ela informou, se estiver dentro do que é ciclo humano. Um 3 ou um 300
+     digitado errado não pode virar previsão: entraria em tudo — faixa, janela
+     fértil, aviso — e ninguém ligaria o absurdo da tela ao número digitado
+     meses atrás. */
+  const duracaoInformada =
+    informado?.duracao != null && informado.duracao >= MINIMO && informado.duracao <= MAXIMO
+      ? Math.round(informado.duracao)
+      : null
+  const fluxoInformado =
+    informado?.diasDeFluxo != null && informado.diasDeFluxo >= 1 && informado.diasDeFluxo <= 15
+      ? Math.round(informado.diasDeFluxo)
+      : null
+
   const validos = ciclos.filter(c => ISO.test(c.comecou) && c.comecou <= hoje)
   if (validos.length === 0) {
     return {
       diaDoCiclo: null,
       fase: null,
       duracaoTipica: null,
+      duracaoUsada: duracaoInformada ?? DURACAO_PADRAO,
+      origemDaDuracao: duracaoInformada !== null ? 'informada' : 'padrao',
+      diasDeFluxo: fluxoInformado ?? DIAS_DE_FLUXO_PADRAO,
       proximaPrevista: null,
       irregular: false,
       atrasoEmDias: null,
@@ -154,27 +236,52 @@ export function situacaoDoCiclo(
   const diaDoCiclo = emDias(ultimo.comecou, hoje) + 1
 
   const ds = duracoes(validos)
-  const duracaoTipica = ds.length >= 2 ? mediana(ds) : null
+  /* Um intervalo já é medida DELA, e vale mais do que a lembrança dela ou do que
+     a média de população. A mediana entra a partir de dois, e é ela que aguenta
+     um mês esquecido sem estragar a conta. */
+  const duracaoTipica = ds.length >= 2 ? mediana(ds) : (ds[0] ?? null)
+  /* Irregular precisa de dois intervalos: com um só não há variação para medir,
+     e chamar de irregular quem tem um registro seria inventar. */
   const irregular = ds.length >= 2 && Math.max(...ds) - Math.min(...ds) > VARIACAO_MAXIMA
 
   /* Quantos dias de fluxo, quando ela registrou o fim. Cinco por omissão, que é
      a duração mais comum — e aqui a média serve, porque erra por um dia e o
      efeito é só o rótulo "menstrual" durar um dia a mais ou a menos. */
+  /* A escada do fluxo, na mesma ordem: o que ela marcou neste ciclo, o que
+     informou, e cinco. */
   const fluxo =
     ultimo.terminou !== null && ISO.test(ultimo.terminou)
       ? Math.max(1, emDias(ultimo.comecou, ultimo.terminou) + 1)
-      : 5
+      : (fluxoInformado ?? DIAS_DE_FLUXO_PADRAO)
 
-  const proximaPrevista =
-    duracaoTipica !== null && !irregular ? somandoDias(ultimo.comecou, duracaoTipica) : null
+  /* A escada da duração. Medir vence lembrar, e lembrar vence a média de
+     população — nesta ordem, sempre. */
+  const duracaoUsada = duracaoTipica ?? duracaoInformada ?? DURACAO_PADRAO
+  const origemDaDuracao: OrigemDaDuracao =
+    duracaoTipica !== null ? 'medida' : duracaoInformada !== null ? 'informada' : 'padrao'
 
+  /* Irregular continua sem previsão, e é a única ausência que sobrou: uma pessoa
+     com ciclos de 22 e de 40 não ganha data nenhuma, porque ali nem a mediana
+     vale, e uma data qualquer seria pior do que nenhuma. */
+  const proximaPrevista = irregular ? null : somandoDias(ultimo.comecou, duracaoUsada)
+
+  /* Atraso só contra previsão MEDIDA. Contra o que ela chutou de cabeça, ou
+     contra os 28 de população, "você está atrasada 3 dias" é uma frase que
+     assusta e não sabe de nada. */
   const atraso =
-    proximaPrevista !== null && hoje > proximaPrevista ? emDias(proximaPrevista, hoje) : null
+    origemDaDuracao === 'medida' && proximaPrevista !== null && hoje > proximaPrevista
+      ? emDias(proximaPrevista, hoje)
+      : null
 
   return {
     diaDoCiclo,
-    fase: faseDoDia(diaDoCiclo, duracaoTipica, fluxo),
+    /* A fase passa a sair desde o primeiro ciclo, pela duração usada. Sem isso a
+       tela dizia só "dia 14" e ficava muda sobre o que aquilo significa. */
+    fase: faseDoDia(diaDoCiclo, duracaoUsada, fluxo),
     duracaoTipica,
+    duracaoUsada,
+    origemDaDuracao,
+    diasDeFluxo: fluxo,
     proximaPrevista,
     irregular,
     atrasoEmDias: atraso,

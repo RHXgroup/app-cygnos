@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CalendarioMes } from '../components/CalendarioMes'
 import { DiaDoCiclo } from '../components/DiaDoCiclo'
+import { MeuCiclo } from '../components/MeuCiclo'
 import {
   apagarCiclo,
   carregarCiclos,
@@ -24,6 +25,7 @@ import {
   diaTemAlgoClinico,
   estadoDoCompartilhamento,
   registrarComeco,
+  salvarCicloInformado,
   salvarDia,
   sincronizarCiclo,
   type DiaDoCiclo as Dia,
@@ -32,10 +34,17 @@ import {
 import {
   compararAntesDaMenstruacao,
   situacaoDoCiclo,
+  type CicloInformado,
   type Comparacao,
   type Fase,
 } from '../lib/cicloDaPessoa'
-import { diasMenstruada, diasPrevistos, mesVizinho, somandoDias } from '../lib/calendarioDoCiclo'
+import {
+  diasMenstruada,
+  diasPrevistos,
+  fluxoAindaEsperado,
+  mesVizinho,
+  somandoDias,
+} from '../lib/calendarioDoCiclo'
 import { diasFerteis, janelaFertil } from '../lib/fertilidade'
 import { avisoDaSemana, padraoAntesDaMenstruacao } from '../lib/padraoDoCiclo'
 import { carregarConsumoPeriodo } from '../lib/consumo'
@@ -71,9 +80,16 @@ import { estilosDe, paleta } from '../lib/tema'
  * ajuda; a mesma tela lida ao contrário vira anticoncepção, e a margem deste
  * cálculo tem, aí, consequência que ninguém desfaz.
  *
- * ── Nada de 28 dias ───────────────────────────────────────────────────────
- * Sem dois registros, a tela diz que ainda não sabe prever. Prever com 28 quem
- * tem 34 é errar seis dias e chamar isso de previsão. */
+ * ── Ela responde uma vez, e o app mede daí em diante ──────────────────────
+ * Esta tela já se recusou a prever sem dois ciclos registrados, e o resultado
+ * era um quadradinho solto no calendário por dois meses. Depois chutou 28, que
+ * é a média da população e erra uma semana em quem tem 34.
+ *
+ * O que faltava era PERGUNTAR: duas perguntas, uma vez, no cartão do topo. A
+ * resposta dela vale desde o primeiro dia e é substituída assim que houver dois
+ * começos para medir. A escada inteira está em , e a tela lê
+ *  para escrever a frase certa em cada degrau — porque uma
+ * previsão sem procedência vira afirmação. */
 
 const NOME_DA_FASE: Record<Fase, string> = {
   menstrual: 'Menstruação',
@@ -119,6 +135,15 @@ export function CicloScreen({
      devolve à pessoa o que ela acabou de salvar. */
   const [selecionadoResumo, setSelecionadoResumo] = useState<string | null>(null)
   const [salvandoDia, setSalvandoDia] = useState(false)
+
+  /* O que ela respondeu sobre o próprio ciclo. Vem da mesma linha de
+     `app_contas` que a preferência de compartilhamento. */
+  const [informado, setInformado] = useState<CicloInformado>({ duracao: null, diasDeFluxo: null })
+  const [salvandoInformado, setSalvandoInformado] = useState(false)
+  /* Ela mandou perguntar depois, OU tocou em "alterar". O mesmo estado nos dois
+     sentidos porque a pergunta é a mesma, e o cartão é o mesmo. */
+  const [perguntaAdiada, setPerguntaAdiada] = useState(false)
+  const [perguntaAberta, setPerguntaAberta] = useState(false)
 
   const [compartilha, setCompartilha] = useState(false)
   const [temNutricionista, setTemNutricionista] = useState(false)
@@ -166,6 +191,7 @@ export function CicloScreen({
     const e = await estadoDoCompartilhamento(contaId)
     setCompartilha(e.ligado)
     setTemNutricionista(e.temNutricionista)
+    setInformado(e.informado)
 
     /* Um ano de dias de uma vez. São no máximo 365 linhas curtas, e evita uma
        ida à rede a cada vez que ela vira o mês do calendário. */
@@ -207,13 +233,24 @@ export function CicloScreen({
     }
   }, [carregar, versao])
 
-  const situacao = situacaoDoCiclo(registros ?? [], hoje)
+  /* A escada inteira mora em `situacaoDoCiclo`: o que foi MEDIDO nos registros
+     dela vence o que ela INFORMOU, que vence os 28 de população. A tela só
+     entrega os dois lados e lê `origemDaDuracao` para escrever a frase certa. */
+  const situacao = situacaoDoCiclo(registros ?? [], hoje, informado)
   const janela = janelaFertil(situacao.proximaPrevista)
 
   const pintados = useMemo(
     () => ({
-      menstruada: diasMenstruada(registros ?? []),
-      previstos: diasPrevistos(situacao.proximaPrevista, registros ?? []),
+      /* Com `hoje`: os dias de fluxo que ainda não chegaram não entram aqui.
+         O que ela viveu é faixa cheia; o que falta é previsão, logo abaixo. */
+      menstruada: diasMenstruada(registros ?? [], hoje, situacao.diasDeFluxo),
+      /* A próxima menstruação MAIS o resto do fluxo deste ciclo. Os dois no tom
+         fraco, pela mesma razão: ainda não aconteceram. Sem a segunda parte, a
+         faixa nascia com um dia e ia crescendo sozinha ao longo da semana. */
+      previstos: new Set([
+        ...diasPrevistos(situacao.proximaPrevista, registros ?? [], situacao.diasDeFluxo),
+        ...fluxoAindaEsperado(registros ?? [], hoje, situacao.diasDeFluxo),
+      ]),
       ferteis: diasFerteis(janela),
       /* Só o que é CLÍNICO vira ponto. Se o ponto saísse também para o dia em
          que ela só marcou relação, ele seria a mesma marca para duas coisas
@@ -221,8 +258,25 @@ export function CicloScreen({
       anotados: new Set(dias.filter(diaTemAlgoClinico).map(d => d.data)),
       comRelacao: new Set(dias.filter(d => d.relacao === true).map(d => d.data)),
     }),
-    [registros, dias, situacao.proximaPrevista, janela],
+    [registros, dias, situacao.proximaPrevista, situacao.diasDeFluxo, janela, hoje],
   )
+
+  async function guardarInformado(i: CicloInformado) {
+    setSalvandoInformado(true)
+    const f = await salvarCicloInformado(contaId, i)
+    setSalvandoInformado(false)
+    if (f) {
+      setErro(f.erro)
+      return
+    }
+    setErro('')
+    /* Local na hora: a previsão, a faixa e a janela fértil se refazem no mesmo
+       toque. Reler do banco para descobrir o que ela acabou de digitar seria uma
+       ida à rede para confirmar o óbvio. */
+    setInformado(i)
+    setPerguntaAberta(false)
+    setPerguntaAdiada(true)
+  }
 
   /* O AVISO. É a peça que separa registrar de acompanhar.
    *
@@ -415,8 +469,7 @@ export function CicloScreen({
                 <Text style={styles.grande}>Toque num dia</Text>
                 <Text style={styles.explicacao}>
                   Marque no calendário quando a sua menstruação começou — pode ser hoje, semana
-                  passada ou retrasada. Com dois registros eu já digo a duração dos SEUS ciclos, e
-                  não a média de 28 dias, que é de população.
+                  passada ou retrasada. A partir daí eu mostro a próxima data e a janela fértil.
                 </Text>
               </>
             ) : (
@@ -433,21 +486,59 @@ export function CicloScreen({
                   )}
                 </View>
 
-                {situacao.duracaoTipica !== null ? (
+                {/* Uma frase por degrau da escada, e a diferença entre elas é
+                    a PROCEDÊNCIA do número. Sem ela a estimativa vira
+                    afirmação, e é aí que o app passa a mentir sem querer. */}
+                {situacao.irregular ? (
                   <Text style={styles.linhaInfo}>
                     Os seus ciclos duram{' '}
-                    <Text style={styles.forte}>{situacao.duracaoTipica} dias</Text>.{' '}
-                    {situacao.irregular
-                      ? 'Eles variam bastante entre si, então não vou arriscar uma data. Um ciclo irregular pode ser normal — e também pode valer uma conversa com quem te acompanha.'
-                      : situacao.atrasoEmDias !== null
-                        ? `A previsão era ${diaEMes(situacao.proximaPrevista ?? '')}, há ${situacao.atrasoEmDias} ${situacao.atrasoEmDias === 1 ? 'dia' : 'dias'} — previsão é estimativa, e atrasar acontece.`
-                        : `A próxima deve começar por volta de ${diaEMes(situacao.proximaPrevista ?? '')}.`}
+                    <Text style={styles.forte}>{situacao.duracaoTipica} dias</Text> em média, mas
+                    variam bastante entre si — então não vou arriscar uma data. Um ciclo irregular
+                    pode ser normal, e também pode valer uma conversa com quem te acompanha.
                   </Text>
                 ) : (
                   <Text style={styles.linhaInfo}>
-                    Com mais um começo registrado eu já digo quanto duram os seus ciclos e quando a
-                    próxima deve vir.
+                    {situacao.origemDaDuracao === 'medida' ? (
+                      <>
+                        Os seus ciclos duram{' '}
+                        <Text style={styles.forte}>{situacao.duracaoTipica} dias</Text>, medido nos
+                        seus registros.{' '}
+                      </>
+                    ) : situacao.origemDaDuracao === 'informada' ? (
+                      <>
+                        Contando com o ciclo de{' '}
+                        <Text style={styles.forte}>{situacao.duracaoUsada} dias</Text> que você me
+                        disse.{' '}
+                      </>
+                    ) : (
+                      <>
+                        Ainda estou usando <Text style={styles.forte}>28 dias</Text>, que é a média
+                        geral e pode não ser a sua.{' '}
+                      </>
+                    )}
+                    {situacao.atrasoEmDias !== null
+                      ? `A previsão era ${diaEMes(situacao.proximaPrevista ?? '')}, há ${situacao.atrasoEmDias} ${situacao.atrasoEmDias === 1 ? 'dia' : 'dias'} — previsão é estimativa, e atrasar acontece.`
+                      : `A próxima deve começar por volta de ${diaEMes(situacao.proximaPrevista ?? '')}.`}
                   </Text>
+                )}
+
+                {/* O convite para corrigir o número, e ele só aparece enquanto o
+                    número ainda não foi medido: depois de dois ciclos
+                    registrados, o que ela lembra já não muda nada, e oferecer a
+                    edição ali sugeriria que muda. */}
+                {situacao.origemDaDuracao !== 'medida' && !perguntaAberta && (
+                  <Pressable
+                    onPress={() => setPerguntaAberta(true)}
+                    style={styles.linkCiclo}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="create-outline" size={14} color={paleta().cores.verde} />
+                    <Text style={styles.textoLinkCiclo}>
+                      {situacao.origemDaDuracao === 'informada'
+                        ? 'Alterar a duração do meu ciclo'
+                        : 'Dizer quanto dura o meu ciclo'}
+                    </Text>
+                  </Pressable>
                 )}
 
                 {janela && !situacao.irregular && (
@@ -466,6 +557,21 @@ export function CicloScreen({
               </>
             )}
           </View>
+
+          {/* As duas perguntas. Aparecem sozinhas na primeira vez, e por
+              "alterar" depois — some assim que a medida dos registros dela
+              substitui o que ela lembrava. */}
+          {(perguntaAberta || (situacao.origemDaDuracao === 'padrao' && !perguntaAdiada)) && (
+            <MeuCiclo
+              informado={informado}
+              salvando={salvandoInformado}
+              onSalvar={i => void guardarInformado(i)}
+              onAgoraNao={() => {
+                setPerguntaAberta(false)
+                setPerguntaAdiada(true)
+              }}
+            />
+          )}
 
           {/* Antes do calendário: é o que ela precisa saber ANTES de olhar os
               dias, e é o único bloco da tela que fala do futuro próximo. */}
@@ -650,6 +756,11 @@ const estilos = estilosDe(t =>
     linhaInfo: { fontSize: 13.5, color: t.inkMedio, lineHeight: 20 },
     forte: { fontWeight: '800', color: t.cores.ink },
     ressalva: { fontSize: 12, color: t.inkFraco },
+    /* Texto, e não botão: corrigir a duração é uma coisa que se faz uma vez, e
+       um botão desenhado ali competiria com o registrar, que é o que a tela
+       existe para receber. */
+    linkCiclo: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+    textoLinkCiclo: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
     ajuda: { fontSize: 12, color: t.inkFraco, lineHeight: 17 },
 
     aviso: {

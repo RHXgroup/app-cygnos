@@ -1,6 +1,6 @@
 import { falha } from './erros'
 import { supabase } from './supabase'
-import type { Ciclo } from './cicloDaPessoa'
+import type { Ciclo, CicloInformado } from './cicloDaPessoa'
 
 /* O que fala com o banco sobre o ciclo. O que DECIDE mora em `cicloDaPessoa`,
  * que não importa nada de execução e por isso tem teste de verdade — mesmo
@@ -191,13 +191,26 @@ export async function compartilharCiclo(ligado: boolean): Promise<ResultadoCompa
  * a tela precisa saber a diferença entre "desligado" e "não tem para quem
  * mandar": um interruptor apagado sem explicação faz a pessoa achar que o app
  * quebrou. */
-export type EstadoDoCompartilhamento = { ligado: boolean; temNutricionista: boolean }
+export type EstadoDoCompartilhamento = {
+  ligado: boolean
+  temNutricionista: boolean
+  /* O que ela respondeu sobre o próprio ciclo, quando respondeu.
+   *
+   * Vem junto porque sai da MESMA linha de `app_contas` que a preferência de
+   * compartilhamento: buscar em duas chamadas seria uma ida à rede a mais por
+   * abertura da tela, para ler dois inteiros que estão ali do lado. */
+  informado: CicloInformado
+}
 
 export async function estadoDoCompartilhamento(
   contaId: string,
 ): Promise<EstadoDoCompartilhamento> {
   const [conta, vinculos] = await Promise.all([
-    supabase.from('app_contas').select('compartilha_ciclo').eq('id', contaId).maybeSingle(),
+    supabase
+      .from('app_contas')
+      .select('compartilha_ciclo, ciclo_duracao_informada, ciclo_fluxo_informado')
+      .eq('id', contaId)
+      .maybeSingle(),
     /* Lista, e não `maybeSingle()`.
      *
      * A chave primária de `app_vinculos` é (conta_id, nutricionista_id): uma
@@ -218,11 +231,55 @@ export async function estadoDoCompartilhamento(
 
   return {
     ligado: conta.data?.compartilha_ciclo === true,
+    informado: {
+      duracao: numeroOuNulo(conta.data?.ciclo_duracao_informada),
+      diasDeFluxo: numeroOuNulo(conta.data?.ciclo_fluxo_informado),
+    },
     /* EXATAMENTE um. Com dois, o servidor se recusa a mandar — escolher entre
        profissionais é decisão dela, e não há tela para isso —, e a chave tem de
        aparecer desligada aqui pelo mesmo motivo. */
     temNutricionista: validos.length === 1,
   }
+}
+
+/* O `smallint` chega como número, mas a coluna aceita nulo e o PostgREST pode
+   devolver a linha inteira ausente. `Number(null)` é 0, e um ciclo de zero dias
+   entraria em toda conta desta tela sem erro nenhum — por isso a conversão
+   passa por aqui e não por um `Number()` solto. */
+const numeroOuNulo = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null
+
+/* O que ela respondeu sobre o próprio ciclo.
+ *
+ * ── Por que perguntar, em vez de assumir 28 ───────────────────────────────
+ * A mulher sabe quanto dura o ciclo dela — é a primeira coisa que qualquer
+ * médico pergunta. O app perguntava isso para a NUTRICIONISTA, no questionário,
+ * e não perguntava para a dona do ciclo; e enquanto não perguntava, ou não
+ * previa nada (primeiro mês inteiro sem o app servir para coisa nenhuma) ou
+ * chutava a média da população.
+ *
+ * Os dois campos são independentes de propósito: dá para saber a duração e não
+ * lembrar quantos dias de fluxo. Um `null` aqui quer dizer "ela não respondeu",
+ * e não "zero" — ver `numeroOuNulo`.
+ *
+ * A validação de faixa mora no banco (`check` entre 15 e 45, e entre 1 e 15) e
+ * também em `situacaoDoCiclo`, que descarta o que estiver fora antes de prever.
+ * Repetido de propósito: o banco protege o dado, e a função protege a conta de
+ * quem já tem um valor estranho gravado. */
+export async function salvarCicloInformado(
+  contaId: string,
+  informado: CicloInformado,
+): Promise<{ erro: string } | null> {
+  const { error } = await supabase
+    .from('app_contas')
+    .update({
+      ciclo_duracao_informada: informado.duracao,
+      ciclo_fluxo_informado: informado.diasDeFluxo,
+    })
+    .eq('id', contaId)
+
+  if (!error) return null
+  return { erro: falha('Não consegui guardar os dados do seu ciclo agora.', error) }
 }
 
 /* ── O dia do calendário ───────────────────────────────────────────────────*/

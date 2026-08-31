@@ -35,16 +35,60 @@ console.log('\n1. sem registro nenhum, o app diz que não sabe')
   ok('não inventa atraso', s.atrasoEmDias === null)
 }
 
-console.log('\n2. um registro só: sabe o dia, não prevê')
+console.log('\n2. um registro só: prevê, e diz de onde tirou o número')
 
 {
   const s = situacaoDoCiclo([c('2026-08-25')], '2026-08-30')
   ok('dia 6 do ciclo', s.diaDoCiclo === 6, String(s.diaDoCiclo))
-  ok('sem duração típica', s.duracaoTipica === null)
-  ok('sem previsão', s.proximaPrevista === null)
-  /* Um registro só não permite dizer folicular, lútea nem nada — mas ela
-     ESTAVA menstruada nos primeiros dias, e isso ela observou. */
-  ok('fase null fora do fluxo', s.fase === null, String(s.fase))
+  /* MEDIDA continua nula: um começo só não tem intervalo nenhum para medir, e a
+     tela não pode escrever "seus ciclos duram X". */
+  ok('sem duração medida', s.duracaoTipica === null)
+  /* Mas prevê. A versão que se recusava a prever deixava quem marcava o
+     primeiro dia com um quadradinho solto no calendário — sem faixa, sem janela
+     fértil, sem data — por dois meses. */
+  ok('prevê mesmo assim', s.proximaPrevista === '2026-09-22', String(s.proximaPrevista))
+  ok('e diz que o número é de população', s.origemDaDuracao === 'padrao', s.origemDaDuracao)
+  ok('fase sai desde o primeiro ciclo', s.fase === 'folicular', String(s.fase))
+  /* O que a regra antiga protegia continua protegido: nada de "você está
+     atrasada" apoiado em 28 dias de população. */
+  ok('sem atraso contra previsão de população', s.atrasoEmDias === null)
+}
+
+console.log('\n2b. o que ELA informou vence os 28, e é substituído pelo medido')
+
+{
+  const s = situacaoDoCiclo([c('2026-08-25')], '2026-08-30', { duracao: 34, diasDeFluxo: 6 })
+  ok('usa os 34 dela', s.duracaoUsada === 34, String(s.duracaoUsada))
+  ok('a origem é a resposta dela', s.origemDaDuracao === 'informada', s.origemDaDuracao)
+  ok('a previsão anda junto', s.proximaPrevista === '2026-09-28', String(s.proximaPrevista))
+  ok('o fluxo informado também vale', s.diasDeFluxo === 6, String(s.diasDeFluxo))
+  /* Nem contra o número dela: ela LEMBROU, não mediu. */
+  ok('e continua sem atraso', s.atrasoEmDias === null)
+}
+
+{
+  /* Dois começos: agora existe intervalo, e MEDIR vence LEMBRAR. Ela disse 34, e
+     os registros dela dizem 30 — vale 30. */
+  const s = situacaoDoCiclo(
+    [c('2026-07-01'), c('2026-07-31')], '2026-08-10', { duracao: 34, diasDeFluxo: 5 },
+  )
+  ok('a medida substitui a resposta', s.duracaoUsada === 30, String(s.duracaoUsada))
+  ok('e a origem muda', s.origemDaDuracao === 'medida', s.origemDaDuracao)
+  ok('duracaoTipica passa a existir', s.duracaoTipica === 30, String(s.duracaoTipica))
+}
+
+{
+  /* Fora da faixa do ciclo humano não entra. Um 3 ou um 300 digitado errado
+     entraria na faixa do calendário, na janela fértil e no aviso da semana — e
+     ninguém ligaria o absurdo da tela ao número digitado meses antes. */
+  const curto = situacaoDoCiclo([c('2026-08-25')], '2026-08-30', { duracao: 3, diasDeFluxo: null })
+  ok('3 dias é recusado', curto.origemDaDuracao === 'padrao', curto.origemDaDuracao)
+  const longo = situacaoDoCiclo([c('2026-08-25')], '2026-08-30', { duracao: 300, diasDeFluxo: null })
+  ok('300 dias é recusado', longo.origemDaDuracao === 'padrao', longo.origemDaDuracao)
+  const fluxoAbsurdo = situacaoDoCiclo(
+    [c('2026-08-25')], '2026-08-30', { duracao: null, diasDeFluxo: 40 },
+  )
+  ok('fluxo de 40 dias é recusado', fluxoAbsurdo.diasDeFluxo === 5, String(fluxoAbsurdo.diasDeFluxo))
 }
 
 {

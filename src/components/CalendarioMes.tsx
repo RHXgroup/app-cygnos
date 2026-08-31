@@ -27,6 +27,16 @@ import { estilosDe, paleta } from '../lib/tema'
  * O único preenchimento forte da tela é HOJE, em tinta neutra. Um por tela é o
  * que faz ele significar alguma coisa; três não significam nenhum.
  *
+ * ── E o dia selecionado deixou de ser uma caixa ───────────────────────────
+ * Ele tinha um anel próprio, e quem usou leu como "um negócio quadrado quando
+ * eu seleciono um dia". Dois contornos na mesma célula — o anel de hoje e o de
+ * selecionado — brigam, e o de selecionado ainda ganhava do que a célula
+ * significa.
+ *
+ * Agora o selecionado é só o número em NEGRITO. É suficiente porque o dia
+ * selecionado nunca está sozinho: ou a folha dele está aberta por cima, ou o
+ * cartão logo abaixo já está mostrando o que tem nele.
+ *
  * ── O que saiu ────────────────────────────────────────────────────────────
  * A borda tracejada do previsto (truque de 2010, e chamava mais atenção que o
  * dia registrado), o anel verde da janela fértil (virou ponto embaixo), a
@@ -67,7 +77,11 @@ export function CalendarioMes({
   ano: number
   mes: number
   hoje: string
+  /* Dias em que ela menstruou. Quando não marcou o fim, são os dias de fluxo
+     que já aconteceram — a faixa cheia. */
   menstruada: Set<string>
+  /* A próxima menstruação prevista, MAIS o resto do fluxo deste ciclo que ainda
+     deve vir. Os dois no tom fraco, pela mesma razão: ainda não aconteceram. */
   previstos: Set<string>
   /* A janela fértil estimada. Só sai quando há previsão de verdade. */
   ferteis: Set<string>
@@ -193,15 +207,10 @@ export function CalendarioMes({
                 />
               )}
 
-              <View
-                style={[
-                  styles.dia,
-                  /* O ÚNICO preenchimento forte da tela é hoje, em tinta neutra.
-                     Um por tela é o que faz ele significar alguma coisa. */
-                  d.ehHoje && styles.diaHoje,
-                  escolhido && !d.ehHoje && styles.diaEscolhido,
-                ]}
-              >
+              {/* Um contorno só na tela, e ele é o de hoje. O anel do dia
+                  selecionado saiu daqui: dois contornos na mesma célula brigam,
+                  e o segundo lia como caixa quadrada. */}
+              <View style={[styles.dia, d.ehHoje && styles.diaHoje]}>
                 <Text
                   style={[
                     styles.numero,
@@ -209,6 +218,7 @@ export function CalendarioMes({
                     ehPrevisto && styles.numeroPrevisto,
                     d.futuro && !ehPrevisto && styles.numeroFuturo,
                     d.ehHoje && styles.numeroHoje,
+                    escolhido && styles.numeroEscolhido,
                   ]}
                 >
                   {d.dia}
@@ -281,8 +291,7 @@ const estilos = estilosDe(t =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    diaHoje: { backgroundColor: t.cores.ink },
-    diaEscolhido: { borderWidth: 1.5, borderColor: t.cores.ink },
+    diaHoje: { backgroundColor: t.cores.ink, borderRadius: 15 },
 
     numero: { fontSize: 14.5, fontWeight: '600', color: t.cores.ink },
     /* Número NA COR, e não branco sobre preenchimento. Branco sobre vermelho é
@@ -291,6 +300,10 @@ const estilos = estilosDe(t =>
     numeroPrevisto: { color: t.cores.cicloPrevisto, fontWeight: '700' },
     numeroFuturo: { color: t.inkFraco },
     numeroHoje: { color: t.cores.branco, fontWeight: '800' },
+    /* O selecionado é só o peso da fonte. Ele nunca precisa se defender sozinho:
+       ou a folha do dia está aberta por cima, ou o cartão abaixo do calendário
+       está mostrando o que tem nele. */
+    numeroEscolhido: { fontWeight: '900' },
 
     marcas: {
       flexDirection: 'row',

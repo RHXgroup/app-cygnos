@@ -142,7 +142,11 @@ console.log('\n3. lista fora de ordem, duplicada, e repetida')
     { comecou: '2026-07-04', terminou: null },
     { comecou: '2026-08-01', terminou: null },
   ]
-  ok('menstruada não depende da ordem', diasMenstruada(ciclos).size === 3)
+  /* Três ciclos sem fim marcado, cinco dias cada, sem sobreposição: 15 dias.
+     A ordem da lista não muda nada — o Set nasce do conteúdo, e não do
+     caminho. */
+  ok('menstruada não depende da ordem', diasMenstruada(ciclos).size === 15,
+    String(diasMenstruada(ciclos).size))
 }
 
 console.log('\n4. texto absurdo, emoji, e coisa que não é texto')

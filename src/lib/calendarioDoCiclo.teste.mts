@@ -1,5 +1,6 @@
 import {
   diasMenstruada,
+  fluxoAindaEsperado,
   diasNoMes,
   diasPrevistos,
   marcaDoDia,
@@ -118,18 +119,74 @@ console.log('\n5. os dias em que ela estava menstruada')
 }
 
 {
-  /* Sem fim marcado, só o primeiro dia. Pintar cinco por suposição mostraria
-     como fato o que ela não disse. */
+  /* Sem fim marcado, pinta os cinco dias de fluxo.
+     Já pintou UM, com o argumento de que cinco mostraria como fato o que ela não
+     disse. O argumento estava certo e o calendário estava errado: quase ninguém
+     volta para marcar o fim, então na prática TODO ciclo virava um quadradinho
+     solto — parecia que ela menstruou cinco vezes por um dia. */
   const d = diasMenstruada([c('2026-08-10')])
-  ok('sem fim, um dia só', d.size === 1 && d.has('2026-08-10'))
+  ok('sem fim, pinta os cinco', d.size === 5, String(d.size))
+  ok('do começo', d.has('2026-08-10'))
+  ok('ao quinto dia', d.has('2026-08-14'))
+  ok('e não o sexto', !d.has('2026-08-15'))
+}
+
+{
+  /* A honestidade fica no `hoje`: o que ainda não aconteceu não vira faixa
+     cheia. O resto sai por `fluxoAindaEsperado`, no tom fraco. */
+  const d = diasMenstruada([c('2026-08-10')], '2026-08-12')
+  ok('nada além de hoje', d.size === 3, String(d.size))
+  ok('hoje entra', d.has('2026-08-12'))
+  ok('amanhã não', !d.has('2026-08-13'))
+}
+
+{
+  /* O tamanho informado por ela chega até o desenho. Sem isto, quem respondeu
+     "6 dias" via uma faixa de 5: o número dela mudava a previsão e não mudava o
+     calendário, e não havia como ligar uma coisa à outra. */
+  const seis = diasMenstruada([c('2026-08-10')], undefined, 6)
+  ok('fluxo informado de 6 pinta seis', seis.size === 6, String(seis.size))
+  ok('e vai até o dia 15', seis.has('2026-08-15'))
+  ok('resto do fluxo também respeita o 6',
+    fluxoAindaEsperado([c('2026-08-10')], '2026-08-12', 6).size === 3)
+  ok('e o previsto também',
+    diasPrevistos('2026-09-10', [c('2026-08-10')], 6).size === 6)
+
+  /* Valor absurdo não desenha faixa de trezentos dias. Ele já é recusado em
+     `situacaoDoCiclo`, mas chamada antiga e teste também chegam aqui. */
+  ok('300 dias é aparado', diasMenstruada([c('2026-08-10')], undefined, 300).size === 15)
+  ok('zero vira um', diasMenstruada([c('2026-08-10')], undefined, 0).size === 1)
+  ok('NaN cai no padrão', diasMenstruada([c('2026-08-10')], undefined, NaN).size === 5)
+}
+
+{
+  const f = fluxoAindaEsperado([c('2026-08-10')], '2026-08-12')
+  ok('o que falta do fluxo são dois dias', f.size === 2, String(f.size))
+  ok('amanhã', f.has('2026-08-13'))
+  ok('e depois', f.has('2026-08-14'))
+  ok('sem repetir o que já passou', !f.has('2026-08-12'))
+
+  /* Ciclo com fim marcado não tem "resto esperado": ela já disse quando acabou,
+     e o app não discute com ela. */
+  ok('com fim marcado não sobra nada',
+    fluxoAindaEsperado([c('2026-08-10', '2026-08-11')], '2026-08-12').size === 0)
+  /* Fluxo já terminado não deixa resto, e o começo no futuro não conta. */
+  ok('fluxo vencido não sobra nada',
+    fluxoAindaEsperado([c('2026-08-10')], '2026-08-30').size === 0)
+  ok('começo no futuro é ignorado',
+    fluxoAindaEsperado([c('2026-09-10')], '2026-08-30').size === 0)
+  ok('sem ciclo nenhum', fluxoAindaEsperado([], '2026-08-30').size === 0)
+  ok('hoje inválido não estoura', fluxoAindaEsperado([c('2026-08-10')], 'lixo').size === 0)
 }
 
 {
   ok('começo e fim no mesmo dia conta um', diasMenstruada([c('2026-08-10', '2026-08-10')]).size === 1)
+  /* Fim impossível cai na regra do "sem fim", que agora são cinco dias. O que
+     importa aqui é que ele não pinta de agosto a maio. */
   ok('fim ANTES do começo é tratado como sem fim',
-    diasMenstruada([c('2026-08-10', '2026-08-01')]).size === 1)
+    diasMenstruada([c('2026-08-10', '2026-08-01')]).size === 5)
   ok('data inválida é ignorada', diasMenstruada([c('nao é data', '2026-08-14')]).size === 0)
-  ok('fim inválido vira sem fim', diasMenstruada([c('2026-08-10', 'lixo')]).size === 1)
+  ok('fim inválido vira sem fim', diasMenstruada([c('2026-08-10', 'lixo')]).size === 5)
   ok('lista vazia', diasMenstruada([]).size === 0)
 }
 
