@@ -52,16 +52,35 @@ import { estilosDe, paleta } from '../lib/tema'
 
 /* '2026-08-01' → 'Sáb, 01/08'. Lida como número e não com new Date(texto): a
    string sem hora é interpretada como UTC, e no fuso de Brasília isso devolve o
-   dia anterior. */
-function rotuloDoDia(iso: string, hoje = dataISO(new Date())): string {
+   dia anterior.
+ *
+ * ── Por que NÃO é o `rotuloDoDia` de lib/formatar ─────────────────────────
+ * Chamava-se assim, e o nome enganava: parecia a armadilha 5, duas
+ * implementações do mesmo assunto. Não é — as duas dizem coisas diferentes
+ * sobre o mesmo dia, e de propósito.
+ *
+ * A noite é indexada pelo dia em que a pessoa ACORDOU. A noite com a data de
+ * hoje é a madrugada que acabou de passar; chamá-la de "Hoje", como faria a de
+ * `formatar`, diria que ela dormiu hoje à noite — que ainda não aconteceu.
+ *
+ * Assunto diferente, função diferente, e agora nome diferente também. */
+function rotuloDaNoite(iso: string, hoje = dataISO(new Date())): string {
+  if (iso === hoje) return 'Esta madrugada'
+
+  /* Ontem a partir do `hoje` que entrou, e não de `new Date()`.
+     Com dois relógios a função se contradizia quando `hoje` era passado. */
+  const [ah, mh, dh] = hoje.split('-').map(Number)
+  const ontem = new Date(ah, mh - 1, dh - 1)
+  if (iso === dataISO(ontem)) return 'Noite de ontem'
+
+  /* `DIAS_CURTOS[d.getDay()]` com data torta é `undefined`, e o `padStart`
+     aceita a string "undefined" sem reclamar: '2026-13-45' saía como
+     "Dom, 45/13" e 'lixo' como "undefined, undefined/undefined". Ida e volta
+     pelo Date confere de uma vez o formato, o alcance e o 31 de fevereiro. */
   const [ano, mes, dia] = iso.split('-').map(Number)
   const d = new Date(ano, mes - 1, dia)
+  if (dataISO(d) !== iso) return 'Data desconhecida'
 
-  const ontem = new Date()
-  ontem.setDate(ontem.getDate() - 1)
-
-  if (iso === hoje) return 'Esta madrugada'
-  if (iso === dataISO(ontem)) return 'Noite de ontem'
   return `${DIAS_CURTOS[d.getDay()]}, ${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
 }
 
@@ -255,7 +274,7 @@ export function SonoScreen({
               </Pressable>
 
               <View style={styles.centroNavegacao}>
-                <Text style={styles.rotuloNoite}>{rotuloDoDia(dia)}</Text>
+                <Text style={styles.rotuloNoite}>{rotuloDaNoite(dia)}</Text>
                 {salva && <Text style={styles.jaRegistrada}>já registrada</Text>}
               </View>
 
@@ -505,9 +524,9 @@ export function SonoScreen({
                     onPress={() => setDia(n.data)}
                     style={({ pressed }) => [styles.linhaNoite, pressed && styles.chipPressionado]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Abrir a noite de ${rotuloDoDia(n.data)}`}
+                    accessibilityLabel={`Abrir a noite de ${rotuloDaNoite(n.data)}`}
                   >
-                    <Text style={styles.dataNoite}>{rotuloDoDia(n.data)}</Text>
+                    <Text style={styles.dataNoite}>{rotuloDaNoite(n.data)}</Text>
                     <Text style={styles.duracaoNoite}>{duracao(tempoDormindo(n))}</Text>
                     {n.qualidade !== null && (
                       <View style={styles.seloQualidade}>
@@ -519,7 +538,7 @@ export function SonoScreen({
                       hitSlop={10}
                       style={({ pressed }) => [styles.apagar, pressed && styles.apagarPressionado]}
                       accessibilityRole="button"
-                      accessibilityLabel={`Apagar a noite de ${rotuloDoDia(n.data)}`}
+                      accessibilityLabel={`Apagar a noite de ${rotuloDaNoite(n.data)}`}
                     >
                       <Ionicons name="close" size={15} color={paleta().inkFraco} />
                     </Pressable>
@@ -554,7 +573,7 @@ export function SonoScreen({
 
       {desfazivel && (
         <BarraDesfazer
-          texto={`Noite de ${rotuloDoDia(desfazivel.data)} apagada`}
+          texto={`Noite de ${rotuloDaNoite(desfazivel.data)} apagada`}
           onDesfazer={desfazer}
           bottom={bottom + 16}
         />
