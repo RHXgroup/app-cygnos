@@ -14,10 +14,10 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
+import { Confirmacao } from '../components/Confirmacao'
 import {
   carregarCatalogo,
   conversaNoApp,
@@ -473,6 +473,8 @@ function Ficha({
   onDesvincular: () => Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }>
 }) {
   const [saindo, setSaindo] = useState(false)
+  const [perguntando, setPerguntando] = useState(false)
+  const [erroSaida, setErroSaida] = useState('')
   const styles = estilos()
   /* Uma consulta em destaque e a contagem do resto. A ficha não é a agenda: ela
      responde "e agora?" numa linha, e quem quiser a lista inteira toca e abre a
@@ -576,41 +578,56 @@ function Ficha({
           acompanhamento, não vem sair dele. Mas existe, e sem pedir motivo —
           trocar de profissional é rotina, e um formulário de justificativa
           transformaria isso em rompimento. */}
+      {/* Discreto e no fim, como toda saída: quem entra aqui vem ver o
+          acompanhamento, não vem sair dele. */}
       <Pressable
-        onPress={() => {
-          if (saindo) return
-          Alert.alert(
-            'Encerrar o acompanhamento?',
-            `Você deixa de ser acompanhada por ${nutri.nome}. O que ela já registrou continua no seu app, e o seu ciclo deixa de ser compartilhado.
-
-Você pode procurar outra nutricionista depois.`,
-            [
-              { text: 'Continuar acompanhada', style: 'cancel' },
-              {
-                text: 'Encerrar',
-                style: 'destructive',
-                onPress: async () => {
-                  setSaindo(true)
-                  const r = await onDesvincular()
-                  setSaindo(false)
-                  /* Só na falha: no sucesso a tela troca de ramo sozinha e este
-                     componente deixa de existir. */
-                  if (r.tipo === 'erro') Alert.alert('Não deu certo', r.mensagem)
-                },
-              },
-            ],
-          )
-        }}
+        onPress={() => setPerguntando(true)}
         style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
         accessibilityRole="button"
         accessibilityLabel={`Encerrar o acompanhamento com ${nutri.nome}`}
       >
-        {saindo ? (
-          <ActivityIndicator size="small" color={paleta().inkFraco} />
-        ) : (
-          <Text style={styles.textoSair}>Encerrar acompanhamento</Text>
-        )}
+        <Text style={styles.textoSair}>Encerrar acompanhamento</Text>
       </Pressable>
+
+      {/* A caixa da casa, e não o `Alert.alert` do sistema.
+       *
+       * Eu tinha usado o Alert nativo — que aparece com a cara do Android no
+       * meio de um app com desenho próprio — sendo que este componente existe
+       * desde antes, e existe exatamente por causa disso. O comentário dentro
+       * dele diz: "uma caixa que não se parece com o app parece um aviso do
+       * celular, e a pessoa lê com outra atenção".
+       *
+       * Escrevi novo sem procurar o que já havia. É a armadilha 5, e o meu
+       * arquivo era o ÚNICO do app ainda chamando Alert.alert. */}
+      <Confirmacao
+        visivel={perguntando}
+        titulo="Encerrar o acompanhamento?"
+        mensagem={`Você deixa de ser acompanhada por ${nutri.nome}. O que ela já registrou continua no seu app, e o seu ciclo deixa de ser compartilhado.
+
+Você pode procurar outra nutricionista depois.`}
+        rotuloConfirmar="Encerrar"
+        rotuloCancelar="Continuar acompanhada"
+        destrutiva
+        ocupada={saindo}
+        onCancelar={() => setPerguntando(false)}
+        onConfirmar={async () => {
+          setSaindo(true)
+          const r = await onDesvincular()
+          setSaindo(false)
+          setPerguntando(false)
+          if (r.tipo === 'erro') setErroSaida(r.mensagem)
+        }}
+      />
+
+      <Confirmacao
+        visivel={!!erroSaida}
+        titulo="Não deu certo"
+        mensagem={erroSaida}
+        rotuloConfirmar="Entendi"
+        rotuloCancelar="Fechar"
+        onCancelar={() => setErroSaida('')}
+        onConfirmar={() => setErroSaida('')}
+      />
     </>
   )
 }

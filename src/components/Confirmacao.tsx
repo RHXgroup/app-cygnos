@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import type { ReactNode } from 'react'
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* A pergunta antes de uma ação sem volta.
@@ -19,12 +20,20 @@ export function Confirmacao({
   rotuloConfirmar = 'Confirmar',
   rotuloCancelar = 'Cancelar',
   destrutiva = false,
+  ocupada = false,
+  children,
   onConfirmar,
   onCancelar,
 }: {
   visivel: boolean
   titulo: string
   mensagem: string
+  /* O que vai ENTRE a mensagem e os botões: um campo, uma escolha, um aviso.
+     A caixa continua servindo para perguntar "tem certeza?" sem nada disso. */
+  children?: ReactNode
+  /* A ação está em curso. O confirmar apaga e para de responder, para dois
+     toques não virarem duas ações. */
+  ocupada?: boolean
   rotuloConfirmar?: string
   rotuloCancelar?: string
   /* Pinta o botão de confirmar como perigo. Reservado para o que não tem
@@ -51,6 +60,8 @@ export function Confirmacao({
           <Text style={styles.titulo}>{titulo}</Text>
           <Text style={styles.mensagem}>{mensagem}</Text>
 
+          {children}
+
           <View style={styles.botoes}>
             <Pressable
               onPress={onCancelar}
@@ -62,10 +73,11 @@ export function Confirmacao({
 
             <Pressable
               onPress={onConfirmar}
+              disabled={ocupada}
               style={({ pressed }) => [
                 styles.botao,
                 destrutiva ? styles.botaoPerigo : styles.botaoConfirmar,
-                pressed && styles.pressionado,
+                (pressed || ocupada) && styles.pressionado,
               ]}
               accessibilityRole="button"
             >
