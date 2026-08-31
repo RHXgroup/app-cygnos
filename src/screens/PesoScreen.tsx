@@ -16,6 +16,8 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
 import { MiniGrafico } from '../components/MiniGrafico'
+import { carregarGastoMedido } from '../lib/metas'
+import { fraseDoGasto, type GastoReal } from '../lib/gastoReal'
 import {
   fraseDaDistancia,
   resumoDaTendencia,
@@ -76,6 +78,11 @@ export function PesoScreen({
   const [mudou, setMudou] = useState(false)
   const [texto, setTexto] = useState('')
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
+  /* O gasto MEDIDO, quando já há registro suficiente para calculá-lo.
+   *
+   * Nulo com menos de catorze dias registrados ou cobertura baixa — a regra
+   * mora em `gastoReal.ts`, e a tela só desenha o que ela devolver. */
+  const [gasto, setGasto] = useState<GastoReal | null>(null)
 
   /* O foco vem de app_contas, definido na tela de Perfil. Efeito separado e sem
      mexer no `carregando`: um campo só não pode segurar a tela inteira. */
@@ -84,6 +91,13 @@ export function PesoScreen({
 
     carregarObjetivoPeso(contaId).then(r => {
       if (ativo && r.tipo === 'ok') setObjetivo(r.objetivo)
+    })
+
+    /* Sem mexer no `carregando`, pelo mesmo motivo do foco logo acima: é uma
+       frase a mais, e uma frase não pode segurar a tela do peso. Falha vira
+       nulo lá dentro, e nulo aqui é uma frase que não aparece. */
+    carregarGastoMedido(contaId).then(g => {
+      if (ativo) setGasto(g)
     })
 
     return () => {
@@ -320,6 +334,35 @@ export function PesoScreen({
                 const f = fraseDaDistancia(resumoDaTendencia(tendenciaDoPeso(registros)))
                 return f === null ? null : <Text style={styles.explicaTendencia}>{f}</Text>
               })()}
+
+              {/* O GASTO MEDIDO, e de onde ele saiu.
+               *
+               * É a coisa mais valiosa que este app calcula, e ela era calculada
+               * e não chegava a lugar nenhum: `carregarGastoMedido` devolvia só
+               * o número, a tela de Metas usava o número, e a frase que explica
+               * a conta ficou sem chamador. Apareceu na lista de órfãos.
+               *
+               * Fica AQUI, e não na tela de Metas, porque é aqui que a pessoa
+               * está olhando a linha de tendência — e o gasto medido é a
+               * resposta da pergunta seguinte: por que ela anda, ou por que não
+               * anda.
+               *
+               * Fórmula estática erra de 15 a 25% por pessoa. Errar 20% em 2.000
+               * kcal são 400 por dia: quem come 400 a mais do que pensa não
+               * emagrece, conclui que dieta não funciona com ela, e larga. */}
+              {gasto !== null && (
+                <View style={styles.blocoGasto}>
+                  <View style={styles.linhaTituloGasto}>
+                    <Ionicons name="flame-outline" size={15} color={paleta().cores.limao} />
+                    <Text style={styles.tituloGasto}>Seu gasto medido</Text>
+                  </View>
+                  <Text style={styles.textoGasto}>{fraseDoGasto(gasto)}</Text>
+                  <Text style={styles.diasDoGasto}>
+                    {gasto.diasRegistrados} dias com comida anotada dentro de {gasto.diasDoPeriodo}.
+                    Quanto mais dias, mais firme fica o número.
+                  </Text>
+                </View>
+              )}
 
               {/* O ritmo é o que faz a variação querer dizer alguma coisa:
                   "perdeu 2,3 kg" é uma frase diferente em três semanas e em oito
@@ -640,6 +683,22 @@ linhaRitmo: {
   ajuda: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
   /* A explicacao do susto tem peso proprio: ela e a frase que impede alguem de
      largar o plano por causa de 1 kg de agua. */
+  blocoGasto: {
+    marginTop: 14,
+    padding: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+    gap: 6,
+  },
+  linhaTituloGasto: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  tituloGasto: { fontSize: 13, fontWeight: '800', color: t.cores.ink },
+  textoGasto: { fontSize: 12.5, lineHeight: 18, color: t.inkMedio },
+  /* Menor e mais apagado: é a nota de rodapé da frase acima, e não uma segunda
+     afirmação com o mesmo peso. */
+  diasDoGasto: { fontSize: 11, lineHeight: 15.5, color: t.inkFraco },
+
   explicaTendencia: {
     fontSize: 12.5,
     lineHeight: 18,

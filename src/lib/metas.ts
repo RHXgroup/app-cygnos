@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { falha } from './erros'
 import { carregarConsumoPeriodo } from './consumo'
 import { carregarPeso } from './peso'
-import { gastoReal } from './gastoReal'
+import { gastoReal, type GastoReal } from './gastoReal'
 import { tendenciaDoPeso } from './tendenciaDoPeso'
 import { dataISO } from './formatar'
 import {
@@ -542,7 +542,15 @@ export async function carregarCorpoDaConta(contaId: string): Promise<{
  *
  * Devolve null em qualquer falha — item 11. A tela cai na fórmula, que é o que
  * ela já fazia. */
-export async function carregarGastoMedido(contaId: string): Promise<number | null> {
+/* Devolve o GASTO INTEIRO, e não só o número.
+ *
+ * Devolvia `.kcal` e jogava o resto fora — a média consumida, quanto o peso
+ * andou, quantos dias entraram na conta. E é justamente esse resto que responde
+ * a pergunta que vem depois do número: de onde ele saiu.
+ *
+ * `fraseDoGasto`, que existe para escrever isso, ficou sem chamador nenhum no
+ * app por causa deste `?.kcal`. Apareceu na lista do `npm run orfaos`. */
+export async function carregarGastoMedido(contaId: string): Promise<GastoReal | null> {
   const DIAS = 56
 
   const ate = new Date()
@@ -565,16 +573,14 @@ export async function carregarGastoMedido(contaId: string): Promise<number | nul
     porDia.set(i.data, (porDia.get(i.data) ?? 0) + i.calorias)
   }
 
-  return (
-    gastoReal(
-      [...porDia].map(([data, calorias]) => ({ data, calorias: Math.round(calorias) })),
-      /* A LINHA DE TENDÊNCIA, e não a balança: dois quilos entre duas pesagens
-         podem ser água, e um gasto calculado em cima disso erraria por
-         centenas de calorias. */
-      tendenciaDoPeso(pesos.peso.registros).map(t => ({
-        data: t.data,
-        tendencia: t.tendencia,
-      })),
-    )?.kcal ?? null
+  return gastoReal(
+    [...porDia].map(([data, calorias]) => ({ data, calorias: Math.round(calorias) })),
+    /* A LINHA DE TENDÊNCIA, e não a balança: dois quilos entre duas pesagens
+       podem ser água, e um gasto calculado em cima disso erraria por centenas
+       de calorias. */
+    tendenciaDoPeso(pesos.peso.registros).map(t => ({
+      data: t.data,
+      tendencia: t.tendencia,
+    })),
   )
 }

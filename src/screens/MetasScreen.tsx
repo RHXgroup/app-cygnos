@@ -213,7 +213,10 @@ export function MetasScreen({
         /* A escada: o MEDIDO vence o calculo dela, que vence a formula.
            Formula estatica erra de 15 a 25% por pessoa, e o medido sai do que
            ela realmente comeu contra o que o peso fez. */
-        if (ativo) setSugestao(metasSugeridas(corpo, corpo.alvoKcalDoCalculo, medido))
+        /* Só o número aqui: esta tela sugere metas, e a explicação de onde o
+           gasto saiu mora na tela de Peso, junto da linha de tendência que o
+           produziu. */
+        if (ativo) setSugestao(metasSugeridas(corpo, corpo.alvoKcalDoCalculo, medido?.kcal ?? null))
       },
     )
     return () => {
