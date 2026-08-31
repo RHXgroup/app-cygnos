@@ -241,5 +241,153 @@ console.log('\n4. o que NENHUMA frase pode dizer')
     d.every(x => /\d/.test(x.texto) && x.base >= 4), JSON.stringify(d.map(x => x.base)))
 }
 
+console.log('\n5. emagrecendo com proteina baixa')
+
+{
+  /* Perdeu 3 kg, comendo 70 g de proteina para 67 kg -> 1,04 g/kg. Abaixo de
+     1,2. */
+  const pesos = [
+    { data: dia(1), kg: 70 },
+    { data: dia(10), kg: 69 },
+    { data: dia(20), kg: 68 },
+    { data: dia(28), kg: 67 },
+  ]
+  const dias = Array.from({ length: 10 }, (_, i) => ({
+    data: dia(i + 1), calorias: 1600, proteinas: 70,
+  }))
+  const d = descobertas({ ...VAZIO, pesos, dias })
+  ok('achou', d.length === 1, JSON.stringify(d.map(x => x.chave)))
+  ok('e a da proteina', d[0]?.chave === 'proteina_no_deficit')
+  ok('diz quanto perdeu', d[0]?.texto.includes('3,0 kg'), d[0]?.texto)
+  ok('e quanto come por quilo', d[0]?.texto.includes('1,0 g por quilo'), d[0]?.texto)
+  ok('diz em quantos dias', d[0]?.texto.includes('10 dias'), d[0]?.texto)
+  /* Aponta para a nutricionista: e o unico lugar do app em que uma descoberta
+     manda falar com alguem, e e porque aqui ha o que fazer a respeito. */
+  ok('aponta para a nutricionista', d[0]?.texto.includes('nutricionista'), d[0]?.texto)
+}
+
+{
+  /* Proteina em ordem: 1,5 g/kg para 67 kg = 100 g. O app cala. */
+  const pesos = [
+    { data: dia(1), kg: 70 }, { data: dia(10), kg: 69 },
+    { data: dia(20), kg: 68 }, { data: dia(28), kg: 67 },
+  ]
+  const dias = Array.from({ length: 10 }, (_, i) => ({
+    data: dia(i + 1), calorias: 1600, proteinas: 100,
+  }))
+  ok('proteina em ordem, o app cala', descobertas({ ...VAZIO, pesos, dias }).length === 0)
+}
+
+{
+  /* NAO esta emagrecendo: mantem o peso. Quem mantem nao esta no risco que a
+     frase descreve, e receber o aviso mesmo assim faria desconfiar das outras. */
+  const pesos = [
+    { data: dia(1), kg: 70 }, { data: dia(10), kg: 70.2 },
+    { data: dia(20), kg: 69.9 }, { data: dia(28), kg: 70.1 },
+  ]
+  const dias = Array.from({ length: 10 }, (_, i) => ({
+    data: dia(i + 1), calorias: 1600, proteinas: 50,
+  }))
+  ok('sem perda de peso, nao avisa', descobertas({ ...VAZIO, pesos, dias }).length === 0)
+}
+
+{
+  /* Perdeu 600 g. E balanca, nao emagrecimento. */
+  const pesos = [
+    { data: dia(1), kg: 70 }, { data: dia(10), kg: 69.8 },
+    { data: dia(20), kg: 69.6 }, { data: dia(28), kg: 69.4 },
+  ]
+  const dias = Array.from({ length: 10 }, (_, i) => ({
+    data: dia(i + 1), calorias: 1600, proteinas: 50,
+  }))
+  ok('perda de 600 g e ruido de balanca', descobertas({ ...VAZIO, pesos, dias }).length === 0)
+}
+
+{
+  /* GANHOU peso. Nao pode virar "voce perdeu -2 kg". */
+  const pesos = [
+    { data: dia(1), kg: 67 }, { data: dia(10), kg: 68 },
+    { data: dia(20), kg: 69 }, { data: dia(28), kg: 70 },
+  ]
+  const dias = Array.from({ length: 10 }, (_, i) => ({
+    data: dia(i + 1), calorias: 2600, proteinas: 50,
+  }))
+  ok('ganho de peso nao vira perda negativa',
+    descobertas({ ...VAZIO, pesos, dias }).length === 0)
+}
+
+{
+  /* Poucos dias de proteina registrada: 4 nao bastam (o piso e 8). */
+  const pesos = [
+    { data: dia(1), kg: 70 }, { data: dia(10), kg: 69 },
+    { data: dia(20), kg: 68 }, { data: dia(28), kg: 67 },
+  ]
+  const dias = Array.from({ length: 4 }, (_, i) => ({
+    data: dia(i + 1), calorias: 1600, proteinas: 50,
+  }))
+  ok('4 dias de proteina nao bastam', descobertas({ ...VAZIO, pesos, dias }).length === 0)
+}
+
+{
+  /* Dia sem proteina anotada e ignorado, e nao conta como zero -- zero puxaria
+     a media para baixo e faria o aviso disparar em quem come bem. */
+  const pesos = [
+    { data: dia(1), kg: 70 }, { data: dia(10), kg: 69 },
+    { data: dia(20), kg: 68 }, { data: dia(28), kg: 67 },
+  ]
+  const dias = [
+    ...Array.from({ length: 8 }, (_, i) => ({
+      data: dia(i + 1), calorias: 1600, proteinas: 110,
+    })),
+    ...Array.from({ length: 8 }, (_, i) => ({
+      data: dia(i + 10), calorias: 1600, proteinas: null,
+    })),
+  ]
+  ok('dia sem proteina anotada nao conta como zero',
+    descobertas({ ...VAZIO, pesos, dias }).length === 0)
+}
+
+{
+  /* NaN e Infinity nao viram media. */
+  const pesos = [
+    { data: dia(1), kg: 70 }, { data: dia(10), kg: 69 },
+    { data: dia(20), kg: 68 }, { data: dia(28), kg: 67 },
+  ]
+  const dias = Array.from({ length: 10 }, (_, i) => ({
+    data: dia(i + 1), calorias: 1600, proteinas: i === 0 ? NaN : Infinity,
+  }))
+  const d = descobertas({ ...VAZIO, pesos, dias })
+  ok('NaN e Infinity na proteina nao viram descoberta', d.length === 0, JSON.stringify(d))
+}
+
+console.log('\n6. a frase da proteina nao diagnostica')
+
+{
+  const pesos = [
+    { data: dia(1), kg: 70 }, { data: dia(10), kg: 69 },
+    { data: dia(20), kg: 68 }, { data: dia(28), kg: 67 },
+  ]
+  const dias = Array.from({ length: 10 }, (_, i) => ({
+    data: dia(i + 1), calorias: 1600, proteinas: 70,
+  }))
+  const t = descobertas({ ...VAZIO, pesos, dias })[0].texto.toLowerCase()
+
+  /* Esta descoberta soma um FATO GERAL de nutricao aos numeros dela, e por isso
+     tem um crivo proprio. O app nao mediu massa magra e NAO PODE dizer que ela
+     perdeu musculo -- so que quem emagrece assim COSTUMA perder. */
+  const afirmacoes = [
+    'voce perdeu musculo', 'você perdeu músculo',
+    'voce esta perdendo musculo', 'você está perdendo músculo',
+    'sua massa magra', 'voce tem', 'você tem',
+  ]
+  const achou = afirmacoes.find(a => t.includes(a))
+  ok('nao afirma que ELA perdeu musculo', achou === undefined, achou ?? '')
+  /* O fato geral aparece como geral. */
+  ok('o fato geral aparece como geral', t.includes('costuma'), t)
+  /* E nao manda ela consertar sozinha: manda mostrar para quem pode olhar. */
+  ok('encaminha em vez de prescrever',
+    t.includes('nutricionista') && !t.includes('coma mais') && !t.includes('aumente'), t)
+}
+
 console.log(`\n${passaram} passaram, ${falharam} falharam`)
 if (falharam > 0) process.exit(1)

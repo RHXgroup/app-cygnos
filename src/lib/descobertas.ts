@@ -40,13 +40,13 @@
 import { somandoDias } from './datas.ts'
 
 export type DiaDeSono = { data: string; minutos: number | null }
-export type DiaDeCalorias = { data: string; calorias: number | null }
+export type DiaDeCalorias = { data: string; calorias: number | null; proteinas?: number | null }
 export type DiaDePeso = { data: string; kg: number | null }
 
 export type Descoberta = {
   /* Identifica o tipo, para a tela não repetir a mesma no dia seguinte e para
      o teste apontar qual falhou. */
-  chave: 'sono_calorias' | 'peso_no_ciclo'
+  chave: 'sono_calorias' | 'peso_no_ciclo' | 'proteina_no_deficit'
   texto: string
   /* Quantos dias (ou ciclos) sustentam a frase. A tela mostra, e é isto que
      separa medida de horóscopo. */
@@ -75,6 +75,27 @@ const NOITE_CURTA_EM_MINUTOS = 6 * 60
  * 700 g. Uma balança doméstica varia algumas centenas de gramas entre pesagens
  * do mesmo dia; dizer que "o seu peso oscila 300 g" seria dar nome a ruído. */
 const OSCILACAO_MINIMA_KG = 0.7
+
+/* ── Proteína durante o emagrecimento ─────────────────────────────────────
+ *
+ * O piso abaixo do qual vale avisar, em grama por quilo de peso.
+ *
+ * 1,2 g/kg. A faixa que a literatura de preservação de massa magra em déficit
+ * energético usa vai de 1,2 a 1,6, e o limite de baixo é o que se pode chamar
+ * de pouco sem discussão — avisar em 1,5 seria avisar gente que está bem.
+ *
+ * A ideia veio de olhar o Monju, que é app de GLP-1 e organiza tudo em volta
+ * disso. Ele não é concorrente — é outro público —, mas o raciocínio dele vale
+ * para qualquer déficit, e não só para quem usa medicação: emagrecer rápido com
+ * proteína baixa perde músculo junto com a gordura. */
+const PROTEINA_MINIMA_G_POR_KG = 1.2
+
+/* Quanto de peso precisa ter saído para isto ser emagrecimento, e não balança.
+ *
+ * 1 kg. Abaixo disso é oscilação de água — a mesma que a descoberta do ciclo
+ * existe para explicar —, e avisar sobre "perda" que não houve seria criar
+ * preocupação a partir de ruído. */
+const PERDA_MINIMA_KG = 1
 
 const numero = (v: number | null | undefined): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -187,6 +208,70 @@ function pesoNoCiclo(
   }
 }
 
+/* ── Emagrecendo com proteína baixa ───────────────────────────────────────
+ *
+ * ── Por que esta é diferente das outras duas ──────────────────────────────
+ * As outras devolvem à pessoa o que ela mesma registrou, cruzado. Esta soma UM
+ * fato geral de nutrição — proteína baixa em déficit custa músculo — aos
+ * números dela.
+ *
+ * Isso muda o que ela pode dizer, e o texto foi escrito sabendo disso:
+ *
+ *   · o fato geral aparece como geral ("quem emagrece com pouca proteína
+ *     costuma perder"), e nunca como afirmação sobre o corpo dela — o app não
+ *     mediu massa magra e não pode dizer que ela perdeu músculo;
+ *   · os números dela aparecem como dela, com o tamanho da amostra;
+ *   · e termina apontando para a nutricionista, que é quem pode olhar isso com
+ *     a ficha na frente. É o único lugar do app em que uma descoberta manda
+ *     falar com alguém, e é porque aqui há o que fazer a respeito.
+ *
+ * ── E ela só existe neste app ─────────────────────────────────────────────
+ * Exige peso ao longo do tempo E proteína registrada E a profissional para
+ * quem apontar. Um contador de calorias tem o segundo; uma balança tem o
+ * primeiro; nenhum dos dois tem o terceiro. */
+function proteinaNoDeficit(
+  pesos: DiaDePeso[],
+  dias: DiaDeCalorias[],
+): Descoberta | null {
+  const comPeso = pesos
+    .map(p => ({ data: p.data, kg: numero(p.kg) }))
+    .filter((p): p is { data: string; kg: number } => p.kg !== null)
+    .sort((a, b) => a.data.localeCompare(b.data))
+  if (comPeso.length < MINIMO_POR_GRUPO) return null
+
+  const primeiro = comPeso[0].kg
+  const ultimo = comPeso[comPeso.length - 1].kg
+  const perdeu = primeiro - ultimo
+  /* Só quando está emagrecendo. Quem mantém ou ganha peso não está no risco que
+     esta frase descreve, e receber o aviso mesmo assim faria ela desconfiar de
+     todas as outras. */
+  if (perdeu < PERDA_MINIMA_KG) return null
+
+  const proteinas = dias
+    .map(d => numero(d.proteinas))
+    .filter((v): v is number => v !== null)
+  if (proteinas.length < MINIMO_POR_GRUPO * 2) return null
+
+  /* Contra o peso ATUAL, e não o inicial: é o corpo que ela tem agora que
+     precisa ser sustentado. Usar o inicial inflaria a necessidade e faria o
+     aviso disparar em quem está bem. */
+  const porQuilo = media(proteinas) / ultimo
+  if (porQuilo >= PROTEINA_MINIMA_G_POR_KG) return null
+
+  const gkg = porQuilo.toFixed(1).replace('.', ',')
+  const kg = perdeu.toFixed(1).replace('.', ',')
+
+  return {
+    chave: 'proteina_no_deficit',
+    base: proteinas.length,
+    texto:
+      `Você perdeu ${kg} kg no período, comendo em média ${Math.round(media(proteinas))} g de ` +
+      `proteína por dia — cerca de ${gkg} g por quilo, em ${proteinas.length} dias registrados. ` +
+      'Quem emagrece com proteína baixa costuma perder músculo junto com a gordura. ' +
+      'Vale mostrar isso para a sua nutricionista.',
+  }
+}
+
 /* As descobertas que os dados sustentam, da mais forte para a mais fraca.
  *
  * Lista, e não uma só, porque quem chama decide quantas mostrar — e mostrar
@@ -200,6 +285,7 @@ export function descobertas(dados: {
   comecosDeCiclo: string[]
 }): Descoberta[] {
   const fora = [
+    proteinaNoDeficit(dados.pesos ?? [], dados.dias ?? []),
     pesoNoCiclo(dados.pesos ?? [], dados.comecosDeCiclo ?? []),
     sonoECalorias(dados.noites ?? [], dados.dias ?? []),
   ].filter((d): d is Descoberta => d !== null)

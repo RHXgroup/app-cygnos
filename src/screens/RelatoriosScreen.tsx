@@ -186,7 +186,11 @@ function Conteudo({
             data: d.data,
             minutos: d.noite ? tempoDormindo(d.noite) : null,
           })),
-          dias: relatorio.dias.map(d => ({ data: d.data, calorias: d.calorias })),
+          dias: relatorio.dias.map(d => ({
+            data: d.data,
+            calorias: d.calorias,
+            proteinas: d.proteinas,
+          })),
           pesos: relatorio.dias.map(d => ({ data: d.data, kg: d.pesoKg })),
           comecosDeCiclo,
         })}
