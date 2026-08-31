@@ -23,6 +23,7 @@
  * ── Só `import type` ──────────────────────────────────────────────────────
  * Roda fora do aparelho. */
 
+import { ehDataReal, emDias, somandoDias } from './datas.ts'
 import type { Ciclo } from './cicloDaPessoa'
 
 /* O mínimo que a tela precisa saber de um dia. Sem os campos privados, de
@@ -42,10 +43,6 @@ export type Padrao = {
   de: number
 }
 
-const DIA = 86400000
-const ISO = /^\d{4}-\d{2}-\d{2}$/
-const doISO = (iso: string) => Date.parse(iso + 'T00:00:00Z')
-const emDias = (de: string, ate: string) => Math.round((doISO(ate) - doISO(de)) / DIA)
 
 /* Quantos dias antes da menstruação contam como "os dias antes".
  *
@@ -77,7 +74,7 @@ export function padraoAntesDaMenstruacao(
 ): Padrao[] {
   const comecos = ciclos
     .map(c => c.comecou)
-    .filter(d => ISO.test(d))
+    .filter(ehDataReal)
     .sort()
 
   /* Quantas vezes cada coisa apareceu, e em quantos ciclos DISTINTOS. Contar
@@ -88,7 +85,7 @@ export function padraoAntesDaMenstruacao(
 
   for (let i = 0; i < comecos.length; i++) {
     const fim = comecos[i]
-    const inicioDaJanela = new Date(doISO(fim) - DIAS_ANTES * DIA).toISOString().slice(0, 10)
+    const inicioDaJanela = somandoDias(fim, -DIAS_ANTES)
 
     /* O ciclo anterior tem de existir e ser plausível: sem isso, a "janela
        antes" do primeiro registro seria um pedaço de tempo sobre o qual não se
@@ -99,7 +96,7 @@ export function padraoAntesDaMenstruacao(
     if (duracao < 15 || duracao > 45) continue
 
     const naJanela = dias.filter(
-      d => ISO.test(d.data) && d.data >= inicioDaJanela && d.data < fim,
+      d => ehDataReal(d.data) && d.data >= inicioDaJanela && d.data < fim,
     )
     /* Ciclo em que ela não anotou nada naqueles dias não conta nem a favor nem
        contra: incluí-lo como "não teve" inventaria uma ausência. */
@@ -148,7 +145,11 @@ export function avisoDaSemana(
   padroes: Padrao[],
   hoje: string,
 ): Aviso | null {
-  if (!proximaPrevista || !ISO.test(proximaPrevista) || !ISO.test(hoje)) return null
+  /* `ehDataReal` e não só o formato: "2026-02-31" passa no formato, não existe
+     no calendário, e o JavaScript escorrega para 3 de março. Sem isto o app
+     dizia "a sua menstruação deve vir em 6 dias" apoiado numa data inventada —
+     uma sonda de entrada hostil pegou. */
+  if (!ehDataReal(proximaPrevista) || !ehDataReal(hoje)) return null
   /* Ciclo irregular não ganha aviso: a data em que ele se apoia não vale, e
      avisar sobre "a semana que vem" com uma previsão que erra dias seria pior
      do que não avisar. */

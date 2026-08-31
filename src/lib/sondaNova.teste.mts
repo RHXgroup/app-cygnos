@@ -8,10 +8,11 @@
 
 import { semanaDaPessoa } from './semanaDaPessoa.ts'
 import { caloriasDoTreino, resumoDoTreino, volumeLegivel } from './resumoDoTreino.ts'
-import { diasMenstruada, diasPrevistos, mesDe, mesVizinho } from './calendarioDoCiclo.ts'
+import { diasMenstruada, diasPrevistos, formaNaFaixa, mesDe, mesVizinho } from './calendarioDoCiclo.ts'
 import { dataProvavelDoParto, diasFerteis, janelaFertil } from './fertilidade.ts'
 import { modeloDoBanco, quantasRespondidas, respondido, vazioDoModelo } from './questionarioDaNutri.ts'
 import { segundaDa } from './semanaVista.ts'
+import { avisoDaSemana, padraoAntesDaMenstruacao } from './padraoDoCiclo.ts'
 import type { SerieFeita } from './treino.ts'
 
 let passou = 0
@@ -250,6 +251,108 @@ console.log('\n7. o volume legível e as calorias, nos extremos')
   ok('Infinity vira vazio', volumeLegivel(Number.POSITIVE_INFINITY) === '')
   ok('caloria com peso Infinity é nula', caloriasDoTreino(60, Number.POSITIVE_INFINITY) === null)
   ok('caloria com minutos Infinity é nula', caloriasDoTreino(Number.POSITIVE_INFINITY, 70) === null)
+}
+
+
+/* ═══ Segunda leva: o padrão do ciclo e o calendário em faixa ═══════════════
+ *
+ * Peças de hoje, e as classes que já produziram defeito aqui: chave de
+ * protótipo, entrada fora de ordem, volume, e data que o formato aceita e o
+ * calendário não. */
+
+console.log('\n8. o padrão do ciclo sob entrada hostil')
+
+{
+  const cs = [{ comecou: '2026-06-01', terminou: null }, { comecou: '2026-06-29', terminou: null },
+              { comecou: '2026-07-27', terminou: null }]
+  const dia = (data: string, sint: string[] = [], hum: string | null = null, des: string[] = []) =>
+    ({ data, sintomas: sint, humor: hum, desejoAlimentar: des })
+
+  /* Sintoma chamado "constructor". Ele vira CHAVE de um Map, e Map não tem
+     protótipo herdado — mas a mesma string atravessa `emLista` e vai para a
+     tela. O que não pode é derrubar nem virar "[object Object]". */
+  naoQuebra('sintoma "constructor"', () =>
+    padraoAntesDaMenstruacao(cs, [dia('2026-06-27', ['constructor']), dia('2026-07-25', ['constructor'])]))
+  naoQuebra('sintoma "__proto__"', () =>
+    padraoAntesDaMenstruacao(cs, [dia('2026-06-27', ['__proto__']), dia('2026-07-25', ['__proto__'])]))
+  const p = padraoAntesDaMenstruacao(cs,
+    [dia('2026-06-27', ['constructor']), dia('2026-07-25', ['constructor'])])
+  ok('e o padrão sai com a string certa', p[0]?.o_que === 'constructor', JSON.stringify(p))
+}
+
+{
+  const cs = [{ comecou: '2026-06-29', terminou: null }, { comecou: '2026-06-01', terminou: null },
+              { comecou: '2026-07-27', terminou: null }]
+  const dia = (data: string, sint: string[]) => ({ data, sintomas: sint, humor: null, desejoAlimentar: [] })
+  /* Os ciclos chegam FORA DE ORDEM do banco quando alguém muda o `order by`. A
+     função ordena antes; sem isso, a janela de cada ciclo seria medida contra o
+     vizinho errado e o padrão sairia de dias aleatórios. */
+  const p = padraoAntesDaMenstruacao(cs, [dia('2026-06-27', ['cólica']), dia('2026-07-25', ['cólica'])])
+  ok('ordem da lista de ciclos não muda o padrão', p[0]?.em === 2, JSON.stringify(p))
+}
+
+{
+  naoQuebra('ciclos com data inválida', () =>
+    padraoAntesDaMenstruacao([{ comecou: 'ontem', terminou: null }], []))
+  naoQuebra('dias com data inválida', () =>
+    padraoAntesDaMenstruacao([{ comecou: '2026-06-01', terminou: null }],
+      [{ data: '', sintomas: ['x'], humor: null, desejoAlimentar: [] }]))
+  naoQuebra('sintomas não-lista', () =>
+    padraoAntesDaMenstruacao([{ comecou: '2026-06-01', terminou: null }],
+      [{ data: '2026-05-30', sintomas: null as never, humor: null, desejoAlimentar: [] }]))
+}
+
+{
+  /* Volume: dois anos de ciclos e um sintoma por dia. */
+  const cs = Array.from({ length: 26 }, (_, i) => ({
+    comecou: new Date(Date.UTC(2025, 0, 1) + i * 28 * 86400000).toISOString().slice(0, 10),
+    terminou: null,
+  }))
+  const dias = Array.from({ length: 730 }, (_, i) => ({
+    data: new Date(Date.UTC(2025, 0, 1) + i * 86400000).toISOString().slice(0, 10),
+    sintomas: ['cólica'],
+    humor: 'irritada',
+    desejoAlimentar: ['doce'],
+  }))
+  const t0 = Date.now()
+  const p = padraoAntesDaMenstruacao(cs, dias)
+  const ms = Date.now() - t0
+  ok('26 ciclos e 730 dias produzem padrão', p.length > 0, String(p.length))
+  ok(`e em menos de 500 ms (${ms} ms)`, ms < 500, `${ms} ms`)
+}
+
+console.log('\n9. o aviso, nas bordas')
+
+{
+  const P = [{ o_que: 'cólica', em: 3, de: 3 }]
+  ok('previsão de 31/02 não vira aviso', avisoDaSemana('2026-02-31', false, P, '2026-02-25') === null,
+    JSON.stringify(avisoDaSemana('2026-02-31', false, P, '2026-02-25')))
+  naoQuebra('padrão com o_que vazio', () => avisoDaSemana('2026-09-01', false,
+    [{ o_que: '', em: 3, de: 3 }], '2026-08-28'))
+  naoQuebra('padrão com em maior que de', () => avisoDaSemana('2026-09-01', false,
+    [{ o_que: 'x', em: 9, de: 3 }], '2026-08-28'))
+  naoQuebra('lista de padrões vazia', () => avisoDaSemana('2026-09-01', false, [], '2026-08-28'))
+}
+
+console.log('\n10. a faixa do calendário')
+
+{
+  /* Mil dias marcados: a forma de cada um olha só os dois vizinhos, então isto
+     tem de ser linear e não quadrático. */
+  const grande = new Set(
+    Array.from({ length: 1000 }, (_, i) =>
+      new Date(Date.UTC(2025, 0, 1) + i * 86400000).toISOString().slice(0, 10)),
+  )
+  const t0 = Date.now()
+  for (const d of grande) formaNaFaixa(d, grande)
+  ok(`1.000 dias em menos de 300 ms (${Date.now() - t0} ms)`, Date.now() - t0 < 300)
+}
+
+{
+  naoQuebra('forma de data inválida', () => formaNaFaixa('nada', new Set(['nada'])))
+  naoQuebra('forma com conjunto vazio', () => formaNaFaixa('2026-08-10', new Set()))
+  ok('dia não marcado ainda responde', formaNaFaixa('2026-08-10', new Set(['2026-08-11'])) === 'inicio',
+    formaNaFaixa('2026-08-10', new Set(['2026-08-11'])))
 }
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')

@@ -1,4 +1,7 @@
+import { diaDaSemana, doISO, ehDataReal, paraISO, somandoDias } from './datas.ts'
 import type { Ciclo } from './cicloDaPessoa'
+
+export { somandoDias }
 
 /* O calendário do ciclo: que dia é o quê, e o que dá para tocar.
  *
@@ -28,12 +31,6 @@ export type DiaDoMes = {
 }
 
 const DIA = 86400000
-const ISO = /^\d{4}-\d{2}-\d{2}$/
-
-const doISO = (iso: string) => Date.parse(iso + 'T00:00:00Z')
-const paraISO = (ms: number) => new Date(ms).toISOString().slice(0, 10)
-
-export const somandoDias = (iso: string, dias: number): string => paraISO(doISO(iso) + dias * DIA)
 
 /* Quantos dias tem o mês. `new Date(Date.UTC(ano, mes, 0))` devolve o último dia
    do mês ANTERIOR ao índice — com mes já 1-based, isso é o último deste. É a
@@ -72,8 +69,8 @@ export function mesDe(ano: number, mes: number, hoje: string): DiaDoMes[] {
 export function diasMenstruada(ciclos: Ciclo[]): Set<string> {
   const dias = new Set<string>()
   for (const c of ciclos) {
-    if (!ISO.test(c.comecou)) continue
-    if (!c.terminou || !ISO.test(c.terminou) || c.terminou < c.comecou) {
+    if (!ehDataReal(c.comecou)) continue
+    if (!c.terminou || !ehDataReal(c.terminou) || c.terminou < c.comecou) {
       dias.add(c.comecou)
       continue
     }
@@ -97,10 +94,12 @@ export function diasPrevistos(
   ciclos: Ciclo[],
 ): Set<string> {
   const dias = new Set<string>()
-  if (!proximaPrevista || !ISO.test(proximaPrevista)) return dias
+  if (!proximaPrevista || !ehDataReal(proximaPrevista)) return dias
 
   const fluxos = ciclos
-    .filter(c => c.terminou && ISO.test(c.comecou) && ISO.test(c.terminou) && c.terminou >= c.comecou)
+    .filter(
+      c => c.terminou && ehDataReal(c.comecou) && ehDataReal(c.terminou) && c.terminou >= c.comecou,
+    )
     .map(c => Math.round((doISO(c.terminou as string) - doISO(c.comecou)) / DIA) + 1)
     .filter(d => d >= 1 && d <= 15)
     .sort((a, b) => a - b)
@@ -170,7 +169,11 @@ export const INICIAIS_DA_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 export type FormaDoDia = 'sozinho' | 'inicio' | 'meio' | 'fim'
 
 export function formaNaFaixa(data: string, marcados: Set<string>): FormaDoDia {
-  const dia = new Date(Date.parse(data + 'T00:00:00Z')).getUTCDay()
+  const dia = diaDaSemana(data)
+  /* Data que não existe não tem vizinho. Antes isto ESTOURAVA — `somandoDias`
+     chamava `toISOString()` sobre um número inválido e derrubava o calendário
+     inteiro numa tela branca. */
+  if (dia < 0) return 'sozinho'
 
   /* Sábado é 6 e domingo é 0. Um encosta na borda direita da grade e o outro na
      esquerda, então a faixa termina ali de qualquer forma. */

@@ -28,27 +28,9 @@
  * ── Só `import type` ──────────────────────────────────────────────────────
  * Como o resto: roda fora do aparelho, e é exercitado com datas de verdade. */
 
+import { doISO, ehDataReal, paraISO, somandoDias as somando } from './datas.ts'
+
 const DIA = 86400000
-const ISO = /^\d{4}-\d{2}-\d{2}$/
-
-const doISO = (iso: string) => Date.parse(iso + 'T00:00:00Z')
-const paraISO = (ms: number) => new Date(ms).toISOString().slice(0, 10)
-const somando = (iso: string, dias: number) => paraISO(doISO(iso) + dias * DIA)
-
-/* A data existe MESMO no calendário?
- *
- * O formato bater não basta: `Date.parse('2026-02-31T00:00:00Z')` não dá erro —
- * o JavaScript ESCORREGA para 3 de março e devolve um número perfeitamente
- * válido. Foi assim que "31 de fevereiro" virou uma data provável de parto em
- * novembro, e o teste pegou.
- *
- * A volta é a prova: se o ISO reconstruído a partir do número não for igual ao
- * que entrou, a data não existia. */
-const ehDataReal = (iso: string): boolean => {
-  if (!ISO.test(iso)) return false
-  const ms = doISO(iso)
-  return Number.isFinite(ms) && paraISO(ms) === iso
-}
 
 /* Quantos dias a fase lútea dura. Fixo de propósito: é o pedaço do ciclo que
    quase não varia, e é justamente isso que permite calcular para trás. */

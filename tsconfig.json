@@ -1,7 +1,17 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+
+    /* O Node exige a extensão `.ts` no import relativo quando roda os testes com
+       `--experimental-strip-types`, e o `tsc` a recusa sem esta opção. Sem as
+       duas, um import de runtime ENTRE arquivos de lib quebra os testes — que é
+       o que aconteceu na primeira vez que `datas.ts` nasceu.
+
+       `noEmit` é o par obrigatório dela, e já é o nosso caso: quem empacota é o
+       Metro, e o `tsc` aqui só confere tipo. */
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
   "exclude": [
     "**/*.teste.mts"
