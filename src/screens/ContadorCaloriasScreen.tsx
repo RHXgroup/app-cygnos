@@ -24,6 +24,8 @@ import {
   carregarConsumo,
   carregarFrequentes,
   carregarUltimaRefeicao,
+  FRACOES_DA_PORCAO,
+  comFator,
   moverDeRefeicao,
   porRefeicao,
   refeicaoPelaHora,
@@ -93,6 +95,26 @@ export function ContadorCaloriasScreen({
   const [erro, setErro] = useState('')
   const [mudou, setMudou] = useState(false)
   const [refeicao, setRefeicao] = useState(() => refeicaoPelaHora())
+  /* Onde começa o bloco "como registrar", para tocar numa refeição já
+     registrada levar até lá. Ver `escolherRefeicao`. */
+  const rolagem = useRef<ScrollView>(null)
+  const yDasFormas = useRef(0)
+
+  /* Tocar no bloco de uma refeição escolhe aquela refeição E leva às formas de
+     registrar.
+   *
+   * O defeito: a tela listava "Café da manhã", "Almoço", "Jantar" com o que ela
+   * comeu em cada um, e os títulos não eram tocáveis. Quem queria mexer no café
+   * da manhã tocava no café da manhã e não acontecia nada — a única forma de
+   * escolher estava num seletor acima, fora da vista depois de rolar.
+   *
+   * E o pior caso era silencioso: às 21h a tela abre em "Jantar" pelo relógio.
+   * Quem tocasse no café da manhã e registrasse alguma coisa via aquilo entrar
+   * no jantar, sem nada avisando. */
+  function escolherRefeicao(r: string) {
+    setRefeicao(r)
+    rolagem.current?.scrollTo({ y: Math.max(yDasFormas.current - 12, 0), animated: true })
+  }
 
   /* null = a tela principal. As portas abrem por cima dela. */
   const [porta, setPorta] = useState<Exclude<PortaDoDiario, 'foto'> | null>(
@@ -526,6 +548,7 @@ export function ContadorCaloriasScreen({
         </View>
       ) : (
         <ScrollView
+          ref={rolagem}
           contentContainerStyle={[styles.conteudo, { paddingBottom: Math.max(bottom, 16) + 16 }]}
           showsVerticalScrollIndicator={false}
           bounces={false}
@@ -566,7 +589,12 @@ export function ContadorCaloriasScreen({
               O que muda entre os dois lugares é só a refeição de destino: o "+"
               usa a do relógio, e aqui é a que a pessoa escolheu logo acima. É
               por isso que este não pode simplesmente sumir. */}
-          <View style={styles.portas}>
+          <View
+            style={styles.portas}
+            onLayout={e => {
+              yDasFormas.current = e.nativeEvent.layout.y
+            }}
+          >
             <Porta
               icone="mic-outline"
               titulo="Falar"
@@ -677,7 +705,16 @@ export function ContadorCaloriasScreen({
           ) : (
             grupos.map(g => (
               <View key={g.refeicao} style={styles.bloco}>
-                <View style={styles.linhaTituloBloco}>
+                {/* O título inteiro é tocável, e é o conserto do defeito que
+                    quem usou relatou: "clico e não direciona certo para a
+                    refeição que eu queria mudar". Ele escolhe a refeição e leva
+                    às formas de registrar, num toque. */}
+                <Pressable
+                  onPress={() => escolherRefeicao(g.refeicao)}
+                  style={({ pressed }) => [styles.linhaTituloBloco, pressed && styles.tituloPressionado]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Adicionar em ${g.refeicao}`}
+                >
                   <Text style={styles.tituloBloco}>{g.refeicao}</Text>
                   <Text style={styles.kcalGrupo}>
                     {(() => {
@@ -685,7 +722,10 @@ export function ContadorCaloriasScreen({
                       return t.calorias === null ? '—' : `${milhar(t.calorias)} kcal`
                     })()}
                   </Text>
-                </View>
+                  <View style={styles.maisNoGrupo}>
+                    <Ionicons name="add" size={15} color={paleta().cores.verde} />
+                  </View>
+                </Pressable>
 
                 {g.itens.map(i => (
                   <LinhaItem
@@ -706,8 +746,7 @@ export function ContadorCaloriasScreen({
           estimativa={estimativa}
           refeicao={refeicao}
           onDescartar={() => setEstimativa(null)}
-          onRegistrar={() => {
-            const e = estimativa
+          onRegistrar={e => {
             setEstimativa(null)
             gravar([
               {
@@ -1046,11 +1085,22 @@ function ConfirmarFoto({
 }: {
   estimativa: Estimativa
   refeicao: string
-  onRegistrar: () => void
+  /* Recebe a estimativa JÁ reescalada. A folha é quem sabe qual fração está
+     escolhida, e mandar o fator para fora faria a tela de cima repetir a conta
+     — dois lugares multiplicando o mesmo número é como eles divergem. */
+  onRegistrar: (e: Estimativa) => void
   onDescartar: () => void
 }) {
   const styles = estilos()
   const { bottom } = useSafeAreaInsets()
+  /* Quanto do prato ela comeu.
+   *
+   * A IA acerta razoavelmente O QUE é e erra bastante QUANTO tem: o melhor app
+   * de foto do mercado erra ±28% na porção. Esta tela era aceitar ou descartar,
+   * e as duas saídas eram ruins — aceitar sabendo que está errado envenena a
+   * soma do dia, descartar joga fora um reconhecimento que estava certo. */
+  const [fator, setFator] = useState(1)
+  const mostrada = comFator(estimativa, fator)
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -1058,33 +1108,58 @@ function ConfirmarFoto({
       <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
         <View style={styles.puxador} />
 
-        <Text style={styles.tituloFolha}>{estimativa.descricao}</Text>
-        {!!estimativa.porcaoEstimada && (
-          <Text style={styles.porcaoFolha}>{estimativa.porcaoEstimada}</Text>
+        <Text style={styles.tituloFolha}>{mostrada.descricao}</Text>
+        {!!mostrada.porcaoEstimada && (
+          <Text style={styles.porcaoFolha}>{mostrada.porcaoEstimada}</Text>
         )}
 
         {/* Número solto, e não um arco: um arco mede progresso contra alguma
             coisa, e aqui não há contra o quê — é um item, não o dia. */}
         <View style={styles.arcoFolha}>
           <Text style={styles.kcalFolha}>
-            {estimativa.calorias === null ? '—' : milhar(estimativa.calorias)}
+            {mostrada.calorias === null ? '—' : milhar(mostrada.calorias)}
           </Text>
           <Text style={styles.unidadeFolha}>kcal</Text>
         </View>
 
         <View style={styles.macrosFolha}>
-          <MacroFolha rotulo="Proteínas" valor={estimativa.proteinas} />
-          <MacroFolha rotulo="Carboidratos" valor={estimativa.carboidratos} />
-          <MacroFolha rotulo="Gorduras" valor={estimativa.gorduras} />
+          <MacroFolha rotulo="Proteínas" valor={mostrada.proteinas} />
+          <MacroFolha rotulo="Carboidratos" valor={mostrada.carboidratos} />
+          <MacroFolha rotulo="Gorduras" valor={mostrada.gorduras} />
+        </View>
+
+        {/* QUANTO DO PRATO ELA COMEU.
+            Frações, e não um controle deslizante: um deslizante devolve 87%, e
+            87% de um número que já é aproximado é precisão inventada. Ninguém
+            olha um prato e pensa "comi 87%" — pensa "comi metade". */}
+        <Text style={styles.rotuloPorcao}>Quanto você comeu?</Text>
+        <View style={styles.fracoes}>
+          {FRACOES_DA_PORCAO.map(f => (
+            <Pressable
+              key={f.fator}
+              onPress={() => setFator(f.fator)}
+              style={({ pressed }) => [
+                styles.fracao,
+                fator === f.fator && styles.fracaoAtiva,
+                pressed && styles.chipPressionado,
+              ]}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: fator === f.fator }}
+            >
+              <Text style={[styles.textoFracao, fator === f.fator && styles.textoFracaoAtiva]}>
+                {f.rotulo}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
         {/* A confiança vem da IA e é mostrada como ela respondeu. Esconder um
             "baixa" faria a pessoa tratar o chute como medida. */}
-        {estimativa.confianca !== 'alta' && (
+        {mostrada.confianca !== 'alta' && (
           <View style={styles.avisoFolha}>
             <Ionicons name="information-circle-outline" size={16} color={paleta().cores.verdeEscuro} />
             <Text style={styles.textoAvisoFolha}>
-              {estimativa.confianca === 'baixa'
+              {mostrada.confianca === 'baixa'
                 ? 'A imagem ficou difícil de ler — esses números são um palpite grosseiro.'
                 : 'Há dúvida sobre o prato ou a porção. Confira antes de registrar.'}
             </Text>
@@ -1105,7 +1180,7 @@ function ConfirmarFoto({
           </Pressable>
 
           <Pressable
-            onPress={onRegistrar}
+            onPress={() => onRegistrar(mostrada)}
             style={({ pressed }) => [styles.botaoRegistrar, pressed && styles.botaoRegistrarPress]}
             accessibilityRole="button"
           >
@@ -1531,6 +1606,31 @@ const estilos = estilosDe(t =>
     borderWidth: 1,
     borderColor: t.cores.borda,
     gap: 10,
+  },
+  tituloPressionado: { opacity: 0.55 },
+  rotuloPorcao: { fontSize: 12.5, fontWeight: '700', color: t.cores.ink, marginTop: 16 },
+  fracoes: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 8 },
+  fracao: {
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+  },
+  fracaoAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  textoFracao: { fontSize: 13, fontWeight: '600', color: t.inkMedio },
+  textoFracaoAtiva: { color: t.cores.branco, fontWeight: '800' },
+  /* O "+" no titulo do grupo: ele e o que diz que dali da para adicionar.
+     Sem ele o titulo tocavel seria um segredo -- area clicavel sem nada
+     indicando que e clicavel e o mesmo que nao existir. */
+  maisNoGrupo: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verdeClaro,
   },
   linhaTituloBloco: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },

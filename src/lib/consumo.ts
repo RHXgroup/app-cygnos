@@ -607,3 +607,53 @@ export async function analisarFoto(origem: 'galeria' | 'camera'): Promise<Result
     return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente outra.' }
   }
 }
+
+/* ── Ajustar a porção de uma estimativa ────────────────────────────────────
+ *
+ * A IA acerta razoavelmente O QUE é o prato e erra bastante QUANTO tem nele: a
+ * medida pública do melhor app de foto do mercado é ±28% de erro na porção.
+ *
+ * Esta tela não deixava corrigir — era aceitar ou descartar. Aceitar sabendo que
+ * está errado envenena a soma do dia; descartar joga fora um reconhecimento que
+ * estava certo. As duas saídas eram ruins.
+ *
+ * ── Por que frações, e não um controle deslizante ─────────────────────────
+ * Um deslizante devolve 87%, e 87% de um número que já é aproximado é precisão
+ * inventada. Ninguém olha um prato e pensa "comi 87%": pensa "comi metade".
+ *
+ * As quatro frações são as que se usam falando, e é a mesma escada do `ajustar`
+ * que já existe para item registrado — duas telas com escalas diferentes para a
+ * mesma ideia fariam a pessoa aprender duas vezes. */
+export const FRACOES_DA_PORCAO = [
+  { fator: 0.5, rotulo: 'metade' },
+  { fator: 1, rotulo: 'tudo' },
+  { fator: 1.5, rotulo: 'uma vez e meia' },
+  { fator: 2, rotulo: 'o dobro' },
+] as const
+
+/* A estimativa reescalada.
+ *
+ * `null` continua `null`: o que a IA não soube dizer não vira número por ser
+ * multiplicado. Item 6 do AGENTS.md — zero no lugar do desconhecido soma como
+ * se fosse verdade.
+ *
+ * A DESCRIÇÃO da porção também muda, e é ela que a pessoa relê depois no
+ * diário: "1 prato" que virou metade precisa dizer "metade de 1 prato", senão o
+ * item guarda um texto que contradiz os próprios números. */
+export function comFator(e: Estimativa, fator: number): Estimativa {
+  if (!Number.isFinite(fator) || fator <= 0 || fator === 1) return e
+
+  const x = (v: number | null) => (v === null ? null : Math.round(v * fator))
+  const nome = FRACOES_DA_PORCAO.find(f => f.fator === fator)?.rotulo
+
+  return {
+    ...e,
+    calorias: x(e.calorias),
+    proteinas: x(e.proteinas),
+    carboidratos: x(e.carboidratos),
+    gorduras: x(e.gorduras),
+    fibras: x(e.fibras),
+    porcaoEstimada:
+      e.porcaoEstimada && nome ? `${nome} de ${e.porcaoEstimada}` : e.porcaoEstimada,
+  }
+}
