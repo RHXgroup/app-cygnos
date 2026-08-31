@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PALAVRA_CONFIRMACAO, excluirConta } from '../lib/conta'
 import { supabase } from '../lib/supabase'

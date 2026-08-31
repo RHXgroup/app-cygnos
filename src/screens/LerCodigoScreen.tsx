@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { consultarCodigo, type ProdutoLido } from '../lib/codigoBarras'
 import { porcao } from '../lib/alimentos'

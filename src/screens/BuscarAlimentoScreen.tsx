@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { anotarBuscaVazia, NOME_NOVA, buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
 import { mascaraQuantidade, numeroDigitado, soDigitos } from '../lib/formulario'

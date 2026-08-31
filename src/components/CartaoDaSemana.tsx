@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { carregarConsumoPeriodo } from '../lib/consumo'
 import { RASCUNHO_SEMANA, semanaJaVista, marcarSemanaVista } from '../lib/semanaVista'
 import { semanaDaPessoa, type Linha } from '../lib/semanaDaPessoa'

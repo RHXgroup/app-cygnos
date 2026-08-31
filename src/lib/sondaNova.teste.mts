@@ -15,6 +15,22 @@ import { segundaDa } from './semanaVista.ts'
 import { avisoDaSemana, padraoAntesDaMenstruacao } from './padraoDoCiclo.ts'
 import type { SerieFeita } from './treino.ts'
 
+/* O teto dos testes de tempo, e por que ele e folgado.
+ *
+ * Estes limites existem para pegar EXPLOSAO DE ORDEM DE GRANDEZA -- um teto
+ * removido que faz o laco percorrer 365 dias por ciclo em vez de 31 --, e nao
+ * para medir desempenho. Quem mede desempenho e outro tipo de teste, com a
+ * maquina parada.
+ *
+ * O numero era 100 ms, e falhava sozinho: o MESMO codigo, cinco vezes seguidas
+ * aqui, deu 30, 70, 94, 98 e 244 ms. Um limite dentro do ruido nao reprova
+ * codigo lento, reprova a sorte -- e ensina quem le a ignorar o vermelho, que e
+ * o unico jeito de perder a falha de verdade no dia em que ela vier.
+ *
+ * Dois segundos continuam pegando o que interessa: sem o teto, os casos daqui
+ * pulam de milhares para milhoes de iteracoes. */
+const LIMITE_MS = 2000
+
 let passou = 0
 let falhou = 0
 function ok(nome: string, condicao: boolean, detalhe = '') {
@@ -196,7 +212,7 @@ console.log('\n5. volume — mil séries e mil ciclos')
   const r = resumoDoTreino(mil, antes, 60, 70)
   const ms = Date.now() - t0
   ok('1.000 séries contra 4.000 de histórico', r.exercicios === 20, String(r.exercicios))
-  ok(`e em menos de 500 ms (${ms} ms)`, ms < 500, `${ms} ms`)
+  ok(`e sem explodir (${ms} ms)`, ms < LIMITE_MS, `${ms} ms`)
 }
 
 {
@@ -205,7 +221,7 @@ console.log('\n5. volume — mil séries e mil ciclos')
   }))
   const t0 = Date.now()
   diasMenstruada(ciclos)
-  ok(`500 ciclos iguais em menos de 100 ms`, Date.now() - t0 < 100)
+  ok(`500 ciclos iguais sem explodir (${Date.now() - t0} ms)`, Date.now() - t0 < LIMITE_MS)
 }
 
 {
@@ -215,7 +231,7 @@ console.log('\n5. volume — mil séries e mil ciclos')
   const t0 = Date.now()
   const d = diasMenstruada(ciclos)
   ok('fim absurdo é limitado', d.size <= 31, String(d.size))
-  ok(`e não trava (${Date.now() - t0} ms)`, Date.now() - t0 < 100)
+  ok(`e não trava (${Date.now() - t0} ms)`, Date.now() - t0 < LIMITE_MS)
 }
 
 console.log('\n6. datas nas bordas')
@@ -322,7 +338,7 @@ console.log('\n8. o padrão do ciclo sob entrada hostil')
   const p = padraoAntesDaMenstruacao(cs, dias)
   const ms = Date.now() - t0
   ok('26 ciclos e 730 dias produzem padrão', p.length > 0, String(p.length))
-  ok(`e em menos de 500 ms (${ms} ms)`, ms < 500, `${ms} ms`)
+  ok(`e sem explodir (${ms} ms)`, ms < LIMITE_MS, `${ms} ms`)
 }
 
 console.log('\n9. o aviso, nas bordas')
@@ -349,7 +365,7 @@ console.log('\n10. a faixa do calendário')
   )
   const t0 = Date.now()
   for (const d of grande) formaNaFaixa(d, grande)
-  ok(`1.000 dias em menos de 300 ms (${Date.now() - t0} ms)`, Date.now() - t0 < 300)
+  ok(`1.000 dias sem explodir (${Date.now() - t0} ms)`, Date.now() - t0 < LIMITE_MS)
 }
 
 {

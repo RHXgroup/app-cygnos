@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { historicoDosExercicios, type SerieFeita } from '../lib/treino'
 import { resumoDoTreino, volumeLegivel, type ResumoDoTreino } from '../lib/resumoDoTreino'
