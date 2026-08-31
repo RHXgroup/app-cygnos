@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { falha } from './erros'
+import { falha, mensagemDoBanco } from './erros'
 import { assinados } from './arquivos'
 
 /* O catálogo de nutricionistas do app.
@@ -152,6 +152,37 @@ export async function carregarCatalogo(): Promise<ResultadoCatalogo> {
     tipo: 'ok',
     catalogo: { lista, vinculadas, vinculada: vinculadas[0] ?? null },
   }
+}
+
+/* Sair do acompanhamento.
+ *
+ * Sem argumento nenhum: a função do banco resolve quem é pela sessão. Não há
+ * como pedir para desvincular outra pessoa porque não há onde dizer quem.
+ *
+ * ── O que ela faz junto, e por quê ─────────────────────────────────────────
+ * Desliga o compartilhamento do ciclo. A pessoa autorizou AQUELA nutricionista
+ * a ver o ciclo dela; saindo, a autorização não pode continuar de pé esperando
+ * a próxima. Dado menstrual não fica em autorização órfã.
+ *
+ * ── O que ela ainda não faz ────────────────────────────────────────────────
+ * APAGA a linha do vínculo, em vez de marcar um fim. Com isso somem as datas do
+ * acompanhamento, e o plano nunca conseguirá congelar como "prescrito por
+ * Fulana, de 12/03 a 28/08, encerrado".
+ *
+ * É dívida consciente: marcar o fim obriga tudo que lê `app_vinculos` — inclusive
+ * o sistema da nutricionista, que não se enxerga daqui — a filtrar `fim is null`.
+ * Mudar a semântica sem ver todos os leitores faria o paciente encerrado
+ * continuar aparecendo na carteira dela. Ver docs/de-quem-e-o-dado.md. */
+export async function desvincular(): Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }> {
+  const { error } = await supabase.rpc('app_desvincular_minha_nutricionista')
+  if (error)
+    return {
+      tipo: 'erro',
+      /* A frase do banco quando ela foi escrita para alguém ler; a nossa quando
+         o que voltou foi rede ou permissão. */
+      mensagem: mensagemDoBanco(error, 'Não consegui encerrar o acompanhamento agora. Verifique a conexão.'),
+    }
+  return { tipo: 'ok' }
 }
 
 /* ── Apresentação ──────────────────────────────────────────────────────────*/

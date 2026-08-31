@@ -14,12 +14,14 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
 import {
   carregarCatalogo,
   conversaNoApp,
+  desvincular,
   linkDoWhatsapp,
   telefoneFormatado,
   type Catalogo,
@@ -289,6 +291,14 @@ export function NutricionistasScreen({
               onAbrir={setAberto}
               onAgendar={() => setAgendando(true)}
               onConversar={onConversar}
+              onDesvincular={async () => {
+                const r = await desvincular()
+                /* Relê em vez de mexer no estado daqui: quem decide se o vínculo
+                   acabou é o banco, e a tela inteira muda de ramo — da ficha
+                   dela para o catálogo. */
+                if (r.tipo === 'ok') setVersao(v => v + 1)
+                return r
+              }}
             />
           ) : (
             <Lista
@@ -451,6 +461,7 @@ function Ficha({
   onAbrir,
   onAgendar,
   onConversar,
+  onDesvincular,
 }: {
   nutri: Nutricionista
   conteudo: ConteudoNutri | null
@@ -459,7 +470,9 @@ function Ficha({
   onAbrir: (chave: ChaveConteudo) => void
   onAgendar: () => void
   onConversar: () => void
+  onDesvincular: () => Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }>
 }) {
+  const [saindo, setSaindo] = useState(false)
   const styles = estilos()
   /* Uma consulta em destaque e a contagem do resto. A ficha não é a agenda: ela
      responde "e agora?" numa linha, e quem quiser a lista inteira toca e abre a
@@ -558,6 +571,46 @@ function Ficha({
       {!!nutri.telefone && (
         <Contato telefone={nutri.telefone} whatsapp={!conversaNoApp(nutri)} />
       )}
+
+      {/* Discreto e no fim, como toda saída: quem entra aqui vem ver o
+          acompanhamento, não vem sair dele. Mas existe, e sem pedir motivo —
+          trocar de profissional é rotina, e um formulário de justificativa
+          transformaria isso em rompimento. */}
+      <Pressable
+        onPress={() => {
+          if (saindo) return
+          Alert.alert(
+            'Encerrar o acompanhamento?',
+            `Você deixa de ser acompanhada por ${nutri.nome}. O que ela já registrou continua no seu app, e o seu ciclo deixa de ser compartilhado.
+
+Você pode procurar outra nutricionista depois.`,
+            [
+              { text: 'Continuar acompanhada', style: 'cancel' },
+              {
+                text: 'Encerrar',
+                style: 'destructive',
+                onPress: async () => {
+                  setSaindo(true)
+                  const r = await onDesvincular()
+                  setSaindo(false)
+                  /* Só na falha: no sucesso a tela troca de ramo sozinha e este
+                     componente deixa de existir. */
+                  if (r.tipo === 'erro') Alert.alert('Não deu certo', r.mensagem)
+                },
+              },
+            ],
+          )
+        }}
+        style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
+        accessibilityRole="button"
+        accessibilityLabel={`Encerrar o acompanhamento com ${nutri.nome}`}
+      >
+        {saindo ? (
+          <ActivityIndicator size="small" color={paleta().inkFraco} />
+        ) : (
+          <Text style={styles.textoSair}>Encerrar acompanhamento</Text>
+        )}
+      </Pressable>
     </>
   )
 }
@@ -1120,6 +1173,15 @@ const estilos = estilosDe(t =>
   crnCartao: { marginTop: 2, fontSize: 12, color: t.inkSuave },
   lugarCartao: { marginTop: 1, fontSize: 11.5, color: t.inkFraco },
   cartaoPressionado: { backgroundColor: t.cores.verdeClaro },
+  botaoSair: {
+    alignSelf: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  botaoSairPressionado: { opacity: 0.6 },
+  textoSair: { fontSize: 13.5, fontWeight: '600', color: t.inkFraco },
   botaoConversar: {
     flexDirection: 'row',
     alignItems: 'center',
