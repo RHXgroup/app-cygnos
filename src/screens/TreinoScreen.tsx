@@ -18,6 +18,8 @@ import { ModoTreino } from '../components/ModoTreino'
 import { RotinaPorIA } from '../components/RotinaPorIA'
 import { AdaptarExercicio } from '../components/AdaptarExercicio'
 import { carregarCalculoAtivo } from '../lib/energia'
+import { carregarNoites, tempoDormindo } from '../lib/sono'
+import { prontidaoDeHoje, SEM_PRONTIDAO, type Prontidao } from '../lib/prontidaoDeHoje'
 import { carregarPeso } from '../lib/peso'
 import {
   NOME_DO_ESFORCO,
@@ -91,6 +93,16 @@ export function TreinoScreen({
      peso do diário — o mesmo par que a sugestão de plano usa, e pelo mesmo
      motivo: o peso do cálculo pode ser de meses atrás. Nulo é aceitável; a
      função do servidor monta rotina sem isso, só monta pior. */
+  /* COMO O CORPO DELA CHEGOU HOJE.
+   *
+   * A análise comparativa dos três melhores aplicativos de treino do mercado
+   * (Strong, Hevy, Fitbod) diz, sobre os três juntos: "nenhum deles lê sono,
+   * HRV ou dados de recuperação para ajustar o treino de hoje".
+   *
+   * Este app tem o sono. É a mesma vantagem de sempre — os dados moram juntos —
+   * e esta é a tela em que ela aparece. */
+  const [prontidao, setProntidao] = useState<Prontidao>(SEM_PRONTIDAO)
+
   const [corpo, setCorpo] = useState<{
     idade: number | null
     genero: string | null
@@ -104,7 +116,8 @@ export function TreinoScreen({
       carregarRotina(contaId),
       carregarCalculoAtivo(contaId),
       carregarPeso(contaId),
-    ]).then(([rS, rR, rC, rP]) => {
+      carregarNoites(contaId),
+    ]).then(([rS, rR, rC, rP, rN]) => {
       if (!vivo) return
       /* Falha aqui não atrapalha a tela: sem peso e idade a rotina sai mais
          genérica, e é só isso. Por isso nada de `setErro` neste trecho. */
@@ -123,6 +136,24 @@ export function TreinoScreen({
         setSessoes(rS.sessoes)
       }
       if (rR.tipo === 'ok') setRotina(rR.exercicios)
+      /* Falha no sono não atrapalha a tela: sem noite, a prontidão fica vazia e
+         a tela simplesmente não diz nada sobre disposição. Item 11 do
+         AGENTS.md. */
+      if (rN?.tipo === 'ok') {
+        setProntidao(
+          prontidaoDeHoje(
+            rN.noites.map(n => ({
+              data: n.data,
+              /* `tempoDormindo` e não a diferença crua entre deitar e levantar:
+                 a latência já está descontada lá, e é o tempo DORMINDO que a
+                 disposição de hoje depende. */
+              minutos: tempoDormindo(n),
+              qualidade: n.qualidade,
+            })),
+            dataISO(new Date()),
+          ),
+        )
+      }
       setCarregando(false)
     })
     return () => {
@@ -249,6 +280,31 @@ export function TreinoScreen({
                     (seguidos > 1 ? ` · ${seguidos} dias seguidos` : '')}
               </Text>
             </View>
+
+            {/* COMO VOCE CHEGOU HOJE.
+                Entre o cabecalho e o botao de comecar, que e onde ela decide.
+                Depois do botao seria tarde; antes do titulo seria antes de ela
+                saber que dia e.
+
+                E SUGESTAO, nunca ordem -- ver `prontidaoDeHoje`. O app mede
+                uma noite, e nao o corpo: quem dormiu mal por causa de filho
+                doente pode estar otimo, e quem dormiu oito horas pode estar
+                gripado. Uma ordem ignorada uma vez vira ruido para sempre. */}
+            {prontidao.frase !== null && (
+              <View
+                style={[
+                  styles.prontidao,
+                  prontidao.nivel === 'baixa' && styles.prontidaoBaixa,
+                ]}
+              >
+                <Ionicons
+                  name={prontidao.nivel === 'boa' ? 'sunny-outline' : 'moon-outline'}
+                  size={17}
+                  color={prontidao.nivel === 'boa' ? paleta().cores.verde : paleta().inkMedio}
+                />
+                <Text style={styles.textoProntidao}>{prontidao.frase}</Text>
+              </View>
+            )}
 
             {/* O modo treino vem antes do registro porque é o que se usa
                 DURANTE; registrar é o que se faz no fim. E o tempo que ele mede
@@ -1272,6 +1328,22 @@ const estilos = estilosDe(t =>
   },
   rotuloHoje: { fontSize: 12, color: t.inkFraco, fontWeight: '700' },
   /* Grande e curto: é o que se lê de relance na porta da academia. */
+  /* Tingido de leve, e sem cor de alerta na noite ruim: dormir pouco nao e
+     erro dela, e pintar de vermelho transformaria a sugestao em repreensao. */
+  prontidao: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: t.cores.cartao,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  prontidaoBaixa: { backgroundColor: t.cores.fundo },
+  textoProntidao: { flex: 1, fontSize: 13, color: t.inkMedio, lineHeight: 18 },
   tituloHoje: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.5 },
   subHoje: { fontSize: 13, color: t.inkMedio, marginTop: 4 },
 
