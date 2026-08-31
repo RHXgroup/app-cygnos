@@ -21,7 +21,7 @@ import { decimal, milhar } from '../lib/formatar'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { estilosDe, paleta } from '../lib/tema'
 /* Saiu daqui para lib/teclado.ts quando a conversa precisou da mesma medida. */
-import { useAlturaTeclado } from '../lib/teclado'
+import { useAlturaTeclado, useDesvioDoTeclado } from '../lib/teclado'
 
 type Modo = 'gramas' | 'medida'
 
@@ -176,6 +176,18 @@ export function BuscarAlimentoScreen({
   const busca = useRef<TextInput>(null)
   const alturaTeclado = useAlturaTeclado()
 
+  /* Quanto o painel precisa subir — perguntado ao hook, e não calculado aqui.
+   *
+   * A conta `teclado + área segura` estava escrita à mão nesta tela e está certa
+   * para o Expo Go, onde a janela NÃO encolhe. Num build de verdade o
+   * `windowSoftInputMode` sai `adjustResize` e ela encolhe: somar o teclado de
+   * novo empurraria o painel para o meio da tela. O `useDesvioDoTeclado` detecta
+   * o encolhimento e devolve zero — mas só se receber a altura da tela, que é
+   * medida no `onLayout` da raiz, e não por `useWindowDimensions`, que não
+   * encolhe junto. A conversa já fazia assim; esta tela ficou para trás. */
+  const [alturaDaTela, setAlturaDaTela] = useState(0)
+  const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
+
   /* O voltar do Android com o painel de quantidade aberto.
    *
    * Escolher o alimento abre o painel POR CIMA da lista. Sem isto, quem
@@ -326,7 +338,10 @@ export function BuscarAlimentoScreen({
   const volumeDaMedida = VOLUME_ML[medida.trim().toLowerCase()] ?? null
 
   return (
-    <View style={[styles.tela, { paddingTop: top + 8 }]}>
+    <View
+      style={[styles.tela, { paddingTop: top + 8 }]}
+      onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}
+    >
       {/* O KeyboardAvoidingView cobre só a busca e a lista. O painel de
           quantidade fica FORA dele, como irmão: por ser posicionado por
           absoluto, ele ignoraria o padding do KAV e continuaria atrás do
@@ -496,8 +511,11 @@ export function BuscarAlimentoScreen({
                  * Ninguém tinha reclamado porque ele é alto — a parte escondida
                  * era a borda de baixo, não o campo. Achado ao caçar o mesmo
                  * defeito na tela de conversa, onde a barra é baixa e sumia
-                 * inteira. */
-                bottom: alturaTeclado > 0 ? alturaTeclado + bottom : 0,
+                 * inteira.
+                 *
+                 * A soma agora vem do `respiro`, que sabe desfazê-la quando a
+                 * janela encolhe — o que só acontece em build. */
+                bottom: alturaTeclado > 0 ? respiro : 0,
                 paddingBottom: alturaTeclado > 0 ? 16 : Math.max(bottom, 16),
               },
             ]}

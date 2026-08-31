@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Keyboard, Platform } from 'react-native'
+import { desvioDoTeclado } from './desvioDoTeclado'
 
 /* Quanto o teclado está ocupando da tela, em pixels. Zero quando está fechado.
  *
@@ -57,7 +58,11 @@ export function useAlturaTeclado(): number {
  *
  * Por isso `alturaDaTela` é opcional e a correção é conservadora: sem ela, ou
  * antes da primeira medida, o comportamento é EXATAMENTE o que está testado
- * hoje. Ela só muda alguma coisa quando prova que a janela encolheu. */
+ * hoje. Ela só muda alguma coisa quando prova que a janela encolheu.
+ *
+ * A decisão em si mora em lib/desvioDoTeclado.ts, que não importa nada de
+ * runtime e por isso pode ser exercitada no Node com os números medidos no
+ * aparelho. Aqui fica só o que precisa do React: medir e lembrar. */
 export function useDesvioDoTeclado(areaSegura: number, alturaDaTela?: number): number {
   const alturaTeclado = useAlturaTeclado()
   const semTeclado = useRef(0)
@@ -66,17 +71,12 @@ export function useDesvioDoTeclado(areaSegura: number, alturaDaTela?: number): n
      aberto faria a comparação sempre dizer "não encolheu". */
   if (alturaTeclado === 0 && alturaDaTela) semTeclado.current = alturaDaTela
 
-  if (alturaTeclado === 0) return areaSegura
-
-  /* Encolheu de verdade? Só conta se a diferença for da ordem do teclado — uma
-     folga de 40 evita que arredondamento ou uma barra que apareceu sejam lidos
-     como encolhimento. */
-  const encolheu =
-    !!alturaDaTela &&
-    semTeclado.current > 0 &&
-    semTeclado.current - alturaDaTela > alturaTeclado - 40
-
-  return encolheu ? 0 : alturaTeclado + areaSegura
+  return desvioDoTeclado({
+    areaSegura,
+    alturaTeclado,
+    alturaSemTeclado: semTeclado.current,
+    alturaAgora: alturaDaTela,
+  })
 }
 
 /* O respiro de baixo que a tela precisa AGORA.
