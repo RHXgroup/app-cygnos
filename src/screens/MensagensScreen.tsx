@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -29,7 +29,7 @@ import {
   ouvirMensagens,
   type Mensagem,
 } from '../lib/mensagens'
-import { horaCurta } from '../lib/formatar'
+import { horaCurta, rotuloDoDia } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 import { useDesvioDoTeclado } from '../lib/teclado'
 
@@ -358,7 +358,21 @@ export function MensagensScreen({
                 Vocês ainda não trocaram mensagens. Escreva a primeira.
               </Text>
             ) : (
-              mensagens.map(m => <Balao key={m.id} mensagem={m} />)
+              mensagens.map((m, i) => (
+                <Fragment key={m.id}>
+                  {/* Separador quando o dia muda, e no topo da conversa.
+                   *
+                   * A tela mostrava só a hora, e "18:05" de hoje é idêntico a
+                   * "18:05" de dez dias atrás. Num acompanhamento nutricional
+                   * isso muda o que a pessoa conclui do silêncio: "ela respondeu
+                   * ontem" e "ela não responde há uma semana" são situações
+                   * diferentes que a tela apresentava igual. */}
+                  {mudouDeDia(mensagens[i - 1], m) && (
+                    <Text style={styles.dia}>{rotuloDoDia(new Date(m.criadaEm), new Date())}</Text>
+                  )}
+                  <Balao mensagem={m} />
+                </Fragment>
+              ))
             )}
           </ScrollView>
 
@@ -397,6 +411,18 @@ export function MensagensScreen({
         </>
       )}
     </View>
+  )
+}
+
+/* A mensagem começa um dia novo? A primeira sempre começa. */
+function mudouDeDia(anterior: Mensagem | undefined, atual: Mensagem): boolean {
+  if (!anterior) return true
+  const a = new Date(anterior.criadaEm)
+  const b = new Date(atual.criadaEm)
+  return (
+    a.getFullYear() !== b.getFullYear() ||
+    a.getMonth() !== b.getMonth() ||
+    a.getDate() !== b.getDate()
   )
 }
 
@@ -474,6 +500,19 @@ const estilos = estilosDe(t =>
       paddingHorizontal: 24,
     },
 
+    dia: {
+      alignSelf: 'center',
+      marginTop: 10,
+      marginBottom: 2,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 10,
+      backgroundColor: t.cores.cartao,
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: t.inkFraco,
+      overflow: 'hidden',
+    },
     linhaBalao: { flexDirection: 'row' },
     linhaBalaoMinha: { justifyContent: 'flex-end' },
     balao: { maxWidth: '82%', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 16 },

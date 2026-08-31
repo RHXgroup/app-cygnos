@@ -73,6 +73,31 @@ export const dataNumerica = (d: Date) =>
     d.getFullYear(),
   ].join('/')
 
+/* "Hoje", "Ontem", ou "Qui, 26 de Out." para o resto.
+ *
+ * Serve para separar dias numa conversa. Sem isso, a conversa mostra só a hora —
+ * e "18:05" de hoje é idêntico a "18:05" de semana passada. Num acompanhamento
+ * nutricional isso não é detalhe: "ela respondeu ontem" e "ela respondeu há dez
+ * dias" mudam completamente o que a pessoa conclui do silêncio.
+ *
+ * `hoje` entra por parâmetro para a função não depender do relógio — é o que
+ * permite exercitá-la com casos de mesa. */
+export function rotuloDoDia(d: Date, hoje: Date): string {
+  const mesmoDia = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+
+  if (mesmoDia(d, hoje)) return 'Hoje'
+
+  /* Ontem pela DATA, e não por 24 horas: às duas da manhã, uma mensagem das
+     dez da noite anterior é de ontem, e não de "hoje há quatro horas". */
+  const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1)
+  if (mesmoDia(d, ontem)) return 'Ontem'
+
+  return dataCurta(d)
+}
+
 /* "Qui, 26 de Out." */
 export const dataCurta = (d: Date) =>
   `${DIAS_CURTOS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()].slice(0, 3)}.`

@@ -91,6 +91,8 @@ export function NutricionistasScreen({
      Só existem sem vínculo: depois do aceite, isto some com a lista. */
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([])
   const [pedindo, setPedindo] = useState<Nutricionista | null>(null)
+  /* Nome de quem acabou de ser encerrada, para o aviso de sucesso. */
+  const [encerrou, setEncerrou] = useState('')
 
   /* Recarrega ao voltar da tela de agendamento: quem acabou de pedir horário
      precisa ver o pedido aparecer aqui, e não uma ficha igual à de antes. */
@@ -292,7 +294,15 @@ export function NutricionistasScreen({
               onAgendar={() => setAgendando(true)}
               onConversar={onConversar}
               onDesvincular={async motivo => {
+                const nomeDela = vinculada.nome
                 const r = await desvincular(motivo)
+                /* Confirma pelo nome de quem saiu.
+                 *
+                 * Sem isto a tela apenas trocava de ramo — da ficha dela para o
+                 * catálogo — e o sucesso ficava mudo. Ação sem volta que não diz
+                 * "pronto" deixa a dúvida de sempre: aconteceu, ou eu fechei sem
+                 * querer? O nome no aviso é o que prova que foi a certa. */
+                if (r.tipo === 'ok') setEncerrou(nomeDela)
                 /* Relê em vez de mexer no estado daqui: quem decide se o vínculo
                    acabou é o banco, e a tela inteira muda de ramo — da ficha
                    dela para o catálogo. */
@@ -318,6 +328,16 @@ export function NutricionistasScreen({
           )}
         </ScrollView>
       )}
+
+      <Confirmacao
+        visivel={!!encerrou}
+        titulo="Acompanhamento encerrado"
+        mensagem={`Você não é mais acompanhada por ${encerrou}. O que ela registrou continua aqui, e você pode procurar outra nutricionista quando quiser.`}
+        rotuloConfirmar="Entendi"
+        rotuloCancelar="Fechar"
+        onCancelar={() => setEncerrou('')}
+        onConfirmar={() => setEncerrou('')}
+      />
 
       {/* Por cima de tudo, e depois do ScrollView: é a camada mais alta da tela
           e precisa cobrir a lista inteira. */}

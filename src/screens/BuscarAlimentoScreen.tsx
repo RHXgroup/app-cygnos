@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { anotarBuscaVazia, NOME_NOVA, buscarAlimentos, porcao, type Alimento } from '../lib/alimentos'
@@ -57,6 +58,16 @@ const MEDIDAS = [
  * Os valores em ml, e não em gramas, para o rótulo poder dizer de onde saiu o
  * número: "considerando copo de 200 ml" é o que permite a pessoa perceber que o
  * copo dela é de 250 e corrigir. */
+/* Onde ficam os pesos que a PESSOA corrigiu.
+ *
+ * O volume abaixo é um palpite de fábrica: copo de 200 ml é o padrão do Brasil,
+ * mas quem usa copo de 250 teria de digitar 250 toda vez que escolhesse "copo".
+ * Atrito que se repete em todo registro é atrito que faz abandonar o recurso.
+ *
+ * Guardado por MEDIDA, não por alimento: o copo da pessoa é o mesmo para leite,
+ * suco e café. A colher de sopa dela também. */
+const CHAVE_PESOS = 'busca.pesosPorMedida'
+
 const VOLUME_ML: Record<string, number> = {
   ml: 1,
   copo: 200,
@@ -141,6 +152,26 @@ export function BuscarAlimentoScreen({
   const [quantidade, setQuantidade] = useState(QUANTIDADE_PADRAO)
   const [medida, setMedida] = useState(MEDIDAS[0])
   const [pesoUnidade, setPesoUnidade] = useState('')
+  /* O que a pessoa já corrigiu antes, por medida. Lido uma vez. */
+  const [pesosSalvos, setPesosSalvos] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let vivo = true
+    AsyncStorage.getItem(CHAVE_PESOS)
+      .then((cru: string | null) => {
+        if (!vivo || !cru) return
+        const lido = JSON.parse(cru) as unknown
+        /* Formato torto é tratado como "nunca corrigiu": o pior que acontece é
+           a pessoa digitar de novo, e isso é melhor do que a tela quebrar. */
+        if (lido && typeof lido === 'object') setPesosSalvos(lido as Record<string, string>)
+      })
+      .catch(() => {
+        /* Sem armazenamento, os palpites de fábrica continuam valendo. */
+      })
+    return () => {
+      vivo = false
+    }
+  }, [])
   const [adicionados, setAdicionados] = useState(0)
   const busca = useRef<TextInput>(null)
   const alturaTeclado = useAlturaTeclado()
@@ -226,6 +257,22 @@ export function BuscarAlimentoScreen({
 
   function confirmar() {
     if (!selecionado || !podeAdicionar) return
+
+    /* Guarda o peso desta medida para a próxima vez — só quando a pessoa
+       CONFIRMOU, que é quando ela endossou o número. Guardar a cada tecla
+       gravaria o "2" de quem está digitando "250". */
+    if (modo === 'medida') {
+      const chave = medida.trim().toLowerCase()
+      const peso = pesoUnidade.trim()
+      if (chave && peso && pesosSalvos[chave] !== peso) {
+        const novos = { ...pesosSalvos, [chave]: peso }
+        setPesosSalvos(novos)
+        AsyncStorage.setItem(CHAVE_PESOS, JSON.stringify(novos)).catch(() => {
+          /* Não gravou: na próxima ela digita de novo. Não vale interromper o
+             registro por causa disso. */
+        })
+      }
+    }
 
     onAdicionar({
       chave: novaChave(),
@@ -568,7 +615,12 @@ export function BuscarAlimentoScreen({
                          * Peso de uma medida não vale para outra. Sem sugestão,
                          * o campo volta a vazio e a tela pede o peso — que é a
                          * verdade, e é o que ela já sabe dizer. */
-                        setPesoUnidade(VOLUME_ML[m] ? String(VOLUME_ML[m]) : '')
+                        /* O que a pessoa corrigiu antes ganha do palpite de
+                           fábrica: se ela já disse que o copo dela é de 250, é
+                           250 que aparece. */
+                        setPesoUnidade(
+                          pesosSalvos[m] ?? (VOLUME_ML[m] ? String(VOLUME_ML[m]) : ''),
+                        )
                       }}
                       style={[styles.fita, medida === m && styles.fitaAtiva]}
                       accessibilityRole="button"
