@@ -14,7 +14,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ditado } from '../components/Ditado'
 import { carregarPlanoAtivo } from '../lib/plano'
-import { carregarIntencoes, lerIntencao, salvarIntencoes, apagarIntencao,
+import { carregarIntencoes, lerIntencao, marcarCumprida, salvarIntencoes, apagarIntencao,
   type IntencaoSalva } from '../lib/intencao'
 import type { Convertida, Intencao, TipoIntencao } from '../lib/intencaoDaIA'
 import { estilosDe, paleta } from '../lib/tema'
@@ -167,6 +167,31 @@ export function ContarPlanoScreen({
     }
   }
 
+  /* O PROPÓSITO fecha o ciclo aqui, e era o único que não fechava.
+   *
+   * Os outros tipos se resolvem sozinhos quando o dia passa: a viagem acabou, o
+   * almoço fora aconteceu. "Quero comer menos à noite" não passa — ele fica, e
+   * a pessoa decide se deu certo. `marcarCumprida` existia para isso, com o
+   * comentário dizendo que é o que dá sentido ao propósito existir, e não tinha
+   * chamador nenhum: apareceu na lista do `npm run orfaos`.
+   *
+   * Tocar de novo no que já está marcado DESMARCA. Sem isso, quem errasse o
+   * toque ficaria com "não deu" num propósito que deu — e não haveria caminho
+   * de volta a não ser apagar o propósito inteiro. */
+  async function marcar(i: IntencaoSalva, valor: boolean) {
+    const novo = i.cumprida === valor ? null : valor
+    const antes = i.cumprida
+
+    /* Pinta na hora e conserta se falhar, como o esquecer logo acima: esperar a
+       rede para acender um selo faz o toque parecer que não funcionou. */
+    setJaTem(atuais => atuais.map(x => (x.id === i.id ? { ...x, cumprida: novo } : x)))
+    const falha = await marcarCumprida(i.id, novo)
+    if (falha) {
+      setJaTem(atuais => atuais.map(x => (x.id === i.id ? { ...x, cumprida: antes } : x)))
+      setErro(falha.erro)
+    }
+  }
+
   const voltar = () => (lida ? setLida(null) : onFechar())
 
   return (
@@ -251,9 +276,57 @@ export function ContarPlanoScreen({
                       color={paleta().cores.verde}
                     />
                     <View style={styles.textoLinha}>
-                      <Text style={styles.textoIntencao}>{i.texto}</Text>
+                      <Text
+                        style={[
+                          styles.textoIntencao,
+                          /* Marcado como "não deu" fica mais apagado, e nunca
+                             riscado: riscar se lê como erro, e um propósito que
+                             não deu certo não é erro de ninguém. */
+                          i.cumprida === false && styles.textoIntencaoFraco,
+                        ]}
+                      >
+                        {i.texto}
+                      </Text>
                       <Text style={styles.quando}>{quandoEmTexto(i.quando, i.ate, hoje)}</Text>
                     </View>
+
+                    {/* SÓ o propósito. Perguntar "deu certo?" sobre uma viagem
+                        que já aconteceu não faz sentido — ela aconteceu. */}
+                    {i.tipo === 'proposito' && (
+                      <View style={styles.deuCerto}>
+                        <Pressable
+                          onPress={() => marcar(i, true)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: i.cumprida === true }}
+                          accessibilityLabel={`Deu certo: ${i.texto}`}
+                        >
+                          <Ionicons
+                            name={i.cumprida === true ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                            size={21}
+                            color={i.cumprida === true ? paleta().cores.verde : paleta().inkFraco}
+                          />
+                        </Pressable>
+                        <Pressable
+                          onPress={() => marcar(i, false)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: i.cumprida === false }}
+                          accessibilityLabel={`Não deu: ${i.texto}`}
+                        >
+                          {/* Um traço, e não um X: X é o botão de esquecer, que
+                              está logo ao lado, e dois X na mesma linha fazendo
+                              coisas diferentes é como alguém apaga o que queria
+                              só marcar. */}
+                          <Ionicons
+                            name={i.cumprida === false ? 'remove-circle' : 'remove-circle-outline'}
+                            size={21}
+                            color={i.cumprida === false ? paleta().inkMedio : paleta().inkFraco}
+                          />
+                        </Pressable>
+                      </View>
+                    )}
+
                     <Pressable
                       onPress={() => esquecer(i)}
                       hitSlop={10}
@@ -391,6 +464,8 @@ const estilos = estilosDe(t =>
     },
     textoLinha: { flex: 1, gap: 2 },
     textoIntencao: { fontSize: 15, color: t.cores.ink, fontWeight: '600' },
+    textoIntencaoFraco: { color: t.inkFraco, fontWeight: '500' },
+    deuCerto: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     quando: { fontSize: 12, color: t.inkFraco },
 
     erro: { fontSize: 13, color: t.cores.erroTexto, lineHeight: 18 },
