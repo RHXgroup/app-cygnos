@@ -103,13 +103,33 @@ entre "campo no meio da tela" e "campo atrás do teclado".
    houver motivo REAL — coisa posicionada por absoluto que precise acompanhar o
    teclado. No iOS use `keyboardWillShow`; no Android só existe `keyboardDidShow`.
 
+**A conta é `teclado + área segura`, e as duas SOMAM.**
+
+`endCoordinates.height` devolve a altura do teclado **sem** a barra de navegação
+que fica por baixo dele. Medido no aparelho:
+
+```
+teclado 306 · área segura 48 · e faltavam exatamente 48
+```
+
+Quem desviar só pela altura do teclado fica 48 por baixo. Em painel alto isso
+esconde a borda e ninguém reclama; em barra baixa some a barra inteira.
+
+Isto custou SEIS tentativas numa tela só, e o motivo de ter custado tanto vale
+mais que a regra: eu trocava o MECANISMO a cada rodada — KeyboardAvoidingView,
+margem, âncora absoluta, medir se a janela encolhe — e nunca conferi o NÚMERO.
+Uma faixa temporária imprimindo os três valores na tela resolveu numa foto.
+
+**Quando o layout estiver errado e a segunda tentativa falhar, pare de trocar de
+mecanismo e imprima os números na tela.** Sai mais barato que a terceira teoria.
+
 **Em build de verdade isto pode mudar**, porque aí o `app.json` passa a valer e o
 edge-to-edge entra. No dia do primeiro build, esta é uma das telas para reabrir.
 
-**E há uma pendência aqui:** `BuscarAlimentoScreen` mede o teclado e posiciona o
-painel por absoluto. Se a janela já encolhe, aquele painel está subindo demais e
-ninguém reparou. **Precisa ser testado num aparelho** — não mexa nele por
-dedução, que foi exatamente o erro que este item passou a documentar.
+**A pendência que estava anotada aqui foi resolvida**, e do jeito contrário do
+que eu supunha: `BuscarAlimentoScreen` não subia DEMAIS, subia de MENOS — os
+mesmos 48 da barra de navegação. Ninguém tinha reclamado porque o painel é alto e
+o que sumia era a borda, não o campo. Corrigido junto com a conversa.
 
 ## 3. Campo numérico e o separador de milhar
 
