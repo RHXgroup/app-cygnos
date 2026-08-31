@@ -45,7 +45,7 @@ import {
   mesVizinho,
   somandoDias,
 } from '../lib/calendarioDoCiclo'
-import { diasFerteis, janelaFertil } from '../lib/fertilidade'
+import { diasFerteis, ehDiaFertil, janelaFertil } from '../lib/fertilidade'
 import { avisoDaSemana, padraoAntesDaMenstruacao } from '../lib/padraoDoCiclo'
 import { carregarConsumoPeriodo } from '../lib/consumo'
 import { dataISO, milhar } from '../lib/formatar'
@@ -685,6 +685,14 @@ export function CicloScreen({
           dia={doDia(diaAberto)}
           carregando={false}
           ehComecoDeCiclo={ehComeco(diaAberto)}
+          /* A MESMA janela que pinta o ponto no calendario, e a MESMA regra:
+             em dia de fluxo o calendario nao mostra o ponto fertil, e o painel
+             nao pode dizer o contrario da tela de onde ela veio.
+
+             Perguntar por um dia so, em vez de montar o Set inteiro, e para
+             isso que `ehDiaFertil` existe -- e ela estava escrita e sem
+             chamador nenhum. */
+          ehFertil={ehDiaFertil(diaAberto, janela) && !pintados.menstruada.has(diaAberto)}
           salvando={salvandoDia}
           onSalvar={d => void guardarDia(d)}
           onMarcarComeco={ligado => void marcarComeco(diaAberto, ligado)}

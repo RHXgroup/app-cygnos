@@ -143,6 +143,7 @@ export function DiaDoCiclo({
   dia,
   carregando,
   ehComecoDeCiclo,
+  ehFertil,
   salvando,
   onSalvar,
   onMarcarComeco,
@@ -154,6 +155,13 @@ export function DiaDoCiclo({
   dia: Dia | null
   carregando: boolean
   ehComecoDeCiclo: boolean
+  /* Se este dia cai na janela fértil estimada.
+   *
+   * O calendário já pintava o ponto e o painel não dizia nada — quem tocasse
+   * num dia marcado abria uma tela que nunca explicava o que a marca queria
+   * dizer. Vem PRONTO de cima, e não calculado aqui: quem sabe a janela é a
+   * tela do ciclo, que tem a previsão e a duração medida. */
+  ehFertil: boolean
   salvando: boolean
   onSalvar: (d: Dia) => void
   /* Marcar ou desmarcar que a menstruação começou NESTE dia. Separado do resto
@@ -261,6 +269,25 @@ export function DiaDoCiclo({
                 <Ionicons name="checkmark" size={18} color={paleta().cores.cicloForte} />
               )}
             </Pressable>
+
+            {/* A JANELA FERTIL, quando o dia cai nela.
+                O calendario ja pintava o ponto e este painel nao dizia nada:
+                quem tocasse num dia marcado abria uma tela que nunca explicava
+                o que a marca queria dizer.
+
+                Com a ressalva junto, e nao escondida numa tela acima. A frase
+                e a mesma do cartao do ciclo, de proposito: duas redacoes para
+                a mesma estimativa fariam uma delas parecer mais firme. */}
+            {ehFertil && (
+              <View style={styles.fertil}>
+                <Ionicons name="ellipse" size={9} color={paleta().cores.cicloForte} />
+                <Text style={styles.textoFertil}>
+                  Dia dentro da <Text style={styles.forteFertil}>janela fértil estimada</Text>.
+                  Estimativa pelas suas datas, erra por dias, e não serve como método
+                  contraceptivo.
+                </Text>
+              </View>
+            )}
 
             {umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
 
@@ -447,6 +474,21 @@ function Etiqueta({
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
+  fertil: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: t.cores.superficie,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  textoFertil: { flex: 1, fontSize: 11.5, lineHeight: 16.5, color: t.inkMedio },
+  forteFertil: { fontWeight: '800', color: t.cores.ink },
+
     tela: { flex: 1, backgroundColor: t.cores.fundo },
     cabecalho: {
       flexDirection: 'row',
