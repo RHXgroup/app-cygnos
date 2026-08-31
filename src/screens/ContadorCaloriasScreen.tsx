@@ -50,6 +50,14 @@ import {
   enderecosDasFotos,
   guardarFotoDoDiario,
 } from '../lib/fotoDoDiario'
+import {
+  diferencaDoOriginal,
+  escolhidaDe,
+  houveTroca,
+  proxima,
+  totaisDe as totaisDaTroca,
+  type ItemComTrocas,
+} from '../lib/trocaNoPlano'
 
 /* O contador de calorias: o que a pessoa comeu hoje, contra a meta dela.
  *
@@ -520,14 +528,61 @@ export function ContadorCaloriasScreen({
     )
   }
 
-  /* Uma refeição inteira do plano vira consumo de uma vez.
+  /* A refeição escolhida do plano, no passo de conferir e trocar.
+   *
+   * Antes, escolher a refeição GRAVAVA direto os itens principais — e as
+   * variações que a nutricionista cadastrou eram ignoradas justamente no
+   * momento em que serviriam. Quem não gostou do que estava no plano não comia,
+   * ou comia e não registrava; plano rígido não é seguido, é abandonado. */
+  const [aConferir, setAConferir] = useState<{
+    rotulo: string
+    itens: ItemComTrocas[]
+  } | null>(null)
+
+  function comerDoPlano(r: RefeicaoSalva) {
+    setPorta(null)
+    /* A primeira opção é SEMPRE a que a nutricionista pôs como principal — é o
+       que `escolhida: 0` significa em toda a lib, inclusive no cálculo da
+       diferença. */
+    setAConferir({
+      rotulo: r.rotulo,
+      itens: r.itens.map(i => ({
+        opcoes: [i, ...i.variacoes].map(o => ({
+          id: o.id,
+          nome: o.nome,
+          descricao: o.descricao,
+          alimentoId: o.alimentoId,
+          caloriasPor100g: o.caloriasPor100g,
+          proteinasPor100g: o.proteinasPor100g,
+          carboidratosPor100g: o.carboidratosPor100g,
+          gordurasPor100g: o.gordurasPor100g,
+          fibrasPor100g: o.fibrasPor100g,
+          gramasTotais: o.gramasTotais,
+        })),
+        escolhida: 0,
+      })),
+    })
+  }
+
+  /* Grava o que ela CONFIRMOU, e não o que o plano previa.
    *
    * O rótulo gravado é o DO PLANO ("Pré-treino"), e não o da faixa lá em cima:
    * quem registra o pré-treino do plano comeu o pré-treino, mesmo que o relógio
    * ache que é hora do almoço. */
-  function comerDoPlano(r: RefeicaoSalva) {
-    setPorta(null)
-    gravar(r.itens.map(i => doPlano(i, r.rotulo)))
+  function confirmarDoPlano() {
+    const escolha = aConferir
+    if (!escolha) return
+    setAConferir(null)
+    /* REUSA `doPlano`, a mesma conversao que a versao anterior usava. Escrever
+       a conta de novo aqui criaria duas implementacoes do mesmo assunto, que
+       sempre divergem -- item 5 do AGENTS.md. E o numero que a folha mostrou
+       tem de ser exatamente o que entra no diario. */
+    gravar(
+      escolha.itens
+        .map(i => escolhidaDe(i))
+        .filter((o): o is NonNullable<typeof o> => o !== null)
+        .map(o => doPlano(o, escolha.rotulo)),
+    )
   }
 
   if (porta === 'receitas') {
@@ -852,6 +907,23 @@ export function ContadorCaloriasScreen({
           plano={plano}
           onEscolher={comerDoPlano}
           onFechar={() => setPorta(null)}
+        />
+      )}
+
+      {/* CONFERIR E TROCAR, antes de gravar. */}
+      {aConferir && (
+        <ConferirDoPlano
+          rotulo={aConferir.rotulo}
+          itens={aConferir.itens}
+          onTrocar={indice =>
+            setAConferir(a =>
+              a === null
+                ? a
+                : { ...a, itens: a.itens.map((i, n) => (n === indice ? proxima(i) : i)) },
+            )
+          }
+          onConfirmar={confirmarDoPlano}
+          onFechar={() => setAConferir(null)}
         />
       )}
 
@@ -1395,6 +1467,146 @@ function EscolherDoPlano({
   )
 }
 
+/* ── Conferir e trocar antes de gravar ─────────────────────────────────────
+ *
+ * O plano JÁ TINHA variações por item — a nutricionista cadastra alternativas,
+ * e a tela de edição as gerencia. Mas registrar gravava sempre o principal, e
+ * as trocas dela eram ignoradas justamente onde serviriam.
+ *
+ * O mecanismo é o do Eat This Much ("troque a refeição e a conta se refaz"), e
+ * aqui ele é melhor por uma razão que nenhum concorrente pode copiar: as
+ * alternativas vêm da profissional que conhece a pessoa. Já passaram por
+ * alergia, preferência e objetivo.
+ *
+ * ── A conta se refaz NA FRENTE dela ───────────────────────────────────────
+ * Trocar sem ver o efeito é trocar no escuro. O total muda a cada toque, e a
+ * diferença aparece com sinal — é com esse número na frente que a pessoa
+ * aprende, em algumas semanas, o custo das próprias substituições.
+ *
+ * E a troca cara também é dita. Esconder o "+188 kcal" seria decidir por ela. */
+function ConferirDoPlano({
+  rotulo,
+  itens,
+  onTrocar,
+  onConfirmar,
+  onFechar,
+}: {
+  rotulo: string
+  itens: ItemComTrocas[]
+  onTrocar: (indice: number) => void
+  onConfirmar: () => void
+  onFechar: () => void
+}) {
+  const styles = estilos()
+  const { bottom } = useSafeAreaInsets()
+  const t = totaisDaTroca(itens)
+  const diferenca = diferencaDoOriginal(itens)
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
+        <View style={styles.puxador} />
+
+        <Text style={styles.tituloFolha}>{rotulo}</Text>
+        <Text style={styles.porcaoFolha}>
+          Toque num alimento para ver as trocas que a sua nutricionista deixou.
+        </Text>
+
+        <ScrollView style={styles.listaPlano} bounces={false}>
+          {itens.map((item, i) => {
+            const o = escolhidaDe(item)
+            if (o === null) return null
+            const temTroca = item.opcoes.length > 1
+            const kcal =
+              o.gramasTotais === null ? null : porcao(o.caloriasPor100g, o.gramasTotais)
+
+            return (
+              <Pressable
+                key={`${o.id}-${i}`}
+                onPress={() => temTroca && onTrocar(i)}
+                disabled={!temTroca}
+                style={({ pressed }) => [
+                  styles.linhaItem,
+                  pressed && temTroca && styles.linhaItemPressionada,
+                ]}
+                accessibilityRole={temTroca ? 'button' : 'text'}
+                accessibilityLabel={
+                  temTroca ? `${o.nome}. Tocar para trocar.` : o.nome
+                }
+              >
+                <View style={styles.textoItem}>
+                  <View style={styles.linhaNomeItem}>
+                    <Text style={styles.nomeItem} numberOfLines={2}>
+                      {o.nome}
+                    </Text>
+                    {/* O selo só aparece onde HÁ troca. Marcar item sem
+                        alternativa criaria a expectativa de um toque que não
+                        faz nada. */}
+                    {temTroca && (
+                      <View style={styles.seloTroca}>
+                        <Ionicons name="swap-horizontal" size={10} color={paleta().cores.verde} />
+                        <Text style={styles.textoSeloTroca}>
+                          {item.escolhida + 1}/{item.opcoes.length}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.detalheItem}>
+                    {o.gramasTotais === null ? 'sem peso' : `${milhar(o.gramasTotais)} g`}
+                  </Text>
+                </View>
+                <Text style={styles.kcalItem}>{kcal === null ? '—' : milhar(kcal)}</Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+
+        <View style={styles.totalTroca}>
+          <Text style={styles.rotuloTotalTroca}>Total</Text>
+          <Text style={styles.valorTotalTroca}>{milhar(t.calorias)} kcal</Text>
+          {/* A diferença só aparece quando houve troca — antes disso não há o
+              que comparar, e um "+0 kcal" seria ruído. */}
+          {houveTroca(itens) && diferenca !== 0 && (
+            <Text style={styles.diferencaTroca}>
+              {diferenca > 0 ? '+' : '−'}
+              {milhar(Math.abs(diferenca))} kcal
+            </Text>
+          )}
+        </View>
+
+        {/* Item 6 do AGENTS.md: o que não tem caloria conhecida fica de fora da
+            soma, e o total DIZ isso. Um total calado sobre o que faltou é um
+            total em que não se pode confiar. */}
+        {t.semCalorias > 0 && (
+          <Text style={styles.rodapeFolha}>
+            {t.semCalorias === 1
+              ? '1 alimento sem caloria conhecida ficou de fora da soma.'
+              : `${t.semCalorias} alimentos sem caloria conhecida ficaram de fora da soma.`}
+          </Text>
+        )}
+
+        <View style={styles.botoesFolha}>
+          <Pressable
+            onPress={onFechar}
+            style={({ pressed }) => [styles.botaoDescartar, pressed && styles.botaoDescartarPress]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.textoDescartar}>Voltar</Text>
+          </Pressable>
+          <Pressable
+            onPress={onConfirmar}
+            style={({ pressed }) => [styles.botaoRegistrar, pressed && styles.botaoRegistrarPress]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.textoRegistrar}>Registrar</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  )
+}
+
 /* A porta do repetir.
  *
  * Duas listas, e a ordem entre elas é a do esforço: primeiro a refeição inteira
@@ -1885,6 +2097,32 @@ const estilos = estilosDe(t =>
     marginRight: 11,
     backgroundColor: t.cores.fundo,
   },
+  seloTroca: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: t.cores.verdeClaro,
+  },
+  textoSeloTroca: { fontSize: 10, fontWeight: '800', color: t.cores.verde },
+
+  totalTroca: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: t.cores.borda,
+  },
+  rotuloTotalTroca: { flex: 1, fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+  valorTotalTroca: { fontSize: 20, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.4 },
+  /* Sem cor de alerta no positivo: comer mais num dia nao e erro, e pintar de
+     vermelho transformaria a informacao em repreensao. */
+  diferencaTroca: { fontSize: 13, fontWeight: '700', color: t.inkMedio },
+
   seloFoto: {
     flexDirection: 'row',
     alignItems: 'center',
