@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Animated,
   AppState,
   Pressable,
   ScrollView,
@@ -1354,6 +1355,7 @@ function CartaoAgua({
   const copos = coposDe(bebido, agua.copoMl)
   const coposMeta = coposDaMeta(agua.metaMl, agua.copoMl)
   const fracao = agua.metaMl > 0 ? Math.min(bebido / agua.metaMl, 1) : 0
+  const bateu = coposMeta > 0 && copos >= coposMeta
 
   return (
     <Pressable
@@ -1388,13 +1390,11 @@ function CartaoAgua({
       {coposMeta <= 8 ? (
         <View style={styles.copos}>
           {Array.from({ length: coposMeta }, (_, i) => (
-            <View key={i} style={[styles.copo, i >= copos && styles.copoVazio]} />
+            <Copo key={i} cheio={i < copos} ehOUltimoCheio={i === copos - 1} />
           ))}
         </View>
       ) : (
-        <View style={styles.trilhoAgua}>
-          <View style={[styles.preenchimentoAgua, { width: `${fracao * 100}%` }]} />
-        </View>
+        <BarraDaAgua fracao={fracao} />
       )}
 
       <Pressable
@@ -1403,10 +1403,113 @@ function CartaoAgua({
         accessibilityRole="button"
         accessibilityLabel={`Registrar um copo de ${agua.copoMl} mililitros`}
       >
-        <Ionicons name="add" size={15} color={paleta().cores.branco} />
-        <Text style={styles.textoRegistrar}>Registrar</Text>
+        <Ionicons name={bateu ? 'checkmark' : 'add'} size={15} color={paleta().cores.branco} />
+        {/* A meta batida é DITA, e uma vez só.
+            Sem isto o cartão passava de "7 / 8 copos" para "8 / 8 copos" e mais
+            nada — o único momento do dia em que a água terminou não se
+            distinguia dos outros sete. E fica no botão, que continua servindo
+            para beber mais: bater a meta não é motivo para o app parar de
+            aceitar água. */}
+        <Text style={styles.textoRegistrar}>{bateu ? 'Meta do dia' : 'Registrar'}</Text>
       </Pressable>
     </Pressable>
+  )
+}
+
+/* Um copo, e o pulso de quando ele enche.
+ *
+ * ── Por que animar isto, e não outra coisa ────────────────────────────────
+ * Registrar água é o gesto mais repetido do app: oito vezes por dia, todo dia.
+ * Ele acontecia em silêncio — a pessoa tocava e o quadradinho simplesmente
+ * estava azul no quadro seguinte, sem nada ligando o toque ao resultado.
+ *
+ * Num gesto que se repete tanto, essa ligação é o que faz o toque PARECER que
+ * funcionou. É a diferença entre um botão e um botão que responde.
+ *
+ * ── E por que só o último ─────────────────────────────────────────────────
+ * Animar os oito a cada toque seria festa, e festa toda vez cansa em dois dias.
+ * Pulsa o que acabou de mudar, e nada mais.
+ *
+ * `useNativeDriver` porque é escala: a animação roda fora da thread de JS, e
+ * continua fluida enquanto a tela recarrega o resto. */
+function Copo({ cheio, ehOUltimoCheio }: { cheio: boolean; ehOUltimoCheio: boolean }) {
+  const styles = estilos()
+  const escala = useRef(new Animated.Value(1)).current
+  /* Se este copo já pulsou. Sem isto, o modo estrito do React chamaria o efeito
+     duas vezes e o pulso sairia dobrado. */
+  const jaPulsou = useRef(false)
+  /* E se este é o PRIMEIRO desenho.
+   *
+   * Sem esta guarda, quem abre o app depois de já ter bebido três copos vê o
+   * terceiro pulsar — um copo que ela encheu horas atrás, animado como se
+   * tivesse acabado de acontecer. E a aba Início monta uma vez por sessão do
+   * app (item 13), então isso valeria uma vez por abertura, todo dia.
+   *
+   * O pulso existe para ligar UM toque ao seu resultado. Fora do toque, ele
+   * mente. */
+  const primeiroDesenho = useRef(true)
+
+  useEffect(() => {
+    const eraOPrimeiro = primeiroDesenho.current
+    primeiroDesenho.current = false
+
+    if (!cheio || !ehOUltimoCheio) {
+      jaPulsou.current = false
+      return
+    }
+    if (eraOPrimeiro || jaPulsou.current) return
+    jaPulsou.current = true
+
+    /* 1,18 e não mais: o copo tem 20 pontos de altura e nada corta o que passa
+       da linha, então um pulso grande esbarraria no número acima. */
+    Animated.sequence([
+      Animated.timing(escala, { toValue: 1.18, duration: 130, useNativeDriver: true }),
+      Animated.spring(escala, { toValue: 1, friction: 4, tension: 90, useNativeDriver: true }),
+    ]).start()
+  }, [cheio, ehOUltimoCheio, escala])
+
+  return (
+    <Animated.View
+      style={[styles.copo, !cheio && styles.copoVazio, { transform: [{ scaleY: escala }] }]}
+    />
+  )
+}
+
+/* A barra, para quem tem mais de oito copos de meta.
+ *
+ * Cresce em vez de saltar, pelo mesmo motivo do copo. `useNativeDriver: false`
+ * porque largura em percentual não roda na thread nativa — e 260 ms de tween
+ * numa view só não custa quadro nenhum. */
+function BarraDaAgua({ fracao }: { fracao: number }) {
+  const styles = estilos()
+  const largura = useRef(new Animated.Value(fracao)).current
+
+  useEffect(() => {
+    Animated.timing(largura, {
+      toValue: fracao,
+      duration: 260,
+      useNativeDriver: false,
+    }).start()
+  }, [fracao, largura])
+
+  return (
+    <View style={styles.trilhoAgua}>
+      <Animated.View
+        style={[
+          styles.preenchimentoAgua,
+          {
+            width: largura.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['0%', '100%'],
+              /* Sem isto, um valor fora de 0..1 — que não deveria existir, mas
+                 a fração vem de uma divisão — extrapolaria para uma largura
+                 negativa ou acima de 100%. */
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      />
+    </View>
   )
 }
 
