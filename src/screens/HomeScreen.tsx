@@ -98,7 +98,7 @@ import {
 } from '../lib/treino'
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
 import { proximoPasso } from '../lib/proximoPasso'
-import { janelaAcordada, ritmoDaAgua } from '../lib/ritmoAgua'
+import { daquiA, janelaAcordada, ritmoDaAgua } from '../lib/ritmoAgua'
 import { estilosDe, paleta } from '../lib/tema'
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
@@ -688,24 +688,34 @@ export function HomeScreen({
    * PRIORIDADE, e quem sabe repartir a meta pela janela acordada é `ritmoAgua`.
    * Separar as duas deixou as duas testáveis. */
   const janela = janelaAcordada(noites)
+
+  /* O RITMO da água, inteiro.
+   *
+   * Era calculado dentro do `proximoPasso` e descartado: de tudo que a conta
+   * produz, só o atraso em mililitros sobrevivia, e o resto — inclusive quando
+   * cai o próximo copo — ia fora. `daquiA`, que existe para escrever esse
+   * "em 40 min", não tinha chamador nenhum no app.
+   *
+   * O arquivo que faz esta conta começa dizendo "quando beber, e não só
+   * quanto". O quando estava pronto e não chegava à tela. */
+  const ritmo =
+    agua && metas.aguaMl > 0 && metas.copoMl > 0
+      ? ritmoDaAgua({
+          metaMl: metas.aguaMl,
+          copoMl: metas.copoMl,
+          bebidoMl: totalDe(agua.hoje),
+          janela,
+          agoraEmMinutos: new Date().getHours() * 60 + new Date().getMinutes(),
+        })
+      : null
+
   const passo = proximoPasso({
     metas,
     /* Já filtradas para hoje. Quem sabe qual intenção vale num dia é o
        `valemPara`, que mora com o resto da conversão e é exercitado lá — o
        `proximoPasso` só decide PRIORIDADE. */
     intencoesDeHoje: valemPara(intencoes, dataISO(new Date())),
-    aguaAtrasadaMl: (() => {
-      if (!agua) return null
-      const agoraEmMinutos = new Date().getHours() * 60 + new Date().getMinutes()
-      const r = ritmoDaAgua({
-        metaMl: metas.aguaMl,
-        copoMl: metas.copoMl,
-        bebidoMl: totalDe(agua.hoje),
-        janela,
-        agoraEmMinutos,
-      })
-      return r.situacao === 'atrasado' ? -r.diferencaMl : null
-    })(),
+    aguaAtrasadaMl: ritmo?.situacao === 'atrasado' ? -ritmo.diferencaMl : null,
     consumo: consumoDeHoje,
     plano: planoVigente,
     noites,
@@ -912,7 +922,18 @@ export function HomeScreen({
 
       {/* ── Água + próxima refeição ── */}
       <View style={styles.linhaDupla}>
-        <CartaoAgua agua={agua} onAbrir={onAbrirAgua} onRegistrar={registrarCopo} />
+        <CartaoAgua
+          agua={agua}
+          /* Só quando a janela veio do SONO dela.
+             Com a janela suposta, "próximo em 40 min" seria um palpite com cara
+             de medida — 7h às 23h é o padrão de ninguém. O cabeçalho de
+             `ritmoAgua.ts` diz isso em uma frase: número calculado sobre
+             palpite não pode ser apresentado com a mesma segurança de um
+             calculado sobre dado. */
+          proximoEmMinutos={janela.suposta ? null : (ritmo?.emMinutos ?? null)}
+          onAbrir={onAbrirAgua}
+          onRegistrar={registrarCopo}
+        />
         {/* Sem próxima refeição de plano encerrado: o horário dela não é
             orientação de hoje. */}
         <CartaoProximaRefeicao plano={planoVigente} onAbrir={onAbrirRefeicao} />
@@ -1335,10 +1356,14 @@ function CartaoCalorias({
  * grande dentro do cartão, e não um "+" de canto encostado na borda dele. */
 function CartaoAgua({
   agua,
+  proximoEmMinutos,
   onAbrir,
   onRegistrar,
 }: {
   agua: Agua | null
+  /* Quanto falta para o próximo copo, no ritmo desta pessoa. Nulo quando não há
+     próximo — meta batida, fora da janela — ou quando a janela é suposta. */
+  proximoEmMinutos: number | null
   onAbrir: () => void
   onRegistrar: () => void
 }) {
@@ -1395,6 +1420,14 @@ function CartaoAgua({
         </View>
       ) : (
         <BarraDaAgua fracao={fracao} />
+      )}
+
+      {/* QUANDO, e não só quanto.
+          O número já era calculado e ia fora. Só aparece com a meta em aberto:
+          "próximo em 40 min" depois de bater a meta é o app pedindo mais água
+          de quem já fez o que precisava. */}
+      {!bateu && proximoEmMinutos !== null && (
+        <Text style={styles.proximoCopo}>Próximo copo {daquiA(proximoEmMinutos)}</Text>
       )}
 
       <Pressable
@@ -2403,6 +2436,14 @@ const estilos = estilosDe(t =>
   linhaValorAgua: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 8 },
   valorAgua: { fontSize: 28, fontWeight: '800', color: t.cores.branco, letterSpacing: -0.8 },
   metaAgua: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+  /* Sobre o degradê do cartão de água, como o resto do texto de lá. */
+  proximoCopo: {
+    marginTop: 8,
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.85)',
+  },
+
   copos: { flexDirection: 'row', gap: 4, marginTop: 10 },
   /* Copo desenhado com View em vez de ícone: a forma é simples e assim a
      largura acompanha o espaço disponível sem estourar em tela estreita. */
