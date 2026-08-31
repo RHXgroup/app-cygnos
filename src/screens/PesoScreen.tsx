@@ -17,7 +17,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
 import { MiniGrafico } from '../components/MiniGrafico'
 import {
+  fraseDaDistancia,
+  resumoDaTendencia,
+  tendenciaDoPeso,
+} from '../lib/tendenciaDoPeso'
+import {
   KG_MAX,
+  DIAS_DA_CURVA,
   KG_MIN,
   apagarRegistroPeso,
   carregarPeso,
@@ -26,7 +32,6 @@ import {
   kgExato,
   registrarPeso,
   ritmoSemanal,
-  serieDe,
   variacaoEmKg,
   type Evolucao,
   type RegistroPeso,
@@ -291,11 +296,30 @@ export function PesoScreen({
           {registros.length >= 2 && (
             <View style={styles.bloco}>
               <Text style={styles.tituloBloco}>Sua curva</Text>
-              <MiniGrafico serie={serieDe(registros)} largura={larguraGrafico} altura={90} />
+              {/* A LINHA DE TENDÊNCIA, e não mais o peso cru.
+               *
+               * O peso oscila 1 a 2 kg dentro do mesmo dia — água, sal,
+               * intestino, ciclo. Quem olhava a curva crua via subida e descida
+               * sem relação nenhuma com gordura, concluía que engordou, e é
+               * isso que faz largar o plano. Os dois melhores aplicativos de
+               * peso do mercado resolvem assim, e por essa razão. */}
+              <MiniGrafico
+                serie={tendenciaDoPeso(registros).slice(-DIAS_DA_CURVA).map(t => t.tendencia)}
+                largura={larguraGrafico}
+                altura={90}
+              />
               <Text style={styles.ajuda}>
-                Os últimos {Math.min(registros.length, 30)} registros, do mais antigo para o mais
-                recente.
+                Os últimos {DIAS_DA_CURVA} dias da sua linha de tendência — e não o peso de cada
+                dia. O peso oscila 1 a 2 kg por água e sal; a linha mostra o que está acontecendo
+                de verdade.
               </Text>
+
+              {/* A frase que desarma o susto. Só aparece quando há susto para
+                  desarmar — falar toda vez faria a explicação virar paisagem. */}
+              {(() => {
+                const f = fraseDaDistancia(resumoDaTendencia(tendenciaDoPeso(registros)))
+                return f === null ? null : <Text style={styles.explicaTendencia}>{f}</Text>
+              })()}
 
               {/* O ritmo é o que faz a variação querer dizer alguma coisa:
                   "perdeu 2,3 kg" é uma frase diferente em três semanas e em oito
@@ -614,6 +638,18 @@ linhaRitmo: {
     tituloBloco: { flex: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
   contagemBloco: { fontSize: 11.5, fontWeight: '600', color: t.inkSuave },
   ajuda: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
+  /* A explicacao do susto tem peso proprio: ela e a frase que impede alguem de
+     largar o plano por causa de 1 kg de agua. */
+  explicaTendencia: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: t.inkMedio,
+    backgroundColor: t.cores.verdeClaro,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
 
   linhaCampo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   campo: {

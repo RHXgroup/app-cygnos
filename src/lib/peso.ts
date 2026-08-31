@@ -192,15 +192,13 @@ export function ritmoSemanal(registros: RegistroPeso[]): number | null {
   return ((atual.kg - primeiro.kg) / dias) * 7
 }
 
-/* Os pesos em ordem de calendário, para o traço do gráfico. Do mais antigo para
-   o mais novo — ao contrário da lista —, porque um gráfico que anda para trás
-   no tempo mostraria a evolução ao contrário. */
-export function serieDe(registros: RegistroPeso[], quantos = DIAS_DA_CURVA): number[] {
-  return [...registros]
-    .sort((a, b) => a.data.localeCompare(b.data))
-    .slice(-quantos)
-    .map(r => r.kg)
-}
+/* O traço do gráfico saiu daqui e virou `tendenciaDoPeso`.
+ *
+ * `serieDe` devolvia os quilos como foram registrados, e o gráfico do peso cru
+ * é o que faz alguém concluir que engordou por causa de 1 kg de água. Apagada
+ * na mesma alteração que a substituiu — item 5 do AGENTS.md: duas
+ * implementações do mesmo assunto sempre divergem, e ninguém descobre por qual
+ * das duas a tela passa. */
 
 /* "72,4" — uma casa na tela, mesmo com três guardadas. As outras importam para
    a conta da variação não acumular erro; para LER, 72,453 é ruído.

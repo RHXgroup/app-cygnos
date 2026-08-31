@@ -49,6 +49,7 @@ import {
 import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
 import { carregarAvisos, quantosNovos } from '../lib/avisos'
 import { carregarDiasComRegistro } from '../lib/sequencia'
+import { tendenciaDoPeso } from '../lib/tendenciaDoPeso' 
 import { reagendarSequencia } from '../lib/lembretes' 
 import { sequenciaDaPessoa } from '../lib/sequenciaDaPessoa' 
 import {
@@ -59,10 +60,10 @@ import {
   type ObjetivoPeso,
 } from '../lib/metas'
 import {
+  DIAS_DA_CURVA,
   carregarPeso,
   evolucaoDe,
   kg,
-  serieDe,
   variacaoEmKg,
   type RegistroPeso,
 } from '../lib/peso'
@@ -1298,7 +1299,13 @@ function CartaoProgresso({
 
         {/* Com um registro só não há curva: a série de um ponto viraria uma
             linha reta que finge um histórico que não existe. */}
-        <MiniGrafico serie={serieDe(pesos)} largura={largura} />
+        {/* A tendencia, e nao o peso cru -- mesma razao da tela de Peso: o
+            numero da balanca oscila 1 a 2 kg por agua e sal, e quem le o cru
+            conclui que engordou. */}
+        <MiniGrafico
+          serie={tendenciaDoPeso(pesos).slice(-DIAS_DA_CURVA).map(t => t.tendencia)}
+          largura={largura}
+        />
 
         <View style={styles.colunaVariacao}>
           {/* Sem foco declarado o selo fica no verde-claro neutro de sempre.
