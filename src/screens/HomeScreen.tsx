@@ -17,6 +17,7 @@ import { carregarIntencoes } from '../lib/intencao'
 import { valemPara, type Intencao } from '../lib/intencaoDaIA'
 import { AnelCalorias } from '../components/AnelCalorias'
 import { CartaoDaSemana } from '../components/CartaoDaSemana'
+import { CartaoDaSequencia } from '../components/CartaoDaSequencia'
 import { AnelProgresso } from '../components/AnelProgresso'
 import { FaixaDeDias } from '../components/FaixaDeDias'
 import { MenuTopo } from '../components/MenuTopo'
@@ -47,6 +48,8 @@ import {
 } from '../lib/plano'
 import { carregarPlanoDaNutri } from '../lib/planoDaNutri'
 import { carregarAvisos, quantosNovos } from '../lib/avisos'
+import { carregarDiasComRegistro } from '../lib/sequencia'
+import { sequenciaDaPessoa } from '../lib/sequenciaDaPessoa' 
 import {
   METAS_VAZIAS,
   carregarMetas,
@@ -200,6 +203,9 @@ export function HomeScreen({
   const [diaSelecionado, setDiaSelecionado] = useState(() => new Date())
   const [noites, setNoites] = useState<Noite[]>([])
   const [sessoes, setSessoes] = useState<Sessao[]>([])
+  /* Os dias em que ela registrou alguma coisa, para a sequência. Vem de uma
+     chamada só, que junta as cinco tabelas no servidor. */
+  const [diasComRegistro, setDiasComRegistro] = useState<string[]>([])
   /* Só o anel usa: é a rotina que diz se hoje é dia de treino ou de descanso.
      Sem ela não há como cobrar treino de ninguém — ver lib/metaDoDia. */
   const [rotina, setRotina] = useState<Exercicio[]>([])
@@ -309,6 +315,37 @@ export function HomeScreen({
       ativo = false
     }
   }, [sessao.user.id, versaoPlano])
+
+  /* A SEQUÊNCIA.
+   *
+   * Relê a cada registro de qualquer assunto — é a única coisa da tela que
+   * depende dos cinco ao mesmo tempo, e é barata: volta só uma lista de datas.
+   *
+   * Sem ela na lista de dependências, quem registrasse o primeiro copo do dia
+   * continuaria vendo "em risco" até fechar o app. Item 13 do AGENTS.md: as
+   * quatro abas montam UMA vez por sessão, e `[]` aqui quer dizer "uma vez por
+   * abertura do aplicativo", não "uma vez por abertura da tela". */
+  useEffect(() => {
+    let ativo = true
+
+    carregarDiasComRegistro().then(dias => {
+      /* Falha vira lista vazia lá dentro, e lista vazia esconde o cartão. Uma
+         sequência que não carregou não pode dizer que a pessoa perdeu a dela —
+         item 11: função de apoio de UI devolve o vazio e a tela decide. */
+      if (ativo && dias.length > 0) setDiasComRegistro(dias)
+    })
+
+    return () => {
+      ativo = false
+    }
+  }, [
+    sessao.user.id,
+    versaoAgua,
+    versaoConsumo,
+    versaoPeso,
+    versaoSono,
+    versaoTreino,
+  ])
 
   /* A água tem versão própria: um copo registrado não é motivo para reler o
      plano inteiro, que são quatro tabelas aninhadas. */
@@ -481,6 +518,11 @@ export function HomeScreen({
   /* O anel da saudação: a média dos pilares que o app realmente mede hoje.
      Ver lib/metaDoDia.ts — as regras de o que entra e o que fica de fora estão
      todas lá, e não espalhadas por esta tela. */
+  /* A sequência. Calculada aqui, e não guardada em estado, porque ela é uma
+     função pura das datas que já estão carregadas — guardar criaria um segundo
+     lugar onde o número pode ficar velho. */
+  const sequencia = sequenciaDaPessoa(diasComRegistro, dataISO(new Date()))
+
   const doDia = calcularMetaDoDia({
     metas,
     agua,
@@ -603,6 +645,16 @@ export function HomeScreen({
 
           Não aparece quando a pessoa está olhando outro dia: "almoço em 40
           min" não faz sentido em cima da terça passada. */}
+
+      {/* A SEQUÊNCIA, antes de tudo.
+          Acima do próximo passo de propósito: ela é o MOTIVO de fazer, e o
+          passo é a tarefa. Motivo vem antes de tarefa — a ordem contrária
+          transforma o app numa lista de pendências, que é exatamente o que ele
+          não pode ser.
+
+          Some sozinha quando não há sequência: um "0 dias" na primeira abertura
+          é o app cobrando antes de a pessoa ter feito qualquer coisa. */}
+      {ehHoje(diaSelecionado) && <CartaoDaSequencia sequencia={sequencia} />}
 
       {/* O que a semana rendeu, uma vez por semana, e só quando há o que dizer.
           Acima do próximo passo de propósito: o passo é o que fazer AGORA, e
