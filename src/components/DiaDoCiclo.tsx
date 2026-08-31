@@ -29,24 +29,37 @@ import { estilosDe, paleta } from '../lib/tema'
 
 /* Um dia do calendário do ciclo.
  *
+ * ── O desenho, e por que ele mudou ────────────────────────────────────────
+ * A primeira versão era um FORMULÁRIO: oito blocos de etiquetas que quebravam
+ * em duas e três linhas, uma parede de rolagem. Quem usou disse "está péssima",
+ * e estava — a tela pedia trabalho em vez de aceitar uma marcação.
+ *
+ * Agora cada categoria é UMA LINHA que rola de lado. Oito categorias viram oito
+ * linhas em vez de vinte, e a tela inteira cabe quase sem rolar. É o que os
+ * aplicativos de ciclo fazem, e é o que faz marcar um dia levar três toques em
+ * vez de uma expedição.
+ *
+ * E o selecionado é PREENCHIDO, não contornado. Contorno fino de 1px some no
+ * meio de doze etiquetas iguais — a pessoa marcava e não via o que marcou.
+ *
+ * ── O vermelho que voltou ─────────────────────────────────────────────────
+ * O botão de "minha menstruação começou" era um bloco vermelho de alarme
+ * ocupando o topo da tela. É o mesmo erro que o calendário tinha: vermelho de
+ * ERRO para menstruação. Virou uma linha com a cor do ciclo, do tamanho do que
+ * ela é.
+ *
  * ── A separação é a tela ──────────────────────────────────────────────────
  * Dois blocos, e a distância entre eles é o desenho todo:
  *
- *   O DE CIMA vai para a nutricionista, se ela ligou o compartilhamento. Fluxo,
- *   sintoma, humor, vontade de comer, recado. Isso muda plano alimentar.
+ *   O DE CIMA vai para a nutricionista, se ela ligou o compartilhamento.
+ *   O DE BAIXO nunca sai — relação, proteção, nota privada. Não existe chave
+ *   para ligar isso, e no banco a função que espelha não lê essas colunas.
  *
- *   O DE BAIXO nunca sai. Relação, proteção, nota privada. Não existe chave
- *   para ligar isso, porque não existe motivo clínico de nutrição para alguém
- *   precisar saber — e no banco a função que espelha não lê essas colunas.
- *
- * Cada bloco DIZ isso, com todas as letras, e não numa nota de rodapé. Quem
- * abre esta tela precisa saber onde está pisando antes de escrever, e não
- * depois.
+ * Cada bloco DIZ isso antes de a pessoa escrever, e não numa nota de rodapé.
  *
  * ── Por que nada é obrigatório ────────────────────────────────────────────
- * Mesma razão do questionário: o objetivo é a pessoa registrar, não preencher
- * um formulário. Um dia com só "cólica" marcado já vale — e é o que a maioria
- * vai fazer. */
+ * O objetivo é ela registrar, não preencher um formulário. Um dia com só
+ * "cólica" marcado já vale, e é o que a maioria vai fazer. */
 
 /* ── As categorias ─────────────────────────────────────────────────────────
  *
@@ -116,7 +129,7 @@ const SECRECOES: { valor: Secrecao; rotulo: string }[] = [
   { valor: 'pegajosa', rotulo: 'pegajosa' },
   { valor: 'cremosa', rotulo: 'cremosa' },
   { valor: 'clara_de_ovo', rotulo: 'clara de ovo' },
-  { valor: 'atipica', rotulo: 'diferente do normal' },
+  { valor: 'atipica', rotulo: 'diferente' },
 ]
 
 const CABECAS: { valor: Cabeca; rotulo: string }[] = [
@@ -175,6 +188,29 @@ export function DiaDoCiclo({
   const alternar = (lista: string[], item: string) =>
     lista.includes(item) ? lista.filter(x => x !== item) : [...lista, item]
 
+  /* Uma categoria de escolha única, em UMA linha que rola de lado.
+     Tocar no que já está marcado desmarca — é o único jeito de voltar atrás num
+     campo opcional, e "marquei sem querer" acontece. */
+  const umaEscolha = <T extends string>(
+    titulo: string,
+    opcoes: { valor: T; rotulo: string }[],
+    atual: T | null,
+    ao: (v: T | null) => void,
+  ) => (
+    <Linha titulo={titulo} styles={styles}>
+      {opcoes.map(o => (
+        <Etiqueta
+          key={o.valor}
+          ativa={atual === o.valor}
+          onPress={() => ao(atual === o.valor ? null : o.valor)}
+          styles={styles}
+        >
+          {o.rotulo}
+        </Etiqueta>
+      ))}
+    </Linha>
+  )
+
   return (
     <Modal visible={visivel} animationType="slide" onRequestClose={onFechar}>
       <KeyboardAvoidingView
@@ -192,7 +228,20 @@ export function DiaDoCiclo({
             <Ionicons name="chevron-down" size={24} color={paleta().cores.ink} />
           </Pressable>
           <Text style={styles.tituloTela}>{diaEMes(data)}</Text>
-          <View style={styles.botaoVoltar} />
+          <Pressable
+            onPress={() => onSalvar(d)}
+            disabled={salvando}
+            style={styles.botaoSalvar}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Salvar"
+          >
+            {salvando ? (
+              <ActivityIndicator size="small" color={paleta().cores.verde} />
+            ) : (
+              <Text style={styles.textoSalvar}>Salvar</Text>
+            )}
+          </Pressable>
         </View>
 
         {carregando ? (
@@ -203,9 +252,13 @@ export function DiaDoCiclo({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* O começo do ciclo vem primeiro e sozinho: é o único campo que
-                muda o cálculo inteiro, e é o que a pessoa veio marcar quando
-                abriu um dia do passado. */}
+            {/* O começo do ciclo, primeiro e sozinho: é o único campo que muda o
+                cálculo inteiro, e é o que a pessoa veio marcar quando abriu um
+                dia do passado.
+
+                Uma LINHA, e não um bloco vermelho ocupando o topo. O bloco era
+                o mesmo erro do calendário — vermelho de alarme para uma coisa
+                que não é alarme. */}
             <Pressable
               onPress={() => onMarcarComeco(!ehComecoDeCiclo)}
               style={[styles.comeco, ehComecoDeCiclo && styles.comecoLigado]}
@@ -213,200 +266,90 @@ export function DiaDoCiclo({
               accessibilityState={{ selected: ehComecoDeCiclo }}
             >
               <Ionicons
-                name={ehComecoDeCiclo ? 'checkmark-circle' : 'ellipse-outline'}
-                size={22}
-                color={ehComecoDeCiclo ? paleta().cores.branco : paleta().inkMedio}
+                name={ehComecoDeCiclo ? 'water' : 'water-outline'}
+                size={19}
+                color={ehComecoDeCiclo ? paleta().cores.cicloForte : paleta().inkMedio}
               />
               <Text style={[styles.textoComeco, ehComecoDeCiclo && styles.textoComecoLigado]}>
-                A minha menstruação começou neste dia
+                Minha menstruação começou neste dia
               </Text>
+              {ehComecoDeCiclo && (
+                <Ionicons name="checkmark" size={18} color={paleta().cores.cicloForte} />
+              )}
             </Pressable>
 
-            {/* ── O que a nutricionista vê ─────────────────────────────── */}
-            <View style={styles.aviso}>
-              <Ionicons name="people-outline" size={15} color={paleta().inkMedio} />
-              <Text style={styles.textoAviso}>
-                O que você marcar aqui embaixo vai para a sua nutricionista, se você tiver ligado o
-                compartilhamento.
+            {umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
+            {umaEscolha('Energia', ENERGIAS, d.energia, v => setD(x => ({ ...x, energia: v })))}
+
+            <Linha titulo="Dor" styles={styles}>
+              {SINTOMAS.map(s => (
+                <Etiqueta
+                  key={s}
+                  ativa={d.sintomas.includes(s)}
+                  onPress={() => setD(x => ({ ...x, sintomas: alternar(x.sintomas, s) }))}
+                  styles={styles}
+                >
+                  {s}
+                </Etiqueta>
+              ))}
+            </Linha>
+
+            {umaEscolha('Digestão', DIGESTOES, d.digestao, v => setD(x => ({ ...x, digestao: v })))}
+            {umaEscolha('Humor', HUMORES, d.humor, v => setD(x => ({ ...x, humor: v })))}
+            {umaEscolha('Cabeça', CABECAS, d.cabeca, v => setD(x => ({ ...x, cabeca: v })))}
+            {umaEscolha('Pele', PELES, d.pele, v => setD(x => ({ ...x, pele: v })))}
+            {umaEscolha('Secreção', SECRECOES, d.secrecao, v => setD(x => ({ ...x, secrecao: v })))}
+
+            {/* O campo que nenhum app de ciclo tem e nenhum app de nutrição tem.
+                Só faz sentido onde os dois moram juntos. */}
+            <Linha titulo="Vontade de comer" styles={styles}>
+              {DESEJOS.map(v => (
+                <Etiqueta
+                  key={v}
+                  ativa={d.desejoAlimentar.includes(v)}
+                  onPress={() =>
+                    setD(x => ({ ...x, desejoAlimentar: alternar(x.desejoAlimentar, v) }))
+                  }
+                  styles={styles}
+                >
+                  {v}
+                </Etiqueta>
+              ))}
+            </Linha>
+
+            <TextInput
+              value={d.observacao ?? ''}
+              onChangeText={t => setD(x => ({ ...x, observacao: t }))}
+              placeholder="Recado para a sua nutricionista"
+              placeholderTextColor={paleta().inkFraco}
+              keyboardAppearance="dark"
+              multiline
+              textAlignVertical="top"
+              maxLength={500}
+              style={styles.campo}
+              accessibilityLabel="Recado para a sua nutricionista"
+            />
+
+            {/* Discreto, e no fim do bloco que ele descreve: no topo virava um
+                aviso legal que se lê uma vez e nunca mais. */}
+            <View style={styles.nota}>
+              <Ionicons name="people-outline" size={14} color={paleta().inkFraco} />
+              <Text style={styles.textoNota}>
+                Tudo acima vai para a sua nutricionista, se você tiver ligado o compartilhamento.
               </Text>
             </View>
-
-            <Secao titulo="Fluxo" styles={styles}>
-              <View style={styles.chips}>
-                {FLUXOS.map(f => (
-                  <Chip
-                    key={f.valor}
-                    ativo={d.fluxo === f.valor}
-                    onPress={() => setD(x => ({ ...x, fluxo: x.fluxo === f.valor ? null : f.valor }))}
-                    styles={styles}
-                  >
-                    {f.rotulo}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Energia" styles={styles}>
-              <View style={styles.chips}>
-                {ENERGIAS.map(e => (
-                  <Chip
-                    key={e.valor}
-                    ativo={d.energia === e.valor}
-                    onPress={() =>
-                      setD(x => ({ ...x, energia: x.energia === e.valor ? null : e.valor }))
-                    }
-                    styles={styles}
-                  >
-                    {e.rotulo}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Dor" styles={styles}>
-              <View style={styles.chips}>
-                {SINTOMAS.map(s => (
-                  <Chip
-                    key={s}
-                    ativo={d.sintomas.includes(s)}
-                    onPress={() => setD(x => ({ ...x, sintomas: alternar(x.sintomas, s) }))}
-                    styles={styles}
-                  >
-                    {s}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Digestão" styles={styles}>
-              <View style={styles.chips}>
-                {DIGESTOES.map(g => (
-                  <Chip
-                    key={g.valor}
-                    ativo={d.digestao === g.valor}
-                    onPress={() =>
-                      setD(x => ({ ...x, digestao: x.digestao === g.valor ? null : g.valor }))
-                    }
-                    styles={styles}
-                  >
-                    {g.rotulo}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Pele" styles={styles}>
-              <View style={styles.chips}>
-                {PELES.map(pe => (
-                  <Chip
-                    key={pe.valor}
-                    ativo={d.pele === pe.valor}
-                    onPress={() => setD(x => ({ ...x, pele: x.pele === pe.valor ? null : pe.valor }))}
-                    styles={styles}
-                  >
-                    {pe.rotulo}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Cabeça" styles={styles}>
-              <View style={styles.chips}>
-                {CABECAS.map(cb => (
-                  <Chip
-                    key={cb.valor}
-                    ativo={d.cabeca === cb.valor}
-                    onPress={() =>
-                      setD(x => ({ ...x, cabeca: x.cabeca === cb.valor ? null : cb.valor }))
-                    }
-                    styles={styles}
-                  >
-                    {cb.rotulo}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Secreção" styles={styles}>
-              <View style={styles.chips}>
-                {SECRECOES.map(se => (
-                  <Chip
-                    key={se.valor}
-                    ativo={d.secrecao === se.valor}
-                    onPress={() =>
-                      setD(x => ({ ...x, secrecao: x.secrecao === se.valor ? null : se.valor }))
-                    }
-                    styles={styles}
-                  >
-                    {se.rotulo}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Humor" styles={styles}>
-              <View style={styles.chips}>
-                {HUMORES.map(h => (
-                  <Chip
-                    key={h.valor}
-                    ativo={d.humor === h.valor}
-                    onPress={() => setD(x => ({ ...x, humor: x.humor === h.valor ? null : h.valor }))}
-                    styles={styles}
-                  >
-                    {h.rotulo}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            {/* O campo que nenhum app de ciclo tem e nenhum app de nutrição
-                tem. Só faz sentido onde os dois moram juntos — e é o que deixa
-                a nutricionista ver o padrão em vez de ouvir "eu ataco o
-                chocolate uns dias antes". */}
-            <Secao titulo="Vontade de comer" styles={styles}>
-              <View style={styles.chips}>
-                {DESEJOS.map(v => (
-                  <Chip
-                    key={v}
-                    ativo={d.desejoAlimentar.includes(v)}
-                    onPress={() =>
-                      setD(x => ({ ...x, desejoAlimentar: alternar(x.desejoAlimentar, v) }))
-                    }
-                    styles={styles}
-                  >
-                    {v}
-                  </Chip>
-                ))}
-              </View>
-            </Secao>
-
-            <Secao titulo="Recado para a sua nutricionista" styles={styles}>
-              <TextInput
-                value={d.observacao ?? ''}
-                onChangeText={t => setD(x => ({ ...x, observacao: t }))}
-                placeholder="Alguma coisa que ela precise saber deste dia"
-                placeholderTextColor={paleta().inkFraco}
-                keyboardAppearance="dark"
-                multiline
-                textAlignVertical="top"
-                maxLength={500}
-                style={[styles.campo, styles.campoGrande]}
-                accessibilityLabel="Recado para a sua nutricionista"
-              />
-            </Secao>
 
             {/* ── O que NUNCA sai ──────────────────────────────────────── */}
-            <View style={styles.divisor} />
-
-            <View style={styles.avisoPrivado}>
-              <Ionicons name="lock-closed" size={15} color={paleta().cores.verde} />
-              <Text style={styles.textoAvisoPrivado}>
-                Daqui para baixo é só seu. Não vai para a sua nutricionista nem para ninguém, e
-                não existe opção para ligar isso.
+            <View style={styles.privado}>
+              <View style={styles.tituloPrivado}>
+                <Ionicons name="lock-closed" size={15} color={paleta().cores.verde} />
+                <Text style={styles.textoTituloPrivado}>Só seu</Text>
+              </View>
+              <Text style={styles.explicacaoPrivado}>
+                Não vai para a sua nutricionista nem para ninguém, e não existe opção para ligar
+                isso.
               </Text>
-            </View>
 
-            <Secao titulo="Relação" styles={styles}>
               <View style={styles.linhaSwitch}>
                 <Text style={styles.rotuloSwitch}>Tive relação neste dia</Text>
                 <Switch
@@ -416,8 +359,8 @@ export function DiaDoCiclo({
                       ...x,
                       relacao: v ? true : null,
                       /* Desligar a relação limpa a proteção: o banco recusa
-                         proteção sem relação, e um "sim" solto na tela seria
-                         uma resposta que ela não deu. */
+                         proteção sem relação, e um "sim" solto na tela seria uma
+                         resposta que ela não deu. */
                       relacaoProtegida: v ? x.relacaoProtegida : null,
                     }))
                   }
@@ -425,19 +368,23 @@ export function DiaDoCiclo({
                   accessibilityLabel="Tive relação neste dia"
                 />
               </View>
+
               {d.relacao === true && (
-                <View style={styles.chips}>
-                  <Chip
-                    ativo={d.relacaoProtegida === true}
+                <View style={styles.chipsPrivado}>
+                  <Etiqueta
+                    ativa={d.relacaoProtegida === true}
                     onPress={() =>
-                      setD(x => ({ ...x, relacaoProtegida: x.relacaoProtegida === true ? null : true }))
+                      setD(x => ({
+                        ...x,
+                        relacaoProtegida: x.relacaoProtegida === true ? null : true,
+                      }))
                     }
                     styles={styles}
                   >
                     com proteção
-                  </Chip>
-                  <Chip
-                    ativo={d.relacaoProtegida === false}
+                  </Etiqueta>
+                  <Etiqueta
+                    ativa={d.relacaoProtegida === false}
                     onPress={() =>
                       setD(x => ({
                         ...x,
@@ -447,42 +394,23 @@ export function DiaDoCiclo({
                     styles={styles}
                   >
                     sem proteção
-                  </Chip>
+                  </Etiqueta>
                 </View>
               )}
-            </Secao>
 
-            <Secao titulo="Nota só sua" styles={styles}>
               <TextInput
                 value={d.notaPrivada ?? ''}
                 onChangeText={t => setD(x => ({ ...x, notaPrivada: t }))}
-                placeholder="O que você quiser lembrar, e mais ninguém lê"
+                placeholder="Nota só sua"
                 placeholderTextColor={paleta().inkFraco}
                 keyboardAppearance="dark"
                 multiline
                 textAlignVertical="top"
                 maxLength={500}
-                style={[styles.campo, styles.campoGrande]}
+                style={styles.campo}
                 accessibilityLabel="Nota privada"
               />
-            </Secao>
-
-            <Pressable
-              onPress={() => onSalvar(d)}
-              disabled={salvando}
-              style={({ pressed }) => [
-                styles.botao,
-                salvando && styles.desligado,
-                pressed && styles.pressionado,
-              ]}
-              accessibilityRole="button"
-            >
-              {salvando ? (
-                <ActivityIndicator color={paleta().cores.branco} />
-              ) : (
-                <Text style={styles.textoBotao}>Salvar</Text>
-              )}
-            </Pressable>
+            </View>
           </ScrollView>
         )}
       </KeyboardAvoidingView>
@@ -490,7 +418,12 @@ export function DiaDoCiclo({
   )
 }
 
-function Secao({
+/* Uma categoria em UMA linha que rola de lado.
+ *
+ * Era um bloco com quebra de linha, e oito deles viravam vinte linhas de
+ * rolagem — a parede que fez a tela ser chamada de péssima. Em linha, oito
+ * categorias são oito linhas, e a tela cabe quase inteira. */
+function Linha({
   titulo,
   children,
   styles,
@@ -500,20 +433,27 @@ function Secao({
   styles: ReturnType<typeof estilos>
 }) {
   return (
-    <View style={styles.secao}>
-      <Text style={styles.tituloSecao}>{titulo}</Text>
-      {children}
+    <View style={styles.categoria}>
+      <Text style={styles.tituloCategoria}>{titulo}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.fileira}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
     </View>
   )
 }
 
-function Chip({
-  ativo,
+function Etiqueta({
+  ativa,
   onPress,
   children,
   styles,
 }: {
-  ativo: boolean
+  ativa: boolean
   onPress: () => void
   children: React.ReactNode
   styles: ReturnType<typeof estilos>
@@ -521,11 +461,11 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, ativo && styles.chipAtivo]}
+      style={[styles.etiqueta, ativa && styles.etiquetaAtiva]}
       accessibilityRole="button"
-      accessibilityState={{ selected: ativo }}
+      accessibilityState={{ selected: ativa }}
     >
-      <Text style={[styles.textoChip, ativo && styles.textoChipAtivo]}>{children}</Text>
+      <Text style={[styles.textoEtiqueta, ativa && styles.textoEtiquetaAtiva]}>{children}</Text>
     </Pressable>
   )
 }
@@ -538,68 +478,62 @@ const estilos = estilosDe(t =>
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 12,
-      paddingBottom: 4,
+      paddingBottom: 6,
     },
-    botaoVoltar: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    botaoVoltar: { width: 60, height: 44, justifyContent: 'center' },
     tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
+    /* Salvar no cabeçalho, e não no fim de uma rolagem de dez telas: quem marcou
+       uma coisa não devia rolar até o fim para guardá-la. */
+    botaoSalvar: { width: 60, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
+    textoSalvar: { fontSize: 15, fontWeight: '800', color: t.cores.verde },
 
-    conteudo: { paddingHorizontal: 20, gap: 16 },
+    conteudo: { paddingVertical: 6, gap: 14 },
 
     comeco: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 11,
+      marginHorizontal: 20,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: t.cores.borda,
       backgroundColor: t.cores.cartao,
       paddingHorizontal: 15,
-      paddingVertical: 15,
+      paddingVertical: 14,
     },
-    comecoLigado: { backgroundColor: t.cores.erroTexto, borderColor: t.cores.erroTexto },
+    /* Fundo tingido e texto na cor, e não bloco vermelho cheio. Mesmo raciocínio
+       do calendário: menstruação não é alarme. */
+    comecoLigado: { backgroundColor: t.cores.cicloFundo, borderColor: t.cores.cicloForte },
     textoComeco: { flex: 1, fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
-    textoComecoLigado: { color: t.cores.branco },
+    textoComecoLigado: { color: t.cores.cicloForte },
 
-    aviso: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-    textoAviso: { flex: 1, fontSize: 12, color: t.inkMedio, lineHeight: 17 },
-
-    divisor: { height: 1, backgroundColor: t.cores.borda, marginTop: 6 },
-    avisoPrivado: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 8,
-      backgroundColor: t.cores.verdeClaro,
-      borderRadius: 12,
-      padding: 13,
-    },
-    textoAvisoPrivado: { flex: 1, fontSize: 12.5, color: t.cores.ink, lineHeight: 18, fontWeight: '600' },
-
-    secao: { gap: 8 },
-    tituloSecao: {
-      fontSize: 12,
+    categoria: { gap: 7 },
+    tituloCategoria: {
+      fontSize: 13,
       fontWeight: '800',
-      color: t.inkFraco,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      color: t.cores.ink,
+      paddingHorizontal: 20,
     },
+    /* O padding fica no CONTEÚDO, e não na rolagem: no container, a primeira
+       etiqueta seria cortada ao rolar de volta. */
+    fileira: { paddingHorizontal: 20, gap: 8 },
 
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    chip: {
-      paddingHorizontal: 14,
+    etiqueta: {
+      paddingHorizontal: 15,
       paddingVertical: 10,
       borderRadius: 11,
       borderWidth: 1,
       borderColor: t.cores.borda,
       backgroundColor: t.cores.cartao,
     },
-    chipAtivo: { borderColor: t.cores.verde, backgroundColor: t.cores.verdeMenta },
-    textoChip: { fontSize: 13.5, color: t.inkMedio, fontWeight: '600' },
-    textoChipAtivo: { color: t.cores.verde, fontWeight: '800' },
-
-    linhaSwitch: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    rotuloSwitch: { flex: 1, fontSize: 14.5, color: t.cores.ink },
+    /* PREENCHIDA, e não contornada. Um contorno de 1px some no meio de doze
+       etiquetas iguais, e a pessoa marcava sem ver o que marcou. */
+    etiquetaAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+    textoEtiqueta: { fontSize: 13.5, color: t.inkMedio, fontWeight: '600' },
+    textoEtiquetaAtiva: { color: t.cores.branco, fontWeight: '800' },
 
     campo: {
+      marginHorizontal: 20,
       backgroundColor: t.cores.cartao,
       borderRadius: 12,
       borderWidth: 1,
@@ -608,19 +542,26 @@ const estilos = estilosDe(t =>
       paddingVertical: 12,
       fontSize: 15,
       color: t.cores.ink,
+      minHeight: 72,
+      lineHeight: 21,
     },
-    campoGrande: { minHeight: 88, lineHeight: 21 },
 
-    botao: {
-      backgroundColor: t.cores.verde,
-      borderRadius: 14,
-      height: 50,
-      alignItems: 'center',
-      justifyContent: 'center',
+    nota: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingHorizontal: 20 },
+    textoNota: { flex: 1, fontSize: 11.5, color: t.inkFraco, lineHeight: 16 },
+
+    privado: {
+      marginHorizontal: 20,
       marginTop: 6,
+      gap: 10,
+      backgroundColor: t.cores.verdeClaro,
+      borderRadius: 16,
+      paddingVertical: 15,
     },
-    desligado: { opacity: 0.6 },
-    pressionado: { opacity: 0.85 },
-    textoBotao: { color: t.cores.branco, fontSize: 15, fontWeight: '800' },
+    tituloPrivado: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 15 },
+    textoTituloPrivado: { fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
+    explicacaoPrivado: { fontSize: 12, color: t.inkMedio, lineHeight: 17, paddingHorizontal: 15 },
+    linhaSwitch: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15 },
+    rotuloSwitch: { flex: 1, fontSize: 14.5, color: t.cores.ink },
+    chipsPrivado: { flexDirection: 'row', gap: 8, paddingHorizontal: 15 },
   }),
 )
