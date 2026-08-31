@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
+  RefreshControl,
   AppState,
   Pressable,
   ScrollView,
@@ -129,6 +130,7 @@ export function HomeScreen({
   onEditarPlano,
   onAbrirAgua,
   onAbrirCompras,
+  onRecarregar,
   onAbrirMetas,
   onAbrirPeso,
   naFrente,
@@ -169,6 +171,11 @@ export function HomeScreen({
   onAbrirAgua: () => void
   /* A lista de compras nasce de um plano, entao quem abre entrega o plano. */
   onAbrirCompras: (plano: PlanoCompleto) => void
+  /* Puxar para atualizar. Sobe todos os contadores de uma vez, no App, porque é
+     lá que eles moram — e um gesto que atualizasse um pedaço só deixaria o
+     resto velho, o que é pior do que não atualizar: a pessoa acha que
+     atualizou. */
+  onRecarregar: () => void
   onAbrirMetas: () => void
   onAbrirPeso: () => void
   /* Se a aba Inicio esta NA FRENTE. So o recado usa -- ele e marcado como
@@ -241,6 +248,14 @@ export function HomeScreen({
      sobre o que já foi dito — nunca para criar cobrança nova. */
   const [intencoes, setIntencoes] = useState<Intencao[]>([])
   const [detalheDoDia, setDetalheDoDia] = useState(false)
+  /* O anel do gesto, e nada mais.
+   *
+   * Ele NÃO espera as leituras terminarem — os efeitos são vários, cada um com
+   * o seu contador, e não há um "acabou" único para esperar. Meio segundo é o
+   * tempo de a rede responder na maioria das vezes, e o que a pessoa precisa
+   * saber é que o gesto foi recebido; o conteúdo se troca sozinho quando
+   * chegar, sem piscar, como já acontece ao voltar do segundo plano. */
+  const [puxando, setPuxando] = useState(false)
   /* O que o app consegue calcular do corpo dela, para ter o que DEVOLVER no
      primeiro dia. Nulo enquanto não houver peso registrado — e é justamente
      esse nulo que faz o cartão pedir o peso em vez de mostrar um número.
@@ -360,23 +375,29 @@ export function HomeScreen({
 
   /* O RECADO DA NUTRICIONISTA.
    *
-   * ── Por que este efeito depende de `naFrente` ────────────────────────────
-   * Buscar o recado MARCA COMO LIDO: o servidor grava `lido_em` na primeira
-   * leitura, e isso existe para ela — saber que foi lido é o que faz uma
-   * profissional continuar escrevendo. Sem esse retorno ela escreve duas vezes
-   * e para.
+   * ── Buscar é um ATO, e não uma consulta ─────────────────────────────────
+   * O servidor grava `lido_em` na primeira leitura, e isso existe para ela:
+   * saber que foi lido é o que faz uma profissional continuar escrevendo. Sem
+   * esse retorno ela escreve duas vezes e para.
    *
-   * A consequência é que buscar é um ATO, e não uma consulta. Quem abre o app
-   * na aba Mensagens tem esta aba montada por trás (item 13 do AGENTS.md), e
-   * sem a guarda o recado seria marcado como lido sem ninguém ter visto —
-   * fazendo o retorno mentir para ela.
+   * Por isso o `naFrente`. Quem abre o app na aba Mensagens tem esta aba
+   * montada por trás (item 13 do AGENTS.md), e sem a guarda o recado seria
+   * marcado como lido sem ninguém ter visto — fazendo o retorno mentir para ela.
    *
-   * `jaBuscou` evita repetir a cada volta para a aba: uma vez por abertura do
-   * app basta, e o recado não muda de minuto em minuto. */
-  const jaBuscouRecado = useRef(false)
+   * ── E por que a guarda é por VERSÃO, e não "uma vez por abertura" ───────
+   * Era um booleano de uma vez só, e isso é o item 8 em cima do único conteúdo
+   * desta tela que veio de uma PESSOA: a nutricionista escreve com o sistema
+   * dela aberto do lado, e o recado só chegava se o paciente fechasse e abrisse
+   * o aplicativo. E ninguém fecha app.
+   *
+   * `versaoPlano` sobe ao voltar do segundo plano e ao puxar para atualizar —
+   * os dois momentos em que a pessoa está presente e olhando para esta tela.
+   * Trocar de aba não mexe nele, então a proteção do parágrafo acima continua
+   * inteira, que é o motivo de a guarda existir. */
+  const recadoNaVersao = useRef(-1)
   useEffect(() => {
-    if (!naFrente || jaBuscouRecado.current) return
-    jaBuscouRecado.current = true
+    if (!naFrente || recadoNaVersao.current === versaoPlano) return
+    recadoNaVersao.current = versaoPlano
     let vivo = true
     carregarRecadoDaNutri().then(r => {
       if (vivo) setRecado(r)
@@ -384,7 +405,7 @@ export function HomeScreen({
     return () => {
       vivo = false
     }
-  }, [naFrente])
+  }, [naFrente, versaoPlano])
 
   /* A SEQUÊNCIA.
    *
@@ -736,10 +757,30 @@ export function HomeScreen({
       style={styles.tela}
       contentContainerStyle={[styles.conteudo, { paddingTop: top + 8 }]}
       showsVerticalScrollIndicator={false}
-      /* A rolagem continua — o conteúdo é mais alto que a tela —, mas sem o
-         efeito elástico do iOS nas pontas. */
-      bounces={false}
-      overScrollMode="never"
+      /* O elástico das pontas estava desligado aqui, e o comentário dizia só
+         isso. Ele volta porque agora ele SERVE para alguma coisa: sem bounce no
+         iOS e com `overScrollMode="never"` no Android, o puxar-para-atualizar
+         simplesmente não acontece — o gesto não tem para onde ir.
+         O que estava certo era desligar elástico que não faz nada; o que
+         mudou é que ele passou a fazer. */
+      refreshControl={
+        <RefreshControl
+          refreshing={puxando}
+          onRefresh={() => {
+            setPuxando(true)
+            onRecarregar()
+            /* Meio segundo, e não "até tudo chegar": são oito efeitos com oito
+               contadores, e não existe um "acabou" único para esperar. O que a
+               pessoa precisa saber é que o gesto foi recebido — o conteúdo se
+               troca sozinho quando chegar, sem piscar, do mesmo jeito que já
+               acontece ao voltar do segundo plano. */
+            setTimeout(() => setPuxando(false), 500)
+          }}
+          tintColor={paleta().cores.verde}
+          colors={[paleta().cores.verde]}
+          progressBackgroundColor={paleta().cores.cartao}
+        />
+      }
     >
       <View style={styles.barraTopo}>
         <Pressable

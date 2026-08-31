@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -365,6 +365,27 @@ function AreaLogada({ sessao }: { sessao: Session }) {
     return () => sub.remove()
   }, [])
 
+  /* PUXAR PARA ATUALIZAR, na tela inicial.
+   *
+   * Mora aqui porque os contadores moram aqui: cada tela lê o seu por
+   * dependência de efeito, e um gesto que só subisse um deles atualizaria um
+   * pedaço da tela e deixaria o resto velho — que é pior do que não atualizar,
+   * porque a pessoa acha que atualizou.
+   *
+   * O item 8 do AGENTS.md pede as duas coisas, e só a primeira existia: o
+   * `AppState` já subia o `versaoPlano` ao voltar do segundo plano, mas quem
+   * está COM o app aberto — esperando a nutricionista publicar o plano do outro
+   * lado, que é a situação exata da armadilha — não tinha gesto nenhum. Sair do
+   * app e voltar só para forçar a leitura é o que ninguém descobre sozinho. */
+  const recarregarTudo = useCallback(() => {
+    setVersaoPlano(v => v + 1)
+    setVersaoAgua(v => v + 1)
+    setVersaoMetas(v => v + 1)
+    setVersaoPeso(v => v + 1)
+    setVersaoConsumo(v => v + 1)
+    setVersaoSono(v => v + 1)
+  }, [])
+
   /* O ponto da aba Mensagens.
    *
    * Mora aqui, e não na tela de conversa, porque o ponto tem que aparecer para
@@ -577,6 +598,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                  * que a nutricionista recebe passa a mentir para ela. */
                 naFrente={aba === chave}
                 sessao={sessao}
+                onRecarregar={recarregarTudo}
                 versaoPlano={versaoPlano}
                 versaoAgua={versaoAgua}
                 versaoMetas={versaoMetas}
@@ -919,6 +941,7 @@ function TelaDaAba({
   chave,
   naFrente,
   sessao,
+  onRecarregar,
   versaoPlano,
   versaoAgua,
   versaoMetas,
@@ -955,6 +978,10 @@ function TelaDaAba({
      recado da nutricionista e LIDO ao ser buscado. */
   naFrente: boolean
   sessao: Session
+  /* Puxar para atualizar, na tela inicial: sobe TODOS os contadores de uma vez.
+     Um gesto que atualizasse um pedaco so deixaria o resto velho, e a pessoa
+     acharia que atualizou. */
+  onRecarregar: () => void
   versaoPlano: number
   versaoAgua: number
   versaoMetas: number
@@ -991,6 +1018,7 @@ function TelaDaAba({
     case 'hoje':
       return (
         <HomeScreen
+          onRecarregar={onRecarregar}
           naFrente={naFrente}
           onAbrirMensagens={onAbrirMensagens}
           sessao={sessao}
