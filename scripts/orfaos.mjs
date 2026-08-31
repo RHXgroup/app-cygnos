@@ -52,31 +52,60 @@ const naRaiz = fs
 const arquivos = [...varrer('src'), ...naRaiz]
 const fonte = new Map(arquivos.map(f => [f, fs.readFileSync(f, 'utf8')]))
 
+/* ── O CAMINHO do import não é uso ────────────────────────────────────────
+ *
+ * `PlanosScreen` é uma tela inteira que ninguém monta, e ela não aparecia aqui.
+ * O motivo: `NovoPlanoScreen` faz
+ *
+ *     import type { Plano } from './PlanosScreen'
+ *
+ * e o nome do ARQUIVO casava com a fronteira de identificador — barra de um
+ * lado, aspas do outro. Importar um tipo de dentro de um arquivo fazia o
+ * componente daquele arquivo parecer montado.
+ *
+ * O terceiro defeito desta ferramenta no mesmo sentido dos dois primeiros:
+ * conferir de menos e parecer que conferiu.
+ *
+ * Some só o CAMINHO, e não a linha inteira: `export { comFator } from './x'` é
+ * um reexporte, e ali `comFator` É uso de verdade. Apagar a linha toda
+ * transformaria todo reexporte do projeto em órfão falso. */
+const semCaminhos = new Map(
+  [...fonte].map(([f, t]) => [f, t.replace(/(\bfrom\s*|\bimport\s*)(['"])[^'"]*\2/g, '$1$2$2')]),
+)
+
 /* Fronteira de identificador de verdade: `$` e `_` contam como letra, senão
    `metas` casaria dentro de `carregarMetas`. */
 const usadoEm = (nome, texto) =>
   new RegExp('(^|[^A-Za-z0-9_$])' + nome + '($|[^A-Za-z0-9_$])').test(texto)
 
+/* Devolve os órfãos E os nomes que chegou a examinar.
+ *
+ * Os dois, porque as duas listas erram de jeitos diferentes: a de órfãos erra
+ * inventando, e a de examinados erra ESVAZIANDO. Um regex rígido demais não
+ * produz acusação falsa — ele produz uma lista curta e tranquilizadora, que é
+ * pior, porque ninguém desconfia de uma lista curta. */
 function orfaos(dentroDe, padrao) {
   const achados = []
+  const examinados = new Set()
   for (const [arq, txt] of fonte) {
     if (!dentroDe(arq)) continue
 
     const nomes = [...txt.matchAll(padrao)].map(m => m[1] || m[2])
 
     for (const nome of nomes) {
+      examinados.add(nome)
       let usos = 0
-      for (const [outro, t] of fonte) {
+      for (const [outro, t] of semCaminhos) {
         if (outro === arq) continue
         if (usadoEm(nome, t)) usos++
       }
       if (usos === 0) achados.push({ arq: arq.split(path.sep).join('/'), nome })
     }
   }
-  return achados
+  return { achados, examinados }
 }
 
-const achados = orfaos(
+const { achados, examinados: examinadosLib } = orfaos(
   a => a.includes(`${path.sep}lib${path.sep}`),
   /^export (?:async )?function (\w+)|^export const (\w+)/gm,
 )
@@ -89,21 +118,82 @@ const achados = orfaos(
  * desenhou pode estar esperando a tela que vai usá-la.
  *
  * Só nomes com maiúscula, que é o que o JSX consegue montar. */
-const componentes = orfaos(
+const { achados: componentes, examinados: examinadosTela } = orfaos(
   a => /components|screens/.test(a),
   /^export (?:default )?function ([A-Z]\w+)|^export const ([A-Z]\w+)/gm,
 )
 
-/* ── A conferência do próprio script ──────────────────────────────────────
- * Três nomes que o app inteiro usa. Se algum deles aparecer na lista, o regex
- * quebrou e a lista não vale nada. */
-const IMPOSSIVEIS = ['supabase', 'paleta', 'estilosDe']
-const falsos = achados.filter(a => IMPOSSIVEIS.includes(a.nome))
+/* E a guarda do outro lado, que faltava.
+ *
+ * A de cima pega o regex FROUXO — o dia em que a barra invertida some e tudo
+ * vira órfão. Esta pega o contrário, que é o defeito mais perigoso dos dois:
+ * uma varredura que examina de MENOS produz uma lista curta e tranquilizadora,
+ * e ninguém desconfia de lista curta.
+ *
+ * Duas perguntas, porque um controle só não bastava. A primeira versão desta
+ * guarda olhava apenas a lista de órfãos, e por isso não pegava nenhuma das
+ * duas mutações que testei — com o regex apertado, a lista simplesmente
+ * ESVAZIA, e um filtro sobre lista vazia não acusa nada.
+ *
+ *   1. o nome foi EXAMINADO? se não, o regex parou de reconhecê-lo;
+ *   2. e ficou de fora dos órfãos? se não, a detecção de uso quebrou.
+ *
+ * Os nomes são de coisas que o app usa com certeza, e que ele deixaria de usar
+ * só numa reforma grande — e uma reforma grande é exatamente quando alguém
+ * precisa saber que a ferramenta parou de valer. */
+const CONHECIDOS = {
+  lib: { examinados: examinadosLib, orfaos: achados, nomes: ['supabase', 'paleta', 'estilosDe'] },
+  tela: {
+    examinados: examinadosTela,
+    orfaos: componentes,
+    nomes: ['HomeScreen', 'MaisScreen', 'MensagensScreen'],
+  },
+}
 
-if (falsos.length > 0) {
+/* E o controle NEGATIVO, que as duas guardas acima não davam.
+ *
+ * As duas de cima pegam a ferramenta acusando demais. Nenhuma pega a ferramenta
+ * achando NADA — e testei: com a detecção de uso sempre verdadeira, ou com a
+ * fronteira de identificador afrouxada, a lista sai vazia e as duas passam
+ * satisfeitas. Ferramenta de conferência que não acha nada é a que ninguém
+ * questiona, e é o pior desfecho possível para uma delas.
+ *
+ * O jeito de provar que ela ainda acha é exigir que ela ache algo que
+ * sabidamente existe. Estes dois são órfãos de verdade, conferidos à mão.
+ *
+ * Se um deles sumir daqui, são só duas explicações, e as duas pedem ação:
+ * alguém montou/chamou (então tire o nome desta lista, na mesma alteração), ou
+ * a ferramenta parou de enxergar. */
+const DEVEM_APARECER = {
+  lib: { orfaos: achados, nomes: ['hexDe'] },
+  /* `PlanosScreen` está aqui por um motivo a mais: ele só aparece porque o
+     caminho do import deixou de contar como uso. Sem ele nesta lista, alguém
+     desfazendo aquela limpeza esconderia uma tela inteira de novo, e a
+     ferramenta continuaria dizendo "Success". */
+  tela: { orfaos: componentes, nomes: ['ArcoMeta', 'PlanosScreen'] },
+}
+
+const quebras = []
+for (const [onde, c] of Object.entries(CONHECIDOS)) {
+  for (const nome of c.nomes) {
+    if (!c.examinados.has(nome)) quebras.push(`${nome} (${onde}) nem foi examinado`)
+    else if (c.orfaos.some(o => o.nome === nome)) quebras.push(`${nome} (${onde}) saiu como órfão`)
+  }
+}
+for (const [onde, c] of Object.entries(DEVEM_APARECER)) {
+  for (const nome of c.nomes) {
+    if (!c.orfaos.some(o => o.nome === nome))
+      quebras.push(
+        `${nome} (${onde}) devia sair como órfão e não saiu ` +
+          '— ou alguém o ligou (tire daqui), ou a varredura parou de achar',
+      )
+  }
+}
+
+if (quebras.length > 0) {
   console.error('\nO SCRIPT ESTÁ QUEBRADO, e não o código.\n')
-  console.error(`  ${falsos.map(f => f.nome).join(', ')} aparece(m) como órfão(s),`)
-  console.error('  e o app inteiro usa. A lista abaixo não valeria nada.\n')
+  for (const q of quebras) console.error(`  ${q}`)
+  console.error('\n  O app usa todos eles. A lista abaixo não valeria nada.\n')
   process.exit(1)
 }
 
