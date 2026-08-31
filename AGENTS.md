@@ -416,7 +416,23 @@ E **conferir não é opcional**, porque a única evidência que o editor SQL dá
 função que o app usa com a chave pública e separa "existe e barrada" de "existe
 e executa sem sessão".
 
-## 15. Antes de dar por pronto
+## 15. Ler corpo de função do banco corrompe acento no caminho
+
+`pg_get_functiondef` devolve o corpo com os acentos estragados quando a resposta
+passa pelo caminho JSON — e o estrago VOLTA GRAVADO se alguém colar aquilo de
+volta. Uma função do sistema já perdeu 12 comentários assim, num round-trip
+anterior, e ninguém viu até alguém reler o corpo com atenção.
+
+O transporte que não corrompe:
+
+```sql
+select encode(convert_to(pg_get_functiondef(oid), 'UTF8'), 'base64')
+```
+
+e decodificar do outro lado. Vale sempre que for LER corpo de função para
+reescrever — que é justamente quando o dano se torna permanente.
+
+## 16. Antes de dar por pronto
 
 - `npx tsc --noEmit` — o principal, e por muito tempo o único.
 - `npm run contrato` — confere que toda RPC que o app chama existe no banco com
