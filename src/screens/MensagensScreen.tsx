@@ -31,6 +31,7 @@ import {
 } from '../lib/mensagens'
 import { horaCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { useAlturaTeclado } from '../lib/teclado'
 
 /* A conversa com a nutricionista.
  *
@@ -81,23 +82,19 @@ export function MensagensScreen({
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
-  /* ── Nenhum tratamento de teclado aqui, e é de propósito ──────────────────
+  /* ── O teclado, e uma medição TEMPORÁRIA na tela ─────────────────────────
    *
-   * O app roda no Expo Go, e no Expo Go as configurações de Android do app.json
-   * NÃO valem: quem manda é o manifesto do próprio Expo Go, que usa
-   * `adjustResize`. A janela encolhe sozinha quando o teclado sobe, o `flex: 1`
-   * da conversa reflui, e a barra de escrever fica acima do teclado sem
-   * ninguém fazer nada.
+   * Seis tentativas erraram aqui, cada uma partindo de uma teoria diferente
+   * sobre o que o Android faz com a janela. A foto mostrou que a barra de
+   * escrever fica FORA da tela, abaixo do teclado — ou seja, a janela não
+   * encolhe. Mas o painel do BuscarAlimentoScreen mede o teclado e funciona no
+   * mesmo aparelho, o que só fecha se a medida chegar aqui diferente.
    *
-   * Cinco tentativas minhas erraram por SOMAR deslocamento em cima do que o
-   * sistema já fazia — KeyboardAvoidingView, margem, medição, âncora absoluta.
-   * Cada uma empurrava a barra por um caminho diferente, e o resultado era ela
-   * no meio da tela ou atrás do teclado.
-   *
-   * A área segura de baixo continua valendo, porque esta tela cobre a barra de
-   * abas: com o teclado fechado o rodapé precisa desviar da barra de gestos.
-   * Com ele aberto, a janela encolhida já termina acima dela. */
-  const respiro = bottom
+   * Então a barra sobe a altura medida, e a tela MOSTRA os números por uma
+   * rodada. Uma foto encerra o que seis deduções não encerraram. Sai assim que
+   * a resposta chegar. */
+  const alturaTeclado = useAlturaTeclado()
+  const respiro = alturaTeclado > 0 ? alturaTeclado : bottom
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -355,7 +352,13 @@ export function MensagensScreen({
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
-          <View style={[styles.barraEnvio, { paddingBottom: 10 + respiro }]}>
+          {/* TEMPORÁRIO: some na próxima alteração. */}
+          <Text style={styles.medida}>
+            teclado {Math.round(alturaTeclado)} · segura {Math.round(bottom)} · respiro{' '}
+            {Math.round(respiro)}
+          </Text>
+
+          <View style={[styles.barraEnvio, { marginBottom: respiro }]}>
             <TextInput
               value={texto}
               onChangeText={setTexto}
@@ -476,6 +479,15 @@ const estilos = estilosDe(t =>
     horaMinha: { color: 'rgba(255,255,255,0.75)' },
 
     erro: { paddingHorizontal: 20, paddingBottom: 6, fontSize: 12.5, color: t.cores.erroTexto },
+    /* TEMPORÁRIO, para uma foto responder o que seis deduções não responderam. */
+    medida: {
+      textAlign: 'center',
+      fontSize: 11,
+      fontWeight: '700',
+      color: t.cores.branco,
+      backgroundColor: t.cores.verdeEscuro,
+      paddingVertical: 3,
+    },
 
     /* No FLUXO da coluna, sem posicionamento nenhum. A janela encolhe com o
        teclado (adjustResize do Expo Go), então o último filho de uma coluna já
