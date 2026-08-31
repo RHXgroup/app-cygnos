@@ -39,6 +39,27 @@ const MESES = [
   'Dezembro',
 ]
 
+/* Data que o `Date` não conseguiu entender.
+ *
+ * `new Date('lixo')` não estoura: devolve um Date em que TODO getter é NaN. Aí
+ * `MESES[NaN]` é `undefined`, e o `.slice(0, 3)` do `dataCurta` estoura de
+ * verdade — a tela inteira morre por causa de uma string torta numa coluna.
+ *
+ * É a armadilha 10 outra vez, com um vetor no lugar do `Record`: valor vindo do
+ * banco indexando direto. Os dois caminhos que chegam aqui leem data crua —
+ * `new Date(m.criadaEm)` na conversa e `new Date(s.criadaEm)` na lista de
+ * pedidos —, e um `null` numa dessas colunas derrubaria a tela toda.
+ *
+ * Achado por caso de mesa depois que a função virou testável, não em uso. */
+const naoEhData = (d: Date) => Number.isNaN(d.getTime())
+
+/* O que aparece no lugar quando a data não dá para ler.
+ *
+ * Não é "hoje" e não é uma data chutada: inventar dia numa tela de consulta faz
+ * alguém aparecer no consultório no dia errado. Admitir que o app não sabe é a
+ * única resposta honesta. */
+const SEM_DATA = 'Data desconhecida'
+
 /* 8752 → "8.752" */
 export const milhar = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
@@ -47,7 +68,7 @@ export const decimal = (n: number, casas = 1) => n.toFixed(casas).replace('.', '
 
 /* "Quinta-feira, 26 de Outubro" */
 export const dataPorExtenso = (d: Date) =>
-  `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`
+  naoEhData(d) ? SEM_DATA : `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`
 
 /* "2026-10-26" — o dia do calendário DO APARELHO, para mandar ao banco.
  *
@@ -63,11 +84,13 @@ export const dataISO = (d: Date) =>
 
 /* "14:32" */
 export const horaCurta = (d: Date) =>
-  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  naoEhData(d)
+    ? '--:--' /* guarda o formato, para não desmontar linha apertada */
+    : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
 /* "26/10/2026" */
 export const dataNumerica = (d: Date) =>
-  [
+  naoEhData(d) ? '--/--/----' : [
     String(d.getDate()).padStart(2, '0'),
     String(d.getMonth() + 1).padStart(2, '0'),
     d.getFullYear(),
@@ -100,4 +123,6 @@ export function rotuloDoDia(d: Date, hoje: Date): string {
 
 /* "Qui, 26 de Out." */
 export const dataCurta = (d: Date) =>
-  `${DIAS_CURTOS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()].slice(0, 3)}.`
+  naoEhData(d)
+    ? SEM_DATA
+    : `${DIAS_CURTOS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()].slice(0, 3)}.`
