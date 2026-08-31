@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -43,7 +44,12 @@ import { carregarPlanoAtivo, type PlanoCompleto, type RefeicaoSalva } from '../l
 import { porcao } from '../lib/alimentos'
 import type { AlimentoEscolhido, Nutrientes } from '../lib/plano'
 import { horaCurta, milhar } from '../lib/formatar'
-import { estilosDe, paleta } from '../lib/tema'
+import { estilosDe, paleta } from '../lib/tema'
+import {
+  apagarFotoDoDiario,
+  enderecosDasFotos,
+  guardarFotoDoDiario,
+} from '../lib/fotoDoDiario'
 
 /* O contador de calorias: o que a pessoa comeu hoje, contra a meta dela.
  *
@@ -134,6 +140,20 @@ export function ContadorCaloriasScreen({
   /* A estimativa esperando confirmação. Nada é gravado antes de a pessoa ver o
      número — a IA erra, e um item errado no diário estraga o total do dia. */
   const [estimativa, setEstimativa] = useState<Estimativa | null>(null)
+  /* A imagem que gerou a estimativa, guardada ate ela confirmar.
+   *
+   * So sobe DEPOIS do Registrar: subir antes encheria o bucket de foto que a
+   * pessoa descartou, e ela descarta com frequencia -- e a foto errada e
+   * justamente a que a nutricionista nao deveria ver. */
+  const [fotoEmBase64, setFotoEmBase64] = useState<string | null>(null)
+  /* Caminho no bucket → endereço assinado. Um mapa, e não um endereço por
+     linha: `createSignedUrls` resolve todos de uma vez, e doze fotos seriam
+     doze idas à rede na abertura da tela.
+   *
+   * Endereço assinado VENCE em uma hora (item 7 do AGENTS.md). Por isso ele é
+   * ESTADO, refeito quando os itens mudam — e não um valor calculado no render,
+   * que ficaria velho numa tela aberta a manhã inteira. */
+  const [fotosAbertas, setFotosAbertas] = useState<Map<string, string>>(new Map())
   /* Quantos registros estão esperando a rede voltar. Zero na maioria das
      vezes; quando não é, a tela precisa dizer — senão a pessoa acha que o
      item sumiu. */
@@ -215,7 +235,7 @@ export function ContadorCaloriasScreen({
     onFechar()
   }
 
-  async function gravar(novos: ItemParaGravar[]) {
+  async function gravar(novos: ItemParaGravar[], imagemBase64?: string | null) {
     setErro('')
 
     /* Aparece na lista ANTES de a rede responder.
@@ -236,12 +256,22 @@ export function ContadorCaloriasScreen({
       fibras: n.fibras,
       origem: n.origem,
       confianca: n.confianca,
+      fotoPath: n.fotoPath ?? null,
       id: `${PROVISORIO}${quando.getTime()}-${i}`,
       comidoEm: quando.toISOString(),
     }))
     setItens(atuais => [...atuais, ...provisorios])
 
-    const r = await registrarConsumo(contaId, novos, quando)
+    /* A foto sobe ANTES do insert, porque o caminho dela e uma coluna da
+       linha. Devolve null se falhar -- item 11: a foto e acessorio, e o item
+       precisa entrar no diario de qualquer jeito. Perder o registro por causa
+       de uma imagem seria trocar o essencial pelo acessorio. */
+    const caminho = imagemBase64 ? await guardarFotoDoDiario(contaId, imagemBase64) : null
+    const comFoto = caminho
+      ? novos.map(n => (n.origem === 'foto' ? { ...n, fotoPath: caminho } : n))
+      : novos
+
+    const r = await registrarConsumo(contaId, comFoto, quando)
 
     if (r.tipo === 'erro') {
       /* Falhou: o registro NÃO se perde.
@@ -328,7 +358,14 @@ export function ContadorCaloriasScreen({
        saiu, e não para o fim. */
     restaurar: item =>
       setItens(atuais => [...atuais, item].sort((a, b) => a.comidoEm.localeCompare(b.comidoEm))),
-    apagarDeVerdade: item => apagarConsumo(item.id),
+    apagarDeVerdade: async item => {
+      const falha = await apagarConsumo(item.id)
+      /* A imagem sai junto. Foto orfa ocupa espaco para sempre e ninguem vai
+         procura-la depois. So depois de a linha sair de verdade: apagar a
+         imagem primeiro deixaria um item sem foto se o apagar falhasse. */
+      if (!falha) await apagarFotoDoDiario(item.fotoPath)
+      return falha
+    },
     aoFalhar: setErro,
     /* Limpa o erro de antes junto: a regra vale aqui como em toda tela que
        relê — mensagem vencida escondendo conteúdo bom. */
@@ -408,7 +445,10 @@ export function ContadorCaloriasScreen({
     setAnalisando(false)
 
     if (r.tipo === 'erro') setErro(r.mensagem)
-    else if (r.tipo === 'ok') setEstimativa(r.estimativa)
+    else if (r.tipo === 'ok') {
+      setEstimativa(r.estimativa)
+      setFotoEmBase64(r.base64)
+    }
     /* 'cancelado' não é erro: a pessoa desistiu da foto e a tela fica como
        estava, sem aviso nenhum. */
   }
@@ -529,6 +569,23 @@ export function ContadorCaloriasScreen({
       />
     )
   }
+
+  /* Os enderecos assinados, refeitos quando a lista muda.
+     Nao no render: assinar e ida a rede, e render acontece muitas vezes. */
+  useEffect(() => {
+    let vivo = true
+    const caminhos = itens.map(i => i.fotoPath).filter((c): c is string => !!c)
+    if (caminhos.length === 0) {
+      setFotosAbertas(new Map())
+      return
+    }
+    enderecosDasFotos(caminhos).then(m => {
+      if (vivo) setFotosAbertas(m)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [itens])
 
   const totais = totaisConsumidos(itens)
   const grupos = porRefeicao(itens)
@@ -744,6 +801,7 @@ export function ContadorCaloriasScreen({
                   <LinhaItem
                     key={i.id}
                     item={i}
+                    foto={i.fotoPath ? (fotosAbertas.get(i.fotoPath) ?? null) : null}
                     onCorrigir={() => abrirAcoes(i)}
                   />
                 ))}
@@ -758,9 +816,18 @@ export function ContadorCaloriasScreen({
         <ConfirmarFoto
           estimativa={estimativa}
           refeicao={refeicao}
-          onDescartar={() => setEstimativa(null)}
-          onRegistrar={e => {
+          onDescartar={() => {
             setEstimativa(null)
+            setFotoEmBase64(null)
+          }}
+          onRegistrar={e => {
+            const imagem = fotoEmBase64
+            setEstimativa(null)
+            setFotoEmBase64(null)
+            /* A imagem viaja para `gravar`, que a sobe antes do insert -- o
+               caminho dela e uma coluna da linha.
+               A pessoa nao espera por isso: a lista otimista ja mostrou o
+               item antes de a rede responder. */
             gravar([
               {
                 refeicao,
@@ -774,7 +841,7 @@ export function ContadorCaloriasScreen({
                 origem: 'foto',
                 confianca: e.confianca,
               },
-            ])
+            ], imagem)
           }}
         />
       )}
@@ -1040,8 +1107,22 @@ function LinhaForma({
   )
 }
 
-function LinhaItem({ item, onCorrigir }: { item: ItemConsumo; onCorrigir: () => void }) {
+function LinhaItem({
+  item,
+  foto,
+  onCorrigir,
+}: {
+  item: ItemConsumo
+  /* O endereço assinado, quando já resolveu. Nulo enquanto carrega, ou quando o
+     item não tem foto. */
+  foto: string | null
+  onCorrigir: () => void
+}) {
   const styles = estilos()
+  /* QUAL endereço falhou, e não um booleano — item 7 do AGENTS.md. Com booleano,
+     um endereço novo (a assinatura é renovada de hora em hora) entraria já
+     marcado como quebrado e a foto nunca mais voltaria. */
+  const [falhou, setFalhou] = useState<string | null>(null)
   return (
     /* A linha inteira abre a folha de correção, e é o único jeito de tocar
        nela. Havia um X aqui, de dezesseis pixels, encostado nesta mesma área e
@@ -1057,6 +1138,24 @@ function LinhaItem({ item, onCorrigir }: { item: ItemConsumo; onCorrigir: () => 
       accessibilityRole="button"
       accessibilityLabel={`Corrigir ${item.nome}`}
     >
+      {/* A MINIATURA.
+          Antes a foto era analisada e jogada fora: a nutricionista recebia
+          "Arroz, feijão e frango, 620 kcal" — a leitura da IA, e não o prato.
+          Sem a imagem ela não corrige a porção, não nota o que ficou de fora e
+          não comenta.
+
+          Toda <Image> remota precisa de `onError`: sem ele, a que falha não
+          desenha nada e sobra um buraco do tamanho dela, que se lê como app
+          quebrado — pior do que nunca ter tido foto. */}
+      {foto !== null && foto !== falhou && (
+        <Image
+          source={{ uri: foto }}
+          style={styles.miniatura}
+          onError={() => setFalhou(foto)}
+          accessibilityIgnoresInvertColors
+        />
+      )}
+
       <View style={styles.textoItem}>
         <View style={styles.linhaNomeItem}>
           <Text style={styles.nomeItem} numberOfLines={2}>
@@ -1777,6 +1876,15 @@ const estilos = estilosDe(t =>
   textoItem: { flex: 1 },
   linhaNomeItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   nomeItem: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  /* Quadrada e pequena: ela é referência, e não o conteúdo da linha. Grande
+     demais empurraria o nome e a caloria, que é o que se lê. */
+  miniatura: {
+    width: 42,
+    height: 42,
+    borderRadius: 9,
+    marginRight: 11,
+    backgroundColor: t.cores.fundo,
+  },
   seloFoto: {
     flexDirection: 'row',
     alignItems: 'center',

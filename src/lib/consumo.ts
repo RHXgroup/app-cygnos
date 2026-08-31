@@ -28,11 +28,19 @@ export type ItemConsumo = {
   origem: OrigemItem
   confianca: 'alta' | 'media' | 'baixa' | null
   comidoEm: string
+  /* O caminho da foto no bucket privado, quando o item veio de foto.
+   *
+   * CAMINHO, e não endereço: endereço assinado vence em uma hora, e guardar um
+   * na linha faria a foto quebrar depois do almoço. Quem transforma em endereço
+   * é `fotoDoDiario`, na hora de desenhar. */
+  fotoPath: string | null
 }
 
 /* O que se manda para gravar. Sem id nem hora — quem carimba é o banco. */
-export type ItemParaGravar = Omit<ItemConsumo, 'id' | 'comidoEm'> & {
+export type ItemParaGravar = Omit<ItemConsumo, 'id' | 'comidoEm' | 'fotoPath'> & {
   alimentoId?: number | null
+  /* Opcional: quase todo item entra sem foto. */
+  fotoPath?: string | null
 }
 
 /* As refeições que o app oferece. São sugestões, não uma lista fechada: quem
@@ -125,7 +133,7 @@ export type ResultadoConsumo =
   | { tipo: 'erro'; mensagem: string }
 
 const COLUNAS =
-  'id, refeicao, nome, descricao, calorias, proteinas, carboidratos, gorduras, fibras, origem, confianca, comido_em'
+  'id, refeicao, nome, descricao, calorias, proteinas, carboidratos, gorduras, fibras, origem, confianca, comido_em, foto_path'
 
 type Linha = {
   id: string
@@ -140,6 +148,7 @@ type Linha = {
   origem: OrigemItem
   confianca: 'alta' | 'media' | 'baixa' | null
   comido_em: string
+  foto_path?: string | null
 }
 
 /* numeric volta como string do PostgREST quando não cabe em float sem perda. */
@@ -158,6 +167,7 @@ const daLinha = (l: Linha): ItemConsumo => ({
   origem: l.origem,
   confianca: l.confianca,
   comidoEm: l.comido_em,
+  fotoPath: l.foto_path ?? null,
 })
 
 /* O que foi comido num dia, em ordem de relógio. */
@@ -243,6 +253,7 @@ export async function registrarConsumo(
         origem: i.origem,
         confianca: i.confianca,
         alimento_id: i.alimentoId ?? null,
+        foto_path: i.fotoPath ?? null,
       })),
     )
     .select(COLUNAS)
@@ -538,7 +549,13 @@ export type ContextoDaFoto = {
 }
 
 export type ResultadoFoto =
-  | { tipo: 'ok'; estimativa: Estimativa }
+  /* O `base64` volta junto para a tela poder GUARDAR a imagem depois de a
+     pessoa confirmar. Antes ela era mandada para a IA e descartada.
+   *
+   * Volta daqui em vez de ser lida de novo do arquivo: é a mesma imagem já
+   * reduzida e comprimida, e ler duas vezes custaria o dobro num aparelho
+   * fraco. */
+  | { tipo: 'ok'; estimativa: Estimativa; base64: string }
   | { tipo: 'cancelado' }
   | { tipo: 'erro'; mensagem: string }
 
@@ -627,6 +644,7 @@ export async function analisarFoto(
 
     return {
       tipo: 'ok',
+      base64: reduzida.base64,
       estimativa: {
         descricao: data.descricao ?? 'Alimento',
         porcaoEstimada: data.porcao_estimada ?? '',
