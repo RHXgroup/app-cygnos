@@ -35,8 +35,7 @@
         "expo-image-picker",
         {
           "photosPermission": "O Cygnos acessa suas fotos para você mandar a imagem do seu perfil, a foto do prato ou a ficha de treino da academia.",
-          "cameraPermission": "O Cygnos usa a câmera para você fotografar o prato, a ficha de treino ou a imagem do seu perfil.",
-          "microphonePermission": false
+          "cameraPermission": "O Cygnos usa a câmera para você fotografar o prato, a ficha de treino ou a imagem do seu perfil."
         }
       ],
       "expo-font",
