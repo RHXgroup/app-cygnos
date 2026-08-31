@@ -45,6 +45,43 @@ em destaque. Hoje ela mostra a ficha de uma só.
 
 ---
 
+## 1b. A pré-visualização precisa dizer a verdade — e virou pré-requisito
+
+**O que mudou:** o telefone da nutricionista passou a aparecer no app quando ela
+tem `mostra_telefone_no_app = true`. Antes só saía com `canal_de_contato =
+'whatsapp'`, e por isso não aparecia para ninguém.
+
+**Por que isso torna a prévia urgente.** Hoje o cartão *"E isso que um estranho
+vê"* **mente nas duas direções**: promete o telefone (que o app não mostrava) e
+omite o que o app mostra — "Acompanha você", "Agendar consulta", "Conversar".
+
+Enquanto ela mente, a chavinha do telefone é consentimento no escuro: a
+profissional liga, confere numa prévia que não corresponde, e o número vai para
+um catálogo que ela nunca viu de verdade.
+
+**Uma leitura que pesa na decisão:** as 12 profissionais têm
+`mostra_telefone_no_app = true`, **nenhuma** com `false`, **nenhuma** nula. Esse
+padrão — 12/0/0 — quase sempre quer dizer valor escrito por padrão do sistema, e
+não escolha de cada uma. A chavinha aparece no painel delas com o rótulo
+"fica visível para qualquer pessoa", então quem abriu aquela tela viu; quem
+nunca abriu, não.
+
+Foi por isso que o Helton decidiu publicar **e** deixar a opção com elas: a saída
+não é esconder o número, é fazer a prévia mostrar a verdade para a escolha ser
+informada.
+
+**O que fazer:** a prévia renderiza exatamente o que `app_nutricionistas()`
+devolve, com os mesmos elementos do cartão do app. Se um dado não sai da função,
+não aparece na prévia.
+
+### Como validar
+
+Ligar e desligar cada chavinha e conferir que a prévia acompanha. E o teste que
+fecha: abrir o app com uma conta de paciente e comparar lado a lado. **Qualquer
+diferença é defeito da prévia**, não do app — o app mostra o que a função manda.
+
+---
+
 ## 2. `app_desvincular(p_paciente_id)` ainda apaga em vez de encerrar
 
 **Hoje:** o corpo faz `delete`. E `app_vinculos` é uma **view** sobre
