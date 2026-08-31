@@ -593,8 +593,18 @@ export async function confirmarCopo(ml: number, totalDoDia: number, copoDoDia: n
         body: `${ml} ml registrados. ${totalDoDia} ml no dia.`,
         ...(Platform.OS === 'android' ? { autoDismiss: true } : {}),
       },
-      /* Imediata. `null` dispara na hora. */
-      trigger: null,
+      /* Imediata, E no canal silencioso criado logo acima.
+       *
+       * `trigger: null` também dispara na hora, mas SEM canal — e sem canal a
+       * notificação cai no padrão, que tem importância DEFAULT: som, vibração e
+       * salto na tela. Ou seja, o canal MIN era criado e nunca usado, e a
+       * confirmação fazia exatamente o barulho que o comentário acima diz que
+       * ela não pode fazer.
+       *
+       * `{ channelId }` é o `ChannelAwareTriggerInput`, que a própria biblioteca
+       * descreve como "delivered immediately". No iOS não há canal, e lá `null`
+       * continua sendo a forma certa. */
+      trigger: Platform.OS === 'android' ? { channelId: 'agua-confirma' } : null,
     })
   } catch {
     /* Falhar em confirmar não desfaz o copo, que já está gravado. Ficar sem a
