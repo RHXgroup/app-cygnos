@@ -154,6 +154,21 @@ mesmos 48 da barra de navegação. Ninguém tinha reclamado porque o painel é a
 o que sumia era a borda, não o campo. Corrigido junto com a conversa, e as duas
 telas continuam sendo as primeiras a reabrir no primeiro build.
 
+**E as duas ficaram desiguais depois disso, o que é a armadilha 5 outra vez.** A
+conversa passou a usar `useDesvioDoTeclado`; buscar alimento manteve a conta
+escrita à mão. A conta à mão está certa no Expo Go e ERRADA num build: lá o
+`android:windowSoftInputMode` sai `adjustResize`, a janela encolhe sozinha, e
+somar de novo empurra o painel 354 para cima do que já estava resolvido. Hoje as
+duas medem a raiz no `onLayout` e perguntam ao mesmo lugar. **A altura tem de vir
+do `onLayout`**, e não de `useWindowDimensions`, que não encolhe junto.
+
+A decisão mora em `lib/desvioDoTeclado.ts`, separada do hook, e o motivo do corte
+vale para qualquer código escrito para um build que ainda não existe: **aquele
+ramo nunca rodou**. No Expo Go a janela não encolhe, então o tratamento do
+encolhimento ia estrear em produção. Fora do aparelho ele roda com os números que
+foram medidos NO aparelho — 306, 48, e os 354 que a foto mostrou faltando —, e é
+o mais perto de testar um build que dá para chegar antes de ter um.
+
 ## 3. Campo numérico e o separador de milhar
 
 Quem digita dez mil escreve `10.000`, e `Number("10.000")` é **10**.
