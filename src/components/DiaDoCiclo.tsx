@@ -14,7 +14,17 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { diaVazio, type DiaDoCiclo as Dia, type Fluxo, type Humor } from '../lib/ciclo'
+import {
+  diaVazio,
+  type Cabeca,
+  type Digestao,
+  type DiaDoCiclo as Dia,
+  type Energia,
+  type Fluxo,
+  type Humor,
+  type Pele,
+  type Secrecao,
+} from '../lib/ciclo'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* Um dia do calendário do ciclo.
@@ -38,32 +48,89 @@ import { estilosDe, paleta } from '../lib/tema'
  * um formulário. Um dia com só "cólica" marcado já vale — e é o que a maioria
  * vai fazer. */
 
+/* ── As categorias ─────────────────────────────────────────────────────────
+ *
+ * Vieram de comparar com o Clue, que registra em 12 categorias de ~4 opções, e
+ * não em 200 campos soltos. A lição maior daquela comparação não é a
+ * quantidade: é que TODA categoria tem a opção positiva.
+ *
+ * Sem ela, só quem está mal registra — e o padrão que o app devolve sai sempre
+ * negativo. A pessoa abre e lê que fica mal todo mês, porque os dias bons ela
+ * nunca teve onde marcar.
+ *
+ * Por isso a primeira opção de cada lista é a boa, e não a queixa. */
+
+/* 'escape' não é fluxo leve: é sangramento fora do período, é outra coisa, e é
+   justamente o que faz alguém procurar ajuda. Chamá-lo de leve some com a
+   informação dentro da média. */
 const FLUXOS: { valor: Fluxo; rotulo: string }[] = [
   { valor: 'nenhum', rotulo: 'nenhum' },
+  { valor: 'escape', rotulo: 'escape' },
   { valor: 'leve', rotulo: 'leve' },
   { valor: 'moderado', rotulo: 'moderado' },
   { valor: 'intenso', rotulo: 'intenso' },
 ]
 
+/* Só DOR. Inchaço, náusea e intestino saíram daqui e viraram "digestão" — a
+   mesma informação em dois lugares apareceria duas vezes na ficha dela. */
 const SINTOMAS = [
   'cólica',
-  'inchaço',
   'dor de cabeça',
   'seio dolorido',
-  'acne',
-  'intestino solto',
-  'intestino preso',
-  'náusea',
+  'dor de ovulação',
+  'dor lombar',
   'cansaço',
   'insônia',
 ]
 
 const HUMORES: { valor: Humor; rotulo: string }[] = [
   { valor: 'bem', rotulo: 'bem' },
+  { valor: 'feliz', rotulo: 'feliz' },
   { valor: 'irritada', rotulo: 'irritada' },
   { valor: 'triste', rotulo: 'triste' },
   { valor: 'ansiosa', rotulo: 'ansiosa' },
   { valor: 'oscilando', rotulo: 'oscilando' },
+]
+
+const ENERGIAS: { valor: Energia; rotulo: string }[] = [
+  { valor: 'energizada', rotulo: 'energizada' },
+  { valor: 'normal', rotulo: 'normal' },
+  { valor: 'baixa', rotulo: 'baixa' },
+  { valor: 'exausta', rotulo: 'exausta' },
+]
+
+const DIGESTOES: { valor: Digestao; rotulo: string }[] = [
+  { valor: 'bem', rotulo: 'bem' },
+  { valor: 'inchada', rotulo: 'inchada' },
+  { valor: 'gases', rotulo: 'gases' },
+  { valor: 'enjoada', rotulo: 'enjoada' },
+  { valor: 'presa', rotulo: 'presa' },
+  { valor: 'solta', rotulo: 'solta' },
+]
+
+/* O marcador de fertilidade que ela observa sem depender de exame. Os nomes são
+   os que se usam de verdade — "clara de ovo" é o termo, e traduzi-lo para algo
+   mais formal faria quem procura por ele não encontrar. */
+const SECRECOES: { valor: Secrecao; rotulo: string }[] = [
+  { valor: 'seca', rotulo: 'seca' },
+  { valor: 'pegajosa', rotulo: 'pegajosa' },
+  { valor: 'cremosa', rotulo: 'cremosa' },
+  { valor: 'clara_de_ovo', rotulo: 'clara de ovo' },
+  { valor: 'atipica', rotulo: 'diferente do normal' },
+]
+
+const CABECAS: { valor: Cabeca; rotulo: string }[] = [
+  { valor: 'focada', rotulo: 'focada' },
+  { valor: 'calma', rotulo: 'calma' },
+  { valor: 'dispersa', rotulo: 'dispersa' },
+  { valor: 'estressada', rotulo: 'estressada' },
+]
+
+const PELES: { valor: Pele; rotulo: string }[] = [
+  { valor: 'boa', rotulo: 'boa' },
+  { valor: 'oleosa', rotulo: 'oleosa' },
+  { valor: 'seca', rotulo: 'seca' },
+  { valor: 'acne', rotulo: 'acne' },
 ]
 
 const DESEJOS = ['doce', 'salgado', 'carboidrato', 'chocolate', 'gordura', 'sem fome']
@@ -179,7 +246,24 @@ export function DiaDoCiclo({
               </View>
             </Secao>
 
-            <Secao titulo="Como você se sentiu" styles={styles}>
+            <Secao titulo="Energia" styles={styles}>
+              <View style={styles.chips}>
+                {ENERGIAS.map(e => (
+                  <Chip
+                    key={e.valor}
+                    ativo={d.energia === e.valor}
+                    onPress={() =>
+                      setD(x => ({ ...x, energia: x.energia === e.valor ? null : e.valor }))
+                    }
+                    styles={styles}
+                  >
+                    {e.rotulo}
+                  </Chip>
+                ))}
+              </View>
+            </Secao>
+
+            <Secao titulo="Dor" styles={styles}>
               <View style={styles.chips}>
                 {SINTOMAS.map(s => (
                   <Chip
@@ -189,6 +273,72 @@ export function DiaDoCiclo({
                     styles={styles}
                   >
                     {s}
+                  </Chip>
+                ))}
+              </View>
+            </Secao>
+
+            <Secao titulo="Digestão" styles={styles}>
+              <View style={styles.chips}>
+                {DIGESTOES.map(g => (
+                  <Chip
+                    key={g.valor}
+                    ativo={d.digestao === g.valor}
+                    onPress={() =>
+                      setD(x => ({ ...x, digestao: x.digestao === g.valor ? null : g.valor }))
+                    }
+                    styles={styles}
+                  >
+                    {g.rotulo}
+                  </Chip>
+                ))}
+              </View>
+            </Secao>
+
+            <Secao titulo="Pele" styles={styles}>
+              <View style={styles.chips}>
+                {PELES.map(pe => (
+                  <Chip
+                    key={pe.valor}
+                    ativo={d.pele === pe.valor}
+                    onPress={() => setD(x => ({ ...x, pele: x.pele === pe.valor ? null : pe.valor }))}
+                    styles={styles}
+                  >
+                    {pe.rotulo}
+                  </Chip>
+                ))}
+              </View>
+            </Secao>
+
+            <Secao titulo="Cabeça" styles={styles}>
+              <View style={styles.chips}>
+                {CABECAS.map(cb => (
+                  <Chip
+                    key={cb.valor}
+                    ativo={d.cabeca === cb.valor}
+                    onPress={() =>
+                      setD(x => ({ ...x, cabeca: x.cabeca === cb.valor ? null : cb.valor }))
+                    }
+                    styles={styles}
+                  >
+                    {cb.rotulo}
+                  </Chip>
+                ))}
+              </View>
+            </Secao>
+
+            <Secao titulo="Secreção" styles={styles}>
+              <View style={styles.chips}>
+                {SECRECOES.map(se => (
+                  <Chip
+                    key={se.valor}
+                    ativo={d.secrecao === se.valor}
+                    onPress={() =>
+                      setD(x => ({ ...x, secrecao: x.secrecao === se.valor ? null : se.valor }))
+                    }
+                    styles={styles}
+                  >
+                    {se.rotulo}
                   </Chip>
                 ))}
               </View>

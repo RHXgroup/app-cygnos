@@ -237,9 +237,20 @@ export function CicloScreen({
   const aviso = useMemo(() => {
     const padroes = padraoAntesDaMenstruacao(
       registros ?? [],
+      /* As cinco categorias novas entram no padrão junto com os sintomas — é o
+         que permite o aviso dizer "energia baixa" e "digestão inchada", que são
+         justamente os que mais se repetem antes da menstruação.
+
+         Os privados continuam de fora: a função nem tem os campos. */
       dias.map(d => ({
         data: d.data,
-        sintomas: d.sintomas,
+        sintomas: [
+          ...d.sintomas,
+          ...(d.energia ? [`energia ${d.energia}`] : []),
+          ...(d.digestao ? [`digestão ${d.digestao}`] : []),
+          ...(d.pele ? [`pele ${d.pele}`] : []),
+          ...(d.cabeca ? [`cabeça ${d.cabeca}`] : []),
+        ],
         humor: d.humor,
         desejoAlimentar: d.desejoAlimentar,
       })),
@@ -263,6 +274,11 @@ export function CicloScreen({
     if (ehComeco(d.data)) partes.push('menstruação começou')
     if (d.fluxo) partes.push(`fluxo ${d.fluxo}`)
     if (d.sintomas.length) partes.push(d.sintomas.join(', '))
+    if (d.energia) partes.push(`energia ${d.energia}`)
+    if (d.digestao) partes.push(`digestão ${d.digestao}`)
+    if (d.pele) partes.push(`pele ${d.pele}`)
+    if (d.cabeca) partes.push(`cabeça ${d.cabeca}`)
+    if (d.secrecao) partes.push(`secreção ${d.secrecao.replace('_', ' ')}`)
     if (d.humor) partes.push(`humor ${d.humor}`)
     if (d.desejoAlimentar.length) partes.push(`vontade de ${d.desejoAlimentar.join(', ')}`)
     if (d.relacao) partes.push(

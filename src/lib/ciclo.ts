@@ -243,14 +243,35 @@ export async function estadoDoCompartilhamento(
  * A tela diz as duas coisas com todas as letras, e é por isso que os campos
  * ficam em blocos separados e não numa lista só. */
 
-export type Fluxo = 'nenhum' | 'leve' | 'moderado' | 'intenso'
-export type Humor = 'bem' | 'irritada' | 'triste' | 'ansiosa' | 'oscilando'
+/* 'escape' é sangramento fora do período, e NÃO é fluxo leve: é outra coisa, e
+   é justamente o que faz alguém procurar ajuda. Chamá-lo de leve some com a
+   informação dentro da média. */
+export type Fluxo = 'nenhum' | 'escape' | 'leve' | 'moderado' | 'intenso'
+export type Humor = 'bem' | 'feliz' | 'irritada' | 'triste' | 'ansiosa' | 'oscilando'
+
+/* As cinco categorias que vieram da comparação com o Clue.
+ *
+ * Todas têm a opção POSITIVA, e essa é a lição maior daquela comparação: sem
+ * ela só quem está mal registra, e o padrão que o app devolve sai sempre
+ * negativo — a pessoa abre e lê que fica mal todo mês, porque os dias bons ela
+ * nunca teve onde marcar. */
+export type Energia = 'energizada' | 'normal' | 'baixa' | 'exausta'
+export type Digestao = 'bem' | 'inchada' | 'gases' | 'enjoada' | 'presa' | 'solta'
+/* O marcador de fertilidade que a pessoa observa sem depender de exame. */
+export type Secrecao = 'seca' | 'pegajosa' | 'cremosa' | 'clara_de_ovo' | 'atipica'
+export type Cabeca = 'focada' | 'calma' | 'dispersa' | 'estressada'
+export type Pele = 'boa' | 'oleosa' | 'seca' | 'acne'
 
 export type DiaDoCiclo = {
   data: string
   fluxo: Fluxo | null
   sintomas: string[]
   humor: Humor | null
+  energia: Energia | null
+  digestao: Digestao | null
+  secrecao: Secrecao | null
+  cabeca: Cabeca | null
+  pele: Pele | null
   desejoAlimentar: string[]
   observacao: string | null
   /* Os três que ficam. */
@@ -264,6 +285,11 @@ type LinhaDia = {
   fluxo: string | null
   sintomas: string[] | null
   humor: string | null
+  energia: string | null
+  digestao: string | null
+  secrecao: string | null
+  cabeca: string | null
+  pele: string | null
   desejo_alimentar: string[] | null
   observacao: string | null
   relacao: boolean | null
@@ -271,14 +297,25 @@ type LinhaDia = {
   nota_privada: string | null
 }
 
+/* Literal de uma linha só, e não concatenação.
+ *
+ * O cliente do Supabase lê ESTE texto em tempo de tipo para saber o formato do
+ * retorno. Quebrado em duas partes com `+`, ele deixa de ser literal, a
+ * inferência morre, e o `as LinhaDia` vira erro de conversão impossível.
+ * Comprido é o preço. */
 const COLUNAS_DIA =
-  'data, fluxo, sintomas, humor, desejo_alimentar, observacao, relacao, relacao_protegida, nota_privada'
+  'data, fluxo, sintomas, humor, energia, digestao, secrecao, cabeca, pele, desejo_alimentar, observacao, relacao, relacao_protegida, nota_privada'
 
 const doDia = (l: LinhaDia): DiaDoCiclo => ({
   data: l.data,
   fluxo: (l.fluxo as Fluxo | null) ?? null,
   sintomas: l.sintomas ?? [],
   humor: (l.humor as Humor | null) ?? null,
+  energia: (l.energia as Energia | null) ?? null,
+  digestao: (l.digestao as Digestao | null) ?? null,
+  secrecao: (l.secrecao as Secrecao | null) ?? null,
+  cabeca: (l.cabeca as Cabeca | null) ?? null,
+  pele: (l.pele as Pele | null) ?? null,
   desejoAlimentar: l.desejo_alimentar ?? [],
   observacao: l.observacao,
   relacao: l.relacao,
@@ -291,6 +328,11 @@ export const diaVazio = (data: string): DiaDoCiclo => ({
   fluxo: null,
   sintomas: [],
   humor: null,
+  energia: null,
+  digestao: null,
+  secrecao: null,
+  cabeca: null,
+  pele: null,
   desejoAlimentar: [],
   observacao: null,
   relacao: null,
@@ -344,6 +386,11 @@ export async function salvarDia(
         fluxo: d.fluxo,
         sintomas: d.sintomas,
         humor: d.humor,
+        energia: d.energia,
+        digestao: d.digestao,
+        secrecao: d.secrecao,
+        cabeca: d.cabeca,
+        pele: d.pele,
         desejo_alimentar: d.desejoAlimentar,
         observacao: d.observacao?.trim() || null,
         relacao: d.relacao,
@@ -372,6 +419,11 @@ export const diaTemAlgo = (d: DiaDoCiclo): boolean =>
   d.fluxo !== null ||
   d.sintomas.length > 0 ||
   d.humor !== null ||
+  d.energia !== null ||
+  d.digestao !== null ||
+  d.secrecao !== null ||
+  d.cabeca !== null ||
+  d.pele !== null ||
   d.desejoAlimentar.length > 0 ||
   (d.observacao ?? '').trim() !== '' ||
   d.relacao !== null ||
@@ -384,6 +436,11 @@ export const diaTemAlgoClinico = (d: DiaDoCiclo): boolean =>
   d.fluxo !== null ||
   d.sintomas.length > 0 ||
   d.humor !== null ||
+  d.energia !== null ||
+  d.digestao !== null ||
+  d.secrecao !== null ||
+  d.cabeca !== null ||
+  d.pele !== null ||
   d.desejoAlimentar.length > 0 ||
   (d.observacao ?? '').trim() !== ''
 
