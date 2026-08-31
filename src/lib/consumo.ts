@@ -513,6 +513,28 @@ export type Estimativa = {
   gorduras: number | null
   fibras: number | null
   confianca: 'alta' | 'media' | 'baixa'
+  /* A IA declarou que o hábito dela mudou a resposta — desempatou um alimento
+     parecido ou calibrou a porção.
+   *
+   * Existe para a TELA DIZER. Contexto que age escondido e erra é o pior dos
+   * dois mundos: sem contexto o erro é aleatório e a pessoa desconfia; com
+   * contexto o erro fica PLAUSÍVEL, bate com o plano dela, e passa. */
+  usouContexto: boolean
+}
+
+/* O que o app conta à IA sobre esta pessoa antes de ela olhar a foto.
+ *
+ * Nenhum concorrente pode fazer isto: eles adivinham do zero toda vez. Aqui o
+ * app sabe o que ela come naquele horário — está no plano da nutricionista e no
+ * que ela repetiu dezenas de vezes.
+ *
+ * A trava contra a ancoragem mora na função do servidor, e a regra em uma
+ * frase é: a foto é a verdade, a lista é só pista. Uma feijoada continua sendo
+ * feijoada mesmo que o hábito dela seja salada. */
+export type ContextoDaFoto = {
+  refeicao: string
+  /* O que ela costuma comer NESTA refeição, do mais frequente para o menos. */
+  costuma: string[]
 }
 
 export type ResultadoFoto =
@@ -538,7 +560,10 @@ async function pedirPermissao(origem: 'galeria' | 'camera'): Promise<boolean> {
  *
  * Sem recorte, ao contrário do avatar: o prato inteiro é a informação, e cortar
  * um pedaço faria a estimativa da porção sair menor do que a comida real. */
-export async function analisarFoto(origem: 'galeria' | 'camera'): Promise<ResultadoFoto> {
+export async function analisarFoto(
+  origem: 'galeria' | 'camera',
+  contexto?: ContextoDaFoto,
+): Promise<ResultadoFoto> {
   if (!(await pedirPermissao(origem))) {
     return {
       tipo: 'erro',
@@ -577,7 +602,17 @@ export async function analisarFoto(origem: 'galeria' | 'camera'): Promise<Result
     if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
 
     const { data, error } = await supabase.functions.invoke('analisar-alimento', {
-      body: { imageBase64: reduzida.base64, mimeType: 'image/jpeg' },
+      body: {
+        imageBase64: reduzida.base64,
+        mimeType: 'image/jpeg',
+        /* Só vai o que existe. Contexto vazio faria o servidor montar uma frase
+           pela metade, e frase pela metade o modelo completa sozinho — que é
+           pior do que não mandar nada. */
+        contexto:
+          contexto && contexto.costuma.length > 0
+            ? { refeicao: contexto.refeicao, costuma: contexto.costuma.slice(0, 8) }
+            : undefined,
+      },
     })
 
     if (error) {
@@ -601,6 +636,11 @@ export async function analisarFoto(origem: 'galeria' | 'camera'): Promise<Result
         gorduras: data.gorduras ?? null,
         fibras: data.fibras ?? null,
         confianca: data.confianca ?? 'baixa',
+        /* `=== true` e nao `??`: a funcao antiga nao devolve o campo, e um
+           app novo falando com a versao anterior da funcao veria `undefined`.
+           Undefined tem de virar false -- dizer "considerei o seu habito"
+           quando nem contexto foi mandado seria inventar uma explicacao. */
+        usouContexto: data.usou_contexto === true,
       },
     }
   } catch {

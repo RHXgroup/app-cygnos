@@ -391,7 +391,20 @@ export function ContadorCaloriasScreen({
     setErro('')
     setAnalisando(true)
 
-    const r = await analisarFoto(origem)
+    /* O QUE ELA COSTUMA COMER NESTA REFEICAO vai junto com a foto.
+     *
+     * E a vantagem que nenhum concorrente pode copiar: eles adivinham do zero
+     * toda vez. Aqui o app sabe que as 12:30 ela come arroz, feijao e frango,
+     * porque ela repetiu.
+     *
+     * A trava contra a ancoragem mora na funcao do servidor: a foto e a
+     * verdade, a lista e so pista. Uma feijoada continua sendo feijoada mesmo
+     * que o habito dela seja salada -- e a tela DIZ quando o habito foi usado,
+     * para ela poder desmentir. */
+    const r = await analisarFoto(origem, {
+      refeicao,
+      costuma: frequentes.map(f => f.nome),
+    })
     setAnalisando(false)
 
     if (r.tipo === 'erro') setErro(r.mensagem)
@@ -1155,6 +1168,20 @@ function ConfirmarFoto({
 
         {/* A confiança vem da IA e é mostrada como ela respondeu. Esconder um
             "baixa" faria a pessoa tratar o chute como medida. */}
+        {/* O que foi CONSIDERADO, e nao so o que foi respondido.
+            Contexto que age escondido e erra e o pior dos dois mundos: sem ele
+            o erro e aleatorio e a pessoa desconfia; com ele o erro fica
+            plausivel, bate com o habito dela, e passa. */}
+        {estimativa.usouContexto && (
+          <View style={styles.avisoContexto}>
+            <Ionicons name="repeat" size={15} color={paleta().inkMedio} />
+            <Text style={styles.textoAvisoContexto}>
+              Considerei o que voce costuma comer neste horario. Se o prato for outro, troque
+              antes de registrar.
+            </Text>
+          </View>
+        )}
+
         {mostrada.confianca !== 'alta' && (
           <View style={styles.avisoFolha}>
             <Ionicons name="information-circle-outline" size={16} color={paleta().cores.verdeEscuro} />
@@ -1608,6 +1635,17 @@ const estilos = estilosDe(t =>
     gap: 10,
   },
   tituloPressionado: { opacity: 0.55 },
+  avisoContexto: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 14,
+    backgroundColor: t.cores.fundo,
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  textoAvisoContexto: { flex: 1, fontSize: 11.5, color: t.inkMedio, lineHeight: 16 },
   rotuloPorcao: { fontSize: 12.5, fontWeight: '700', color: t.cores.ink, marginTop: 16 },
   fracoes: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 8 },
   fracao: {
