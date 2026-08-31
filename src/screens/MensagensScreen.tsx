@@ -82,19 +82,24 @@ export function MensagensScreen({
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
-  /* ── O teclado, e uma medição TEMPORÁRIA na tela ─────────────────────────
+  /* ── A conta é teclado MAIS área segura, e as duas somam ─────────────────
    *
-   * Seis tentativas erraram aqui, cada uma partindo de uma teoria diferente
-   * sobre o que o Android faz com a janela. A foto mostrou que a barra de
-   * escrever fica FORA da tela, abaixo do teclado — ou seja, a janela não
-   * encolhe. Mas o painel do BuscarAlimentoScreen mede o teclado e funciona no
-   * mesmo aparelho, o que só fecha se a medida chegar aqui diferente.
+   * Seis tentativas erraram aqui porque eu tratava as duas como alternativas:
+   * ou o teclado, ou a barra de gestos. Uma medição na tela do aparelho mostrou
+   * a verdade:
    *
-   * Então a barra sobe a altura medida, e a tela MOSTRA os números por uma
-   * rodada. Uma foto encerra o que seis deduções não encerraram. Sai assim que
-   * a resposta chegar. */
+   *     teclado 306 · segura 48 · e faltavam exatamente 48
+   *
+   * No Android com edge-to-edge, `endCoordinates.height` devolve a altura do
+   * teclado SEM a barra de navegação que fica por baixo dele. O teclado ocupa
+   * 306, a barra ocupa 48, e o que precisa ser desviado são os 354.
+   *
+   * Com o teclado fechado sobra só a área segura, como antes.
+   *
+   * O ouvinte sempre funcionou. O que estava errado era a aritmética, e eu
+   * passei seis rodadas mexendo no COMO em vez de conferir o QUANTO. */
   const alturaTeclado = useAlturaTeclado()
-  const respiro = alturaTeclado > 0 ? alturaTeclado : bottom
+  const respiro = alturaTeclado > 0 ? alturaTeclado + bottom : bottom
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -352,12 +357,6 @@ export function MensagensScreen({
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
-          {/* TEMPORÁRIO: some na próxima alteração. */}
-          <Text style={styles.medida}>
-            teclado {Math.round(alturaTeclado)} · segura {Math.round(bottom)} · respiro{' '}
-            {Math.round(respiro)}
-          </Text>
-
           <View style={[styles.barraEnvio, { marginBottom: respiro }]}>
             <TextInput
               value={texto}
@@ -479,15 +478,6 @@ const estilos = estilosDe(t =>
     horaMinha: { color: 'rgba(255,255,255,0.75)' },
 
     erro: { paddingHorizontal: 20, paddingBottom: 6, fontSize: 12.5, color: t.cores.erroTexto },
-    /* TEMPORÁRIO, para uma foto responder o que seis deduções não responderam. */
-    medida: {
-      textAlign: 'center',
-      fontSize: 11,
-      fontWeight: '700',
-      color: t.cores.branco,
-      backgroundColor: t.cores.verdeEscuro,
-      paddingVertical: 3,
-    },
 
     /* No FLUXO da coluna, sem posicionamento nenhum. A janela encolhe com o
        teclado (adjustResize do Expo Go), então o último filho de uma coluna já

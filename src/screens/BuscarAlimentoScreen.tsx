@@ -438,9 +438,19 @@ export function BuscarAlimentoScreen({
             style={[
               styles.painel,
               {
-                bottom: alturaTeclado,
-                /* Com o teclado aberto, o respiro do gesto do iPhone fica por
-                   baixo dele — repetir a folga aqui abriria um vão à toa. */
+                /* Teclado MAIS área segura, e as duas somam.
+                 *
+                 * No Android com edge-to-edge, `endCoordinates.height` devolve a
+                 * altura do teclado SEM a barra de navegação que fica por baixo
+                 * dele. Medido no aparelho: teclado 306, barra 48, e faltavam
+                 * exatamente 48.
+                 *
+                 * Este painel subia 306 e ficava 48 por baixo do que devia.
+                 * Ninguém tinha reclamado porque ele é alto — a parte escondida
+                 * era a borda de baixo, não o campo. Achado ao caçar o mesmo
+                 * defeito na tela de conversa, onde a barra é baixa e sumia
+                 * inteira. */
+                bottom: alturaTeclado > 0 ? alturaTeclado + bottom : 0,
                 paddingBottom: alturaTeclado > 0 ? 16 : Math.max(bottom, 16),
               },
             ]}
