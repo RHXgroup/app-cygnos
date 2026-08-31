@@ -131,9 +131,31 @@ async function lerIds(chave: string): Promise<string[]> {
  *
  * Falhar em cancelar um não impede os outros: o que sobra é um aviso a mais,
  * e parar no meio deixaria a lista inteira pendurada. */
-async function cancelarDoTipo(chave: string): Promise<void> {
+async function cancelarDoTipo(chave: string, tipo?: 'refeicao' | 'agua'): Promise<void> {
   const Notifications = await notificacoes()
-  for (const id of await lerIds(chave)) {
+
+  /* Os identificadores guardados MAIS o que o sistema tiver com esta marca.
+   *
+   * A lista guardada some quando o armazenamento é apagado, e aí desligar não
+   * desligava nada: o interruptor virava "off" e o aparelho continuava
+   * avisando, sem nada no app capaz de parar. Perguntar ao sistema fecha esse
+   * buraco, e os dois caminhos juntos cobrem também os avisos agendados por
+   * versões antigas, que não tinham marca. */
+  const doSistema: string[] = []
+  if (tipo) {
+    try {
+      const agendados = await Notifications.getAllScheduledNotificationsAsync()
+      for (const a of agendados) {
+        if ((a.content?.data as { tipo?: string } | undefined)?.tipo === tipo) {
+          doSistema.push(a.identifier)
+        }
+      }
+    } catch {
+      /* Sem a lista do sistema, sobra a guardada — que é o que havia antes. */
+    }
+  }
+
+  for (const id of [...new Set([...(await lerIds(chave)), ...doSistema])]) {
     try {
       await Notifications.cancelScheduledNotificationAsync(id)
     } catch {
@@ -148,12 +170,30 @@ async function cancelarDoTipo(chave: string): Promise<void> {
   }
 }
 
-/* Limpa uma vez o que a versão anterior agendou sem identificar. Ver CHAVE_FAXINA. */
+/* Limpa uma vez o que ficou órfão. Ver CHAVE_FAXINA.
+ *
+ * ── Ela roda de novo quando o armazenamento é apagado, e isso é o certo ────
+ * No Expo Go tudo que o app guarda vive dentro dos dados do PRÓPRIO Expo Go:
+ * quando ele se atualiza, ou o Android limpa os dados dele, some a sessão e
+ * somem as preferências — inclusive a lista de quais avisos este app agendou.
+ *
+ * Os avisos, porém, NÃO somem: eles vivem no sistema Android. Sem a lista, o
+ * `cancelarDoTipo` não tem o que cancelar e os antigos continuam agendados,
+ * agora invisíveis para o app. A marca da faxina mora no mesmo armazenamento
+ * que foi apagado, então ela some junto e a limpeza roda de novo — que é
+ * exatamente o que precisa acontecer.
+ *
+ * ── E apaga também o que já foi ENTREGUE ──────────────────────────────────
+ * Cancelar agendamento não tira da gaveta de notificações o aviso que já caiu
+ * lá. Depois de perder o armazenamento, a pessoa remarcava os lembretes e via
+ * ressurgir um aviso velho — que ela leu como o app repetindo coisa antiga, e
+ * não como resíduo. `dismissAll` só alcança as notificações deste app. */
 async function faxinaUnica(): Promise<void> {
   try {
     if ((await AsyncStorage.getItem(CHAVE_FAXINA)) === '1') return
     const Notifications = await notificacoes()
     await Notifications.cancelAllScheduledNotificationsAsync()
+    await Notifications.dismissAllNotificationsAsync()
     await AsyncStorage.setItem(CHAVE_FAXINA, '1')
   } catch {
     /* Sem storage a faxina roda de novo na próxima vez. Cancelar duas vezes não
@@ -176,24 +216,61 @@ function proximaHora(horas: number[]): string | null {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-export async function lembretesLigados(): Promise<boolean> {
+/* O interruptor está ligado?
+ *
+ * ── Por que a resposta não pode sair só do armazenamento ───────────────────
+ * No Expo Go, tudo que o app guarda vive dentro dos dados do PRÓPRIO Expo Go.
+ * Quando ele se atualiza — ou o Android limpa os dados dele — some a sessão e
+ * somem as preferências. Os avisos agendados NÃO somem: eles vivem no sistema
+ * Android.
+ *
+ * O resultado, relatado por quem usa: o celular atualizou, o app deslogou, e os
+ * dois interruptores apareceram DESMARCADOS — sobre lembretes que continuavam
+ * agendados e tocando. A tela mentia e mandava remarcar o que já estava lá.
+ *
+ * Então a preferência guardada vira ATALHO, e não verdade. Um "1" é aceito de
+ * cara porque é barato. Qualquer outra coisa — "0", ou nada, que é o caso de
+ * quem perdeu o armazenamento — é conferida contra o sistema, que sabe o que
+ * está agendado de verdade.
+ *
+ * O "0" também é conferido de propósito: desligar grava "0" e cancela, mas se o
+ * cancelamento falhar no meio, o armazenamento diz desligado e o aparelho
+ * continua avisando. Conferir corrige os dois sentidos.
+ *
+ * O custo é carregar o expo-notifications, e por isso ele só é pago quando a
+ * resposta rápida diz "não" — que é raro depois do primeiro uso. */
+async function ligadoDeVerdade(chave: string, tipo: 'refeicao' | 'agua'): Promise<boolean> {
+  let guardado: string | null = null
   try {
-    return (await AsyncStorage.getItem(CHAVE_LIGADO)) === '1'
+    guardado = await AsyncStorage.getItem(chave)
   } catch {
-    /* Storage indisponível não é motivo para a tela quebrar: sem a preferência
-       lida, o estado mostrado é "desligado", que é o padrão de quem nunca
-       ligou. */
-    return false
+    /* Sem armazenamento, só resta perguntar ao sistema — que é o que vem
+       abaixo. */
+  }
+  if (guardado === '1') return true
+
+  try {
+    const Notifications = await notificacoes()
+    const agendados = await Notifications.getAllScheduledNotificationsAsync()
+    const tem = agendados.some(a => (a.content?.data as { tipo?: string } | undefined)?.tipo === tipo)
+
+    /* Reescreve o atalho, para a próxima abertura não pagar de novo. */
+    if (tem) {
+      try {
+        await AsyncStorage.setItem(chave, '1')
+      } catch {
+        /* Sem armazenamento continua funcionando, só mais devagar. */
+      }
+    }
+    return tem
+  } catch {
+    /* Módulo indisponível: fica com o que o armazenamento disse. */
+    return guardado === '1'
   }
 }
 
-export async function lembretesDeAguaLigados(): Promise<boolean> {
-  try {
-    return (await AsyncStorage.getItem(CHAVE_AGUA)) === '1'
-  } catch {
-    return false
-  }
-}
+export const lembretesLigados = () => ligadoDeVerdade(CHAVE_LIGADO, 'refeicao')
+export const lembretesDeAguaLigados = () => ligadoDeVerdade(CHAVE_AGUA, 'agua')
 
 export type ResultadoLembretes =
   /* `proximo` é 'HH:MM' e existe para a tela poder provar que funcionou.
@@ -234,7 +311,7 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
       })
     }
 
-    await cancelarDoTipo(CHAVE_IDS_REFEICOES)
+    await cancelarDoTipo(CHAVE_IDS_REFEICOES, 'refeicao')
 
     const refeicoes = plano?.refeicoes ?? []
     const ids: string[] = []
@@ -250,6 +327,11 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: r.rotulo,
+          /* Marcado com o tipo, igual ao da água. É o que permite reconhecer os
+             avisos deste app olhando o SISTEMA, sem depender de uma lista de
+             identificadores guardada no aparelho — que é justamente o que se
+             perde. Ver `ligadoDeVerdade`. */
+          data: { tipo: 'refeicao' },
           /* O corpo diz o que fazer, e não só que está na hora: "hora do
              almoço" é informação que o relógio já dá. */
           body:
@@ -282,7 +364,7 @@ export async function ligarLembretes(plano: PlanoCompleto | null): Promise<Resul
 export async function desligarLembretes(): Promise<void> {
   /* Só as refeições. Antes isto apagava tudo — e com o interruptor da água ao
      lado, desligar um calaria o outro sem avisar. */
-  await cancelarDoTipo(CHAVE_IDS_REFEICOES)
+  await cancelarDoTipo(CHAVE_IDS_REFEICOES, 'refeicao')
   try {
     await AsyncStorage.setItem(CHAVE_LIGADO, '0')
   } catch {
@@ -348,7 +430,7 @@ export async function ligarLembretesDeAgua(
       })
     }
 
-    await cancelarDoTipo(CHAVE_IDS_AGUA)
+    await cancelarDoTipo(CHAVE_IDS_AGUA, 'agua')
 
     /* Em minutos desde a meia-noite. Sem o ritmo da pessoa, o antigo de três em
        três horas — que continua valendo para quem nunca registrou uma noite. */
@@ -412,7 +494,7 @@ export async function ligarLembretesDeAgua(
 }
 
 export async function desligarLembretesDeAgua(): Promise<void> {
-  await cancelarDoTipo(CHAVE_IDS_AGUA)
+  await cancelarDoTipo(CHAVE_IDS_AGUA, 'agua')
   try {
     await AsyncStorage.setItem(CHAVE_AGUA, '0')
   } catch {
