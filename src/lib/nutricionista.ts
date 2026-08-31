@@ -164,17 +164,24 @@ export async function carregarCatalogo(): Promise<ResultadoCatalogo> {
  * a ver o ciclo dela; saindo, a autorização não pode continuar de pé esperando
  * a próxima. Dado menstrual não fica em autorização órfã.
  *
- * ── O que ela ainda não faz ────────────────────────────────────────────────
- * APAGA a linha do vínculo, em vez de marcar um fim. Com isso somem as datas do
- * acompanhamento, e o plano nunca conseguirá congelar como "prescrito por
- * Fulana, de 12/03 a 28/08, encerrado".
+ * ── O vínculo TERMINA, não some ────────────────────────────────────────────
+ * A função marca `fim` em `app_vinculos_historico`. `app_vinculos` é uma VIEW
+ * sobre essa tabela filtrando `fim is null` — por isso todo o resto do app
+ * continua enxergando só o vínculo vivo sem saber que existe histórico.
  *
- * É dívida consciente: marcar o fim obriga tudo que lê `app_vinculos` — inclusive
- * o sistema da nutricionista, que não se enxerga daqui — a filtrar `fim is null`.
- * Mudar a semântica sem ver todos os leitores faria o paciente encerrado
- * continuar aparecendo na carteira dela. Ver docs/de-quem-e-o-dado.md. */
-export async function desvincular(): Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }> {
-  const { error } = await supabase.rpc('app_desvincular_minha_nutricionista')
+ * A primeira versão desta função fazia `delete from app_vinculos`, e como view
+ * simples repassa o delete, ela apagava a linha do histórico em vez de encerrar.
+ * O `delete` na view foi revogado justamente para isso não voltar a acontecer
+ * por descuido de ninguém. */
+export async function desvincular(
+  /* O que a pessoa quis dizer, se quis dizer alguma coisa. Vazio vira null no
+     banco: campo em branco não é resposta, e guardar string vazia faria uma
+     lista de motivos cheia de nada. */
+  motivo?: string,
+): Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }> {
+  const { error } = await supabase.rpc('app_desvincular_minha_nutricionista', {
+    p_motivo: motivo?.trim() || null,
+  })
   if (error)
     return {
       tipo: 'erro',

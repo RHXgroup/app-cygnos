@@ -14,7 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
 import { Confirmacao } from '../components/Confirmacao'
@@ -291,8 +291,8 @@ export function NutricionistasScreen({
               onAbrir={setAberto}
               onAgendar={() => setAgendando(true)}
               onConversar={onConversar}
-              onDesvincular={async () => {
-                const r = await desvincular()
+              onDesvincular={async motivo => {
+                const r = await desvincular(motivo)
                 /* Relê em vez de mexer no estado daqui: quem decide se o vínculo
                    acabou é o banco, e a tela inteira muda de ramo — da ficha
                    dela para o catálogo. */
@@ -470,11 +470,12 @@ function Ficha({
   onAbrir: (chave: ChaveConteudo) => void
   onAgendar: () => void
   onConversar: () => void
-  onDesvincular: () => Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }>
+  onDesvincular: (motivo: string) => Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }>
 }) {
   const [saindo, setSaindo] = useState(false)
   const [perguntando, setPerguntando] = useState(false)
   const [erroSaida, setErroSaida] = useState('')
+  const [motivo, setMotivo] = useState('')
   const styles = estilos()
   /* Uma consulta em destaque e a contagem do resto. A ficha não é a agenda: ela
      responde "e agora?" numa linha, e quem quiser a lista inteira toca e abre a
@@ -609,15 +610,41 @@ Você pode procurar outra nutricionista depois.`}
         rotuloCancelar="Continuar acompanhada"
         destrutiva
         ocupada={saindo}
-        onCancelar={() => setPerguntando(false)}
+        onCancelar={() => {
+          setPerguntando(false)
+          setMotivo('')
+        }}
         onConfirmar={async () => {
           setSaindo(true)
-          const r = await onDesvincular()
+          const r = await onDesvincular(motivo)
           setSaindo(false)
           setPerguntando(false)
+          setMotivo('')
           if (r.tipo === 'erro') setErroSaida(r.mensagem)
         }}
-      />
+      >
+        {/* Opcional de verdade, e o rótulo diz o destino ANTES de a pessoa
+            escrever.
+         *
+         * Sem dizer que ela vai ler, o campo vira uma armadilha: quem desabafa
+         * achando que é anônimo escreve uma coisa, e descobre depois que a
+         * profissional leu. Com o destino à mostra, cada um escolhe o tom — e
+         * quem não quiser dizer nada não diz, que é o caso mais comum.
+         *
+         * Não há segunda chavinha de "mandar para ela?". Um campo opcional já É
+         * a escolha, e um motivo que ninguém lê é desabafo, não retorno. */}
+        <Text style={styles.rotuloMotivo}>Quer dizer o motivo? Ela vai poder ler.</Text>
+        <TextInput
+          value={motivo}
+          onChangeText={setMotivo}
+          placeholder="Opcional"
+          placeholderTextColor={paleta().inkFraco}
+          style={styles.campoMotivo}
+          multiline
+          maxLength={500}
+          textAlignVertical="top"
+        />
+      </Confirmacao>
 
       <Confirmacao
         visivel={!!erroSaida}
@@ -1198,6 +1225,17 @@ const estilos = estilosDe(t =>
     paddingHorizontal: 16,
   },
   botaoSairPressionado: { opacity: 0.6 },
+  rotuloMotivo: { marginTop: 4, marginBottom: 8, fontSize: 13, color: t.inkSuave },
+  campoMotivo: {
+    minHeight: 76,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: t.cores.fundo,
+    color: t.cores.ink,
+    fontSize: 14,
+    lineHeight: 19,
+    marginBottom: 4,
+  },
   textoSair: { fontSize: 13.5, fontWeight: '600', color: t.inkFraco },
   botaoConversar: {
     flexDirection: 'row',
