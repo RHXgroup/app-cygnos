@@ -467,6 +467,26 @@ positivo em `lib/interpretador.ts`.
 - `npm run contrato` — confere que toda RPC que o app chama existe no banco com
   a assinatura exata, e lista as que executam sem sessão. Precisa de rede, e por
   isso fica fora do `npm test`.
+- `npm run orfaos` — lista o que `src/lib` exporta e ninguém chama. **Órfão não
+  é erro**: exportar só para o teste é legítimo, e função nova esperando a tela
+  também. A saída é lista para olhar, não reprovação.
+
+  Existe porque **"o objeto existe" e "o caminho passa por ele" são duas
+  conferências**, e a segunda é a que pega defeito. Num dia só apareceram três
+  do mesmo formato: um canal de notificação criado e nunca posto no `trigger`
+  (a confirmação de água tocava e vibrava, que era exatamente o que o canal MIN
+  existia para evitar), uma busca de refeição no plano que nunca casava, e um
+  `useRespiroDeBaixo` que perdeu o chamador e ficou meses esperando alguém
+  importar a versão errada. Nos três o código rodava e nada falhava.
+
+  E ele **confere a si mesmo** antes de imprimir, o que não é zelo: as duas
+  primeiras versões deste script rodaram com sucesso sem conferir nada. Uma
+  tinha `\b` comido pelo heredoc do shell, virando um caractere de backspace, e
+  acusou os 400 exportados. A outra varria só `src/` e esquecia o `App.tsx`, que
+  mora na raiz e é o maior consumidor de lib do projeto — acusou de órfão o
+  ouvinte do botão de água e o do tema. Se `supabase` aparecer na lista, o
+  quebrado é o script.
+
 - `npm test` — todos os `.teste.mts` de uma vez. Um só:
   `node --experimental-strip-types src/lib/<arquivo>.teste.mts`.
 

@@ -79,15 +79,16 @@ export function useDesvioDoTeclado(areaSegura: number, alturaDaTela?: number): n
   })
 }
 
-/* O respiro de baixo que a tela precisa AGORA.
+/* Aqui morava `useRespiroDeBaixo`, e ele foi APAGADO de propósito.
  *
- * Com o teclado fechado, é a área segura — a barra de gestos do Android ou a
- * faixa do iPhone. Com o teclado aberto, é zero: o teclado já cobre a barra, e
- * somar os dois abre um vão do tamanho de um dedo entre o campo e o teclado.
+ * Ele devolvia zero com o teclado aberto, partindo de que o teclado já cobria a
+ * barra de gestos. A medição desmentiu: as duas SOMAM, e foi por isso que a
+ * conversa passou a usar `useDesvioDoTeclado`. Só que o antigo ficou aqui, sem
+ * chamador nenhum, por várias sessões.
  *
- * Errar isso nos dois sentidos já aconteceu neste app: sem a área segura, o
- * campo de escrever da conversa ficava POR BAIXO da barra de gestos e não dava
- * para tocar nele. */
-export function useRespiroDeBaixo(areaSegura: number): number {
-  return useAlturaTeclado() > 0 ? 0 : areaSegura
-}
+ * Duas funções sobre o mesmo assunto, uma delas errada, esperando alguém
+ * importar a de cima — é a armadilha 5 do AGENTS.md, que manda apagar a antiga
+ * na MESMA alteração em que a substituta entra. Ficou registrado porque quem a
+ * deixou para trás foi quem cita a armadilha.
+ *
+ * Achado por `npm run orfaos`, e não por leitura. */

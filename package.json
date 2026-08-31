@@ -34,7 +34,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "node scripts/testes.mjs",
-    "contrato": "node --env-file=.env scripts/contrato.mjs"
+    "contrato": "node --env-file=.env scripts/contrato.mjs",
+    "orfaos": "node scripts/orfaos.mjs"
   },
   "private": true
 }
