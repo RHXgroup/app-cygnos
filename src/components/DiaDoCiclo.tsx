@@ -23,6 +23,11 @@ import {
   type Humor,
 } from '../lib/ciclo'
 import { estilosDe, paleta } from '../lib/tema'
+import {
+  relacaoDoDia,
+  resumoDoDia,
+  temAlgoAnotado,
+} from '../lib/resumoDoDiaDoCiclo'
 
 /* Um dia do calendário do ciclo.
  *
@@ -173,7 +178,21 @@ export function DiaDoCiclo({
   const { top, bottom } = useSafeAreaInsets()
   const [d, setD] = useState<Dia>(() => diaVazio(data))
 
+  /* VER primeiro, EDITAR depois.
+   *
+   * Tocar num dia abria o editor, sempre. Para um dia em branco está certo —
+   * ela tocou para anotar. Para um dia já preenchido está errado: ela tocou
+   * para ver, e recebia um formulário com seis categorias de etiqueta para
+   * atravessar até achar o que ela mesma já tinha respondido.
+   *
+   * Ver é o gesto comum; editar é a exceção. */
+  const [editando, setEditando] = useState(false)
+
   useEffect(() => {
+    /* Reabrir sempre começa no resumo — mesmo que a última vez tenha terminado
+       no editor. Herdar o modo faria o painel abrir diferente conforme o que
+       ela fez ontem, e ninguém consegue prever uma tela assim. */
+    if (visivel) setEditando(false)
     if (visivel) setD(dia ?? diaVazio(data))
   }, [visivel, data, dia])
 
@@ -289,6 +308,36 @@ export function DiaDoCiclo({
               </View>
             )}
 
+            {!editando && temAlgoAnotado(dia) ? (
+              <>
+                {resumoDoDia(dia).map(l => (
+                  <View key={l.rotulo} style={styles.linhaResumo}>
+                    <Text style={styles.rotuloResumo}>{l.rotulo}</Text>
+                    <Text style={styles.valorResumo}>{l.valor}</Text>
+                  </View>
+                ))}
+
+                {/* A relação fica por último e separada. Este dado nunca sai do
+                    aparelho — a função que espelha para a nutricionista não o
+                    copia, e isso é garantido pela AUSÊNCIA de código lá. */}
+                {relacaoDoDia(dia) !== null && (
+                  <View style={styles.linhaResumo}>
+                    <Ionicons name="heart" size={14} color={paleta().cores.cicloForte} />
+                    <Text style={styles.valorResumo}>{relacaoDoDia(dia)}</Text>
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={() => setEditando(true)}
+                  style={({ pressed }) => [styles.botaoEditar, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="create-outline" size={17} color={paleta().cores.ink} />
+                  <Text style={styles.textoEditar}>Editar este dia</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
             {umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
 
             <Categoria titulo="Dor" styles={styles}>
@@ -419,6 +468,8 @@ export function DiaDoCiclo({
                 accessibilityLabel="Nota privada"
               />
             </View>
+              </>
+            )}
           </ScrollView>
         )}
       </KeyboardAvoidingView>
@@ -474,6 +525,33 @@ function Etiqueta({
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
+  /* ── O resumo do dia ──
+     Linhas de leitura, e não campos. O rótulo mais fraco que o valor: quem
+     abriu veio ver O QUE ela anotou, e não a lista de perguntas. */
+  linhaResumo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: t.cores.borda,
+  },
+  rotuloResumo: { fontSize: 12.5, color: t.inkFraco, width: 108 },
+  valorResumo: { flex: 1, fontSize: 14, fontWeight: '600', color: t.cores.ink },
+  botaoEditar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+  },
+  textoEditar: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+
   fertil: {
     flexDirection: 'row',
     alignItems: 'flex-start',

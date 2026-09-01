@@ -225,13 +225,17 @@ export function Ditado({
         accessibilityRole="button"
         accessibilityLabel="Parar de gravar"
       >
+        {/* Três blocos, e não uma linha só.
+             Ponto + "Ouvindo" + cronômetro + espaçador + "toque para parar"
+             dividiam a MESMA linha, e num telefone estreito ela espremia tudo
+             até a palavra quebrar no meio — sobrando ilegível justamente a
+             instrução de que a pessoa precisa naquele instante. */}
         <View style={styles.linhaGravando}>
           <View style={styles.ponto} />
           <Text style={styles.textoGravando}>Ouvindo</Text>
-          <Text style={styles.relogio}>{relogio(segundos)}</Text>
-          <View style={styles.empurra} />
-          <Text style={styles.toqueParaParar}>toque para parar</Text>
         </View>
+
+        <Text style={styles.relogio}>{relogio(segundos)}</Text>
 
         {/* A onda é a prova de que o microfone está captando: reta com a pessoa
             falando significa que o áudio não está entrando.
@@ -264,6 +268,11 @@ export function Ditado({
             />
           ))}
         </View>
+
+        <View style={styles.pararLinha}>
+          <Ionicons name="stop-circle" size={18} color={paleta().cores.erroTexto} />
+          <Text style={styles.toqueParaParar}>Toque para parar</Text>
+        </View>
       </Pressable>
     )
   }
@@ -276,7 +285,9 @@ export function Ditado({
         accessibilityRole="button"
         accessibilityLabel="Falar o que você comeu"
       >
-        <Ionicons name="mic-outline" size={18} color={paleta().cores.verde} />
+        <View style={styles.bolhaDoMicrofone}>
+          <Ionicons name="mic" size={19} color={paleta().cores.branco} />
+        </View>
         <Text style={styles.texto}>Falar em vez de digitar</Text>
       </Pressable>
 
@@ -302,16 +313,37 @@ export function Ditado({
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
+  /* 52 de altura e canto redondo de pílula.
+     46 num retângulo se lê como campo de formulário; o microfone é uma AÇÃO, e
+     precisa parecer um botão em que se toca. */
   botao: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    height: 46,
-    borderRadius: 14,
+    gap: 10,
+    height: 52,
+    paddingHorizontal: 16,
+    borderRadius: 26,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.cartao,
+  },
+  /* O ícone dentro de um círculo cheio, e não solto sobre o fundo. É o que
+     separa "um ícone ao lado de um texto" de um botão com identidade. */
+  bolhaDoMicrofone: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verde,
+  },
+  pararLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 10,
   },
   pressionado: { opacity: 0.7 },
   texto: { fontSize: 15, fontWeight: '700', color: t.cores.verde },
@@ -354,20 +386,24 @@ const estilos = estilosDe(t =>
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  linhaGravando: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  linhaGravando: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   ponto: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.cores.erroTexto },
   textoGravando: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
   /* Dígito de largura fixa: sem isto o "1" é mais estreito que o "8" e o
      cronômetro balança de um lado para o outro a cada segundo, empurrando o
      "toque para parar" junto. */
+  /* Grande: com o bloco reorganizado, o cronometro deixou de dividir a linha
+     com a instrucao e passou a ser a informacao principal enquanto ela fala. */
   relogio: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: t.inkMedio,
+    fontSize: 30,
+    fontWeight: '800',
+    color: t.cores.ink,
+    textAlign: 'center',
+    marginTop: 6,
     fontVariant: ['tabular-nums'],
   },
-  empurra: { flex: 1 },
-  toqueParaParar: { fontSize: 12, color: t.inkMedio },
+
+  toqueParaParar: { fontSize: 13, fontWeight: '600', color: t.inkMedio },
 
   pensando: { borderColor: t.cores.borda },
   textoPensando: { fontSize: 14, fontWeight: '600', color: t.inkSuave },

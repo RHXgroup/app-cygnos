@@ -646,7 +646,15 @@ export function ModoTreino({
 
               {/* As séries como bolinhas: quantas faltam se lê de relance, e de
                   relance é como se olha o telefone no meio de um treino. */}
+              {/* DIZ o que as bolinhas são.
+                   Elas apareciam sozinhas embaixo do exercício, e "quatro
+                   bolinhas" não é nada até alguém contar que são as séries. */}
               {exercicio?.series ? (
+                <>
+                  <Text style={styles.rotuloBolinhas}>
+                    {feitas[exercicio.id] ?? 0} de {exercicio.series}{' '}
+                    {exercicio.series === 1 ? 'série' : 'séries'}
+                  </Text>
                 <View style={styles.bolinhas}>
                   {Array.from({ length: exercicio.series }, (_, i) => (
                     <View
@@ -658,6 +666,7 @@ export function ModoTreino({
                     />
                   ))}
                 </View>
+                </>
               ) : (
                 <Text style={styles.detalhe}>
                   {feitas[exercicio?.id ?? ''] ?? 0} séries feitas
@@ -991,6 +1000,13 @@ const estilos = estilosDe(t =>
     color: t.inkMedio,
     textAlign: 'center',
     marginBottom: 10,
+  },
+  rotuloBolinhas: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: t.inkMedio,
+    textAlign: 'center',
+    marginTop: 14,
   },
   avisoPreparo: {
     fontSize: 12.5,

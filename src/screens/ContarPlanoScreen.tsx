@@ -133,7 +133,12 @@ export function ContarPlanoScreen({
            minha. Só cai na genérica quando ela não mandou nada. */
         setErro(
           r.convertida.observacao ??
-            'Não entendi nenhum plano nessa frase. Tente dizer quando é: "amanhã", "sábado".',
+            /* O que FALTA, e um exemplo inteiro.
+                A frase antiga dizia que não entendeu e mandava "dizer quando
+                é" — sem mostrar uma frase que funcione, quem não acertou de
+                primeira não tem por onde tentar de novo. */
+            'Faltou dizer QUANDO. Escreva a data junto: "amanhã eu almoço fora" ' +
+              'ou "sábado tem aniversário".',
         )
         return
       }
@@ -249,11 +254,20 @@ export function ContarPlanoScreen({
 
             {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
+            {/* Desligado enquanto não há o que ler.
+                 Ele ficava aceso com o campo vazio, e tocar nele gastava uma
+                 ida à IA para receber "não entendi" — o app cobrando da pessoa
+                 um erro que ele mesmo deixou acontecer. */}
             <Pressable
               onPress={ler}
-              disabled={pedindo}
-              style={[styles.botao, pedindo && styles.botaoOcupado]}
+              disabled={pedindo || fala.trim().length < 4}
+              style={[
+                styles.botao,
+                pedindo && styles.botaoOcupado,
+                !pedindo && fala.trim().length < 4 && styles.botaoDesligado,
+              ]}
               accessibilityRole="button"
+              accessibilityState={{ disabled: pedindo || fala.trim().length < 4 }}
             >
               {pedindo ? (
                 <ActivityIndicator color={paleta().cores.branco} />
@@ -477,6 +491,9 @@ const estilos = estilosDe(t =>
       marginTop: 12,
     },
     botaoOcupado: { opacity: 0.6 },
+    /* Cinza de verdade, e não só apagado: um botão verde que não responde ao
+       toque se lê como app travado. */
+    botaoDesligado: { backgroundColor: t.cores.trilho },
     textoBotao: { color: t.cores.branco, fontSize: 15, fontWeight: '800' },
     botaoTexto: { alignItems: 'center', paddingVertical: 12 },
     textoBotaoTexto: { color: t.inkMedio, fontSize: 14, fontWeight: '700' },
