@@ -75,6 +75,10 @@ construir nada: **o plano tem autora, e a autora vê o resultado.**
 ## A proposta, em ordem
 
 1. **A mãe vê o plano** — leitura pura, uma função nova, nenhuma escrita.
+   Mostrando o que é **estruturado** (alimento-alvo, texturas, preparações,
+   degrau), e **não** o texto livre: `objetivo_principal` e
+   `criterio_evolucao` são escritos por profissional para profissional, e
+   viram jargão na tela da mãe. O texto livre fica como nota clínica.
 2. **A mãe registra a exposição** — a escalada em sete botões, um toque e meio.
    Na quinta oferta do mesmo alimento, o app **não cobra a sexta**.
 3. **O resumo da semana, por alimento-alvo** — quantas ofertas, até que degrau,
