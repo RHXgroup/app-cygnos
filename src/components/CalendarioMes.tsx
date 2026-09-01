@@ -100,6 +100,16 @@ export function CalendarioMes({
 }) {
   const styles = estilos()
   const dias = mesDe(ano, mes, hoje)
+
+  /* O que ESTE mês tem, para a legenda só explicar o que está à vista.
+     Calculado uma vez sobre os dias do mês, e não perguntado por marca dentro
+     do laço — o laço desenha, e quem decide o que existe é isto. */
+  const doMes = dias.map(d => d.data)
+  const temMenstruada = doMes.some(x => menstruada.has(x))
+  const temPrevisto = doMes.some(x => previstos.has(x) && !menstruada.has(x))
+  const temFertil = doMes.some(x => ferteis.has(x) && !menstruada.has(x))
+  const temRelacao = doMes.some(x => comRelacao.has(x))
+  const temAnotado = doMes.some(x => anotados.has(x))
   const vazios = primeiroDiaDaSemana(ano, mes)
   const podeIrAdiante = podeAvancar(ano, mes, hoje)
 
@@ -239,6 +249,48 @@ export function CalendarioMes({
           )
         })}
       </View>
+
+      {/* A LEGENDA.
+       *
+       * O calendário tem cinco códigos visuais — faixa cheia, faixa fraca,
+       * ponto verde, coração e ponto cinza — e nenhum deles diz o que é. Quem
+       * abre pela primeira vez vê "umas bolinhas verdinhas" e tem de deduzir.
+       *
+       * Só entra o que ESTE mês tem. Uma legenda que explica cinco marcas num
+       * mês que tem duas é uma lista de coisas para procurar e não achar — e
+       * ela ocupa espaço embaixo de um calendário, que é onde o dedo está. */}
+      <View style={styles.legenda}>
+        {temMenstruada && (
+          <View style={styles.itemLegenda}>
+            <View style={[styles.amostraFaixa, styles.faixaMenstruada]} />
+            <Text style={styles.textoLegenda}>menstruação</Text>
+          </View>
+        )}
+        {temPrevisto && (
+          <View style={styles.itemLegenda}>
+            <View style={[styles.amostraFaixa, styles.faixaPrevista]} />
+            <Text style={styles.textoLegenda}>previsão</Text>
+          </View>
+        )}
+        {temFertil && (
+          <View style={styles.itemLegenda}>
+            <View style={styles.pontoFertil} />
+            <Text style={styles.textoLegenda}>janela fértil</Text>
+          </View>
+        )}
+        {temRelacao && (
+          <View style={styles.itemLegenda}>
+            <Ionicons name="heart" size={9} color={paleta().cores.cicloForte} />
+            <Text style={styles.textoLegenda}>relação</Text>
+          </View>
+        )}
+        {temAnotado && (
+          <View style={styles.itemLegenda}>
+            <View style={styles.pontoAnotado} />
+            <Text style={styles.textoLegenda}>anotação</Text>
+          </View>
+        )}
+      </View>
     </View>
   )
 }
@@ -317,5 +369,21 @@ const estilos = estilosDe(t =>
        volta do número pesava tanto quanto o dia que ela registrou. */
     pontoFertil: { width: 4, height: 4, borderRadius: 2, backgroundColor: t.cores.verde },
     pontoAnotado: { width: 4, height: 4, borderRadius: 2, backgroundColor: t.inkFraco },
+
+    legenda: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 12,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: t.cores.borda,
+    },
+    itemLegenda: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    /* Um retângulo pequeno da MESMA cor da faixa do calendário. Um círculo
+       aqui e uma faixa lá seriam duas formas para a mesma coisa, e a pessoa
+       teria de fazer a ligação sozinha. */
+    amostraFaixa: { width: 14, height: 9, borderRadius: 3 },
+    textoLegenda: { fontSize: 11, color: t.inkMedio },
   }),
 )
