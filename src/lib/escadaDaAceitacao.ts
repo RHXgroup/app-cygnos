@@ -48,12 +48,19 @@ export type Degrau = {
      chegar perto → mexer → cheirar → tocar → provar → comer é a ordem real da
      aproximação, e é o que uma criança de cinco anos lê sozinha.
    *
-   * `recusa` NÃO é um sentido, e por isso tem valor próprio. A primeira versão
+   * A recusa NÃO é um sentido, e por isso tem valor próprio. A primeira versão
    * deste arquivo deu 'olhar' à recusa, o que confundia dois estados
    * diferentes: recusar é o nível ZERO da Escalada — a criança não fez nada —,
    * enquanto ver o alimento e suportá-lo por perto já é Tolerar. Tratar os dois
-   * como o mesmo degrau infla o progresso de quem só recusou. */
-  sentido: 'recusa' | 'perto' | 'mao' | 'cheiro' | 'toque' | 'boca' | 'comer'
+   * como o mesmo degrau infla o progresso de quem só recusou.
+   *
+   * E o valor chama-se `virouORosto`, e não `recusa`, DE PROPÓSITO. Quando ele
+   * se chamava `recusa`, alguém revisando confundiu-o com a `chave` — que é
+   * `'recusou'` e vai ao banco — e apontou uma divergência de grafia que não
+   * existia. O alarme foi falso, mas o convite ao erro era real: dois campos
+   * parecidos lado a lado, um que o banco lê e outro que não. Um nome que
+   * nenhuma coluna teria desfaz a confusão sem precisar de comentário. */
+  sentido: 'virouORosto' | 'perto' | 'mao' | 'cheiro' | 'toque' | 'boca' | 'bocaCheia'
 }
 
 /* ── A correspondência com a Escalada Alimentar do sistema ─────────────────
@@ -90,7 +97,7 @@ export const DEGRAUS: Degrau[] = [
     paraMae: 'Não quis agora',
     cena: 'Virou o rosto, empurrou o prato',
     paraFilho: 'Hoje não deu vontade',
-    sentido: 'recusa',
+    sentido: 'virouORosto',
   },
   {
     chave: 'tolerar',
@@ -138,7 +145,7 @@ export const DEGRAUS: Degrau[] = [
     paraMae: 'Comeu',
     cena: 'Mastigou e engoliu',
     paraFilho: 'Comi!',
-    sentido: 'comer',
+    sentido: 'bocaCheia',
   },
 ]
 

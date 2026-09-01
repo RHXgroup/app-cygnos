@@ -7,6 +7,7 @@ import {
   fraseDoRegistro,
   porMes,
   proximoDegrau,
+  REACOES,
   reacaoDoBanco,
   resumoDoAlimento,
   type Registro,
@@ -56,6 +57,35 @@ console.log('\nescadaDaAceitacao\n')
     'todo degrau fala com a mãe e com a criança',
     DEGRAUS.every(d => d.paraMae && d.cena && d.paraFilho),
   )
+}
+
+/* ── Os valores EXATOS que o banco espera ─────────────────────────────────
+ *
+ * Este bloco existe por causa de um quase-erro. Numa revisão, a sessão do
+ * sistema apontou que o app usaria `'recusa'` onde a coluna `aceitacao` guarda
+ * `'recusou'`. Era falso alarme — a `chave` sempre esteve certa, e o que ela
+ * viu era o campo de desenho —, mas o alerta estava bem colocado: divergência
+ * de grafia entre app e banco **passa no teste de unidade e falha no insert**,
+ * em produção, no aparelho de alguém.
+ *
+ * Então os nomes ficam escritos aqui, à mão, um por um. Não derivados de
+ * DEGRAUS: derivar do próprio código sob teste não prova nada — provaria que a
+ * lista é igual a si mesma. Estes são os nomes das categorias da Escalada
+ * Alimentar do sistema, e se alguém renomear um degrau, isto quebra. */
+{
+  const NO_BANCO = ['recusou', 'tolerar', 'interagir', 'cheirar', 'tocar', 'provar', 'comer']
+  ok('as chaves são exatamente as do banco', DEGRAUS.map(d => d.chave).join(',') === NO_BANCO.join(','),
+     DEGRAUS.map(d => d.chave).join(','))
+
+  const NA_REACAO = ['positiva', 'neutra', 'negativa']
+  ok('e as reações também', REACOES.map(r => r.noBanco).join(',') === NA_REACAO.join(','),
+     REACOES.map(r => r.noBanco).join(','))
+
+  /* O campo de desenho não pode parecer valor de banco — foi o que confundiu o
+     revisor. Nenhum `sentido` pode coincidir com uma chave. */
+  const chaves = new Set(DEGRAUS.map(d => String(d.chave)))
+  const colisao = DEGRAUS.filter(d => chaves.has(String(d.sentido))).map(d => d.sentido)
+  ok('nenhum sentido se confunde com uma chave', colisao.length === 0, colisao.join(','))
 }
 
 /* ── Valor do banco não indexa direto ──────────────────────────────────────
