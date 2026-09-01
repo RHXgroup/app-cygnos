@@ -18,6 +18,11 @@ import { falha, mensagemDoBanco } from './erros'
  * decide de quem é a mensagem — se `de` viesse do cliente, um lado poderia
  * escrever se passando pelo outro. */
 
+/* 'foto' ou 'audio'. O app precisa saber ANTES de baixar — imagem se desenha,
+   áudio se toca —, e descobrir pela extensão do caminho quebraria no dia em que
+   o formato mudar. */
+export type TipoDeAnexo = 'foto' | 'audio'
+
 export type Mensagem = {
   id: number
   /* 'paciente' ou 'nutricionista'. Texto cru: o app não decide isto, o banco
@@ -26,6 +31,13 @@ export type Mensagem = {
   texto: string
   criadaEm: string
   lidaEm: string | null
+  /* O CAMINHO no bucket privado, e não o endereço.
+   *
+   * Endereço assinado vence em uma hora, e guardar um aqui faria o anexo
+   * quebrar depois do almoço numa tela que fica aberta (item 7). Quem
+   * transforma em endereço é `fotoDoDiario`, na hora de desenhar. */
+  anexoPath: string | null
+  anexoTipo: TipoDeAnexo | null
 }
 
 export type ResultadoMensagens =
@@ -38,6 +50,8 @@ type Linha = {
   texto: string
   criada_em: string
   lida_em: string | null
+  anexo_path?: string | null
+  anexo_tipo?: string | null
 }
 
 const daLinha = (l: Linha): Mensagem => ({
@@ -46,6 +60,12 @@ const daLinha = (l: Linha): Mensagem => ({
   texto: l.texto,
   criadaEm: l.criada_em,
   lidaEm: l.lida_em,
+  anexoPath: l.anexo_path ?? null,
+  /* Tipo desconhecido vira nulo, e não é indexado num `Record` (item 10): um
+     valor novo na coluna derrubaria a conversa inteira, e conversa é a tela em
+     que a pessoa está esperando resposta de gente. Sem tipo, o anexo
+     simplesmente não desenha — o texto continua lá. */
+  anexoTipo: l.anexo_tipo === 'foto' || l.anexo_tipo === 'audio' ? l.anexo_tipo : null,
 })
 
 export const ehMinha = (m: Mensagem) => m.de === 'paciente'
@@ -55,7 +75,7 @@ export const ehMinha = (m: Mensagem) => m.de === 'paciente'
 export async function carregarMensagens(): Promise<ResultadoMensagens> {
   const { data, error } = await supabase
     .from('app_mensagens')
-    .select('id, de, texto, criada_em, lida_em')
+    .select('id, de, texto, criada_em, lida_em, anexo_path, anexo_tipo')
     .order('criada_em', { ascending: true })
 
   if (error)
@@ -95,8 +115,25 @@ export type ResultadoEnvio = { tipo: 'ok' } | { tipo: 'erro'; mensagem: string }
 /* Falha aqui devolve a frase do BANCO. Ele escreve em português para alguém ler
    — "Você ainda não tem uma nutricionista para conversar." —, e traduzir isso
    seria perder o motivo. Mesma exceção de lib/agenda.ts. */
-export async function enviarMensagem(texto: string): Promise<ResultadoEnvio> {
-  const { error } = await supabase.rpc('app_enviar_mensagem', { p_texto: texto })
+/* O anexo vai JUNTO com o texto, na mesma mensagem.
+ *
+ * Duas mensagens — uma com a foto e outra com a legenda — chegariam separadas do
+ * lado dela, e às vezes fora de ordem. E não há como mandar só o caminho depois:
+ * o servidor confere que ele começa na pasta de quem envia, e essa conferência
+ * tem de acontecer no mesmo momento em que a linha nasce.
+ *
+ * Texto vazio deixou de ser erro quando há anexo: uma foto sem legenda é uma
+ * mensagem inteira, e exigir texto obrigaria a pessoa a escrever "olha" para
+ * poder mandar o prato. */
+export async function enviarMensagem(
+  texto: string,
+  anexo?: { path: string; tipo: TipoDeAnexo } | null,
+): Promise<ResultadoEnvio> {
+  const { error } = await supabase.rpc('app_enviar_mensagem', {
+    p_texto: texto,
+    p_anexo_path: anexo?.path ?? null,
+    p_anexo_tipo: anexo?.tipo ?? null,
+  })
   if (error)
     return {
       tipo: 'erro',

@@ -700,6 +700,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         {mensagensAbertas && (
           <Sobreposta>
             <MensagensScreen
+              contaId={sessao.user.id}
               onFechar={() => setMensagensAbertas(false)}
               onAbrirNutricionistas={() => {
                 setMensagensAbertas(false)

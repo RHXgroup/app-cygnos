@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Image,
   AppState,
   Linking,
   Pressable,
@@ -28,8 +29,15 @@ import {
   marcarLidas,
   ouvirMensagens,
   type Mensagem,
+  type TipoDeAnexo,
 } from '../lib/mensagens'
 import { horaCurta, rotuloDoDia } from '../lib/formatar'
+import {
+  apagarFotoDoDiario,
+  enderecoDaFoto,
+  escolherFoto,
+  guardarFotoDoDiario,
+} from '../lib/fotoDoDiario'
 import { comoElaResponde } from '../lib/ritmoDaConversa'
 import { estilosDe, paleta } from '../lib/tema'
 import { useDesvioDoTeclado } from '../lib/teclado'
@@ -51,6 +59,7 @@ import { useDesvioDoTeclado } from '../lib/teclado'
  * volta não é conversa. Esta tem realtime — e mantém a releitura do segundo
  * plano como rede, para o caso de a inscrição ter caído sem avisar. */
 export function MensagensScreen({
+  contaId,
   onFechar,
   onAbrirNutricionistas,
   visivel,
@@ -58,6 +67,9 @@ export function MensagensScreen({
   onLeu,
   onChegou,
 }: {
+  /* Para subir o anexo: o caminho no bucket começa com a pasta da conta, e é
+     ela que o servidor confere ao receber a mensagem. */
+  contaId: string
   /* Existe desde que Mensagens deixou de ser aba e virou tela aberta por cima.
      Como aba ela não precisava fechar — a barra levava embora. */
   onFechar: () => void
@@ -110,6 +122,13 @@ export function MensagensScreen({
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [carregando, setCarregando] = useState(true)
   const [texto, setTexto] = useState('')
+  /* O anexo escolhido, ainda não enviado.
+   *
+   * Ele sobe para o bucket ANTES do envio — precisa de um caminho para o
+   * servidor conferir —, mas a mensagem só nasce quando ela toca em enviar.
+   * Assim ela vê o que escolheu, escreve a legenda, e pode trocar de ideia. */
+  const [anexo, setAnexo] = useState<{ path: string; tipo: TipoDeAnexo } | null>(null)
+  const [subindoAnexo, setSubindoAnexo] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
   /* Separado do erro de enviar: um é sobre a mensagem que não saiu, o outro
@@ -212,11 +231,13 @@ export function MensagensScreen({
 
   async function enviar() {
     const limpo = texto.trim()
-    if (!limpo || enviando) return
+    /* Foto sem legenda é mensagem inteira: exigir texto obrigaria a pessoa a
+       escrever "olha" para poder mandar o prato. */
+    if ((!limpo && !anexo) || enviando) return
 
     setEnviando(true)
     setErro('')
-    const r = await enviarMensagem(limpo)
+    const r = await enviarMensagem(limpo, anexo)
     setEnviando(false)
 
     if (r.tipo === 'erro') {
@@ -228,8 +249,48 @@ export function MensagensScreen({
        horário vêm do banco, e uma linha montada na mão apareceria com hora do
        aparelho e id inventado — que some e reaparece na próxima leitura. */
     setTexto('')
+    setAnexo(null)
     const msgs = await carregarMensagens()
     if (msgs.tipo === 'ok') setMensagens(msgs.mensagens)
+  }
+
+  /* A foto sobe primeiro, e a mensagem depois.
+   *
+   * O servidor confere que o caminho começa na pasta de quem envia — sem isso,
+   * alguém chamando a função direto apontaria a mensagem para o arquivo de
+   * outra conta e faria a própria nutricionista abrir a foto de um terceiro. E
+   * essa conferência tem de acontecer no mesmo momento em que a linha nasce,
+   * então o caminho já precisa existir antes do envio.
+   *
+   * Falhar em subir não bloqueia a conversa: ela continua podendo escrever. */
+  async function anexarFoto(origem: 'camera' | 'galeria') {
+    const escolha = await escolherFoto(origem)
+    if (escolha.tipo === 'cancelado') return
+    if (escolha.tipo === 'erro') {
+      setErro(escolha.mensagem)
+      return
+    }
+
+    setSubindoAnexo(true)
+    setErro('')
+    const caminho = await guardarFotoDoDiario(contaId, escolha.base64)
+    setSubindoAnexo(false)
+
+    if (!caminho) {
+      setErro('Não consegui preparar a foto agora. Você pode escrever e tentar de novo depois.')
+      return
+    }
+    setAnexo({ path: caminho, tipo: 'foto' })
+  }
+
+  /* Descartar antes de enviar TIRA do servidor.
+   *
+   * O arquivo já subiu; sem isto, escolher e desistir deixaria uma foto órfã no
+   * bucket para sempre — e ninguém vai procurá-la depois. */
+  function descartarAnexo() {
+    const antigo = anexo
+    setAnexo(null)
+    if (antigo) void apagarFotoDoDiario(antigo.path)
   }
 
   const whatsapp = nutri?.telefone ? linkDoWhatsapp(nutri.telefone) : null
@@ -397,7 +458,40 @@ export function MensagensScreen({
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
+          {/* A PRÉVIA do que vai junto.
+              Sem ela, a pessoa escolhe a foto, vê a tela voltar igual, e não
+              sabe se pegou — e manda a mesma foto três vezes. */}
+          {anexo && (
+            <View style={styles.previaAnexo}>
+              <Ionicons name="image" size={16} color={paleta().cores.verde} />
+              <Text style={styles.textoPrevia}>Foto pronta para enviar</Text>
+              <Pressable
+                onPress={descartarAnexo}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Tirar a foto da mensagem"
+              >
+                <Ionicons name="close" size={17} color={paleta().inkFraco} />
+              </Pressable>
+            </View>
+          )}
+
           <View style={[styles.barraEnvio, { marginBottom: respiro }]}>
+            <Pressable
+              onPress={() => anexarFoto('camera')}
+              onLongPress={() => anexarFoto('galeria')}
+              disabled={subindoAnexo || enviando}
+              style={({ pressed }) => [styles.botaoClipe, pressed && { opacity: 0.6 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Mandar uma foto. Segure para escolher da galeria."
+            >
+              {subindoAnexo ? (
+                <ActivityIndicator size="small" color={paleta().cores.verde} />
+              ) : (
+                <Ionicons name="camera-outline" size={21} color={paleta().cores.verde} />
+              )}
+            </Pressable>
+
             <TextInput
               value={texto}
               onChangeText={setTexto}
@@ -411,10 +505,10 @@ export function MensagensScreen({
             />
             <Pressable
               onPress={enviar}
-              disabled={!texto.trim() || enviando}
+              disabled={(!texto.trim() && !anexo) || enviando}
               style={({ pressed }) => [
                 styles.botaoEnviar,
-                (!texto.trim() || enviando) && styles.botaoEnviarApagado,
+                (!texto.trim() && !anexo) || enviando ? styles.botaoEnviarApagado : null,
                 pressed && styles.botaoZapPressionado,
               ]}
               accessibilityRole="button"
@@ -451,10 +545,53 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
   const styles = estilos()
   const minha = ehMinha(mensagem)
 
+  /* O ENDEREÇO é estado, e não conta no render.
+   *
+   * O bucket é privado: `getPublicUrl` devolveria um endereço com cara de
+   * válido que o servidor recusa, sem erro nenhum do lado do app (item 7).
+   * Assinar é `async`.
+   *
+   * E o endereço VENCE em uma hora. Numa conversa que fica aberta, isso é o
+   * caso comum — por isso o `onError` guarda QUAL endereço falhou, e não um
+   * booleano: um endereço novo entra tentando de novo. */
+  const [endereco, setEndereco] = useState<string | null>(null)
+  const [falhou, setFalhou] = useState<string | null>(null)
+
+  useEffect(() => {
+    let vivo = true
+    if (!mensagem.anexoPath) {
+      setEndereco(null)
+      return
+    }
+    void enderecoDaFoto(mensagem.anexoPath).then(u => {
+      if (vivo) setEndereco(u)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [mensagem.anexoPath])
+
   return (
     <View style={[styles.linhaBalao, minha && styles.linhaBalaoMinha]}>
       <View style={[styles.balao, minha ? styles.balaoMeu : styles.balaoDela]}>
-        <Text style={[styles.textoBalao, minha && styles.textoBalaoMeu]}>{mensagem.texto}</Text>
+        {/* A FOTO vem antes do texto, porque é a legenda que explica a imagem e
+            não o contrário. Sem endereço — ainda assinando, ou falhou — o balão
+            desenha só o texto: uma imagem que não carrega deixa um buraco do
+            tamanho dela, e isso se lê como app quebrado. */}
+        {mensagem.anexoTipo === 'foto' && endereco && endereco !== falhou && (
+          <Image
+            source={{ uri: endereco }}
+            style={styles.fotoDoBalao}
+            onError={() => setFalhou(endereco)}
+            accessibilityLabel={minha ? 'Foto que você mandou' : 'Foto que ela mandou'}
+          />
+        )}
+
+        {/* Texto vazio não desenha linha: foto sem legenda é mensagem inteira, e
+            um `<Text>` vazio deixaria um vão embaixo da imagem. */}
+        {!!mensagem.texto.trim() && (
+          <Text style={[styles.textoBalao, minha && styles.textoBalaoMeu]}>{mensagem.texto}</Text>
+        )}
         <View style={styles.rodapeBalao}>
           <Text style={[styles.hora, minha && styles.horaMinha]}>
             {horaCurta(new Date(mensagem.criadaEm))}
@@ -572,7 +709,35 @@ const estilos = estilosDe(t =>
     /* No FLUXO da coluna, sem posicionamento nenhum. A janela encolhe com o
        teclado (adjustResize do Expo Go), então o último filho de uma coluna já
        é o que fica logo acima dele. */
-    barraEnvio: {
+    /* Largura cheia do balão e altura fixa: proporção livre faria cada foto
+     mudar a altura da conversa enquanto ela carrega, e a lista pularia sob o
+     dedo de quem está rolando. */
+  fotoDoBalao: {
+    width: '100%',
+    height: 170,
+    borderRadius: 12,
+    marginBottom: 6,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+  },
+  previaAnexo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: t.cores.verdeMenta,
+  },
+  textoPrevia: { flex: 1, fontSize: 12.5, fontWeight: '600', color: t.cores.verdeEscuro },
+  botaoClipe: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barraEnvio: {
       flexDirection: 'row',
       alignItems: 'flex-end',
       gap: 8,
