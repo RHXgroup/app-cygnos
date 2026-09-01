@@ -79,9 +79,11 @@ type Fase = 'parado' | 'preparando' | 'treinando' | 'descansando'
  * chão e anda até a barra — e o cronômetro que começava no toque contava essa
  * caminhada como parte da série.
  *
- * Cinco: dá para largar o telefone e se posicionar, e é curto o bastante para
- * não virar espera. */
-const SEGUNDOS_DE_PREPARO = 5
+ * Sete, e não cinco: o aviso falado ("Acabou o descanso") come mais de um
+ * segundo do começo, e a contagem só entra aos três. Com cinco, sobrava um
+ * silêncio curto demais entre o aviso e o "três" — e era ali que a fala
+ * atropelava. */
+const SEGUNDOS_DE_PREPARO = 7
 
 /* A voz.
  *
@@ -143,6 +145,16 @@ async function acharVoz() {
  * lendo uma notificação. */
 function falar(texto: string) {
   try {
+    /* PARA o que estiver falando antes de falar de novo.
+     *
+     * Sem isto as falas EMPILHAM: "Acabou o descanso" leva mais de um segundo,
+     * e o "três" entra na fila atrás dela em vez de tocar na hora. A contagem
+     * atrasa, o "um" e o "Vai" chegam depois de a série já ter começado — e foi
+     * exatamente o que apareceu no teste: ele falava "três, dois" e quebrava.
+     *
+     * O mais novo sempre vence, porque numa contagem o número velho não
+     * interessa mais. */
+    Speech.stop()
     Speech.speak(texto, {
       language: 'pt-BR',
       voice: vozEscolhida,
@@ -472,7 +484,9 @@ export function ModoTreino({
     setFimDoDescanso(null)
     /* Não cai direto na série: a pessoa está sentada, e ainda tem de levantar e
        chegar na barra. A voz avisa e conta os últimos três. */
-    prepararSerie('Acabou o descanso')
+    /* Curto de propósito: quanto mais longo o aviso, mais perto ele chega do
+       "três" — e é a colisão dos dois que quebrava a contagem. */
+    prepararSerie('Descanso acabou')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agora, fase, fimDoDescanso])
 
