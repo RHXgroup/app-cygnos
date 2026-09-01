@@ -391,6 +391,10 @@ export function ModoTreino({
        aparelho. Descansar aqui prenderia ela olhando o telefone à toa. */
     if (acabou && indice < exercicios.length - 1) {
       setIndice(i => i + 1)
+      /* O exercício novo começa PARADO, esperando o "Iniciar a série".
+         Continuar contando daria a este exercício o tempo da caminhada até o
+         outro aparelho, que não é série de ninguém. */
+      setInicioDaSerie(null)
       return
     }
     if (acabou) return
@@ -602,8 +606,8 @@ export function ModoTreino({
                       e um zero parado ali seria um cronômetro quebrado. */}
                   {segundosDaSerie !== null && (
                     <Text style={styles.tempoDaSerie}>
-                      {Math.floor(segundosDaSerie / 60)}:
-                      {String(segundosDaSerie % 60).padStart(2, '0')} nesta série
+                      Fazendo a série · {Math.floor(segundosDaSerie / 60)}:
+                      {String(segundosDaSerie % 60).padStart(2, '0')}
                     </Text>
                   )}
 
@@ -636,14 +640,41 @@ export function ModoTreino({
                     </Pressable>
                   </View>
 
-                  <Pressable
-                    onPress={fizASerie}
-                    style={({ pressed }) => [styles.botaoGrande, pressed && styles.pressionado]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Fiz a série"
-                  >
-                    <Text style={styles.textoBotaoGrande}>Fiz a série</Text>
-                  </Pressable>
+                  {/* DOIS estados, e não um.
+                   *
+                   * Só existia "Fiz a série", e o cronômetro tinha de começar
+                   * sozinho — o que funciona depois do descanso, e não na
+                   * PRIMEIRA série nem ao trocar de exercício, porque ali não
+                   * houve descanso nenhum antes. Nesses dois momentos a pessoa
+                   * ficava olhando um botão que só sabia terminar uma série que
+                   * nunca tinha começado.
+                   *
+                   * Agora: "Iniciar a série" quando está parada, "Terminei a
+                   * série" enquanto corre. Depois do descanso ele já entra
+                   * correndo, que é o que ela pediu — quem acabou de descansar
+                   * está indo para a barra, e um toque a mais ali é um toque
+                   * com o peso na mão. */}
+                  {inicioDaSerie === null ? (
+                    <Pressable
+                      onPress={() => setInicioDaSerie(Date.now())}
+                      style={({ pressed }) => [styles.botaoGrande, pressed && styles.pressionado]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Iniciar a série"
+                    >
+                      <Ionicons name="play" size={19} color={paleta().cores.branco} />
+                      <Text style={styles.textoBotaoGrande}>Iniciar a série</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={fizASerie}
+                      style={({ pressed }) => [styles.botaoGrande, pressed && styles.pressionado]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Terminei a série"
+                    >
+                      <Ionicons name="checkmark" size={20} color={paleta().cores.branco} />
+                      <Text style={styles.textoBotaoGrande}>Terminei a série</Text>
+                    </Pressable>
+                  )}
 
                   <View style={styles.linhaNavegar}>
                     <Pressable
@@ -858,6 +889,8 @@ const estilos = estilosDe(t =>
     descansoAtual: { fontSize: 12.5, color: t.inkFraco },
 
     botaoGrande: {
+    flexDirection: 'row',
+    gap: 9,
       alignSelf: 'stretch',
       backgroundColor: t.cores.verde,
       borderRadius: 18,
