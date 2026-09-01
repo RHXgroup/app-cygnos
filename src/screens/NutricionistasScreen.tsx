@@ -447,6 +447,28 @@ function PainelDePedido({
           outras — e nada muda no seu app até alguém aceitar.
         </Text>
 
+        {/* O que acontece com os DADOS, dito antes de o pedido sair.
+          *
+          * Faltava, e a falta era dos dois lados. Do lado de quem usa: a pessoa
+          * entregava peso, refeição e sono a uma estranha sem que a tela
+          * dissesse isso em lugar nenhum — o aviso acima fala só do pedido, e
+          * quem lê entende "ela me responde", não "ela vê o meu diário".
+          *
+          * Do lado da loja: o Google só aceita não declarar isso como
+          * compartilhamento com terceiro quando a transferência parte de uma
+          * AÇÃO da pessoa e ela foi avisada na hora. A ação existia; o aviso,
+          * não. Ver docs/seguranca-dos-dados-play.md.
+          *
+          * O ciclo é citado porque ele é a exceção, e omitir a exceção seria
+          * prometer a mais: ele tem interruptor próprio, nasce desligado, e
+          * continua desligado depois do vínculo. Quem lê "ela vê o que você
+          * registra" sem essa frase pode concluir que já está vendo. */}
+        <Text style={styles.avisoDados}>
+          Se ela aceitar, passa a acompanhar o que você registra aqui — peso, refeições, água, sono
+          e treinos. O ciclo menstrual fica de fora: ele só é compartilhado se você ligar isso na
+          tela dele. Você encerra o acompanhamento quando quiser, sem precisar dar motivo.
+        </Text>
+
         {!!erro && <Text style={styles.erroPedido}>{erro}</Text>}
       </ScrollView>
 
@@ -1330,6 +1352,18 @@ const estilos = estilosDe(t =>
     lineHeight: 20,
   },
   avisoPedido: { marginTop: 14, fontSize: 12.5, lineHeight: 18, color: t.inkFraco },
+  /* Um pouco mais forte que o aviso de cima, e não menor: é a única linha da
+     tela que diz o que a pessoa está entregando, e letra miúda de rodapé é
+     exatamente o formato que se aprende a não ler. */
+  avisoDados: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: t.cores.borda,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: t.inkMedio,
+  },
   erroPedido: { marginTop: 12, fontSize: 13, lineHeight: 19, color: t.cores.erroTexto },
   botaoPedir: {
     marginHorizontal: 20,
