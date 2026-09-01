@@ -155,6 +155,15 @@ export function ContadorCaloriasScreen({
   /* A estimativa esperando confirmação. Nada é gravado antes de a pessoa ver o
      número — a IA erra, e um item errado no diário estraga o total do dia. */
   const [estimativa, setEstimativa] = useState<Estimativa | null>(null)
+  /* As linhas da foto moram AQUI, e não dentro da folha.
+   *
+   * Porque trocar um item abre a busca de alimentos, que é uma tela inteira por
+   * cima — e a folha desmontaria junto, levando as escolhas dela. Com o estado
+   * aqui, a pessoa volta da busca e encontra tudo como deixou, com um item a
+   * menos de erro. */
+  const [linhasDaFoto, setLinhasDaFoto] = useState<LinhaEscolhida[]>([])
+  /* Qual item está sendo trocado. Nulo quando ninguém está trocando nada. */
+  const [trocandoItem, setTrocandoItem] = useState<number | null>(null)
   /* A imagem que gerou a estimativa, guardada ate ela confirmar.
    *
    * So sobe DEPOIS do Registrar: subir antes encheria o bucket de foto que a
@@ -489,6 +498,7 @@ export function ContadorCaloriasScreen({
     if (r.tipo === 'erro') setErro(r.mensagem)
     else if (r.tipo === 'ok') {
       setEstimativa(r.estimativa)
+      setLinhasDaFoto(linhasIniciais(r.estimativa))
       setFotoEmBase64(r.base64)
     }
     /* 'cancelado' não é erro: a pessoa desistiu da foto e a tela fica como
@@ -669,6 +679,48 @@ export function ContadorCaloriasScreen({
         refeicao={refeicao}
         onFechar={() => setPorta(null)}
         onAdicionar={novos => gravar(novos.map(a => doAlimento(a, refeicao)))}
+      />
+    )
+  }
+
+  /* TROCAR um item da foto.
+   *
+   * A IA acerta o arroz e a batata e erra o prato principal — leu um filé à
+   * parmegiana como "frango assado, coxa e sobrecoxa". Sem esta saída, a pessoa
+   * só podia APAGAR o item e perder também o peso e as calorias que ela teria
+   * de digitar de novo.
+   *
+   * A busca devolve o alimento de TABELA, com número de verdade: o que entra no
+   * lugar deixa de ser estimativa e passa a ser medida. */
+  if (trocandoItem !== null) {
+    return (
+      <BuscarAlimentoScreen
+        refeicao={refeicao}
+        motivo="consumo"
+        onAdicionar={a => {
+          const indice = trocandoItem
+          setTrocandoItem(null)
+          setLinhasDaFoto(atuais =>
+            atuais.map((l, i) =>
+              i === indice
+                ? {
+                    /* Volta inteiro e sem correção: o número novo veio de
+                       tabela, e a fração que ela tinha escolhido era sobre a
+                       porção que a IA chutou — aplicá-la aqui reescalaria uma
+                       medida boa por causa de um chute que saiu. */
+                    item: {
+                      nome: a.nome,
+                      porcaoEstimada: a.descricao,
+                      ...absolutos(a),
+                    },
+                    fator: 1,
+                    dentro: true,
+                  }
+                : l,
+            ),
+          )
+        }}
+        onFechar={() => setTrocandoItem(null)}
       />
     )
   }
@@ -913,6 +965,9 @@ export function ContadorCaloriasScreen({
       {estimativa && (
         <ConfirmarFoto
           estimativa={estimativa}
+          linhas={linhasDaFoto}
+          onLinhas={setLinhasDaFoto}
+          onTrocar={setTrocandoItem}
           refeicao={refeicao}
           onDescartar={() => {
             setEstimativa(null)
@@ -1330,11 +1385,19 @@ function LinhaItem({
  * modelo, e vira o viés que calibra a próxima foto. Ver `paraGravar`. */
 function ConfirmarFoto({
   estimativa,
+  linhas,
+  onLinhas,
+  onTrocar,
   refeicao,
   onRegistrar,
   onDescartar,
 }: {
   estimativa: Estimativa
+  /* Controlada de fora: trocar um item abre a busca por cima, a folha desmonta,
+     e sem isto ela voltaria zerada. */
+  linhas: LinhaEscolhida[]
+  onLinhas: (linhas: LinhaEscolhida[]) => void
+  onTrocar: (indice: number) => void
   refeicao: string
   /* Recebe as LINHAS, e não os itens já prontos: quem monta o que vai para o
      banco é `paraGravar`, num lugar só. A folha decide o que a pessoa escolheu;
@@ -1349,10 +1412,8 @@ function ConfirmarFoto({
   /* Todos entram marcados, e inteiros. É o caminho comum — a pessoa fotografou
      o que comeu — e obrigá-la a marcar item por item cobraria seis toques de
      quem não tinha nada a corrigir. */
-  const [linhas, setLinhas] = useState<LinhaEscolhida[]>(() => linhasIniciais(estimativa))
-
   const mexer = (indice: number, muda: (l: LinhaEscolhida) => LinhaEscolhida) =>
-    setLinhas(atuais => atuais.map((l, i) => (i === indice ? muda(l) : l)))
+    onLinhas(linhas.map((l, i) => (i === indice ? muda(l) : l)))
 
   const dentro = linhas.filter(l => l.dentro)
   const totais = totaisDaFoto(dentro.map(l => comFator(l.item, l.fator)))
@@ -1385,6 +1446,7 @@ function ConfirmarFoto({
               linha={l}
               onFracao={fator => mexer(i, x => ({ ...x, fator }))}
               onAlternar={() => mexer(i, x => ({ ...x, dentro: !x.dentro }))}
+              onTrocar={() => onTrocar(i)}
             />
           ))}
         </ScrollView>
@@ -1493,10 +1555,13 @@ function LinhaDaFoto({
   linha,
   onFracao,
   onAlternar,
+  onTrocar,
 }: {
   linha: LinhaEscolhida
   onFracao: (fator: number) => void
   onAlternar: () => void
+  /* Abre a busca para pôr outro alimento no lugar deste. */
+  onTrocar: () => void
 }) {
   const styles = estilos()
   const t = paleta()
@@ -1505,16 +1570,28 @@ function LinhaDaFoto({
   return (
     <View style={[styles.itemDaFoto, !linha.dentro && styles.itemDaFotoFora]}>
       <View style={styles.linhaTopoItem}>
-        <View style={styles.textosDoItem}>
-          <Text style={styles.nomeDoItem} numberOfLines={2}>
-            {mostrado.nome}
-          </Text>
+        <Pressable
+          style={styles.textosDoItem}
+          onPress={onTrocar}
+          accessibilityRole="button"
+          accessibilityLabel={`Trocar ${linha.item.nome} por outro alimento`}
+        >
+          {/* O NOME é o botão de trocar.
+              A IA acerta o arroz e erra o prato principal, e sem esta saída a
+              pessoa só podia apagar o item — perdendo junto o peso e as
+              calorias que ela teria de digitar de novo. */}
+          <View style={styles.linhaNomeItem}>
+            <Text style={styles.nomeDoItem} numberOfLines={2}>
+              {mostrado.nome}
+            </Text>
+            <Ionicons name="swap-horizontal" size={14} color={paleta().inkFraco} />
+          </View>
           {!!mostrado.porcaoEstimada && (
             <Text style={styles.porcaoDoItem} numberOfLines={1}>
               {mostrado.porcaoEstimada}
             </Text>
           )}
-        </View>
+        </Pressable>
 
         <Text style={styles.kcalDoItem}>
           {linha.dentro ? (mostrado.calorias === null ? '—' : `${milhar(mostrado.calorias)} kcal`) : ''}
@@ -2172,7 +2249,8 @@ const estilos = estilosDe(t =>
   itemDaFotoFora: { backgroundColor: t.cores.fundo, opacity: 0.6 },
   linhaTopoItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   textosDoItem: { flex: 1 },
-  nomeDoItem: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  linhaNomeItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  nomeDoItem: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: t.cores.ink },
   porcaoDoItem: { marginTop: 2, fontSize: 11.5, color: t.inkSuave },
   kcalDoItem: {
     fontSize: 12.5,
@@ -2325,8 +2403,7 @@ const estilos = estilosDe(t =>
   /* ── Itens do dia ── */
   linhaItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   textoItem: { flex: 1 },
-  linhaNomeItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  nomeItem: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  nomeItem: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
   /* Quadrada e pequena: ela é referência, e não o conteúdo da linha. Grande
      demais empurraria o nome e a caloria, que é o que se lê. */
   miniatura: {
