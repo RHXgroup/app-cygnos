@@ -587,6 +587,29 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
           />
         )}
 
+        {/* ── Áudio, que este app ainda não toca ──────────────────────────
+         *
+         * O tipo aceita 'audio' e a coluna também, mas só a foto é desenhada
+         * acima. Sem esta linha, um áudio vindo do lado dela desenha um balão
+         * VAZIO — só a hora —, e a paciente não fica sabendo que chegou nada.
+         * É a armadilha 10 na forma de um valor conhecido e não tratado.
+         *
+         * Dizer que não toca é pior que tocar e melhor que sumir: ela sabe que
+         * existe uma mensagem e pode pedir por escrito. Quando houver
+         * reprodução, esta linha vira o player. */}
+        {mensagem.anexoTipo === 'audio' && (
+          <View style={styles.audioAviso}>
+            <Ionicons
+              name="mic-outline"
+              size={15}
+              color={minha ? 'rgba(255,255,255,0.8)' : paleta().inkMedio}
+            />
+            <Text style={[styles.audioTexto, minha && styles.audioTextoMeu]}>
+              Áudio — este aplicativo ainda não toca
+            </Text>
+          </View>
+        )}
+
         {/* Texto vazio não desenha linha: foto sem legenda é mensagem inteira, e
             um `<Text>` vazio deixaria um vão embaixo da imagem. */}
         {!!mensagem.texto.trim() && (
@@ -719,6 +742,16 @@ const estilos = estilosDe(t =>
     marginBottom: 6,
     backgroundColor: 'rgba(0,0,0,0.06)',
   },
+
+    audioAviso: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 2,
+      marginBottom: 2,
+    },
+    audioTexto: { fontSize: 13, fontStyle: 'italic', color: t.inkMedio },
+    audioTextoMeu: { color: 'rgba(255,255,255,0.8)' },
   previaAnexo: {
     flexDirection: 'row',
     alignItems: 'center',
