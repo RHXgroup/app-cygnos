@@ -172,11 +172,12 @@ const CONHECIDOS = {
  * a ferramenta parou de enxergar. */
 const DEVEM_APARECER = {
   lib: { orfaos: achados, nomes: ['hexDe'] },
-  /* `PlanosScreen` está aqui por um motivo a mais: ele só aparece porque o
-     caminho do import deixou de contar como uso. Sem ele nesta lista, alguém
-     desfazendo aquela limpeza esconderia uma tela inteira de novo, e a
-     ferramenta continuaria dizendo "Success". */
-  tela: { orfaos: componentes, nomes: ['ArcoMeta', 'PlanosScreen'] },
+  /* `PlanosScreen` esteve aqui e SAIU — a tela foi apagada em 01/09/2026, e o
+     controle negativo apontando para um arquivo que não existe mais reprovaria
+     a ferramenta todo dia. Foi ela mesma que avisou, com a frase que este bloco
+     manda escrever: "ou alguém o ligou, ou a varredura parou de achar". Era a
+     terceira opção — alguém apagou —, e o recado serviu do mesmo jeito. */
+  tela: { orfaos: componentes, nomes: ['ArcoMeta'] },
 }
 
 const quebras = []
