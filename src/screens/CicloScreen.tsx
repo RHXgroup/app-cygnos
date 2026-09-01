@@ -462,6 +462,34 @@ export function CicloScreen({
             </View>
           ) : null}
 
+          {/* ── A PROMESSA, dita na entrada e não escondida ───────────────
+           *
+           * O painel do dia já dizia isto — mas só para quem já tocou num dia.
+           * Quem abre o Ciclo pela primeira vez, olha, e fecha nunca leu; e é
+           * justamente essa pessoa que está decidindo se anota alguma coisa
+           * aqui.
+           *
+           * ── E por que não é um aviso que some ─────────────────────────
+           * Porque não é uma novidade, é uma GARANTIA. Aviso de primeira vez
+           * some depois de lido, e a dúvida sobre privacidade volta toda vez
+           * que ela vai escrever algo que não quer que ninguém veja.
+           *
+           * ── E por que ela é forte ──────────────────────────────────────
+           * A separação não é uma configuração que alguém pode ter deixado
+           * ligada por engano: a função que espelha os dados para a
+           * nutricionista simplesmente NÃO TEM código para copiar estes
+           * campos. Garantido pela ausência, e não pela boa vontade. O Clue
+           * ganha confiança dizendo o que faz; nós fazemos mais e não
+           * dizíamos. */}
+          <View style={styles.promessa}>
+            <Ionicons name="lock-closed" size={14} color={paleta().cores.verde} />
+            <Text style={styles.textoPromessa}>
+              O que você marcar como <Text style={styles.negritoPromessa}>relação</Text> e as{' '}
+              <Text style={styles.negritoPromessa}>notas privadas</Text> ficam só neste aparelho.
+              Não vão para a sua nutricionista, e não existe opção para ligar isso.
+            </Text>
+          </View>
+
           {/* ── Onde ela está. A tela DIZ, em vez de esperar. ───────────── */}
           <View style={styles.agora}>
             {situacao.diaDoCiclo === null ? (
@@ -717,7 +745,22 @@ const estilos = estilosDe(t =>
     tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
     conteudo: { paddingHorizontal: 20, gap: 14 },
 
-    blocoErro: {
+    promessa: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    marginBottom: 14,
+    borderRadius: 12,
+    backgroundColor: t.cores.verdeMenta,
+    borderWidth: 1,
+    borderColor: t.cores.verdeClaro,
+  },
+  textoPromessa: { flex: 1, fontSize: 11.5, lineHeight: 16.5, color: t.cores.verdeEscuro },
+  negritoPromessa: { fontWeight: '800' },
+
+  blocoErro: {
       backgroundColor: t.cores.erroFundo,
       borderRadius: 12,
       borderWidth: 1,
