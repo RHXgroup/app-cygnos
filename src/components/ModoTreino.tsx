@@ -12,6 +12,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'
+import * as Speech from 'expo-speech'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
 import { relogio } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
@@ -69,7 +70,38 @@ const PADRAO_DA_VIBRACAO = [0, 200, 120, 200, 120, 450]
    faria os dois se confundirem com o telefone no bolso. */
 const VIBRACAO_DA_SERIE = [0, 90]
 
-type Fase = 'parado' | 'treinando' | 'descansando'
+type Fase = 'parado' | 'preparando' | 'treinando' | 'descansando'
+
+/* Os segundos entre tocar em "iniciar" e a série começar de verdade.
+ *
+ * ── Por que existe uma folga ──────────────────────────────────────────────
+ * Ninguém treina com o telefone na mão. A pessoa toca, LARGA o aparelho no
+ * chão e anda até a barra — e o cronômetro que começava no toque contava essa
+ * caminhada como parte da série.
+ *
+ * Cinco: dá para largar o telefone e se posicionar, e é curto o bastante para
+ * não virar espera. */
+const SEGUNDOS_DE_PREPARO = 5
+
+/* A voz.
+ *
+ * ── Por que falar, e não só apitar ────────────────────────────────────────
+ * O apito diz que ALGO aconteceu; a voz diz O QUE aconteceu. Com o telefone no
+ * chão e a pessoa de costas, "bip" e "bip" são a mesma coisa — e ela tem de
+ * voltar para olhar a tela, que é exatamente o que o modo treino existe para
+ * evitar.
+ *
+ * Falar é barato: roda no aparelho, sem rede, sem permissão e sem bateria
+ * relevante. É o contrário de OUVIR, que exigiria o microfone aberto o tempo
+ * todo — são coisas opostas, e só esta está aqui. */
+function falar(texto: string) {
+  try {
+    Speech.speak(texto, { language: 'pt-BR', rate: 1.05 })
+  } catch {
+    /* Sem voz, o apito e a vibração continuam avisando. Nada aqui pode parar
+       um treino. */
+  }
+}
 
 /* O primeiro número de "8-12", "10", "até a falha".
  *
@@ -140,6 +172,22 @@ export function ModoTreino({
    *
    * Nulo enquanto ela está descansando ou ainda não começou. */
   const [inicioDaSerie, setInicioDaSerie] = useState<number | null>(null)
+  /* Quando a contagem de preparação acaba, ou nulo se não há contagem. */
+  const [fimDoPreparo, setFimDoPreparo] = useState<number | null>(null)
+  /* O último número já falado, para não repetir a cada quadro: o relógio bate a
+     cada 250 ms, e sem isto o "três" sairia quatro vezes. */
+  const ultimoFalado = useRef<number | null>(null)
+
+  /* Começa a preparação: cinco segundos, com a voz contando o fim.
+   *
+   * Usado nos dois caminhos — o toque em "Iniciar a série" e o fim do
+   * descanso —, porque nos dois a pessoa está longe do telefone. */
+  function prepararSerie(anuncio = 'Prepare-se') {
+    ultimoFalado.current = null
+    setFimDoPreparo(Date.now() + SEGUNDOS_DE_PREPARO * 1000)
+    setFase('preparando')
+    falar(anuncio)
+  }
 
   /* Dois tocadores, e não um: trocar a fonte de um tocador só custa recarregar
      o arquivo no meio do treino, e é justamente quando não pode atrasar. */
@@ -323,6 +371,42 @@ export function ModoTreino({
   const segundosDaSerie =
     inicioDaSerie === null ? null : Math.max(0, Math.round((agora - inicioDaSerie) / 1000))
 
+  const restamNoPreparo =
+    fimDoPreparo === null ? 0 : Math.max(0, Math.ceil((fimDoPreparo - agora) / 1000))
+
+  /* Fala 3, 2, 1 e larga a série. Só os três últimos: contar de cinco cansa, e
+     o que a pessoa precisa é do aviso de que está para começar. */
+  useEffect(() => {
+    if (fase !== 'preparando' || fimDoPreparo === null) return
+
+    if (agora >= fimDoPreparo) {
+      setFimDoPreparo(null)
+      setFase('treinando')
+      setInicioDaSerie(Date.now())
+      /* Com o peso e as repetições junto: é o que ela olharia na tela antes de
+         pegar a barra, e é justamente o que ela não pode olhar agora. Sem a
+         carga cadastrada, só "Vai" — inventar número aqui seria pior. */
+      const carga = exercicio ? cargaDe(exercicio) : null
+      const reps = exercicio ? repsDe(exercicio) : null
+      falar(
+        carga && reps
+          ? `Vai. ${carga} quilos, ${reps} repetições.`
+          : reps
+            ? `Vai. ${reps} repetições.`
+            : 'Vai',
+      )
+      avisar()
+      return
+    }
+
+    const faltam = Math.ceil((fimDoPreparo - agora) / 1000)
+    if (faltam <= 3 && faltam >= 1 && ultimoFalado.current !== faltam) {
+      ultimoFalado.current = faltam
+      falar(String(faltam))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agora, fase, fimDoPreparo])
+
   const restamNoDescanso =
     fimDoDescanso === null ? 0 : Math.max(0, Math.round((fimDoDescanso - agora) / 1000))
 
@@ -332,9 +416,9 @@ export function ModoTreino({
     if (fase !== 'descansando' || fimDoDescanso === null) return
     if (agora < fimDoDescanso) return
     setFimDoDescanso(null)
-    setFase('treinando')
-    setInicioDaSerie(Date.now())
-    avisar()
+    /* Não cai direto na série: a pessoa está sentada, e ainda tem de levantar e
+       chegar na barra. A voz avisa e conta os últimos três. */
+    prepararSerie('Acabou o descanso')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agora, fase, fimDoDescanso])
 
@@ -394,6 +478,14 @@ export function ModoTreino({
        descanso entre exercícios é outro assunto e a pessoa costuma andar até o
        aparelho. Descansar aqui prenderia ela olhando o telefone à toa. */
     if (acabou && indice < exercicios.length - 1) {
+      /* O nome do PRÓXIMO, falado.
+         É o momento em que ela precisa andar até outro aparelho, e o único jeito
+         de saber para onde era voltar e ler a tela. */
+      const proximo = exercicios[indice + 1]
+      falar(
+        `Acabou ${exercicio.nome}. Agora: ${proximo.nome}` +
+          (proximo.series ? `, ${proximo.series} séries.` : '.'),
+      )
       setIndice(i => i + 1)
       /* O exercício novo começa PARADO, esperando o "Iniciar a série".
          Continuar contando daria a este exercício o tempo da caminhada até o
@@ -407,7 +499,20 @@ export function ModoTreino({
        o modo treino só avisava quando o descanso acabava, e não quando ele
        começava — quem está de fone não sabia que o telefone tinha registrado. */
     avisarFimDaSerie()
-    setFimDoDescanso(Date.now() + descansoDe(exercicio) * 1000)
+
+    /* A voz diz ONDE ela está e QUANTO vai descansar.
+     *
+     * Três apitos diferentes ainda são três apitos: com o telefone no chão e a
+     * pessoa de costas, ela sabe que ALGO aconteceu e não o quê. "Série dois de
+     * quatro. Descanse sessenta segundos." responde as duas perguntas que ela
+     * teria de voltar até a tela para responder. */
+    const segundos = descansoDe(exercicio)
+    const ondeEstou = exercicio.series
+      ? `Série ${jaFeitas} de ${exercicio.series}. `
+      : `Série ${jaFeitas}. `
+    falar(`${ondeEstou}Descanse ${segundos} segundos.`)
+
+    setFimDoDescanso(Date.now() + segundos * 1000)
     setFase('descansando')
   }
 
@@ -561,7 +666,26 @@ export function ModoTreino({
             </ScrollView>
 
             <View style={[styles.rodape, { paddingBottom: bottom + 16 }]}>
-              {fase === 'descansando' ? (
+              {fase === 'preparando' ? (
+                <>
+                  <Text style={styles.rotuloDescanso}>Começa em</Text>
+                  <Text style={styles.contagem}>{restamNoPreparo}</Text>
+                  <Text style={styles.avisoPreparo}>
+                    Pode largar o telefone. Eu aviso na hora de começar.
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setFimDoPreparo(null)
+                      setFase('treinando')
+                      setInicioDaSerie(Date.now())
+                    }}
+                    style={styles.botaoPular}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.textoPular}>Começar agora</Text>
+                  </Pressable>
+                </>
+              ) : fase === 'descansando' ? (
                 <>
                   <Text style={styles.rotuloDescanso}>Descanso</Text>
                   <Text style={styles.contagem}>{restamNoDescanso}</Text>
@@ -593,11 +717,11 @@ export function ModoTreino({
                   <Pressable
                     onPress={() => {
                       setFimDoDescanso(null)
-                      setFase('treinando')
-                      /* Pular o descanso também começa a série: o cronômetro
-                         mede o mesmo de qualquer jeito, e quem pulou está indo
-                         para a barra agora. */
-                      setInicioDaSerie(Date.now())
+                      /* Pular o descanso também passa pela preparação: quem
+                         pulou está indo para a barra AGORA, e é justamente
+                         quem mais precisa dos segundos para largar o
+                         telefone. */
+                      prepararSerie()
                     }}
                     style={styles.botaoPular}
                     accessibilityRole="button"
@@ -663,7 +787,7 @@ export function ModoTreino({
                    * com o peso na mão. */}
                   {inicioDaSerie === null ? (
                     <Pressable
-                      onPress={() => setInicioDaSerie(Date.now())}
+                      onPress={() => prepararSerie()}
                       style={({ pressed }) => [styles.botaoGrande, pressed && styles.pressionado]}
                       accessibilityRole="button"
                       accessibilityLabel="Iniciar a série"
@@ -867,6 +991,13 @@ const estilos = estilosDe(t =>
     color: t.inkMedio,
     textAlign: 'center',
     marginBottom: 10,
+  },
+  avisoPreparo: {
+    fontSize: 12.5,
+    color: t.inkMedio,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 6,
   },
   rotuloDescanso: {
       fontSize: 12.5,
