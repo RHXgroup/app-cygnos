@@ -220,6 +220,24 @@ export async function salvarDescanso(id: string, segundos: number): Promise<void
   if (error) falha('Não consegui guardar o descanso deste exercício.', error)
 }
 
+/* A carga que ela ajustou no meio do treino, guardada no exercício.
+ *
+ * ── A assimetria que isto conserta ────────────────────────────────────────
+ * O DESCANSO ajustado já persistia; a CARGA não. Ela subia o peso na terceira
+ * semana, o número ia para a série registrada — e o exercício continuava com o
+ * peso da primeira semana, para ser corrigido de novo no treino seguinte.
+ *
+ * E é justamente a carga que muda toda semana: progressão de carga é o motivo
+ * de um treino de força existir. O campo que mais muda era o único que não
+ * lembrava. */
+export async function salvarCarga(id: string, kg: number | null): Promise<void> {
+  const { error } = await supabase
+    .from('app_treino_exercicios')
+    .update({ carga_kg: kg })
+    .eq('id', id)
+  if (error) falha('Não consegui guardar a carga deste exercício.', error)
+}
+
 export async function apagarExercicio(id: string): Promise<{ erro: string } | null> {
   const { error } = await supabase.from('app_treino_exercicios').delete().eq('id', id)
   if (!error) return null

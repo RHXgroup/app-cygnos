@@ -33,6 +33,7 @@ import {
   adicionarExercicio,
   apagarExercicio,
   editarExercicio,
+  salvarCarga,
   salvarDescanso,
   trocarPorAdaptado,
   apagarSessao,
@@ -471,6 +472,12 @@ export function TreinoScreen({
         exercicios={doHoje}
         /* Persiste na hora. Ajustar o descanso toda semana é exatamente o
            atrito que este modo existe para tirar. */
+        /* A carga sobe de semana em semana, e era a única coisa que a pessoa
+           ajustava e o app esquecia. */
+        onCargaMudou={(id, kg) => {
+          void salvarCarga(id, kg)
+          setRotina(atuais => atuais.map(e => (e.id === id ? { ...e, cargaKg: kg } : e)))
+        }}
         onDescansoMudou={(id, seg) => {
           void salvarDescanso(id, seg)
           setRotina(atuais =>

@@ -88,6 +88,7 @@ export function ModoTreino({
   contaId,
   pesoKg,
   exercicios,
+  onCargaMudou,
   onDescansoMudou,
   onTerminar,
   onFechar,
@@ -102,6 +103,9 @@ export function ModoTreino({
   exercicios: Exercicio[]
   /* A pessoa ajustou o descanso deste exercício. Persiste, porque ajustar de
      novo toda semana é exatamente o atrito que este modo existe para tirar. */
+  /* A carga que ela ajustou. Persiste pelo mesmo motivo do descanso — e com
+     mais razão, porque é o número que muda toda semana. */
+  onCargaMudou: (exercicioId: string, kg: number | null) => void
   onDescansoMudou: (exercicioId: string, segundos: number) => void
   /* Os minutos medidos. Quem grava a sessão é a tela. */
   onTerminar: (minutos: number) => void
@@ -519,7 +523,10 @@ export function ModoTreino({
                     rotulo="kg"
                     valor={cargaDe(exercicio)}
                     passo={2.5}
-                    onMudar={n => setCargas(c => ({ ...c, [exercicio.id]: n }))}
+                    onMudar={n => {
+                      setCargas(c => ({ ...c, [exercicio.id]: n }))
+                      onCargaMudou(exercicio.id, n)
+                    }}
                     styles={styles}
                   />
                   <Ajuste
