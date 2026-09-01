@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { createAudioPlayer } from 'expo-audio'
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
 import { relogio } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
@@ -63,6 +63,11 @@ const MAX = 600
 /* Dois toques curtos e um longo. Padrão diferente do de mensagem, para não se
    confundir com notificação de outro app no meio do treino. */
 const PADRAO_DA_VIBRACAO = [0, 200, 120, 200, 120, 450]
+
+/* Um toque só, curto. O fim da série ela já sabe — acabou de largar o peso —,
+   e o aviso aqui é confirmação, não chamado. Vibrar igual ao fim do descanso
+   faria os dois se confundirem com o telefone no bolso. */
+const VIBRACAO_DA_SERIE = [0, 90]
 
 type Fase = 'parado' | 'treinando' | 'descansando'
 
@@ -118,8 +123,24 @@ export function ModoTreino({
   const [inicio, setInicio] = useState<number | null>(null)
   const [agora, setAgora] = useState(() => Date.now())
   const [fimDoDescanso, setFimDoDescanso] = useState<number | null>(null)
+  /* Quando esta série começou.
+   *
+   * ── Por que começa sozinha ────────────────────────────────────────────
+   * O caminho natural seria pedir um toque para começar e outro para terminar.
+   * Mas quem está com a barra na mão não toca em nada — e uma série que a
+   * pessoa esqueceu de iniciar aparece com tempo zero, que é pior do que não
+   * ter tempo nenhum, porque entra na média.
+   *
+   * Então ele começa quando o descanso acaba, e para quando ela marca a série.
+   * Continua um toque por série, e o tempo vem de graça.
+   *
+   * Nulo enquanto ela está descansando ou ainda não começou. */
+  const [inicioDaSerie, setInicioDaSerie] = useState<number | null>(null)
 
-  const tocador = useRef<ReturnType<typeof createAudioPlayer> | null>(null)
+  /* Dois tocadores, e não um: trocar a fonte de um tocador só custa recarregar
+     o arquivo no meio do treino, e é justamente quando não pode atrasar. */
+  const somDoDescanso = useRef<ReturnType<typeof createAudioPlayer> | null>(null)
+  const somDaSerie = useRef<ReturnType<typeof createAudioPlayer> | null>(null)
   /* Quando o último toque em "fiz a série" foi aceito.
    *
    * Achado varrendo os caminhos de escrita: o botão não tinha guarda de toque
@@ -211,20 +232,65 @@ export function ModoTreino({
     void guardarRascunho(RASCUNHO.treino, { inicio, indice, feitas })
   }, [visivel, restaurado, inicio, indice, feitas])
 
-  /* Um tocador por sessão, criado na primeira vez que precisa. Criar a cada
+  /* ── O modo de áudio, uma vez por abertura do modo treino ───────────────
+   *
+   * Sem isto o apito some em dois casos que são exatamente os da academia:
+   * no iPhone com o interruptor de silencioso ligado — que é como quase todo
+   * mundo anda —, e no Android depois de o ditado ter gravado áudio, porque a
+   * sessão fica em modo de gravação e a reprodução sai baixa.
+   *
+   * `shouldPlayInBackground` fica falso: o aviso é para quem está olhando o
+   * treino, e áudio em segundo plano pediria permissão que este app não tem
+   * motivo para ter. */
+  useEffect(() => {
+    if (!visivel) return
+    void setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      /* Não interrompe música: quem treina ouvindo som quer o apito POR CIMA,
+         e não no lugar. */
+      interruptionMode: 'mixWithOthers',
+    }).catch(() => {
+      /* Sem o modo, o som ainda toca — só mais baixo. A vibração não depende
+         disto, e é ela que a pessoa sente com o telefone no bolso. */
+    })
+  }, [visivel])
+
+  /* Um tocador por som, criado na primeira vez que precisa. Criar a cada
      descanso deixaria um por série pendurado até o app fechar. */
-  function avisar() {
-    Vibration.vibrate(PADRAO_DA_VIBRACAO)
+  function tocar(qual: 'descanso' | 'serie') {
+    const ref = qual === 'descanso' ? somDoDescanso : somDaSerie
     try {
-      if (!tocador.current) {
-        tocador.current = createAudioPlayer(require('../../assets/fim-do-descanso.wav'))
+      if (!ref.current) {
+        ref.current = createAudioPlayer(
+          qual === 'descanso'
+            ? require('../../assets/fim-do-descanso.wav')
+            : require('../../assets/fim-da-serie.wav'),
+        )
       }
-      tocador.current.seekTo(0)
-      tocador.current.play()
+      ref.current.volume = 1
+      ref.current.seekTo(0)
+      ref.current.play()
     } catch {
       /* Sem som a vibração já avisou. Um treino não pode parar porque o áudio
          do aparelho está ocupado por outro app. */
     }
+  }
+
+  /* FIM DO DESCANSO: som subindo, e a vibração longa. É o "vai". */
+  function avisar() {
+    Vibration.vibrate(PADRAO_DA_VIBRACAO)
+    tocar('descanso')
+  }
+
+  /* FIM DA SÉRIE: som descendo, e um toque curto. É o "para".
+   *
+   * Dois sons diferentes de propósito: com o mesmo, quem está de fone teria de
+   * olhar a tela para saber qual dos dois aconteceu — que é exatamente o que o
+   * som existe para evitar. */
+  function avisarFimDaSerie() {
+    Vibration.vibrate(VIBRACAO_DA_SERIE)
+    tocar('serie')
   }
 
   const exercicio = exercicios[indice] as Exercicio | undefined
@@ -250,6 +316,9 @@ export function ModoTreino({
     }
   }, [visivel, contaId, exercicio?.id])
 
+  const segundosDaSerie =
+    inicioDaSerie === null ? null : Math.max(0, Math.round((agora - inicioDaSerie) / 1000))
+
   const restamNoDescanso =
     fimDoDescanso === null ? 0 : Math.max(0, Math.round((fimDoDescanso - agora) / 1000))
 
@@ -260,6 +329,7 @@ export function ModoTreino({
     if (agora < fimDoDescanso) return
     setFimDoDescanso(null)
     setFase('treinando')
+    setInicioDaSerie(Date.now())
     avisar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agora, fase, fimDoDescanso])
@@ -300,6 +370,10 @@ export function ModoTreino({
       cargaKg: cargaDe(exercicio),
       repeticoes: repsDe(exercicio),
     }
+    /* O tempo desta série fica só nesta sessão: a coluna não existe no banco, e
+       inventá-la aqui seria gravar num lugar que ninguém lê. O que ela vê é o
+       cronômetro na tela; guardar isso é assunto de outra alteração. */
+    setInicioDaSerie(null)
     void gravarSerie(contaId, feita)
     /* Guardado aqui também: a tela de fim de treino usa isto em vez de reler do
        banco, e assim ela aparece na hora — que é o único momento em que a
@@ -321,6 +395,10 @@ export function ModoTreino({
     }
     if (acabou) return
 
+    /* O apito do FIM DA SÉRIE, junto com o começo do descanso. É o que faltava:
+       o modo treino só avisava quando o descanso acabava, e não quando ele
+       começava — quem está de fone não sabia que o telefone tinha registrado. */
+    avisarFimDaSerie()
     setFimDoDescanso(Date.now() + descansoDe(exercicio) * 1000)
     setFase('descansando')
   }
@@ -505,6 +583,10 @@ export function ModoTreino({
                     onPress={() => {
                       setFimDoDescanso(null)
                       setFase('treinando')
+                      /* Pular o descanso também começa a série: o cronômetro
+                         mede o mesmo de qualquer jeito, e quem pulou está indo
+                         para a barra agora. */
+                      setInicioDaSerie(Date.now())
                     }}
                     style={styles.botaoPular}
                     accessibilityRole="button"
@@ -514,6 +596,46 @@ export function ModoTreino({
                 </>
               ) : (
                 <>
+                  {/* O TEMPO DESTA SÉRIE.
+                      Só aparece depois que o descanso acabou uma vez — na
+                      primeira série do treino não há de onde começar a contar,
+                      e um zero parado ali seria um cronômetro quebrado. */}
+                  {segundosDaSerie !== null && (
+                    <Text style={styles.tempoDaSerie}>
+                      {Math.floor(segundosDaSerie / 60)}:
+                      {String(segundosDaSerie % 60).padStart(2, '0')} nesta série
+                    </Text>
+                  )}
+
+                  {/* O DESCANSO, ajustável ANTES de descansar.
+                      Este controle só existia dentro do descanso, e por isso
+                      ninguém achava: para mudar o tempo era preciso já estar
+                      descansando naquele tempo. Aqui ele fica no caminho de
+                      quem está entre séries, que é quando se decide. */}
+                  <View style={styles.linhaAjuste}>
+                    <Pressable
+                      onPress={() => ajustarDescanso(-PASSO)}
+                      style={styles.botaoAjuste}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Menos quinze segundos de descanso"
+                    >
+                      <Text style={styles.textoAjuste}>−{PASSO}s</Text>
+                    </Pressable>
+                    <Text style={styles.descansoAtual}>
+                      Descanso de {exercicio ? descansoDe(exercicio) : PADRAO_DE_DESCANSO}s
+                    </Text>
+                    <Pressable
+                      onPress={() => ajustarDescanso(PASSO)}
+                      style={styles.botaoAjuste}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Mais quinze segundos de descanso"
+                    >
+                      <Text style={styles.textoAjuste}>+{PASSO}s</Text>
+                    </Pressable>
+                  </View>
+
                   <Pressable
                     onPress={fizASerie}
                     style={({ pressed }) => [styles.botaoGrande, pressed && styles.pressionado]}
@@ -699,7 +821,16 @@ const estilos = estilosDe(t =>
     bolinhaFeita: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
 
     rodape: { paddingHorizontal: 20, gap: 10, alignItems: 'center' },
-    rotuloDescanso: {
+    /* Discreto: é informação, e não o botão. Quem está entre séries decide pelo
+     botão grande logo abaixo, e um número gritando aqui competiria com ele. */
+  tempoDaSerie: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: t.inkMedio,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  rotuloDescanso: {
       fontSize: 12.5,
       fontWeight: '800',
       color: t.inkFraco,

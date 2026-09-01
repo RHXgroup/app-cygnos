@@ -198,6 +198,11 @@ export function PesoScreen({
   })
 
   const evolucao = registros ? evolucaoDe(registros) : null
+  /* A curva desenhada, calculada UMA vez: o gráfico, as duas pontas e a data de
+     cada uma leem a mesma coisa, e recalcular em três lugares é como eles
+     divergem no dia em que alguém mexer na janela. */
+  const curva = registros ? tendenciaDoPeso(registros).slice(-DIAS_DA_CURVA) : []
+
   const ritmo = registros ? ritmoSemanal(registros) : null
 
   const larguraGrafico = larguraTela - MARGEM * 2 - PADDING_CARTAO * 2
@@ -318,10 +323,43 @@ export function PesoScreen({
                * isso que faz largar o plano. Os dois melhores aplicativos de
                * peso do mercado resolvem assim, e por essa razão. */}
               <MiniGrafico
-                serie={tendenciaDoPeso(registros).slice(-DIAS_DA_CURVA).map(t => t.tendencia)}
+                serie={curva.map(t => t.tendencia)}
                 largura={larguraGrafico}
                 altura={90}
+                /* Dois quilos de piso.
+                 *
+                 * Sem ele, três pesagens variando 600 g eram esticadas na
+                 * altura toda e desenhavam uma subida dramática de uma
+                 * variação que é água — o mesmo susto que a linha de
+                 * tendência existe para evitar.
+                 *
+                 * Dois, e não cinco: é a oscilação de um dia normal, então
+                 * abaixo disso o traço fica quase reto (que é a verdade) e
+                 * acima dele a curva volta a se abrir sozinha. */
+                amplitudeMinima={2}
               />
+
+              {/* DE QUANTO A QUANTO, e ENTRE QUE DIAS.
+                  O desenho sozinho não tem escala nem eixo — é uma silhueta.
+                  Sem estes dois números ela sobe e desce sem dizer sobre o quê,
+                  e a mesma linha serviria para 600 g ou para 6 kg. */}
+              {curva.length >= 2 && (
+                <View style={styles.pontasDaCurva}>
+                  <View>
+                    <Text style={styles.pontaValor}>{kgExato(curva[0].tendencia)} kg</Text>
+                    <Text style={styles.pontaData}>{dataNumerica(new Date(curva[0].data))}</Text>
+                  </View>
+                  <View style={styles.pontaDireita}>
+                    <Text style={styles.pontaValor}>
+                      {kgExato(curva[curva.length - 1].tendencia)} kg
+                    </Text>
+                    <Text style={styles.pontaData}>
+                      {dataNumerica(new Date(curva[curva.length - 1].data))}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               <Text style={styles.ajuda}>
                 Os últimos {DIAS_DA_CURVA} dias da sua linha de tendência — e não o peso de cada
                 dia. O peso oscila 1 a 2 kg por água e sal; a linha mostra o que está acontecendo
@@ -683,6 +721,11 @@ linhaRitmo: {
   ajuda: { fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
   /* A explicacao do susto tem peso proprio: ela e a frase que impede alguem de
      largar o plano por causa de 1 kg de agua. */
+  pontasDaCurva: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  pontaDireita: { alignItems: 'flex-end' },
+  pontaValor: { fontSize: 13, fontWeight: '800', color: t.cores.ink },
+  pontaData: { fontSize: 11, color: t.inkFraco, marginTop: 1 },
+
   blocoGasto: {
     marginTop: 14,
     padding: 13,

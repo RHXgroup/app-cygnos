@@ -552,6 +552,7 @@ function FotoDoTreino({
   const [endereco, setEndereco] = useState<string | null>(null)
   const [falhou, setFalhou] = useState<string | null>(null)
   const [subindo, setSubindo] = useState(false)
+  const [salvou, setSalvou] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -584,6 +585,14 @@ function FotoDoTreino({
       onErro('Não consegui guardar a foto agora. O treino continua registrado.')
       return
     }
+
+    /* DIZ que guardou.
+       Ela some sozinha, e não há botão de salvar: a foto sobe no momento em que
+       a pessoa escolhe. Sem esta linha o único sinal era a imagem aparecer, e
+       "apareceu na tela" e "está guardada no servidor" são coisas diferentes —
+       ela não tinha como saber se podia sair da tela. */
+    setSalvou(true)
+    setTimeout(() => setSalvou(false), 2600)
 
     /* A anterior sai do bucket. Foto órfã ocupa espaço para sempre e ninguém
        vai procurá-la depois — e a linha só guarda um caminho. */
@@ -654,6 +663,13 @@ function FotoDoTreino({
           >
             <Text style={styles.textoChip}>Escolher da galeria</Text>
           </Pressable>
+        </View>
+      )}
+
+      {salvou && (
+        <View style={styles.fotoSalva}>
+          <Ionicons name="checkmark-circle" size={15} color={paleta().cores.verde} />
+          <Text style={styles.textoFotoSalva}>Foto guardada.</Text>
         </View>
       )}
 
@@ -766,7 +782,16 @@ function RegistrarTreino({
           </Text>
         </View>
 
-        <Text style={styles.rotulo}>Quanto tempo? (opcional)</Text>
+        {/* Ele já mediu: então DIZ, em vez de perguntar.
+            O cronômetro do modo treino preenche a duração sozinho, e a tela
+            continuava mostrando "Quanto tempo?" por cima do número que ela
+            mesma acabou de calcular — o que se lê como o app não ter reparado
+            no treino inteiro que a pessoa acabou de fazer com ele na mão. */}
+        <Text style={styles.rotulo}>
+          {minutosMedidos > 0 && sessaoDeHoje.duracaoMin !== null
+            ? `Cronometrei ${sessaoDeHoje.duracaoMin} min. Toque se quiser mudar.`
+            : 'Quanto tempo? (opcional)'}
+        </Text>
         <View style={styles.chips}>
           {DURACOES.map(d => (
             <Pressable
@@ -789,7 +814,14 @@ function RegistrarTreino({
           ))}
         </View>
 
+        {/* O que a escala QUER DIZER, antes de escolher.
+            Os cinco números apareciam sozinhos, e o nome de cada um só surgia
+            depois do toque — quem nunca viu a escala precisava tocar nos cinco
+            para descobrir o que estava respondendo. */}
         <Text style={styles.rotulo}>Como foi? (opcional)</Text>
+        <Text style={styles.escala}>
+          1 é muito leve, 5 é o máximo que você conseguiria fazer.
+        </Text>
         <View style={styles.chips}>
           {[1, 2, 3, 4, 5].map(n => (
             <Pressable
@@ -1455,6 +1487,9 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.superficie,
   },
   acoesDaFoto: { flexDirection: 'row', gap: 7 },
+  fotoSalva: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  textoFotoSalva: { fontSize: 12, fontWeight: '600', color: t.cores.verde },
+  escala: { fontSize: 11.5, color: t.inkFraco, marginTop: 3, marginBottom: 2 },
   legendaEsforco: { fontSize: 12, color: t.inkSuave },
 
   botao: {
