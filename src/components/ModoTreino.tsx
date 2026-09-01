@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'
 import * as Speech from 'expo-speech'
+import { PREPARO_MS, acaoDoMomento, restam, type Fase } from '../lib/faseDoTreino'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
 import { relogio } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
@@ -70,20 +71,7 @@ const PADRAO_DA_VIBRACAO = [0, 200, 120, 200, 120, 450]
    faria os dois se confundirem com o telefone no bolso. */
 const VIBRACAO_DA_SERIE = [0, 90]
 
-type Fase = 'parado' | 'preparando' | 'treinando' | 'descansando'
 
-/* Os segundos entre tocar em "iniciar" e a série começar de verdade.
- *
- * ── Por que existe uma folga ──────────────────────────────────────────────
- * Ninguém treina com o telefone na mão. A pessoa toca, LARGA o aparelho no
- * chão e anda até a barra — e o cronômetro que começava no toque contava essa
- * caminhada como parte da série.
- *
- * Sete, e não cinco: o aviso falado ("Acabou o descanso") come mais de um
- * segundo do começo, e a contagem só entra aos três. Com cinco, sobrava um
- * silêncio curto demais entre o aviso e o "três" — e era ali que a fala
- * atropelava. */
-const SEGUNDOS_DE_PREPARO = 7
 
 /* A voz.
  *
@@ -248,7 +236,7 @@ export function ModoTreino({
    * descanso —, porque nos dois a pessoa está longe do telefone. */
   function prepararSerie(anuncio = 'Prepare-se') {
     ultimoFalado.current = null
-    setFimDoPreparo(Date.now() + SEGUNDOS_DE_PREPARO * 1000)
+    setFimDoPreparo(Date.now() + PREPARO_MS)
     setFase('preparando')
     falar(anuncio)
   }
@@ -296,6 +284,13 @@ export function ModoTreino({
   useEffect(() => {
     if (visivel) return
     setFase('parado')
+    /* Os prazos e o cronômetro da série saem JUNTO.
+       Sem isto, fechar o modo treino no meio de uma série e reabrir amanhã
+       mostrava "Fazendo a série · 847:12" — o cronômetro continuava contando um
+       instante que não existe mais. */
+    setFimDoPreparo(null)
+    setFimDoDescanso(null)
+    setInicioDaSerie(null)
     setIndice(0)
     setFeitas({})
     setInicio(null)
@@ -437,21 +432,38 @@ export function ModoTreino({
   const segundosDaSerie =
     inicioDaSerie === null ? null : Math.max(0, Math.round((agora - inicioDaSerie) / 1000))
 
-  const restamNoPreparo =
-    fimDoPreparo === null ? 0 : Math.max(0, Math.ceil((fimDoPreparo - agora) / 1000))
+  const restamNoPreparo = restam(fimDoPreparo, agora)
 
-  /* Fala 3, 2, 1 e larga a série. Só os três últimos: contar de cinco cansa, e
-     o que a pessoa precisa é do aviso de que está para começar. */
+  /* ── O QUE ACONTECE AGORA ───────────────────────────────────────────────
+   *
+   * Eram dois efeitos lendo o relógio na mão, um para a preparação e outro para
+   * o descanso, e as regras moravam dentro deles — onde não dava para
+   * exercitar. O defeito da contagem quebrando só apareceu na academia, com a
+   * pessoa no meio de uma série.
+   *
+   * Agora quem decide é `acaoDoMomento`, que roda no Node com 45 casos e uma
+   * sonda de 6000 instantes. Aqui sobrou o que fala, apita e guarda. */
   useEffect(() => {
-    if (fase !== 'preparando' || fimDoPreparo === null) return
+    const a = acaoDoMomento({ fase, fimDoPreparo, fimDoDescanso, agora })
 
-    if (agora >= fimDoPreparo) {
-      setFimDoPreparo(null)
-      setFase('treinando')
-      setInicioDaSerie(Date.now())
+    if (a.fimDoPreparo !== undefined) setFimDoPreparo(a.fimDoPreparo)
+    if (a.fimDoDescanso !== undefined) setFimDoDescanso(a.fimDoDescanso)
+    if (a.fase !== null) setFase(a.fase)
+    if (a.comecarSerie) setInicioDaSerie(Date.now())
+
+    if (a.contar !== null && ultimoFalado.current !== a.contar) {
+      ultimoFalado.current = a.contar
+      falar(String(a.contar))
+    }
+
+    if (a.falar === 'descanso acabou') {
+      ultimoFalado.current = null
+      falar('Descanso acabou')
+    }
+
+    if (a.falar === 'vai') {
       /* Com o peso e as repetições junto: é o que ela olharia na tela antes de
-         pegar a barra, e é justamente o que ela não pode olhar agora. Sem a
-         carga cadastrada, só "Vai" — inventar número aqui seria pior. */
+         pegar a barra, e é justamente o que ela não pode olhar agora. */
       const carga = exercicio ? cargaDe(exercicio) : null
       const reps = exercicio ? repsDe(exercicio) : null
       falar(
@@ -461,34 +473,14 @@ export function ModoTreino({
             ? `Vai. ${reps} repetições.`
             : 'Vai',
       )
-      avisar()
-      return
     }
 
-    const faltam = Math.ceil((fimDoPreparo - agora) / 1000)
-    if (faltam <= 3 && faltam >= 1 && ultimoFalado.current !== faltam) {
-      ultimoFalado.current = faltam
-      falar(String(faltam))
-    }
+    if (a.apitar) avisar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agora, fase, fimDoPreparo])
+  }, [agora, fase, fimDoPreparo, fimDoDescanso])
 
-  const restamNoDescanso =
-    fimDoDescanso === null ? 0 : Math.max(0, Math.round((fimDoDescanso - agora) / 1000))
+  const restamNoDescanso = restam(fimDoDescanso, agora)
 
-  /* O fim do descanso é detectado aqui, e o aviso sai UMA vez.
-     `fimDoDescanso` vira null no mesmo passo, então o efeito não repete. */
-  useEffect(() => {
-    if (fase !== 'descansando' || fimDoDescanso === null) return
-    if (agora < fimDoDescanso) return
-    setFimDoDescanso(null)
-    /* Não cai direto na série: a pessoa está sentada, e ainda tem de levantar e
-       chegar na barra. A voz avisa e conta os últimos três. */
-    /* Curto de propósito: quanto mais longo o aviso, mais perto ele chega do
-       "três" — e é a colisão dos dois que quebrava a contagem. */
-    prepararSerie('Descanso acabou')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agora, fase, fimDoDescanso])
 
   const minutos = inicio === null ? 0 : Math.max(0, Math.round((agora - inicio) / 60000))
   const segundosDeTreino = inicio === null ? 0 : Math.floor((agora - inicio) / 1000)
