@@ -377,3 +377,22 @@ export function porMes(registros: Registro[]): MesDaEscada[] {
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
     .map(([mes, degrau]) => ({ mes, degrau }))
 }
+
+/* "a cenoura", "o brócolis".
+ *
+ * O nome do alimento vem do banco, e o gênero vem junto sem aviso. Um artigo
+ * errado num app que fala com mãe soa como formulário — "Como foi com o
+ * cenoura?" desfaz num instante o cuidado de todo o resto da tela.
+ *
+ * A regra é curta de propósito: a PRIMEIRA palavra termina em A, é feminino. Em
+ * nome de alimento isso acerta quase sempre, porque o núcleo vem primeiro:
+ * "cenoura cozida", "brócolis no vapor", "abobrinha refogada". Uma tabela de
+ * exceções seria mais uma coisa a manter desatualizada.
+ *
+ * Nome vazio não vira "a " solto: vira "o alimento", que é feio e verdadeiro. */
+export function comArtigo(nome: string): string {
+  const limpo = nome.trim().replace(/\s+/g, ' ')
+  if (!limpo) return 'o alimento'
+  const primeira = limpo.split(' ')[0]
+  return `${/a$/i.test(primeira) ? 'a' : 'o'} ${limpo.toLowerCase()}`
+}

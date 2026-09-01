@@ -1,5 +1,6 @@
 import {
   DEGRAUS,
+  comArtigo,
   OFERTAS_PARA_SABER,
   apoioDoRegistro,
   convitePraCrianca,
@@ -310,6 +311,28 @@ console.log('\nescadaDaAceitacao\n')
   const semDegrau = porMes([reg('2026-03-02', null), reg('2026-03-09', 'tocar')])
   ok('registro sem degrau não cria mês', semDegrau.length === 1 && semDegrau[0].degrau.chave === 'tocar')
   ok('e nenhum mês vem sem degrau', porMes([reg('2026-03-02', null)]).length === 0)
+}
+
+/* ── O artigo do alimento ──────────────────────────────────────────────────
+ *
+ * "Como foi com O cenoura?" desfaz num instante o cuidado de toda a tela. */
+{
+  ok('feminino pela primeira palavra', comArtigo('cenoura') === 'a cenoura')
+  ok('e o núcleo vem primeiro', comArtigo('Cenoura cozida em cubos') === 'a cenoura cozida em cubos')
+  ok('masculino no resto', comArtigo('brócolis') === 'o brócolis')
+  ok('composto masculino', comArtigo('Brócolis no vapor') === 'o brócolis no vapor')
+  ok('abobrinha é feminina', comArtigo('abobrinha refogada') === 'a abobrinha refogada')
+
+  ok('nome vazio não vira artigo solto', comArtigo('') === 'o alimento')
+  ok('só espaços idem', comArtigo('   ') === 'o alimento')
+  ok('espaço a mais some', comArtigo('  arroz   integral  ') === 'o arroz integral')
+
+  /* Nunca sai com "undefined", nem com espaço duplo — é texto que entra numa
+     pergunta feita a uma pessoa. */
+  const amostras = ['Maçã', 'PÃO', 'ovo', 'Batata-doce', 'iogurte natural', '  peixe ']
+  const saidas = amostras.map(comArtigo)
+  ok('sempre começa com o ou a', saidas.every(x => /^[oa] /.test(x)), saidas.join(' | '))
+  ok('nunca sai undefined nem espaço duplo', !saidas.some(x => /undefined|  /.test(x)), saidas.join(' | '))
 }
 
 console.log(`\n${passou} ok, ${falhou} falha(s)\n`)
