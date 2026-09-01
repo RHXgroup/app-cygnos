@@ -619,6 +619,31 @@ export function ContadorCaloriasScreen({
     )
   }
 
+  /* ── ACIMA de qualquer retorno antecipado ───────────────────────────────
+   * O React exige a MESMA sequência de hooks em toda renderização. Um hook
+   * abaixo de um `if (...) return` não roda numa passada e roda na seguinte, e
+   * o app cai inteiro com "Rendered more hooks than during the previous
+   * render" — depois de a tela ter aberto uma vez, que é o que faz o defeito
+   * parecer outra coisa.
+   *
+   * O `tsc` não pega: ordem de hook é regra do React, e não do tipo. */
+  /* Os enderecos assinados, refeitos quando a lista muda.
+     Nao no render: assinar e ida a rede, e render acontece muitas vezes. */
+  useEffect(() => {
+    let vivo = true
+    const caminhos = itens.map(i => i.fotoPath).filter((c): c is string => !!c)
+    if (caminhos.length === 0) {
+      setFotosAbertas(new Map())
+      return
+    }
+    enderecosDasFotos(caminhos).then(m => {
+      if (vivo) setFotosAbertas(m)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [itens])
+
   if (porta === 'receitas') {
     return (
       <ReceitasScreen
@@ -659,22 +684,6 @@ export function ContadorCaloriasScreen({
     )
   }
 
-  /* Os enderecos assinados, refeitos quando a lista muda.
-     Nao no render: assinar e ida a rede, e render acontece muitas vezes. */
-  useEffect(() => {
-    let vivo = true
-    const caminhos = itens.map(i => i.fotoPath).filter((c): c is string => !!c)
-    if (caminhos.length === 0) {
-      setFotosAbertas(new Map())
-      return
-    }
-    enderecosDasFotos(caminhos).then(m => {
-      if (vivo) setFotosAbertas(m)
-    })
-    return () => {
-      vivo = false
-    }
-  }, [itens])
 
   const totais = totaisConsumidos(itens)
   const grupos = porRefeicao(itens)

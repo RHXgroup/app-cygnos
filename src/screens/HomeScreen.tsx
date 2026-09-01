@@ -594,6 +594,50 @@ export function HomeScreen({
     )
   }
 
+  /* O CORPO DELA, para o cartão do primeiro dia ter o que devolver.
+   *
+   * Fica aqui em cima, e não junto do cartão lá embaixo, porque ABAIXO existe
+   * um `if (carregando) return` — e hook depois de retorno antecipado não roda
+   * na primeira renderização e roda na seguinte. O React derruba o app inteiro
+   * com "Rendered more hooks than during the previous render", e ele derruba
+   * DEPOIS de a tela ter aberto uma vez, que é o que faz parecer outra coisa.
+   *
+   * O `tsc` não pega isto: a ordem dos hooks é regra do React, e não do tipo. */
+  useEffect(() => {
+    /* Menos de três dias de registro é a janela em que o cartão pode aparecer.
+       Fora dela não há motivo para a ida à rede, e ela sairia por abertura da
+       tela — quatro vezes por dia, para todo mundo, para sempre. */
+    if (!diasCarregados || diasComRegistro.length >= 3) return
+    let ativo = true
+    void carregarCorpoDaConta(sessao.user.id).then(corpo => {
+      if (!ativo) return
+      /* O gasto MEDIDO não entra: ele precisa de catorze dias registrados, e
+         quem está no primeiro não tem nenhum. Passar `undefined` é dizer isso,
+         em vez de fazer a chamada e receber nulo. */
+      setKcalSugerida(metasSugeridas(corpo, corpo.alvoKcalDoCalculo)?.calorias ?? null)
+    })
+    return () => {
+      ativo = false
+    }
+  }, [sessao.user.id, diasCarregados, diasComRegistro.length])
+
+  /* A sequência. Calculada aqui, e não guardada em estado, porque ela é uma
+     função pura das datas que já estão carregadas — guardar criaria um segundo
+     lugar onde o número pode ficar velho. */
+  const sequencia = sequenciaDaPessoa(diasComRegistro, dataISO(new Date()))
+
+  /* ── ACIMA de qualquer retorno antecipado ───────────────────────────────
+   * O React exige a MESMA sequência de hooks em toda renderização. Um hook
+   * abaixo de um `if (...) return` não roda numa passada e roda na seguinte, e
+   * o app cai inteiro com "Rendered more hooks than during the previous
+   * render" — depois de a tela ter aberto uma vez, que é o que faz o defeito
+   * parecer outra coisa.
+   *
+   * O `tsc` não pega: ordem de hook é regra do React, e não do tipo. */
+  useEffect(() => {
+    void reagendarSequencia(sequencia.dias, sequencia.hojeFeito)
+  }, [sequencia.dias, sequencia.hojeFeito])
+
   if (carregando) {
     return (
       <View style={styles.centro}>
@@ -633,10 +677,6 @@ export function HomeScreen({
   /* O anel da saudação: a média dos pilares que o app realmente mede hoje.
      Ver lib/metaDoDia.ts — as regras de o que entra e o que fica de fora estão
      todas lá, e não espalhadas por esta tela. */
-  /* A sequência. Calculada aqui, e não guardada em estado, porque ela é uma
-     função pura das datas que já estão carregadas — guardar criaria um segundo
-     lugar onde o número pode ficar velho. */
-  const sequencia = sequenciaDaPessoa(diasComRegistro, dataISO(new Date()))
 
   /* ── O primeiro dia ───────────────────────────────────────────────────────
    *
@@ -658,23 +698,6 @@ export function HomeScreen({
         kcalSugerida,
       })
 
-  useEffect(() => {
-    /* Menos de três dias de registro é a janela em que o cartão pode aparecer.
-       Fora dela não há motivo para a ida à rede, e ela sairia por abertura da
-       tela — quatro vezes por dia, para todo mundo, para sempre. */
-    if (!diasCarregados || diasComRegistro.length >= 3) return
-    let ativo = true
-    void carregarCorpoDaConta(sessao.user.id).then(corpo => {
-      if (!ativo) return
-      /* O gasto MEDIDO não entra: ele precisa de catorze dias registrados, e
-         quem está no primeiro não tem nenhum. Passar `undefined` é dizer isso,
-         em vez de fazer a chamada e receber nulo. */
-      setKcalSugerida(metasSugeridas(corpo, corpo.alvoKcalDoCalculo)?.calorias ?? null)
-    })
-    return () => {
-      ativo = false
-    }
-  }, [sessao.user.id, diasCarregados, diasComRegistro.length])
 
   /* O lembrete da sequência acompanha o número.
    *
@@ -684,9 +707,6 @@ export function HomeScreen({
    * aconteceu no dia; quem sabe é o app, e só enquanto está aberto.
    *
    * Não faz nada se o interruptor estiver desligado — a checagem mora lá. */
-  useEffect(() => {
-    void reagendarSequencia(sequencia.dias, sequencia.hojeFeito)
-  }, [sequencia.dias, sequencia.hojeFeito])
 
   const doDia = calcularMetaDoDia({
     metas,
