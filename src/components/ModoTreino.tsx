@@ -94,9 +94,61 @@ const SEGUNDOS_DE_PREPARO = 5
  * Falar é barato: roda no aparelho, sem rede, sem permissão e sem bateria
  * relevante. É o contrário de OUVIR, que exigiria o microfone aberto o tempo
  * todo — são coisas opostas, e só esta está aqui. */
+/* A MELHOR voz de português instalada, e não a que vier.
+ *
+ * ── Por que escolher ──────────────────────────────────────────────────────
+ * Sem escolher, o sistema usa a padrão — que no Android costuma ser a mais
+ * simples das instaladas, e soa como robô de menu de telefone. A pessoa ri e
+ * desliga, e aí a voz inteira não serve para nada.
+ *
+ * Quase todo aparelho tem mais de uma. As "enhanced" (iOS) e as de rede
+ * (Google, no Android) são muito melhores, e é só pedir pelo identificador.
+ *
+ * ── Escolhida uma vez, e nunca de novo ────────────────────────────────────
+ * Listar as vozes é ida ao sistema; fazer isso a cada número da contagem
+ * atrasaria justamente o "três, dois, um". */
+let vozEscolhida: string | undefined
+let jaProcurei = false
+
+async function acharVoz() {
+  if (jaProcurei) return
+  jaProcurei = true
+  try {
+    const vozes = await Speech.getAvailableVoicesAsync()
+    const nossas = vozes.filter(v => /^pt[-_]?BR/i.test(v.language))
+    if (nossas.length === 0) return
+
+    /* Melhor primeiro: qualidade declarada, depois as de rede — que no Android
+       são as que não parecem robô. `network` e `wavenet` aparecem no
+       identificador das boas do Google; `x-afm` e `x-pte` são as locais. */
+    const nota = (v: (typeof nossas)[number]) => {
+      let n = 0
+      if (String(v.quality).toLowerCase() === 'enhanced') n += 4
+      if (/network|wavenet|neural/i.test(v.identifier)) n += 3
+      /* As compactas do iOS são as piores de todas. */
+      if (/compact/i.test(v.identifier)) n -= 3
+      return n
+    }
+    vozEscolhida = [...nossas].sort((a, b) => nota(b) - nota(a))[0]?.identifier
+  } catch {
+    /* Sem lista, fica a padrão. Voz ruim ainda é melhor do que voz nenhuma
+       quando o telefone está no chão. */
+  }
+}
+
+/* Um pouco mais grave e um pouco mais devagar que o padrão.
+ *
+ * A voz padrão sai fina e corrida, e é isso que faz soar de brinquedo. `pitch`
+ * abaixo de 1 e `rate` em 0,95 dão o tom de quem está contando uma série, e não
+ * lendo uma notificação. */
 function falar(texto: string) {
   try {
-    Speech.speak(texto, { language: 'pt-BR', rate: 1.05 })
+    Speech.speak(texto, {
+      language: 'pt-BR',
+      voice: vozEscolhida,
+      rate: 0.95,
+      pitch: 0.92,
+    })
   } catch {
     /* Sem voz, o apito e a vibração continuam avisando. Nada aqui pode parar
        um treino. */
@@ -296,6 +348,8 @@ export function ModoTreino({
    * motivo para ter. */
   useEffect(() => {
     if (!visivel) return
+    /* Procura a voz boa ao abrir o modo treino, e não no meio da contagem. */
+    void acharVoz()
     void setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: false,
