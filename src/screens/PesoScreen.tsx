@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
 import { MiniGrafico } from '../components/MiniGrafico'
 import { carregarGastoMedido } from '../lib/metas'
+import { carregarMedidas, registrarMedida, NOME_DA_PARTE, type Medida, type Parte } from '../lib/medidas'
+import { evolucaoDaMedida, fraseDaVariacao, serieDaMedida } from '../lib/evolucaoDaMedida'
 import { fraseDoGasto, type GastoReal } from '../lib/gastoReal'
 import {
   fraseDaDistancia,
@@ -83,6 +85,21 @@ export function PesoScreen({
    * Nulo com menos de catorze dias registrados ou cobertura baixa — a regra
    * mora em `gastoReal.ts`, e a tela só desenha o que ela devolver. */
   const [gasto, setGasto] = useState<GastoReal | null>(null)
+  /* AS MEDIDAS.
+   *
+   * A cintura continua se movendo quando a balança para. Quem perde gordura e
+   * ganha músculo vê o peso parado e conclui que estagnou — o mesmo susto que a
+   * linha de tendência desarma, com a diferença de que aqui o número que
+   * desarmaria não existia no app.
+   *
+   * Estado separado do peso e carregado à parte: medir é quinzenal e pesar é
+   * diário, e prender um ao outro faria a tela do peso esperar por dado que
+   * quase nunca mudou. */
+  const [medidas, setMedidas] = useState<Medida[]>([])
+  const [medindo, setMedindo] = useState(false)
+  const [cintura, setCintura] = useState('')
+  const [quadril, setQuadril] = useState('')
+  const [braco, setBraco] = useState('')
 
   /* O foco vem de app_contas, definido na tela de Perfil. Efeito separado e sem
      mexer no `carregando`: um campo só não pode segurar a tela inteira. */
@@ -98,6 +115,12 @@ export function PesoScreen({
        nulo lá dentro, e nulo aqui é uma frase que não aparece. */
     carregarGastoMedido(contaId).then(g => {
       if (ativo) setGasto(g)
+    })
+
+    /* Sem mexer no `carregando`, pelo mesmo motivo do gasto: é um bloco a mais,
+       e um bloco não pode segurar a tela do peso. */
+    carregarMedidas(contaId).then(r => {
+      if (ativo && r.tipo === 'ok') setMedidas(r.medidas)
     })
 
     return () => {
@@ -166,6 +189,49 @@ export function PesoScreen({
        fez upsert. Sem o filtro, pesar duas vezes hoje deixaria duas linhas de
        hoje na tela até a próxima abertura. */
     setRegistros(atuais => [r.registro, ...(atuais ?? []).filter(x => x.data !== r.registro.data)])
+  }
+
+  /* O que ela digitou, em número.
+   *
+   * Vírgula passa porque o teclado brasileiro oferece vírgula, e medida é
+   * decimal por natureza — a mesma regra do peso, e de propósito: duas
+   * conversões diferentes no mesmo app seriam duas chances de errar. */
+  const emCm = (t: string): number | null => {
+    const n = Number(t.replace(',', '.'))
+    return t.trim().length > 0 && Number.isFinite(n) && n > 0 ? n : null
+  }
+
+  async function registrarAsMedidas() {
+    const nova = {
+      cinturaCm: emCm(cintura),
+      quadrilCm: emCm(quadril),
+      bracoCm: emCm(braco),
+    }
+    if (nova.cinturaCm === null && nova.quadrilCm === null && nova.bracoCm === null) {
+      setErro('Preencha pelo menos uma medida.')
+      return
+    }
+
+    setSalvando(true)
+    setErro('')
+    Keyboard.dismiss()
+
+    const r = await registrarMedida(contaId, nova)
+    setSalvando(false)
+
+    if (r.tipo === 'erro') {
+      setErro(r.mensagem)
+      return
+    }
+
+    /* Substitui a do dia, e não acrescenta: o banco fez upsert por (conta, dia),
+       e sem o filtro medir duas vezes hoje deixaria duas linhas de hoje na tela
+       até a próxima abertura. Mesma regra do peso. */
+    setMedidas(atuais => [r.medida, ...atuais.filter(x => x.data !== r.medida.data)])
+    setMedindo(false)
+    setCintura('')
+    setQuadril('')
+    setBraco('')
   }
 
   /* Apagar com cinco segundos de volta.
@@ -388,6 +454,82 @@ export function PesoScreen({
                * Fórmula estática erra de 15 a 25% por pessoa. Errar 20% em 2.000
                * kcal são 400 por dia: quem come 400 a mais do que pensa não
                * emagrece, conclui que dieta não funciona com ela, e larga. */}
+              {/* ── AS MEDIDAS ──
+                  Depois da curva do peso e antes do gasto, porque é a mesma
+                  pergunta que a curva responde — "estou mudando?" — e a
+                  cintura responde quando a balança para. */}
+              <View style={styles.blocoMedidas}>
+                <View style={styles.linhaTituloMedidas}>
+                  <Text style={styles.tituloBlocoMedidas}>Medidas</Text>
+                  <Pressable
+                    onPress={() => setMedindo(m => !m)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={medindo ? 'Fechar' : 'Registrar medidas de hoje'}
+                  >
+                    <Text style={styles.acaoMedidas}>{medindo ? 'Fechar' : 'Registrar'}</Text>
+                  </Pressable>
+                </View>
+
+                {medindo ? (
+                  <>
+                    <View style={styles.camposMedidas}>
+                      <CampoDeMedida rotulo="Cintura" valor={cintura} onMudar={setCintura} styles={styles} />
+                      <CampoDeMedida rotulo="Quadril" valor={quadril} onMudar={setQuadril} styles={styles} />
+                      <CampoDeMedida rotulo="Braço" valor={braco} onMudar={setBraco} styles={styles} />
+                    </View>
+                    <Text style={styles.ajuda}>
+                      Preencha só o que você mediu. O que ficar em branco não entra — e não vira
+                      zero.
+                    </Text>
+                    <Pressable
+                      onPress={registrarAsMedidas}
+                      disabled={salvando}
+                      style={({ pressed }) => [
+                        styles.botaoMedidas,
+                        pressed && { opacity: 0.75 },
+                      ]}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.textoBotaoMedidas}>
+                        {salvando ? 'Salvando…' : 'Salvar medidas de hoje'}
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : medidas.length === 0 ? (
+                  <Text style={styles.ajuda}>
+                    A cintura continua se movendo quando a balança para. Meça a cada duas semanas
+                    e eu mostro aqui o que mudou.
+                  </Text>
+                ) : (
+                  (['cintura', 'quadril', 'braco'] as Parte[]).map(parte => {
+                    const e = evolucaoDaMedida(medidas, parte)
+                    const serie = serieDaMedida(medidas, parte)
+                    if (e === null && serie.length === 0) return null
+                    return (
+                      <View key={parte} style={styles.linhaMedida}>
+                        <View style={styles.textosMedida}>
+                          <Text style={styles.nomeMedida}>{NOME_DA_PARTE[parte]}</Text>
+                          <Text style={styles.valorMedida}>
+                            {(e?.atual ?? serie[serie.length - 1]).toFixed(1).replace('.', ',')} cm
+                          </Text>
+                          {/* Sem cor e sem elogio: aumentar braço é objetivo de
+                              gente, e diminuir cintura é objetivo de outra. */}
+                          {fraseDaVariacao(e) !== null && (
+                            <Text style={styles.variacaoMedida}>
+                              {fraseDaVariacao(e)} · {e?.quantas} medições
+                            </Text>
+                          )}
+                        </View>
+                        {serie.length >= 2 && (
+                          <MiniGrafico serie={serie} largura={92} altura={38} amplitudeMinima={4} />
+                        )}
+                      </View>
+                    )
+                  })
+                )}
+              </View>
+
               {gasto !== null && (
                 <View style={styles.blocoGasto}>
                   <View style={styles.linhaTituloGasto}>
@@ -726,6 +868,54 @@ linhaRitmo: {
   pontaValor: { fontSize: 13, fontWeight: '800', color: t.cores.ink },
   pontaData: { fontSize: 11, color: t.inkFraco, marginTop: 1 },
 
+  blocoMedidas: {
+    marginTop: 14,
+    padding: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+    gap: 8,
+  },
+  linhaTituloMedidas: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tituloBlocoMedidas: { fontSize: 13, fontWeight: '800', color: t.cores.ink },
+  acaoMedidas: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
+  camposMedidas: { flexDirection: 'row', gap: 8 },
+  campoMedida: { flex: 1, gap: 4 },
+  rotuloMedida: { fontSize: 11, color: t.inkFraco },
+  entradaMedida: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.fundo,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    fontWeight: '700',
+    color: t.cores.ink,
+  },
+  botaoMedidas: {
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verde,
+    marginTop: 2,
+  },
+  textoBotaoMedidas: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
+  linhaMedida: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: t.cores.borda,
+  },
+  textosMedida: { flex: 1 },
+  nomeMedida: { fontSize: 12, color: t.inkFraco },
+  valorMedida: { fontSize: 17, fontWeight: '800', color: t.cores.ink, marginTop: 1 },
+  variacaoMedida: { fontSize: 11.5, color: t.inkMedio, marginTop: 1 },
+
   blocoGasto: {
     marginTop: 14,
     padding: 13,
@@ -794,3 +984,35 @@ linhaRitmo: {
   apagarPressionado: { backgroundColor: t.cores.trilho },
   }),
 )
+
+/* Um campo de medida. Os três são iguais, e repetir o bloco três vezes na tela
+   era como um deles ficava com o filtro diferente dos outros dois.
+
+   `decimal-pad` com filtro de `[^0-9.,]`, igual ao campo do peso: medida é
+   decimal, e o teclado brasileiro oferece vírgula (armadilha 3). */
+function CampoDeMedida({
+  rotulo,
+  valor,
+  onMudar,
+  styles,
+}: {
+  rotulo: string
+  valor: string
+  onMudar: (t: string) => void
+  styles: ReturnType<typeof estilos>
+}) {
+  return (
+    <View style={styles.campoMedida}>
+      <Text style={styles.rotuloMedida}>{rotulo}</Text>
+      <TextInput
+        value={valor}
+        onChangeText={t => onMudar(t.replace(/[^0-9.,]/g, '').slice(0, 5))}
+        keyboardType="decimal-pad"
+        placeholder="cm"
+        placeholderTextColor={paleta().inkFraco}
+        style={styles.entradaMedida}
+        accessibilityLabel={rotulo + ' em centímetros'}
+      />
+    </View>
+  )
+}
