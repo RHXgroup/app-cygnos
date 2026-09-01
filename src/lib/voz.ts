@@ -1,4 +1,11 @@
-import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio'
+import { Alert } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import {
+  RecordingPresets,
+  getRecordingPermissionsAsync,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio'
 import type { RecordingOptions } from 'expo-audio'
 import { supabase } from './supabase'
 
@@ -99,7 +106,66 @@ export type ResultadoPermissao =
  * `setAudioModeAsync` precisa vir antes do primeiro `record()`: sem ele o
  * iOS grava no modo de reprodução e sai um arquivo mudo — falha silenciosa,
  * das piores, porque o app mostra que gravou e o servidor devolve nada. */
+/* A NOSSA explicação, antes da caixa do sistema.
+ *
+ * ── Por que só o microfone ────────────────────────────────────────────────
+ * A caixa do Android e a do iPhone são do sistema: o app não escolhe cor, nem
+ * formato, e no Android nem o texto. O que dá para escolher é o que a pessoa lê
+ * ANTES dela.
+ *
+ * E isso só vale onde o motivo não é óbvio. Quem tocou em "Tirar foto" sabe por
+ * que a câmera está sendo pedida, e uma explicação ali seria só um toque a mais.
+ * "Por que um aplicativo de nutrição quer o meu microfone?" é a pergunta que
+ * existe de verdade — e quem não tem a resposta nega, e depois não acha onde
+ * liberar.
+ *
+ * ── Uma vez só ───────────────────────────────────────────────────────────
+ * Só antes do PRIMEIRO pedido. Repetir a cada ditado transformaria a explicação
+ * em pedágio, e quem já entendeu não precisa entender de novo. Depois de
+ * concedida, o sistema nem pergunta mais — então isto some sozinho. */
+const CHAVE_JA_EXPLIQUEI = 'microfone.expliquei'
+
+async function explicarAntes(): Promise<boolean> {
+  try {
+    if (await AsyncStorage.getItem(CHAVE_JA_EXPLIQUEI)) return true
+  } catch {
+    /* Sem armazenamento, explica de novo. Explicar duas vezes é chato;
+       não explicar é o que faz a pessoa negar. */
+  }
+
+  const seguiu = await new Promise<boolean>(resolve => {
+    Alert.alert(
+      'Falar em vez de digitar',
+      'O Cygnos usa o microfone só enquanto você segura para falar, e manda o ' +
+        'áudio para transcrever o que você disse. Ele não fica escutando, e nada ' +
+        'é guardado depois que o texto aparece.\n\n' +
+        'O aparelho vai pedir a permissão na tela seguinte.',
+      [
+        { text: 'Agora não', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Pode pedir', onPress: () => resolve(true) },
+      ],
+      { cancelable: false },
+    )
+  })
+
+  if (seguiu) {
+    /* Guarda só depois do SIM: quem disse "agora não" volta a ver a explicação
+       da próxima vez, que é justamente quando ela pode mudar de ideia. */
+    await AsyncStorage.setItem(CHAVE_JA_EXPLIQUEI, '1').catch(() => {})
+  }
+  return seguiu
+}
+
 export async function prepararMicrofone(): Promise<ResultadoPermissao> {
+  /* Só quando o sistema ainda vai perguntar. Já concedida, a caixa não aparece
+     e a explicação seria conversa sobre coisa nenhuma. */
+  const antes = await getRecordingPermissionsAsync().catch(() => null)
+  if (antes && !antes.granted && antes.canAskAgain) {
+    if (!(await explicarAntes())) {
+      return { tipo: 'negada', mensagem: 'Sem problema — é só digitar.' }
+    }
+  }
+
   const permissao = await requestRecordingPermissionsAsync()
   if (!permissao.granted) {
     return {

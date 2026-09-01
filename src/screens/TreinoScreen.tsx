@@ -646,29 +646,44 @@ function FotoDoTreino({
           </View>
         </View>
       ) : (
-        <View style={styles.chips}>
-          {/* Duas portas, e as duas ditas. A galeria importa: quem fotografou a
-              ficha da academia ontem já tem a imagem no aparelho, e obrigá-la a
-              fotografar de novo é pedir para ela desistir. */}
+        /* Duas portas, e as duas ditas. A galeria importa: quem fotografou a
+            ficha da academia ontem já tem a imagem no aparelho, e obrigá-la a
+            fotografar de novo é pedir para ela desistir.
+
+            Botão, e não etiqueta. Eram dois chips pequenos, do mesmo tamanho e
+            forma das etiquetas de escolher duração e esforço logo acima — e
+            etiqueta se lê como opção de uma lista, não como "isto abre a
+            câmera". Agora seguem o mesmo desenho do microfone: pílula alta,
+            com o ícone num círculo cheio. */
+        <View style={styles.portasDaFoto}>
           <Pressable
             onPress={() => tirar('camera')}
             disabled={subindo}
-            style={({ pressed }) => [styles.chip, pressed && styles.pressionado]}
+            style={({ pressed }) => [styles.portaFoto, pressed && styles.pressionado]}
             accessibilityRole="button"
+            accessibilityLabel="Tirar foto do treino"
           >
-            {subindo ? (
-              <ActivityIndicator size="small" color={paleta().inkMedio} />
-            ) : (
-              <Text style={styles.textoChip}>Tirar foto</Text>
-            )}
+            <View style={styles.bolhaDaFoto}>
+              {subindo ? (
+                <ActivityIndicator size="small" color={paleta().cores.branco} />
+              ) : (
+                <Ionicons name="camera" size={18} color={paleta().cores.branco} />
+              )}
+            </View>
+            <Text style={styles.textoPortaFoto}>Tirar foto</Text>
           </Pressable>
+
           <Pressable
             onPress={() => tirar('galeria')}
             disabled={subindo}
-            style={({ pressed }) => [styles.chip, pressed && styles.pressionado]}
+            style={({ pressed }) => [styles.portaFoto, pressed && styles.pressionado]}
             accessibilityRole="button"
+            accessibilityLabel="Escolher foto da galeria"
           >
-            <Text style={styles.textoChip}>Escolher da galeria</Text>
+            <View style={[styles.bolhaDaFoto, styles.bolhaSecundaria]}>
+              <Ionicons name="images" size={17} color={paleta().cores.verde} />
+            </View>
+            <Text style={styles.textoPortaFoto}>Da galeria</Text>
           </Pressable>
         </View>
       )}
@@ -1487,6 +1502,31 @@ const estilos = estilosDe(t =>
   textoChip: { fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
   textoChipAtivo: { color: t.cores.sobreLimao },
   fotoDoTreino: { marginTop: 8, gap: 8 },
+  portasDaFoto: { flexDirection: 'row', gap: 9, marginTop: 8 },
+  portaFoto: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    height: 52,
+    paddingHorizontal: 12,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+  },
+  bolhaDaFoto: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verde,
+  },
+  /* A galeria é a porta secundária: mesmo tamanho, peso menor. Duas cheias
+     disputariam a mesma decisão, e a câmera é a que resolve o caso comum. */
+  bolhaSecundaria: { backgroundColor: t.cores.verdeClaro },
+  textoPortaFoto: { flex: 1, fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
   imagemDoTreino: {
     width: '100%',
     height: 180,
