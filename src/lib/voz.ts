@@ -268,7 +268,18 @@ export async function transcrever(
  * imprime um número plausível e errado.
  *
  * O tipo não protege quando a diferença é a UNIDADE. O nome tem de proteger. */
-export function duracao(segundos: number): string {
+/* O NOME diz o formato, e nao o assunto.
+ *
+ * Esta funcao ja se chamou `relogio` e depois `duracao`, e as duas vezes
+ * colidiu com outra lib: `ritmoAgua.relogio` recebe MINUTOS desde a
+ * meia-noite, `sono.duracao` recebe MINUTOS dormidos, e esta recebe
+ * SEGUNDOS. As tres sao `number => string`, entao o TypeScript nao pega a
+ * troca: compila, roda, e imprime um numero plausivel e errado.
+ *
+ * `mmss` nao colide com assunto nenhum porque nao fala de assunto: fala do
+ * que sai. Quando a diferenca entre duas funcoes e a UNIDADE, o nome e a
+ * unica protecao que existe. */
+export function mmss(segundos: number): string {
   const inteiros = Math.max(0, Math.floor(segundos))
   const min = Math.floor(inteiros / 60)
   const seg = inteiros % 60

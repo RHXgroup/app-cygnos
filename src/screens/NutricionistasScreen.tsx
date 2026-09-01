@@ -42,7 +42,7 @@ import {
   type MinhaConsulta,
 } from '../lib/agenda'
 import {
-  cancelarSolicitacao,
+  cancelarPedidoDeVinculo,
   carregarMinhasSolicitacoes,
   estadoDaSolicitacao,
   estaEmAberto,
@@ -348,7 +348,7 @@ export function NutricionistasScreen({
               solicitacoes={solicitacoes}
               onPedir={setPedindo}
               onCancelar={async id => {
-                const r = await cancelarSolicitacao(id)
+                const r = await cancelarPedidoDeVinculo(id)
                 /* Relê em vez de tirar da lista aqui: quem decide se o pedido
                    pôde mesmo ser desfeito é o banco, e uma linha que some da
                    tela e volta na próxima leitura é pior do que uma que demora

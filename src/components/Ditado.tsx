@@ -6,7 +6,7 @@ import {
   LIMITE_SEGUNDOS,
   OPCOES_DITADO,
   prepararMicrofone,
-  duracao,
+  mmss,
   transcrever,
 } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
@@ -172,7 +172,7 @@ export function Ditado({
 
     /* O tempo tem de ser lido ANTES do stop — depois dele o estado zera, e a
        gravação de dez segundos seria descartada como curta demais. */
-    const duracao = segundos
+    const mmss = segundos
 
     try {
       await gravador.stop()
@@ -189,7 +189,7 @@ export function Ditado({
       return
     }
 
-    const r = await transcrever(uri, duracao)
+    const r = await transcrever(uri, mmss)
     setEstado('parado')
 
     if (r.tipo === 'ok') {
@@ -235,7 +235,7 @@ export function Ditado({
           <Text style={styles.textoGravando}>Ouvindo</Text>
         </View>
 
-        <Text style={styles.relogio}>{duracao(segundos)}</Text>
+        <Text style={styles.relogio}>{mmss(segundos)}</Text>
 
         {/* A onda é a prova de que o microfone está captando: reta com a pessoa
             falando significa que o áudio não está entrando.

@@ -13,7 +13,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
-  cancelarSolicitacao,
+  cancelarPedidoDeConsulta,
   carregarMinhasConsultas,
   carregarVagas,
   consultaCompacta,
@@ -166,7 +166,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
     setCancelando(true)
     setErro(null)
     try {
-      await cancelarSolicitacao(destaque.id)
+      await cancelarPedidoDeConsulta(destaque.id)
       await carregar()
     } catch (e) {
       setErro((e as Error).message)

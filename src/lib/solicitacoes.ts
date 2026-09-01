@@ -130,7 +130,7 @@ export async function solicitarVinculo(
  *
  * A frase cobre os três sem chutar qual foi, e manda fazer a única coisa que
  * resolve os três — reler. Mesma escolha do cancelar de lib/agenda.ts. */
-export async function cancelarSolicitacao(id: number): Promise<ResultadoPedido> {
+export async function cancelarPedidoDeVinculo(id: number): Promise<ResultadoPedido> {
   const { error } = await supabase.rpc('app_cancelar_solicitacao_vinculo', { p_id: id })
   if (error)
     return {

@@ -115,7 +115,7 @@ export async function solicitarConsulta(inicio: string): Promise<void> {
  * consulta. `app_cancelar_solicitacao` não levanta nada: é um update simples,
  * então tudo que chega até aqui é falha de rede ou de permissão, e o que a
  * pessoa leria seria "Network request failed" na hora de desistir de um pedido. */
-export async function cancelarSolicitacao(id: number): Promise<void> {
+export async function cancelarPedidoDeConsulta(id: number): Promise<void> {
   const { error } = await supabase.rpc('app_cancelar_solicitacao', { p_id: id })
   if (error) throw new Error(falha('Não consegui cancelar o pedido agora. Verifique a conexão.', error))
 }
