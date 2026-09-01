@@ -24,7 +24,7 @@ import { prontidaoDeHoje, SEM_PRONTIDAO, type Prontidao } from '../lib/prontidao
 import { carregarPeso } from '../lib/peso'
 import {
   apagarFotoDoDiario,
-  enderecoDaFoto,
+  enderecoNoDiario,
   escolherFoto,
   guardarFotoDoDiario,
 } from '../lib/fotoDoDiario'
@@ -567,7 +567,7 @@ function FotoDoTreino({
       setEndereco(null)
       return
     }
-    void enderecoDaFoto(caminho).then(u => {
+    void enderecoNoDiario(caminho).then(u => {
       if (vivo) setEndereco(u)
     })
     return () => {

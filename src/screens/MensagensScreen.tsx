@@ -34,12 +34,17 @@ import {
 import { horaCurta, rotuloDoDia } from '../lib/formatar'
 import {
   apagarFotoDoDiario,
-  enderecoDaFoto,
+  enderecoNoDiario,
   escolherFoto,
   guardarFotoDoDiario,
 } from '../lib/fotoDoDiario'
 import { comoElaResponde } from '../lib/ritmoDaConversa'
 import { estilosDe, paleta } from '../lib/tema'
+import { AudioDoBalao } from '../components/AudioDoBalao'
+import { useAudioRecorder, useAudioRecorderState } from 'expo-audio'
+import { LIMITE_DO_RECADO, MINIMO_DO_RECADO, guardarAudioDaConversa } from '../lib/audioDaConversa'
+import { falha } from '../lib/erros'
+import { OPCOES_DITADO, mmss, prepararMicrofone } from '../lib/voz'
 import { useDesvioDoTeclado } from '../lib/teclado'
 
 /* A conversa com a nutricionista.
@@ -129,6 +134,22 @@ export function MensagensScreen({
    * Assim ela vê o que escolheu, escreve a legenda, e pode trocar de ideia. */
   const [anexo, setAnexo] = useState<{ path: string; tipo: TipoDeAnexo } | null>(null)
   const [subindoAnexo, setSubindoAnexo] = useState(false)
+
+  /* ── Gravar o recado ──────────────────────────────────────────────────
+   *
+   * Mesmo gravador do ditado, e de propósito: um segundo preset produziria
+   * dois formatos de áudio no mesmo balde, e o formato é o que decide se o
+   * outro lado consegue tocar.
+   *
+   * A diferença é o destino. O ditado grava para VIRAR TEXTO — o áudio é
+   * descartado assim que a transcrição volta. Aqui o áudio É a mensagem, e
+   * quem ouve é a nutricionista. */
+  const gravador = useAudioRecorder(OPCOES_DITADO)
+  const estadoDoGravador = useAudioRecorderState(gravador, 200)
+  const [gravando, setGravando] = useState(false)
+  const gravandoAgora = useRef(false)
+
+  const segundosGravados = Math.floor((estadoDoGravador.durationMillis ?? 0) / 1000)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
   /* Separado do erro de enviar: um é sobre a mensagem que não saiu, o outro
@@ -228,6 +249,89 @@ export function MensagensScreen({
       requestAnimationFrame(() => rolagem.current?.scrollToEnd({ animated: false }))
     }
   }, [mensagens.length])
+
+  /* Para sozinho no limite.
+   *
+   * Sem isto, esquecer o dedo fora do botão grava até a memória acabar — e o
+   * recado de dez minutos não é ouvido por ninguém entre atendimentos. */
+  useEffect(() => {
+    if (gravando && segundosGravados >= LIMITE_DO_RECADO) void pararEAnexar()
+  }, [gravando, segundosGravados])
+
+  /* Sair da tela gravando tem de SOLTAR o microfone.
+   *
+   * O gravador é recurso nativo: deixá-lo aberto mantém o ponto vermelho do
+   * sistema aceso depois que a pessoa já saiu, o que se lê — com razão — como
+   * um app que continua ouvindo. */
+  useEffect(
+    () => () => {
+      if (gravandoAgora.current) gravador.stop().catch(() => {})
+    },
+    [],
+  )
+
+  async function comecarAGravar() {
+    if (gravando || enviando || subindoAnexo) return
+
+    /* A explicação vem ANTES da caixa do sistema, e é a mesma do ditado: a
+       caixa do Android não se estiliza e não diz para que serve, mas tudo em
+       volta dela é nosso. */
+    const permissao = await prepararMicrofone()
+    if (permissao.tipo !== 'ok') {
+      setErro(permissao.mensagem)
+      return
+    }
+
+    try {
+      await gravador.prepareToRecordAsync()
+      gravador.record()
+      gravandoAgora.current = true
+      setGravando(true)
+      setErro('')
+    } catch (e) {
+      setErro(falha('Não consegui abrir o microfone agora.', e))
+    }
+  }
+
+  /* Parar, subir, e só então virar anexo.
+   *
+   * O arquivo sobe ANTES do envio porque o servidor confere que o caminho
+   * começa na pasta de quem manda, e essa conferência acontece no instante em
+   * que a mensagem nasce. Então a pessoa grava, vê "Áudio pronto", pode
+   * escrever uma legenda por cima e pode desistir. */
+  async function pararEAnexar() {
+    if (!gravandoAgora.current) return
+    gravandoAgora.current = false
+    setGravando(false)
+
+    let uri: string | null = null
+    const duracao = segundosGravados
+    try {
+      await gravador.stop()
+      uri = gravador.uri
+    } catch (e) {
+      setErro(falha('A gravação não foi concluída.', e))
+      return
+    }
+
+    /* Toque sem querer não vira mensagem. Abaixo de um segundo é quase sempre
+       o dedo escorregando, e mandar meio segundo de silêncio gasta a atenção
+       dela à toa. */
+    if (!uri || duracao < MINIMO_DO_RECADO) {
+      setErro('Gravação muito curta. Segure e fale por pelo menos um segundo.')
+      return
+    }
+
+    setSubindoAnexo(true)
+    const caminho = await guardarAudioDaConversa(contaId, uri)
+    setSubindoAnexo(false)
+
+    if (!caminho) {
+      setErro('Não consegui preparar o áudio. Você pode escrever e tentar de novo depois.')
+      return
+    }
+    setAnexo({ path: caminho, tipo: 'audio' })
+  }
 
   async function enviar() {
     const limpo = texto.trim()
@@ -463,20 +567,56 @@ export function MensagensScreen({
               sabe se pegou — e manda a mesma foto três vezes. */}
           {anexo && (
             <View style={styles.previaAnexo}>
-              <Ionicons name="image" size={16} color={paleta().cores.verde} />
-              <Text style={styles.textoPrevia}>Foto pronta para enviar</Text>
+              <Ionicons
+                name={anexo.tipo === 'audio' ? 'mic' : 'image'}
+                size={16}
+                color={paleta().cores.verde}
+              />
+              {/* Diz QUAL, e não "anexo pronto": quem gravou e fotografou na
+                  mesma conversa precisa saber o que está preso ali agora. */}
+              <Text style={styles.textoPrevia}>
+                {anexo.tipo === 'audio' ? 'Áudio pronto para enviar' : 'Foto pronta para enviar'}
+              </Text>
               <Pressable
                 onPress={descartarAnexo}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel="Tirar a foto da mensagem"
+                accessibilityLabel={
+                anexo.tipo === 'audio' ? 'Tirar o áudio da mensagem' : 'Tirar a foto da mensagem'
+              }
               >
                 <Ionicons name="close" size={17} color={paleta().inkFraco} />
               </Pressable>
             </View>
           )}
 
-          <View style={[styles.barraEnvio, { marginBottom: respiro }]}>
+          {/* GRAVANDO: a barra some e dá lugar ao que está acontecendo.
+              Deixar o campo de escrever no lugar durante a gravação convida a
+              digitar com o microfone aberto, e o que sai disso é um áudio com
+              o barulho do teclado. */}
+          {gravando && (
+            <View style={[styles.gravando, { marginBottom: respiro }]}>
+              <View style={styles.pontoGravando} />
+              <Text style={styles.tempoGravando}>{mmss(segundosGravados)}</Text>
+              <Text style={styles.dicaGravando}>
+                {segundosGravados >= LIMITE_DO_RECADO - 10
+                  ? `Faltam ${LIMITE_DO_RECADO - segundosGravados}s`
+                  : 'Gravando para a sua nutricionista'}
+              </Text>
+              <Pressable
+                onPress={pararEAnexar}
+                style={({ pressed }) => [styles.botaoParar, pressed && { opacity: 0.75 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Parar de gravar e anexar o áudio"
+              >
+                <Ionicons name="stop" size={18} color={paleta().cores.branco} />
+              </Pressable>
+            </View>
+          )}
+
+          <View
+            style={[styles.barraEnvio, { marginBottom: respiro }, gravando && styles.escondida]}
+          >
             <Pressable
               onPress={() => anexarFoto('camera')}
               onLongPress={() => anexarFoto('galeria')}
@@ -503,23 +643,45 @@ export function MensagensScreen({
               multiline
               maxLength={4000}
             />
-            <Pressable
-              onPress={enviar}
-              disabled={(!texto.trim() && !anexo) || enviando}
-              style={({ pressed }) => [
-                styles.botaoEnviar,
-                (!texto.trim() && !anexo) || enviando ? styles.botaoEnviarApagado : null,
-                pressed && styles.botaoZapPressionado,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Enviar mensagem"
-            >
-              {enviando ? (
-                <ActivityIndicator size="small" color={paleta().cores.branco} />
-              ) : (
-                <Ionicons name="arrow-up" size={20} color={paleta().cores.branco} />
-              )}
-            </Pressable>
+            {/* Um botão só, que troca de função conforme há ou não o que
+                enviar — o mesmo gesto que todo aplicativo de conversa usa, e
+                por isso o único que não precisa ser explicado.
+                Sem isso a barra teria quatro controles lado a lado num espaço
+                que já está apertado, e o de enviar apagado a maior parte do
+                tempo. */}
+            {!texto.trim() && !anexo && !enviando ? (
+              <Pressable
+                onPress={comecarAGravar}
+                disabled={subindoAnexo}
+                style={({ pressed }) => [styles.botaoEnviar, pressed && styles.botaoZapPressionado]}
+                accessibilityRole="button"
+                accessibilityLabel="Gravar um áudio para a sua nutricionista"
+              >
+                {subindoAnexo ? (
+                  <ActivityIndicator size="small" color={paleta().cores.branco} />
+                ) : (
+                  <Ionicons name="mic" size={20} color={paleta().cores.branco} />
+                )}
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={enviar}
+                disabled={(!texto.trim() && !anexo) || enviando}
+                style={({ pressed }) => [
+                  styles.botaoEnviar,
+                  (!texto.trim() && !anexo) || enviando ? styles.botaoEnviarApagado : null,
+                  pressed && styles.botaoZapPressionado,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Enviar mensagem"
+              >
+                {enviando ? (
+                  <ActivityIndicator size="small" color={paleta().cores.branco} />
+                ) : (
+                  <Ionicons name="arrow-up" size={20} color={paleta().cores.branco} />
+                )}
+              </Pressable>
+            )}
           </View>
         </>
       )}
@@ -563,7 +725,7 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
       setEndereco(null)
       return
     }
-    void enderecoDaFoto(mensagem.anexoPath).then(u => {
+    void enderecoNoDiario(mensagem.anexoPath).then(u => {
       if (vivo) setEndereco(u)
     })
     return () => {
@@ -587,27 +749,17 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
           />
         )}
 
-        {/* ── Áudio, que este app ainda não toca ──────────────────────────
+        {/* ── Áudio ────────────────────────────────────────────────────────
          *
-         * O tipo aceita 'audio' e a coluna também, mas só a foto é desenhada
-         * acima. Sem esta linha, um áudio vindo do lado dela desenha um balão
-         * VAZIO — só a hora —, e a paciente não fica sabendo que chegou nada.
-         * É a armadilha 10 na forma de um valor conhecido e não tratado.
+         * Até agora esta linha dizia "este aplicativo ainda não toca", porque
+         * a coluna aceitava 'audio' e só a foto era desenhada — um áudio dela
+         * virava balão VAZIO, e a paciente não ficava sabendo que chegou nada.
          *
-         * Dizer que não toca é pior que tocar e melhor que sumir: ela sabe que
-         * existe uma mensagem e pode pedir por escrito. Quando houver
-         * reprodução, esta linha vira o player. */}
-        {mensagem.anexoTipo === 'audio' && (
-          <View style={styles.audioAviso}>
-            <Ionicons
-              name="mic-outline"
-              size={15}
-              color={minha ? 'rgba(255,255,255,0.8)' : paleta().inkMedio}
-            />
-            <Text style={[styles.audioTexto, minha && styles.audioTextoMeu]}>
-              Áudio — este aplicativo ainda não toca
-            </Text>
-          </View>
+         * Agora toca. O player pede o endereço no primeiro toque, e não ao
+         * montar: `createAudioPlayer` segura recurso nativo, e uma lista de
+         * conversa abriria dezenas de tocadores para ouvir um. */}
+        {mensagem.anexoTipo === 'audio' && mensagem.anexoPath && (
+          <AudioDoBalao caminho={mensagem.anexoPath} minha={minha} />
         )}
 
         {/* Texto vazio não desenha linha: foto sem legenda é mensagem inteira, e
@@ -743,15 +895,6 @@ const estilos = estilosDe(t =>
     backgroundColor: 'rgba(0,0,0,0.06)',
   },
 
-    audioAviso: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingVertical: 2,
-      marginBottom: 2,
-    },
-    audioTexto: { fontSize: 13, fontStyle: 'italic', color: t.inkMedio },
-    audioTextoMeu: { color: 'rgba(255,255,255,0.8)' },
   previaAnexo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -770,6 +913,37 @@ const estilos = estilosDe(t =>
     alignItems: 'center',
     justifyContent: 'center',
   },
+  escondida: { display: 'none' },
+  gravando: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: t.cores.cartao,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  pontoGravando: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.cores.erroBorda },
+  tempoGravando: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: t.cores.ink,
+    /* Largura fixa por dígito: sem isto o "1" é mais estreito que o "8" e o
+       contador treme a cada segundo. */
+    fontVariant: ['tabular-nums'],
+  },
+  dicaGravando: { flex: 1, fontSize: 12.5, color: t.inkMedio },
+  botaoParar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.erroBorda,
+  },
+
   barraEnvio: {
       flexDirection: 'row',
       alignItems: 'flex-end',

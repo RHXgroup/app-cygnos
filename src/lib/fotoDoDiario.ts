@@ -161,11 +161,19 @@ export async function guardarFotoDoDiario(
   }
 }
 
-/* O endereço assinado de UMA foto, ou null.
+/* O endereço assinado de UM objeto do balde, ou null.
+ *
+ * Chamava-se `enderecoNoDiario`, e o nome deixou de ser verdade no dia em que o
+ * áudio da conversa passou a morar no mesmo balde. Ela nunca olhou o conteúdo:
+ * assina um caminho, e quem sabe o que tem ali é quem pediu.
+ *
+ * Nome que mente sobre o que a função aceita convida a segunda implementação —
+ * alguém escreve `enderecoDoAudio` com o mesmo corpo, e a partir daí são duas
+ * (armadilha 5). O nome fala do BALDE, que é o que ela de fato conhece.
  *
  * Null quando falha, de novo: a tela já sabe desenhar o item sem imagem, e um
  * erro aqui não pode cobrir o diário. */
-export async function enderecoDaFoto(caminho: string | null): Promise<string | null> {
+export async function enderecoNoDiario(caminho: string | null): Promise<string | null> {
   if (!caminho) return null
   try {
     const { data, error } = await supabase.storage
