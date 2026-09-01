@@ -214,6 +214,9 @@ export function NutricionistasScreen({
   }, [versao])
 
   const vinculada = catalogo?.vinculada ?? null
+  /* O catálogo MENOS a dela: ela já está inteira logo acima, e repetir a mesma
+     ficha duas vezes na mesma rolagem faria a pessoa achar que são duas. */
+  const outras = (catalogo?.lista ?? []).filter(n => n.id !== vinculada?.id)
 
   /* O mesmo controle nas duas ramificações da tela — a da ficha e a do erro.
      Puxar sobe a versão, e é o efeito de cima que relê: um caminho só para
@@ -256,7 +259,7 @@ export function NutricionistasScreen({
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>
-          {vinculada ? 'Meu nutricionista' : 'Nutricionistas Cygnos'}
+          {vinculada ? 'Minha nutricionista' : 'Nutricionistas Cygnos'}
         </Text>
         <View style={styles.botaoVoltar} />
       </View>
@@ -310,9 +313,38 @@ export function NutricionistasScreen({
                 return r
               }}
             />
-          ) : (
+          ) : null}
+
+          {/* A REDE, mesmo com vínculo.
+           *
+           * Era `vinculada ? <Ficha/> : <Lista/>` — uma ou outra, nunca as
+           * duas. A vitrine sumia junto com a escolha, e trocar de profissional
+           * virava salto no escuro: era preciso encerrar para só então poder
+           * olhar quem mais existe, e nesse intervalo ficar sem ninguém.
+           *
+           * O banco já tinha sido consertado para devolver o catálogo inteiro
+           * (migration 20260901040000). Esta tela mantinha a mesma trava do
+           * lado de cá, e por isso a correção lá não aparecia.
+           *
+           * ── E sem oferecer um segundo vínculo ────────────────────────────
+           * A regra é um ativo por vez, e ela é do banco. A lista aqui é para
+           * VER: as fichas abrem, o pedido não. Oferecer um botão que o
+           * servidor vai recusar é pior do que não oferecer — ela toca, leva
+           * um erro, e conclui que o app está quebrado. */}
+          {vinculada && outras.length > 0 && (
+            <View style={styles.blocoOutras}>
+              <Text style={styles.tituloOutras}>Outras nutricionistas Cygnos</Text>
+              <Text style={styles.ajudaOutras}>
+                Você pode conhecer as fichas. Para trocar de profissional, é preciso encerrar o
+                acompanhamento atual primeiro.
+              </Text>
+            </View>
+          )}
+
+          {(vinculada ? outras.length > 0 : true) && (
             <Lista
-              nutris={catalogo?.lista ?? []}
+              podePedir={!vinculada}
+              nutris={vinculada ? outras : (catalogo?.lista ?? [])}
               solicitacoes={solicitacoes}
               onPedir={setPedindo}
               onCancelar={async id => {
@@ -850,11 +882,16 @@ function Acompanhamento({
 function Lista({
   nutris,
   solicitacoes,
+  podePedir,
   onPedir,
   onCancelar,
 }: {
   nutris: Nutricionista[]
   solicitacoes: Solicitacao[]
+  /* Falso quando ela já tem vínculo: a regra de um ativo por vez é do banco, e
+     um botão que o servidor vai recusar é pior do que botão nenhum — ela toca,
+     leva um erro, e conclui que o app está quebrado. */
+  podePedir: boolean
   onPedir: (n: Nutricionista) => void
   onCancelar: (id: number) => Promise<{ tipo: 'ok' } | { tipo: 'erro'; mensagem: string }>
 }) {
@@ -890,8 +927,9 @@ function Lista({
         {nutris.length} {nutris.length === 1 ? 'profissional' : 'profissionais'} no Cygnos
       </Text>
       <Text style={styles.explicacaoLista}>
-        Toque em quem você quer que acompanhe você e mande um pedido de contato. Se você já está
-        com ela, dê o seu código de vínculo — é com ele que ela puxa a sua conta.
+        {podePedir
+          ? 'Toque em quem você quer que acompanhe você e mande um pedido de contato. Se você já está com ela, dê o seu código de vínculo — é com ele que ela puxa a sua conta.'
+          : 'Toque para ver a ficha de cada uma.'}
       </Text>
 
       <View style={styles.listaCartoes}>
@@ -900,6 +938,7 @@ function Lista({
             key={n.id}
             nutri={n}
             pedido={emAberto.has(n.id)}
+            podePedir={podePedir}
             onPedir={() => onPedir(n)}
           />
         ))}
@@ -916,24 +955,34 @@ function Lista({
 function CartaoDaLista({
   nutri,
   pedido,
+  podePedir,
   onPedir,
 }: {
   nutri: Nutricionista
   pedido: boolean
+  /* Falso quando ela já tem vínculo. O cartão continua abrindo a ficha — ver é
+     o motivo de a lista existir para quem já escolheu —, e o que some é o
+     pedido, que o banco recusaria. */
+  podePedir: boolean
   onPedir: () => void
 }) {
   const styles = estilos()
 
   return (
     <Pressable
-      onPress={pedido ? undefined : onPedir}
-      disabled={pedido}
-      style={({ pressed }) => [styles.cartao, pressed && !pedido && styles.cartaoPressionado]}
+      onPress={pedido || !podePedir ? undefined : onPedir}
+      disabled={pedido || !podePedir}
+      style={({ pressed }) => [
+        styles.cartao,
+        pressed && !pedido && podePedir && styles.cartaoPressionado,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={
-        pedido
-          ? `${nutri.nome}. Pedido enviado, aguardando resposta.`
-          : `Pedir contato com ${nutri.nome}`
+        !podePedir
+          ? `${nutri.nome}. Para trocar, encerre o acompanhamento atual primeiro.`
+          : pedido
+            ? `${nutri.nome}. Pedido enviado, aguardando resposta.`
+            : `Pedir contato com ${nutri.nome}`
       }
     >
       <View style={styles.linhaCartao}>
@@ -1436,6 +1485,9 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.erroFundo,
     padding: 14,
   },
+  blocoOutras: { marginTop: 26, marginBottom: 4, gap: 5 },
+  tituloOutras: { fontSize: 16, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.2 },
+  ajudaOutras: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
   textoErro: { fontSize: 13, color: t.cores.erroTexto },
   }),
 )
