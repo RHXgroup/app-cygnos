@@ -168,10 +168,38 @@ LGPD e o que é apagado.
 Três perguntas ficaram abertas porque a resposta mora no servidor, e daqui eu só
 tenho a chave pública.
 
-### a) A exclusão apaga tudo mesmo?
+### a) A exclusão apaga tudo mesmo? — **RESPONDIDA em 31/08**
 
-**Esta é a mais importante do documento.** A página pública lista dez coisas que
-são apagadas. O app guarda mais do que dez.
+> **As tabelas apagam. Os arquivos não.** A resposta veio da sessão
+> `app-cygnos-84`, que leu a função e conferiu as cascatas uma por uma.
+>
+> `app-excluir-conta` não escreve `delete` nenhum: apaga o usuário do Auth e
+> deixa a cascata trabalhar. Conferido `on delete cascade` em ciclo, treinos,
+> intenções, receitas, consumo, água, peso e sono — **ciclo menstrual e treino
+> não sobrevivem**. Nesse ponto a página pública é só redação incompleta.
+>
+> **Mas o Storage não tem cascata**, e a função só apaga o avatar à mão. Os
+> buckets `fotos-diario` (fotos de refeição e de treino) e
+> `documentos-paciente` (exames) **ficavam no servidor depois da exclusão** —
+> foto de prato com data é dado pessoal igual. Está sendo corrigido: apagar a
+> pasta da conta nos dois buckets antes do `deleteUser`, no mesmo lugar do
+> avatar.
+>
+> **Efeito no formulário:** antes do conserto, declarar "pode pedir exclusão:
+> sim" seria verdade para as tabelas e **mentira para as imagens**. Depois do
+> conserto, verdade inteira. **Confirme que o conserto subiu antes de marcar a
+> caixa.**
+>
+> **Uma pendência continua aberta:** `app_mensagens` (a conversa) não está em
+> `supabase/migrations/` — é do grupo de tabelas criadas fora do repositório, e
+> a cascata dela não pôde ser conferida por leitura. Confirme no banco antes de
+> afirmar que a conversa apaga.
+
+O texto abaixo é o levantamento original que gerou a pergunta, e continua útil
+para conferir a redação da página pública na leva de sexta.
+
+A página pública lista dez coisas que são apagadas. O app guarda mais do que
+dez.
 
 Comparando a lista da página com as tabelas que o app usa, **não aparecem na
 página**:
@@ -212,8 +240,10 @@ caminho não é mudar a declaração — é deixar de exigi-lo.
 
 ## 5. A ordem que eu seguiria na sexta
 
-1. Responder a pergunta (a) — é a única que pode transformar a declaração em
-   informação falsa.
+1. Confirmar que o conserto dos buckets subiu (a pergunta (a) foi respondida em
+   31/08: tabelas apagam, arquivos não apagavam). E confirmar no banco a
+   cascata de `app_mensagens`, que não pôde ser lida nas migrations.
+
 2. Responder (b) e (c), que mudam uma linha cada.
 3. Preencher o formulário com este documento ao lado.
 
