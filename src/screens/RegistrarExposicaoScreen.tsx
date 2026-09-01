@@ -191,11 +191,11 @@ export function RegistrarExposicaoScreen({
         {passo === 'feito' && degrau && (
           <View style={styles.feito}>
             <View
-              style={[styles.seloGrande, { backgroundColor: cores[degrau.altura - 1].leve }]}
+              style={[styles.seloGrande, { backgroundColor: cores[degrau.nivel - 1].leve }]}
             >
               <GlifoDoDegrau
                 sentido={degrau.sentido}
-                cor={cores[degrau.altura - 1].traco}
+                cor={cores[degrau.nivel - 1].traco}
                 tamanho={34}
               />
             </View>

@@ -96,7 +96,7 @@ console.log('\nsonda da escada\n')
 
       /* O recorde nunca pode ser MENOR que o atual: recorde é o mais alto que
          já se alcançou, e o atual é um dos alcançados. */
-      if (r.atual && r.recorde && r.recorde.altura < r.atual.altura) {
+      if (r.atual && r.recorde && r.recorde.nivel < r.atual.nivel) {
         incoerente = `atual ${r.atual.chave} > recorde ${r.recorde.chave}`
       }
       /* Um sem o outro é impossível: se há atual, houve pelo menos um degrau. */
@@ -174,7 +174,7 @@ console.log('\nsonda da escada\n')
   let ordemRuim = ''
   for (const d of DEGRAUS) {
     const p = proximoDegrau(d)
-    if (p && p.altura !== d.altura + 1) ordemRuim = `${d.chave} → ${p.chave}`
+    if (p && p.nivel !== d.nivel + 1) ordemRuim = `${d.chave} → ${p.chave}`
   }
   ok('o próximo degrau é sempre o de cima', ordemRuim === '', ordemRuim)
   ok('e o topo não inventa um próximo', proximoDegrau(DEGRAUS[DEGRAUS.length - 1]) === null)
@@ -223,7 +223,7 @@ console.log('\nsonda da escada\n')
     try {
       const d = degrauDe(cru)
       if (d && !validos.has(d.chave)) inventou = `${cru} → ${d.chave}`
-      if (d && (d.altura < 1 || d.altura > 7)) inventou = `${cru} → altura ${d.altura}`
+      if (d && (d.nivel < 1 || d.nivel > 7)) inventou = `${cru} → altura ${d.nivel}`
       const r = reacaoDoBanco(umDe(REACOES_CRUAS))
       if (r !== null && !['tranquilo', 'indiferente', 'dificil'].includes(r)) inventou = String(r)
     } catch (e) {

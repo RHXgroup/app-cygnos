@@ -46,8 +46,8 @@ console.log('\nescadaDaAceitacao\n')
 /* ── A escada em si ────────────────────────────────────────────────────────*/
 {
   ok('sete degraus', DEGRAUS.length === 7)
-  ok('alturas de 1 a 7, em ordem', DEGRAUS.every((d, i) => d.altura === i + 1))
-  ok('recusar é o primeiro', DEGRAUS[0].chave === 'recusou' && DEGRAUS[0].altura === 1)
+  ok('alturas de 1 a 7, em ordem', DEGRAUS.every((d, i) => d.nivel === i + 1))
+  ok('recusar é o primeiro', DEGRAUS[0].chave === 'recusou' && DEGRAUS[0].nivel === 1)
   ok('comer é o último', DEGRAUS[6].chave === 'comer')
 
   const sentidos = new Set(DEGRAUS.map(d => d.sentido))
@@ -94,7 +94,7 @@ console.log('\nescadaDaAceitacao\n')
  * `registros_exposicao.aceitacao` tem valores legados gravados, e o histórico
  * de um paciente antigo passa por aqui. Armadilha 10 do AGENTS.md. */
 {
-  ok('valor atual resolve', degrauDe('cheirar')?.altura === 4)
+  ok('valor atual resolve', degrauDe('cheirar')?.nivel === 4)
   ok('legado "aceitou" vira comer', degrauDe('aceitou')?.chave === 'comer')
   ok('legado "tolerou" vira tolerar', degrauDe('tolerou')?.chave === 'tolerar')
   ok('legado "provou" vira provar', degrauDe('provou')?.chave === 'provar')

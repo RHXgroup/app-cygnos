@@ -215,6 +215,54 @@ E ao substituir uma função, **apague a antiga na mesma alteração**. Duas
 implementações do mesmo assunto sempre divergem, e ninguém descobre por qual das
 duas a tela passa.
 
+### O caso em que o TypeScript não te salva: mesma assinatura, unidades diferentes
+
+Duas funções com nomes iguais em libs diferentes são um risco conhecido. O que
+não é óbvio é **quando o compilador deixa passar**: quando as duas têm a mesma
+forma e diferem só no SIGNIFICADO do número.
+
+Três casos apareceram num dia só, e o terceiro é o pior:
+
+```
+relogio(n)  em ritmoAgua  recebe MINUTOS desde a meia-noite  -> "07:30"
+relogio(n)  em voz        recebe SEGUNDOS de gravação        -> "1:23"
+```
+
+As duas são `number => string`. Trocar o import compila, roda, e imprime um
+número plausível e errado.
+
+E a fuga também erra: renomear para `duracao` para escapar dessa colisão caiu em
+cima de `sono.duracao`, que recebe minutos — a segunda colisão foi criada
+fugindo da primeira. O que resolveu foi `mmss`, que nomeia o **formato** e não o
+assunto, e por isso não tem com que colidir.
+
+```
+cancelarSolicitacao(id)  em agenda        -> desmarca a CONSULTA
+cancelarSolicitacao(id)  em solicitacoes  -> desfaz o VÍNCULO com a nutri
+```
+
+Os retornos diferem, mas isso só protege quem USA o retorno — e a tela fazia
+`await cancelarSolicitacao(id)` e ignorava. O import errado ali fazia a pessoa
+tocar em "desmarcar consulta" e perder a nutricionista.
+
+E dentro de um arquivo só vale igual: `Degrau.altura` era a posição na escada,
+1 a 7, num componente onde `height` é pixel — com um comentário sobre "altura"
+duas linhas depois. Virou `nivel`.
+
+**A regra:** quando a diferença entre duas coisas é a **unidade** ou o
+**assunto**, e as duas são `number`, o nome é a única proteção que existe.
+Nomeie pelo formato ou pelo objeto (`mmss`, `cancelarPedidoDeVinculo`,
+`nivel`), e não por uma palavra genérica que outro assunto também vai querer.
+
+Para varrer:
+
+```bash
+grep -rhoE "^export (async )?function \w+|^export const \w+" src/lib | sed 's/.* //' | sort | uniq -d
+```
+
+Nome repetido não é erro por si — vários recebem objeto ou aridade diferente, e
+aí o `tsc` pega a troca. Olhe só os que têm a **mesma forma**.
+
 ## 6. Null é resposta, zero é mentira
 
 A base não tem todo nutriente de todo alimento. Um `0` no lugar do desconhecido

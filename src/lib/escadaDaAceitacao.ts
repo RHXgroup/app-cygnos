@@ -38,8 +38,21 @@ export type ChaveDegrau =
 
 export type Degrau = {
   chave: ChaveDegrau
-  /* 1 a 7. É o que o desenho usa para altura, e o que compara dois registros. */
-  altura: number
+  /* A posição na escada, de 1 a 7.
+   *
+   * Chamava-se `altura`, e o nome era perigoso: no componente que desenha a
+   * escada ele convivia com `height` em PIXELS, e havia um comentário sobre
+   * "altura" duas linhas depois de `altura` significar degrau. Quando duas
+   * grandezas diferentes usam a mesma palavra, o tipo não protege — as duas são
+   * `number`, e trocar compila.
+   *
+   * Vale a regra que a sessão app-cygnos-b1 tirou de dois casos piores no mesmo
+   * dia: quando a diferença é a UNIDADE, o nome é a única proteção.
+   *
+   * `nivel` também é o vocabulário do sistema dela, que chama a recusa de nível
+   * zero. Aqui a recusa é 1 porque a lista começa nela — a diferença de origem
+   * está anotada no mapeamento da Escalada, acima. */
+  nivel: number
   paraMae: string
   /* A cena, para a mãe reconhecer sem interpretar. */
   cena: string
@@ -93,7 +106,7 @@ export type Degrau = {
 export const DEGRAUS: Degrau[] = [
   {
     chave: 'recusou',
-    altura: 1,
+    nivel: 1,
     paraMae: 'Não quis agora',
     cena: 'Virou o rosto, empurrou o prato',
     paraFilho: 'Hoje não deu vontade',
@@ -101,7 +114,7 @@ export const DEGRAUS: Degrau[] = [
   },
   {
     chave: 'tolerar',
-    altura: 2,
+    nivel: 2,
     paraMae: 'Deixou ficar perto',
     cena: 'Aceitou o prato na mesa, sem reclamar',
     paraFilho: 'Deixei ficar do meu lado',
@@ -109,7 +122,7 @@ export const DEGRAUS: Degrau[] = [
   },
   {
     chave: 'interagir',
-    altura: 3,
+    nivel: 3,
     paraMae: 'Mexeu, brincou',
     cena: 'Empurrou com o garfo, misturou, cutucou',
     paraFilho: 'Mexi com o garfo',
@@ -117,7 +130,7 @@ export const DEGRAUS: Degrau[] = [
   },
   {
     chave: 'cheirar',
-    altura: 4,
+    nivel: 4,
     paraMae: 'Chegou o nariz',
     cena: 'Cheirou, mesmo de longe',
     paraFilho: 'Cheirei pra ver como era',
@@ -125,7 +138,7 @@ export const DEGRAUS: Degrau[] = [
   },
   {
     chave: 'tocar',
-    altura: 5,
+    nivel: 5,
     paraMae: 'Pegou na mão',
     cena: 'Encostou o dedo, segurou',
     paraFilho: 'Peguei na mão',
@@ -133,7 +146,7 @@ export const DEGRAUS: Degrau[] = [
   },
   {
     chave: 'provar',
-    altura: 6,
+    nivel: 6,
     paraMae: 'Encostou na boca',
     cena: 'Lambeu, mordeu — mesmo que tenha cuspido depois',
     paraFilho: 'Encostei na boca',
@@ -141,7 +154,7 @@ export const DEGRAUS: Degrau[] = [
   },
   {
     chave: 'comer',
-    altura: 7,
+    nivel: 7,
     paraMae: 'Comeu',
     cena: 'Mastigou e engoliu',
     paraFilho: 'Comi!',
@@ -269,13 +282,13 @@ export function resumoDoAlimento(registros: Registro[]): ResumoDoAlimento {
   const atual = comDegrau.length > 0 ? comDegrau[comDegrau.length - 1] : null
   const recorde =
     comDegrau.length > 0
-      ? comDegrau.reduce((a, b) => (b.altura > a.altura ? b : a))
+      ? comDegrau.reduce((a, b) => (b.nivel > a.nivel ? b : a))
       : null
 
   let passo: ResumoDoAlimento['passo'] = null
   if (comDegrau.length >= 2) {
-    const ultimo = comDegrau[comDegrau.length - 1].altura
-    const penultimo = comDegrau[comDegrau.length - 2].altura
+    const ultimo = comDegrau[comDegrau.length - 1].nivel
+    const penultimo = comDegrau[comDegrau.length - 2].nivel
     passo = ultimo > penultimo ? 'subiu' : ultimo < penultimo ? 'desceu' : 'igual'
   }
 
@@ -305,7 +318,7 @@ export function resumoDoAlimento(registros: Registro[]): ResumoDoAlimento {
  * registrou um "não" precisa fechar o app sem sensação de fracasso. */
 export function fraseDoRegistro(degrau: Degrau, resumo: ResumoDoAlimento): string {
   if (degrau.chave === 'comer') return 'Ele comeu.'
-  if (degrau.altura === 1) return 'Tudo bem. Encontrar já conta.'
+  if (degrau.nivel === 1) return 'Tudo bem. Encontrar já conta.'
   if (resumo.passo === 'subiu') return 'Ele chegou mais perto que da última vez.'
   return 'Encontrou de novo. Isso conta.'
 }
@@ -313,7 +326,7 @@ export function fraseDoRegistro(degrau: Degrau, resumo: ResumoDoAlimento): strin
 /* A linha de apoio, embaixo da frase. É onde mora o limite das cinco ofertas —
    dito como alívio ("já dá para saber"), e nunca como meta cumprida. */
 export function apoioDoRegistro(degrau: Degrau, resumo: ResumoDoAlimento): string {
-  if (degrau.altura === 1) {
+  if (degrau.nivel === 1) {
     return 'Recusar é o primeiro degrau, não o contrário de progresso. O alimento apareceu, e ele viu.'
   }
   if (resumo.pedeAtencao) {
@@ -341,7 +354,7 @@ export function apoioDoRegistro(degrau: Degrau, resumo: ResumoDoAlimento): strin
  * cobrança. */
 export function proximoDegrau(atual: Degrau | null): Degrau | null {
   if (!atual) return DEGRAUS[0]
-  return DEGRAUS.find(d => d.altura === atual.altura + 1) ?? null
+  return DEGRAUS.find(d => d.nivel === atual.nivel + 1) ?? null
 }
 
 export function convitePraCrianca(atual: Degrau | null): string {
@@ -370,7 +383,7 @@ export function porMes(registros: Registro[]): MesDaEscada[] {
     if (!d) continue
     const mes = r.data.slice(0, 7)
     const atual = porChave.get(mes)
-    if (!atual || d.altura > atual.altura) porChave.set(mes, d)
+    if (!atual || d.nivel > atual.nivel) porChave.set(mes, d)
   }
 
   return [...porChave.entries()]

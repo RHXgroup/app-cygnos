@@ -75,21 +75,23 @@ function Trilha({
   cores: ReturnType<typeof coresDaEscada>
   styles: ReturnType<typeof estilos>
 }) {
-  const altura = atual?.altura ?? 0
+  const nivelAtual = atual?.nivel ?? 0
 
   return (
     <View>
       <View style={styles.trilha}>
         {DEGRAUS.map((d, i) => {
-          const passado = d.altura < altura
-          const hoje = d.altura === altura
+          const passado = d.nivel < nivelAtual
+          const hoje = d.nivel === nivelAtual
           return (
             <View key={d.chave} style={styles.colunaTrilha}>
               <View
                 style={[
                   styles.marca,
-                  /* A altura cresce com o degrau: a escada é uma escada,
-                     e não sete caixas iguais coloridas. */
+                  /* O PIXEL cresce com o degrau: a escada é uma escada, e não
+                     sete caixas iguais coloridas. `height` aqui é altura de
+                     verdade; o degrau chama-se `nivel` justamente para as duas
+                     palavras não disputarem o mesmo sentido neste arquivo. */
                   { height: 16 + i * 7 },
                   passado && { backgroundColor: cores[i].leve },
                   hoje && { backgroundColor: cores[i].traco },
@@ -102,10 +104,10 @@ function Trilha({
 
       {atual && (
         <View style={styles.hoje}>
-          <View style={[styles.seloHoje, { backgroundColor: cores[atual.altura - 1].leve }]}>
+          <View style={[styles.seloHoje, { backgroundColor: cores[atual.nivel - 1].leve }]}>
             <GlifoDoDegrau
               sentido={atual.sentido}
-              cor={cores[atual.altura - 1].traco}
+              cor={cores[atual.nivel - 1].traco}
               tamanho={30}
             />
           </View>
