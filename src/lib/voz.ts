@@ -260,7 +260,15 @@ export async function transcrever(
 
 /* mm:ss do cronômetro. `currentTime` vem em segundos com casas decimais, e
    mostrar "12.847" enquanto a pessoa fala seria ruído. */
-export function relogio(segundos: number): string {
+/* Uma DURAÇÃO, em "1:23" — e não uma hora do dia.
+ *
+ * Chamava-se `relogio`, e havia OUTRO `relogio` exportado em `ritmoAgua.ts` que
+ * recebe minutos desde a meia-noite e devolve "07:30". Dois nomes iguais, as
+ * duas assinaturas `number => string`: trocar um pelo outro compila, roda, e
+ * imprime um número plausível e errado.
+ *
+ * O tipo não protege quando a diferença é a UNIDADE. O nome tem de proteger. */
+export function duracao(segundos: number): string {
   const inteiros = Math.max(0, Math.floor(segundos))
   const min = Math.floor(inteiros / 60)
   const seg = inteiros % 60

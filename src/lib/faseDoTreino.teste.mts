@@ -107,6 +107,15 @@ console.log('\nO descanso')
   ok('acabando, vai para a preparacao', fim.fase === 'preparando')
   ok('anuncia', fim.falar === 'descanso acabou')
   ok('e abre sete segundos', fim.fimDoPreparo === T + PREPARO_MS)
+  /* O NUMERO, e nao a constante: escrito com `PREPARO_MS` dos dois lados, o
+     caso passa qualquer que seja o valor -- e a mutacao que trocou sete por
+     tres escapou por isso.
+
+     Sete tem motivo: o aviso falado come mais de um segundo do comeco e a
+     contagem so entra aos tres. Com menos, o "Descanso acabou" atropela o
+     "tres", que foi o defeito que apareceu na academia. */
+  ok('e sete sao 7000 ms', PREPARO_MS === 7000)
+  ok('sobra pelo menos 3s entre o aviso e a contagem', PREPARO_MS - 3000 >= 3000)
   /* A serie NAO comeca aqui: comeca no fim da preparacao. Comecar as duas
      coisas juntas contaria a caminhada ate a barra como parte da serie. */
   ok('e a serie nao comeca ainda', fim.comecarSerie === false)

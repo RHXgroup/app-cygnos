@@ -6,7 +6,7 @@ import {
   LIMITE_SEGUNDOS,
   OPCOES_DITADO,
   prepararMicrofone,
-  relogio,
+  duracao,
   transcrever,
 } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
@@ -235,7 +235,7 @@ export function Ditado({
           <Text style={styles.textoGravando}>Ouvindo</Text>
         </View>
 
-        <Text style={styles.relogio}>{relogio(segundos)}</Text>
+        <Text style={styles.relogio}>{duracao(segundos)}</Text>
 
         {/* A onda é a prova de que o microfone está captando: reta com a pessoa
             falando significa que o áudio não está entrando.

@@ -15,7 +15,7 @@ import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'
 import * as Speech from 'expo-speech'
 import { PREPARO_MS, acaoDoMomento, restam, type Fase } from '../lib/faseDoTreino'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
-import { relogio } from '../lib/voz'
+import { duracao } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
 import {
   gravarSerie,
@@ -616,7 +616,7 @@ export function ModoTreino({
           >
             <Ionicons name="chevron-down" size={24} color={paleta().cores.ink} />
           </Pressable>
-          <Text style={styles.relogioTopo}>{relogio(segundosDeTreino)}</Text>
+          <Text style={styles.relogioTopo}>{duracao(segundosDeTreino)}</Text>
           <View style={styles.botaoVoltar} />
         </View>
 
