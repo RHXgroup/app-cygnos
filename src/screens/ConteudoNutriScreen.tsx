@@ -39,6 +39,7 @@ import { ComparativoFotos } from '../components/ComparativoFotos'
 import { decimal, milhar } from '../lib/formatar'
 import { abrirLink } from '../lib/links'
 import { estilosDe, paleta } from '../lib/tema'
+import { Aviso } from '../components/Aviso'
 
 /* O conteúdo de um item do painel "Meu nutricionista".
  *
@@ -698,14 +699,6 @@ function CartaoEnergetico({ energetico: e }: { energetico: Energetico }) {
 
 /* ── Peças ─────────────────────────────────────────────────────────────────*/
 
-function Aviso({ texto }: { texto: string }) {
-  const styles = estilos()
-  return (
-    <View style={styles.aviso}>
-      <Text style={styles.textoAviso}>{texto}</Text>
-    </View>
-  )
-}
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
@@ -824,8 +817,7 @@ cartaoPressionado: { backgroundColor: t.cores.superficie },
   unidadeDestaque: { fontSize: 15, fontWeight: '600', color: t.inkSuave },
   dataDestaque: { marginTop: 4, fontSize: 12, color: t.inkSuave },
 
-  aviso: { marginTop: 16, borderRadius: 16, backgroundColor: t.cores.cartao, padding: 18 },
-fotoReceita: { width: '100%', height: 150, borderRadius: 12, marginBottom: 12 },
+  fotoReceita: { width: '100%', height: 150, borderRadius: 12, marginBottom: 12 },
   linhaTituloReceita: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   nomeReceita: { flexShrink: 1, fontSize: 16, fontWeight: '800', color: t.cores.ink },
   etiquetaReceita: {
@@ -858,6 +850,5 @@ fotoReceita: { width: '100%', height: 150, borderRadius: 12, marginBottom: 12 },
     color: t.cores.limao,
   },
   preparoReceita: { marginTop: 5, fontSize: 13.5, lineHeight: 21, color: t.inkMedio },
-  textoAviso: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
   }),
 )

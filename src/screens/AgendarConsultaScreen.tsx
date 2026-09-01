@@ -27,6 +27,7 @@ import {
   type Vaga,
 } from '../lib/agenda'
 import { estilosDe, paleta } from '../lib/tema'
+import { Aviso } from '../components/Aviso'
 
 /* Pedir consulta.
  *
@@ -425,14 +426,6 @@ function LinhaHorario({
   )
 }
 
-function Aviso({ texto }: { texto: string }) {
-  const styles = estilos()
-  return (
-    <View style={styles.aviso}>
-      <Text style={styles.textoAviso}>{texto}</Text>
-    </View>
-  )
-}
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
@@ -555,8 +548,6 @@ const estilos = estilosDe(t =>
   botaoDesistirPressionado: { backgroundColor: t.cores.erroBorda },
   textoDesistir: { fontSize: 13.5, fontWeight: '700', color: t.cores.erroTexto },
 
-  aviso: { marginTop: 16, borderRadius: 16, backgroundColor: t.cores.cartao, padding: 18 },
-  textoAviso: { fontSize: 13.5, lineHeight: 20, color: t.inkSuave, textAlign: 'center' },
 
   erro: {
     marginTop: 16,
