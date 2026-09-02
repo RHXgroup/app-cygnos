@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { semImagem } from './permissoes'
 
 const BUCKET = 'avatares'
 /* 512px de lado é o suficiente para a maior exibição da foto (o avatar grande
@@ -74,10 +75,7 @@ export async function trocarAvatar(
   if (!(await pedirPermissao(origem))) {
     return {
       tipo: 'erro',
-      mensagem:
-        origem === 'camera'
-          ? 'Preciso de acesso à câmera. Você pode liberar nos ajustes do aparelho.'
-          : 'Preciso de acesso às suas fotos. Você pode liberar nos ajustes do aparelho.',
+      mensagem: semImagem(origem),
     }
   }
 

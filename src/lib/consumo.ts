@@ -4,6 +4,7 @@ import { dataISO } from './formatar'
 import { supabase } from './supabase'
 import { falha } from './erros'
 import { type Estimativa, itensDaEstimativa } from './estimativaDaFoto'
+import { semImagem } from './permissoes'
 
 /* Reexportado para as telas: elas pedem a foto por aqui, e ter de importar o
    tipo de um arquivo e a função de outro é o tipo de detalhe que faz alguém
@@ -631,10 +632,7 @@ export async function analisarFoto(
   if (!(await pedirPermissao(origem))) {
     return {
       tipo: 'erro',
-      mensagem:
-        origem === 'camera'
-          ? 'Preciso de acesso à câmera. Você pode liberar nos ajustes do aparelho.'
-          : 'Preciso de acesso às suas fotos. Você pode liberar nos ajustes do aparelho.',
+      mensagem: semImagem(origem),
     }
   }
 

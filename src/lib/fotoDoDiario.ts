@@ -3,6 +3,7 @@ import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
 import { decode } from 'base64-arraybuffer'
 import { falha } from './erros'
 import { supabase } from './supabase'
+import { semImagem } from './permissoes'
 
 /* A foto do prato, guardada.
  *
@@ -82,10 +83,7 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
   if (!granted)
     return {
       tipo: 'erro',
-      mensagem:
-        origem === 'camera'
-          ? 'Preciso de acesso à câmera. Você pode liberar nos ajustes do aparelho.'
-          : 'Preciso de acesso às suas fotos. Você pode liberar nos ajustes do aparelho.',
+      mensagem: semImagem(origem),
     }
 
   const escolha =

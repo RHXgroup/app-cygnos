@@ -28,6 +28,7 @@ import {
   lembretesLigados,
   reagendarSeLigados,
   reagendarAguaSeLigada,
+  precisaExplicarNotificacao,
   ligarLembretes,
   ligarLembretesDeAgua,
 } from '../lib/lembretes'
@@ -44,6 +45,8 @@ import {
 } from '../lib/tema'
 import { hexDeHsl } from '../lib/cor'
 import { ritmoDeAgua } from '../lib/ritmoDeAgua'
+import { Confirmacao } from '../components/Confirmacao'
+import { EXPLICACAO_DA_NOTIFICACAO, SEM_NOTIFICACAO } from '../lib/permissoes'
 
 const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'sunny-outline' }[] = [
   { chave: 'escuro', rotulo: 'Escuro', icone: 'moon-outline' },
@@ -111,6 +114,21 @@ export function MaisScreen({
   const [lembretes, setLembretes] = useState(false)
   const [mexendoLembretes, setMexendoLembretes] = useState(false)
   const [avisoLembretes, setAvisoLembretes] = useState('')
+
+  /* ── A NOSSA explicação, antes da caixa do sistema ────────────────────
+   *
+   * A permissão de notificação era pedida FRIA: a pessoa ligava o interruptor
+   * e a caixa do Android aparecia sem nada antes. Quem não sabe o que vai
+   * receber recusa — e no Android a recusa é definitiva: ele não pergunta de
+   * novo, e daí em diante o único caminho é as configurações do aparelho.
+   *
+   * O app já explicava, mas DEPOIS da recusa, que é tarde. Agora explica antes,
+   * com a caixa da casa, e o aviso do "negado" continua para quem recusar
+   * mesmo assim.
+   *
+   * Guarda QUAL interruptor pediu, porque são três — refeição, água e
+   * sequência — e depois da explicação é preciso continuar naquele. */
+  const [explicandoAviso, setExplicandoAviso] = useState<null | (() => void)>(null)
   /* Estado próprio, e não um só para os dois: os interruptores são
      independentes — o da refeição depende de existir plano, o da água não
      depende de nada. */
@@ -240,6 +258,17 @@ export function MaisScreen({
      vai tocar. */
   async function alternarLembretes() {
     setAvisoLembretes('')
+
+    /* Só ao LIGAR, e só na primeira vez: já concedida, o sistema não pergunta
+       mais e a explicação seria conversa sobre coisa nenhuma. */
+    if (!lembretes && (await precisaExplicarNotificacao())) {
+      setExplicandoAviso(() => () => void seguirLembretes())
+      return
+    }
+    await seguirLembretes()
+  }
+
+  async function seguirLembretes() {
     setMexendoLembretes(true)
 
     if (lembretes) {
@@ -254,7 +283,7 @@ export function MaisScreen({
 
     if (r.tipo === 'negado') {
       setAvisoLembretes(
-        'O Android não autorizou as notificações. Você pode liberar em Configurações → Aplicativos → Cygnos → Notificações.',
+        SEM_NOTIFICACAO,
       )
       return
     }
@@ -290,6 +319,14 @@ export function MaisScreen({
    * lembretes que serviam. */
   async function alternarSequencia() {
     setAvisoSequencia('')
+    if (!sequencia && (await precisaExplicarNotificacao())) {
+      setExplicandoAviso(() => () => void seguirSequencia())
+      return
+    }
+    await seguirSequencia()
+  }
+
+  async function seguirSequencia() {
     setMexendoSequencia(true)
 
     if (sequencia) {
@@ -304,7 +341,7 @@ export function MaisScreen({
 
     if (r.tipo === 'negado') {
       setAvisoSequencia(
-        'O Android não autorizou as notificações. Você pode liberar em Configurações → Aplicativos → Cygnos → Notificações.',
+        SEM_NOTIFICACAO,
       )
       return
     }
@@ -325,6 +362,14 @@ export function MaisScreen({
 
   async function alternarAgua() {
     setAvisoAgua('')
+    if (!agua && (await precisaExplicarNotificacao())) {
+      setExplicandoAviso(() => () => void seguirAgua())
+      return
+    }
+    await seguirAgua()
+  }
+
+  async function seguirAgua() {
     setFaltaMeta(false)
     setMexendoAgua(true)
 
@@ -344,7 +389,7 @@ export function MaisScreen({
 
     if (r.tipo === 'negado') {
       setAvisoAgua(
-        'O Android não autorizou as notificações. Você pode liberar em Configurações → Aplicativos → Cygnos → Notificações.',
+        SEM_NOTIFICACAO,
       )
       return
     }
@@ -714,6 +759,22 @@ export function MaisScreen({
           <Text style={styles.textoLinkExcluir}>Excluir conta</Text>
         </Pressable>
       </View>
+      {/* A explicação da notificação, com a cara do app.
+          `explicandoAviso` guarda QUAL interruptor pediu — são três, e depois
+          do "pode pedir" é preciso continuar naquele, e não em outro. */}
+      <Confirmacao
+        visivel={explicandoAviso !== null}
+        titulo="Lembretes no seu aparelho"
+        mensagem={EXPLICACAO_DA_NOTIFICACAO}
+        rotuloConfirmar="Pode pedir"
+        rotuloCancelar="Agora não"
+        onCancelar={() => setExplicandoAviso(null)}
+        onConfirmar={() => {
+          const seguir = explicandoAviso
+          setExplicandoAviso(null)
+          seguir?.()
+        }}
+      />
     </ScrollView>
   )
 }

@@ -314,6 +314,21 @@ export type ResultadoLembretes =
  * Sempre apaga antes de agendar. Agendar por cima duplicaria o aviso a cada vez
  * que a pessoa mexesse no plano — e um app que avisa duas vezes a mesma coisa é
  * desinstalado mais rápido do que um que não avisa. */
+/* Precisa da NOSSA explicação antes da caixa do sistema?
+ *
+ * Só quando o sistema ainda vai perguntar. Já concedida, a caixa dele não
+ * aparece; já negada de vez (`canAskAgain` falso), ela também não — e explicar
+ * ali seria prometer uma pergunta que não vem, o que é pior que silêncio.
+ *
+ * Quem desenha a explicação é a TELA: uma lib não renderiza, e o `Alert.alert`
+ * do sistema — o atalho óbvio aqui — desenha a caixa do Android no meio de um
+ * app escuro. Mesmo caminho do microfone. */
+export async function precisaExplicarNotificacao(): Promise<boolean> {
+  const Notifications = await notificacoes()
+  const p = await Notifications.getPermissionsAsync()
+  return !p.granted && p.canAskAgain !== false
+}
+
 async function temPermissao(): Promise<boolean> {
   const Notifications = await notificacoes()
   const permissao = await Notifications.getPermissionsAsync()

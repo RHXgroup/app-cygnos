@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
 import { rotinaDaIA, type RotinaConvertida, type RotinaDaIA } from './rotinaDaIA'
 import { supabase } from './supabase'
+import { semImagem } from './permissoes'
 
 /* A IA monta a rotina de treino de quem não tem personal.
  *
@@ -165,10 +166,7 @@ export async function lerFichaDaFoto(
   if (!granted) {
     return {
       tipo: 'erro',
-      mensagem:
-        origem === 'camera'
-          ? 'Preciso de acesso à câmera. Você pode liberar nos ajustes do aparelho.'
-          : 'Preciso de acesso às suas fotos. Você pode liberar nos ajustes do aparelho.',
+      mensagem: semImagem(origem),
     }
   }
 

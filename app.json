@@ -42,7 +42,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "O Cygnos usa o microfone para você falar o que comeu em vez de digitar."
+          "microphonePermission": "O Cygnos usa o microfone para você falar o que comeu em vez de digitar, e para gravar um áudio para a sua nutricionista."
         }
       ],
       "expo-asset",
