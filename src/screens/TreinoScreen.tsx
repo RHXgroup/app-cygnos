@@ -51,6 +51,7 @@ import { DIAS_CURTOS, DIAS_LONGOS, dataNumerica } from '../lib/formatar'
 import type { DiaSemana } from '../lib/plano'
 import { dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from '../components/Botao'
 
 /* Treino.
  *
@@ -1130,10 +1131,17 @@ function Rotina({
           </View>
         </Pressable>
       ) : (
-        <Pressable onPress={onPedirIA} style={styles.linkIA} accessibilityRole="button">
-          <Ionicons name="sparkles-outline" size={15} color={paleta().cores.verde} />
-          <Text style={styles.textoLinkIA}>Montar outra rotina com IA</Text>
-        </Pressable>
+        /* Botão, e não link.
+           Com rotina montada isto era um texto pequeno com um ícone de 15px, e
+           quem quis montar de novo não achou. O convite grande continua sendo
+           só da rotina vazia — mas "discreto" não pode significar "invisível":
+           montar de novo é a segunda ação mais comum desta tela. */
+        <Botao
+          rotulo="Montar outra rotina com IA"
+          tipo="secundario"
+          icone="sparkles-outline"
+          onPress={onPedirIA}
+        />
       )}
 
       {doDia.length === 0 ? (
@@ -1423,15 +1431,7 @@ const estilos = estilosDe(t =>
   },
   textoConvite: { flex: 1, gap: 4 },
   tituloConvite: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
-  subConvite: { fontSize: 13, color: t.inkMedio, lineHeight: 18 },
-  linkIA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-  },
-  textoLinkIA: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
+  subConvite: { fontSize: 13, color: t.inkMedio, lineHeight: 18 },
   linhaFeito: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   selo: {
     width: 28,

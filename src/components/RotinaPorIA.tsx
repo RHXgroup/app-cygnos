@@ -297,6 +297,43 @@ export function RotinaPorIA({
     setEditando(null)
   }
 
+  /* ACRESCENTAR um exercício ao dia.
+   *
+   * A conferência deixava TIRAR e EDITAR, e não deixava pôr. Quem olha a rotina
+   * pronta e lembra de uma coisa que faz sempre — abdominal no fim, alongamento
+   * — tinha duas saídas ruins: aceitar sem, e depois montar à mão na outra
+   * tela; ou pedir outra rotina inteira, gastando outra chamada paga por causa
+   * de um exercício.
+   *
+   * Nasce em branco e JÁ ABERTO no editor: um item novo sem nome no meio da
+   * lista não se explica sozinho, e o teclado subindo é o que diz "escreva
+   * aqui". A ordem é o fim do dia, que é onde se acrescenta o que se lembrou. */
+  const acrescentar = (dia: DiaSemana) => {
+    setExercicios(atuais => {
+      const doDia = atuais.filter(e => e.dia === dia)
+      const novo: ExercicioComAlerta = {
+        dia,
+        nome: '',
+        ordem: doDia.length + 1,
+        series: 3,
+        repeticoes: '10',
+        cargaKg: null,
+        observacao: null,
+        adaptadoDe: null,
+        descansoSeg: null,
+        /* `alerta` NULO quer dizer "ninguém analisou", e não "é seguro".
+           O alerta existe para avisar quando um exercício carrega a parte que a
+           pessoa disse ter lesionado — quem faz essa conferência é a IA, sobre
+           o que ELA sugeriu. Um exercício escrito à mão aqui não passou por
+           isso, e fingir que passou seria a pior versão de um campo vazio. */
+        alerta: null,
+      }
+      const proximos = [...atuais, novo]
+      setEditando(proximos.length - 1)
+      return proximos
+    })
+  }
+
   const mudar = (i: number, campos: Partial<ExercicioNovo>) =>
     setExercicios(atuais => atuais.map((e, n) => (n === i ? { ...e, ...campos } : e)))
 
@@ -652,6 +689,9 @@ export function RotinaPorIA({
                     ))}
                   </View>
 
+                  {/* O botão fica no FIM do dia, e não no topo: acrescentar é
+                      continuar a lista, e um "adicionar" antes dos itens
+                      sugere que o novo entra na frente. */}
                   {exercicios.map((e, i) =>
                     e.dia !== d ? null : editando === i ? (
                       <View key={i} style={styles.editor}>
@@ -743,6 +783,16 @@ export function RotinaPorIA({
                       </Pressable>
                     ),
                   )}
+
+                  <Pressable
+                    onPress={() => acrescentar(d)}
+                    style={({ pressed }) => [styles.acrescentar, pressed && { opacity: 0.6 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Acrescentar exercício em ${DIAS_ROTULO[d]}`}
+                  >
+                    <Ionicons name="add" size={16} color={paleta().cores.verde} />
+                    <Text style={styles.textoAcrescentar}>Acrescentar exercício</Text>
+                  </Pressable>
                 </View>
               ))}
 
@@ -789,6 +839,19 @@ const estilos = estilosDe(t =>
     tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
     rolagem: { flex: 1 },
   conteudo: { paddingHorizontal: 20, gap: 10 },
+  acrescentar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: t.cores.borda,
+  },
+  textoAcrescentar: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
 
     /* ── O atalho é CARTÃO, e não dois botões soltos ────────────────────
    *
