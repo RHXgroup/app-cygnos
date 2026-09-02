@@ -266,37 +266,46 @@ export function RotinaPorIA({
                 Diga o que você quer, do seu jeito. Eu monto e você confere antes de valer.
               </Text>
 
-              {/* Vem antes do formulário de propósito: quem já tem ficha da
-                  academia não deve ler seis campos para só então descobrir que
-                  bastava fotografar. */}
-              <View style={styles.fotoLinha}>
+              {/* ── O ATALHO de quem já tem ficha, e por que ele encolheu ──
+               *
+               * Isto eram DOIS BOTÕES GRANDES, no topo, antes do formulário. O
+               * argumento era bom no papel: quem já treina com ficha da
+               * academia não deveria ler seis campos para só então descobrir
+               * que bastava fotografar.
+               *
+               * No aparelho deu o contrário. Os dois botões ocupavam a primeira
+               * tela inteira, o formulário ficava abaixo da dobra, e a tela
+               * passava a mensagem de que a IA só sabe LER FICHA — que é
+               * justamente o oposto do que ela faz. Quem queria pedir "CrossFit,
+               * quatro dias, em casa, tenho lesão no ombro" concluía que não
+               * dava, e saía.
+               *
+               * Continua no topo, porque é onde quem tem ficha procura. Mas
+               * como UMA linha discreta: atalho tem tamanho de atalho, e o
+               * caminho principal é o que tem de ocupar a tela. */}
+              <View style={styles.atalhoFicha}>
+                <Text style={styles.textoAtalho}>Já tem ficha da academia?</Text>
                 <Pressable
                   onPress={() => importarFicha('camera')}
                   disabled={pedindo}
-                  style={({ pressed }) => [styles.botaoFoto, pressed && { opacity: 0.7 }]}
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && { opacity: 0.6 }}
                   accessibilityRole="button"
+                  accessibilityLabel="Fotografar a ficha da academia"
                 >
-                  <Ionicons name="camera-outline" size={18} color={paleta().cores.verde} />
-                  <Text style={styles.textoBotaoFoto}>Fotografar ficha</Text>
+                  <Text style={styles.linkAtalho}>Fotografar</Text>
                 </Pressable>
+                <Text style={styles.textoAtalho}>·</Text>
                 <Pressable
                   onPress={() => importarFicha('galeria')}
                   disabled={pedindo}
-                  style={({ pressed }) => [styles.botaoFoto, pressed && { opacity: 0.7 }]}
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && { opacity: 0.6 }}
                   accessibilityRole="button"
+                  accessibilityLabel="Escolher um print da ficha na galeria"
                 >
-                  <Ionicons name="image-outline" size={18} color={paleta().cores.verde} />
-                  <Text style={styles.textoBotaoFoto}>Escolher print</Text>
+                  <Text style={styles.linkAtalho}>Usar um print</Text>
                 </Pressable>
-              </View>
-              <Text style={styles.ajuda}>
-                Já treina com ficha da academia? Fotografe, ou mande o print do aplicativo dela.
-              </Text>
-
-              <View style={styles.divisor}>
-                <View style={styles.risco} />
-                <Text style={styles.textoDivisor}>ou monte comigo</Text>
-                <View style={styles.risco} />
               </View>
 
               <Text style={styles.rotulo}>O que você quer treinar?</Text>
@@ -606,23 +615,16 @@ const estilos = estilosDe(t =>
     tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
     conteudo: { paddingHorizontal: 20, gap: 10 },
 
-    fotoLinha: { flexDirection: 'row', gap: 10 },
-    botaoFoto: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 7,
-      paddingVertical: 13,
-      borderRadius: 12,
-      backgroundColor: t.cores.verdeMenta,
-      borderWidth: 1,
-      borderColor: t.cores.verde,
-    },
-    textoBotaoFoto: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
-    divisor: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 6 },
-    risco: { flex: 1, height: 1, backgroundColor: t.cores.borda },
-    textoDivisor: { fontSize: 12, color: t.inkFraco },
+    atalhoFicha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 14,
+  },
+  textoAtalho: { fontSize: 12.5, color: t.inkMedio },
+  linkAtalho: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
+
     explicacao: { fontSize: 14, color: t.inkMedio, lineHeight: 20, marginBottom: 4 },
     rotulo: { fontSize: 13, fontWeight: '700', color: t.cores.ink, marginTop: 10 },
     ajuda: { fontSize: 12, color: t.inkFraco, lineHeight: 17 },
