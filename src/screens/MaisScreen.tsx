@@ -65,6 +65,7 @@ export function MaisScreen({
   versaoPlano,
   versaoMetas,
   onAbrirNutricionistas,
+  onAbrirRede,
   onAbrirCodigo,
   onAbrirExcluirConta,
   onAbrirMensagens,
@@ -85,6 +86,7 @@ export function MaisScreen({
   versaoPlano: number
   versaoMetas: number
   onAbrirNutricionistas: () => void
+  onAbrirRede: () => void
   onAbrirCodigo: () => void
   onAbrirExcluirConta: () => void
   /* Mensagens deixou de ser aba e virou linha aqui. O contador vem junto:
@@ -613,6 +615,29 @@ export function MaisScreen({
         <SeletorDeCor />
       </View>
 
+      {/* ── A REDE mora AQUI, e não dentro da tela da nutricionista ──────
+          Ela chegou a ficar lá dentro, como uma linha que abria por cima da
+          ficha da profissional da pessoa. Continuava escondida: quem quer
+          conhecer a rede não vai procurar dentro de "Minha nutricionista", e
+          quem abre "Minha nutricionista" quer ver a dela.
+
+          São dois assuntos, e agora são dois lugares. Aqui, antes de
+          Privacidade, é onde ficam as coisas do app que não são do dia. */}
+      <View style={styles.cartao}>
+        <Text style={styles.tituloCartao}>Nutricionistas Cygnos</Text>
+        <Text style={styles.textoPrivacidade}>
+          Conheça as fichas das profissionais da rede: formação, especialidades e como cada uma
+          atende.
+        </Text>
+
+        <LinhaLink
+          icone="people-outline"
+          rotulo="Ver as nutricionistas da rede"
+          onPress={onAbrirRede}
+          interno
+        />
+      </View>
+
       <View style={styles.cartao}>
         <Text style={styles.tituloCartao}>Privacidade</Text>
         <Text style={styles.textoPrivacidade}>
@@ -790,10 +815,12 @@ function LinhaLink({
   icone,
   rotulo,
   onPress,
+  interno = false,
 }: {
   icone: keyof typeof Ionicons.glyphMap
   rotulo: string
   onPress: () => void
+  interno?: boolean
 }) {
   const styles = estilos()
   return (
@@ -805,7 +832,10 @@ function LinhaLink({
     >
       <Ionicons name={icone} size={18} color={paleta().cores.verde} />
       <Text style={styles.textoLink}>{rotulo}</Text>
-      <Ionicons name="open-outline" size={15} color={paleta().inkFraco} />
+      {/* Seta para fora quando o toque SAI do app, seta para o lado quando é
+          tela interna. O ícone é o que diz para onde se vai, e usar o mesmo nos
+          dois casos ensina a pessoa a não confiar nele. */}
+      <Ionicons name={interno ? 'chevron-forward' : 'open-outline'} size={15} color={paleta().inkFraco} />
     </Pressable>
   )
 }

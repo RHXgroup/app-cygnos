@@ -62,9 +62,12 @@ import { estilosDe, paleta } from '../lib/tema'
  *
  * Mesma escolha das outras telas do menu: View sobreposta no App, não Modal. */
 export function NutricionistasScreen({
+  abrirNaRede,
   onFechar,
   onConversar,
 }: {
+  /* Entra direto no catálogo da rede, em vez da ficha da própria. */
+  abrirNaRede?: boolean
   onFechar: () => void
   /* Fecha esta tela e leva à aba da conversa. A ficha responde "quem acompanha
      você"; falar com ela é o passo seguinte óbvio, e sem este botão o caminho
@@ -87,8 +90,11 @@ export function NutricionistasScreen({
   const [aberto, setAberto] = useState<ChaveConteudo | null>(null)
   const [agendando, setAgendando] = useState(false)
   /* A rede aberta por cima da ficha dela. Só existe quando há vínculo: sem
-     vínculo o catálogo já É a tela. */
-  const [vendoRede, setVendoRede] = useState(false)
+     vínculo o catálogo já É a tela.
+     Começa aberta quando se chega pelo "Nutricionistas Cygnos" do Mais: quem
+     entrou por ali pediu a REDE, e mostrar a ficha da própria antes seria um
+     degrau que ela não pediu. */
+  const [vendoRede, setVendoRede] = useState(!!abrirNaRede)
   const [consultas, setConsultas] = useState<MinhaConsulta[]>([])
   /* Os pedidos que ele já fez, e para quem o painel de pedir está aberto.
      Só existem sem vínculo: depois do aceite, isto some com a lista. */
@@ -353,24 +359,20 @@ export function NutricionistasScreen({
            * VER: as fichas abrem, o pedido não. Oferecer um botão que o
            * servidor vai recusar é pior do que não oferecer — ela toca, leva
            * um erro, e conclui que o app está quebrado. */}
-          {vinculada && !vendoRede && outras.length > 0 && (
-            <Pressable
-              onPress={() => setVendoRede(true)}
-              style={({ pressed }) => [styles.portaDaRede, pressed && { opacity: 0.7 }]}
-              accessibilityRole="button"
-              accessibilityLabel={`Conhecer outras ${outras.length} nutricionistas do Cygnos`}
-            >
-              <Ionicons name="people-outline" size={20} color={paleta().cores.verde} />
-              <View style={styles.textosPorta}>
-                <Text style={styles.tituloPorta}>Outras nutricionistas Cygnos</Text>
-                <Text style={styles.ajudaPorta}>
-                  {outras.length} {outras.length === 1 ? 'profissional' : 'profissionais'} · só para
-                  conhecer as fichas
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={paleta().inkFraco} />
-            </Pressable>
-          )}
+          {/* ── A REDE NÃO MORA MAIS AQUI ────────────────────────────────
+              Terceira e quarta versões desta tela no mesmo dia, e a lição está
+              no percurso: primeiro o catálogo SUBSTITUÍA a ficha (sumia ao
+              vincular), depois vinha inteiro logo ABAIXO dela (uma parede de
+              seis fichas), depois virou uma porta aqui dentro — e continuava
+              escondido, porque ninguém procura a rede dentro de "Minha
+              nutricionista".
+
+              O erro repetido foi tratar como problema de FORMA o que era de
+              LUGAR. São dois assuntos, e agora são duas telas: a rede tem
+              entrada própria no Mais, antes de Privacidade.
+
+              Esta tela ainda desenha o catálogo quando se chega por lá — é a
+              mesma tela, entrando por outra porta (`abrirNaRede`). */}
 
           {vinculada && vendoRede && (
             <Text style={styles.ajudaOutras}>
@@ -1523,21 +1525,6 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.erroFundo,
     padding: 14,
   },
-  portaDaRede: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: t.cores.borda,
-    backgroundColor: t.cores.cartao,
-    marginTop: 16,
-  },
-  textosPorta: { flex: 1 },
-  tituloPorta: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
-  ajudaPorta: { fontSize: 12, color: t.inkMedio, marginTop: 2 },
-
   blocoOutras: { marginTop: 26, marginBottom: 4, gap: 5 },
   tituloOutras: { fontSize: 16, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.2 },
   ajudaOutras: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },

@@ -272,6 +272,9 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const [perfilAberto, setPerfilAberto] = useState(false)
   const [codigoAberto, setCodigoAberto] = useState(false)
   const [nutricionistasAbertas, setNutricionistasAbertas] = useState(false)
+  /* Aberta pelo "Nutricionistas Cygnos" do Mais, e não pela ficha da própria:
+     a mesma tela, entrando por outra porta. */
+  const [redeAberta, setRedeAberta] = useState(false)
   const [mensagensAbertas, setMensagensAbertas] = useState(false)
   const [avisosAbertos, setAvisosAbertos] = useState(false)
   const [excluirContaAberta, setExcluirContaAberta] = useState(false)
@@ -611,6 +614,10 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 onAbrirPerfil={() => setPerfilAberto(true)}
                 onAbrirCodigo={() => setCodigoAberto(true)}
                 onAbrirNutricionistas={() => setNutricionistasAbertas(true)}
+                onAbrirRede={() => {
+                  setRedeAberta(true)
+                  setNutricionistasAbertas(true)
+                }}
                 onAbrirAvisos={() => setAvisosAbertos(true)}
                 onAbrirExcluirConta={() => setExcluirContaAberta(true)}
                 onAbrirCadastros={() => setCadastrosAberto(true)}
@@ -680,7 +687,11 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         {nutricionistasAbertas && (
           <Sobreposta>
             <NutricionistasScreen
-              onFechar={() => setNutricionistasAbertas(false)}
+              abrirNaRede={redeAberta}
+              onFechar={() => {
+                setNutricionistasAbertas(false)
+                setRedeAberta(false)
+              }}
               /* Fecha a tela ANTES de trocar de aba: voltar da conversa tem que
                  devolver ao app, e não a uma ficha que ficou aberta por baixo. */
               onConversar={() => {
@@ -954,6 +965,7 @@ function TelaDaAba({
   onAbrirPerfil,
   onAbrirCodigo,
   onAbrirNutricionistas,
+  onAbrirRede,
   onAbrirAvisos,
   onAbrirExcluirConta,
   onAbrirCadastros,
@@ -994,6 +1006,7 @@ function TelaDaAba({
   onAbrirPerfil: () => void
   onAbrirCodigo: () => void
   onAbrirNutricionistas: () => void
+  onAbrirRede: () => void
   /* O destino do sino do topo. */
   onAbrirAvisos: () => void
   onAbrirExcluirConta: () => void
@@ -1077,6 +1090,7 @@ function TelaDaAba({
     case 'mais':
       return (
         <MaisScreen
+          onAbrirRede={onAbrirRede}
           versaoVinculo={versaoVinculo}
           /* Os dois contadores que mudam o horário de um lembrete: o plano dá a
              hora da refeição, a meta de água e o sono dão o ritmo dos copos. */

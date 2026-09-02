@@ -983,14 +983,35 @@ export function ContadorCaloriasScreen({
                   </View>
                 </Pressable>
 
-                {g.itens.map(i => (
-                  <LinhaItem
-                    key={i.id}
-                    item={i}
-                    foto={i.fotoPath ? (fotosAbertas.get(i.fotoPath) ?? null) : null}
-                    onCorrigir={() => abrirAcoes(i)}
-                  />
-                ))}
+                {/* ── UMA FOTO POR PRATO, e não uma por item ──────────────
+                    Um prato com seis alimentos virava seis linhas com a MESMA
+                    miniatura repetida, uma embaixo da outra. Além de feio, era
+                    informação errada: parecia seis fotos, quando foi uma.
+
+                    Agora a foto aparece uma vez, grande, encabeçando os itens
+                    que saíram dela — que é o que ela é: o registro do prato, e
+                    não um ícone de cada alimento. */}
+                {blocosDoGrupo(g.itens).map(b =>
+                  b.foto ? (
+                    <View key={b.chave} style={styles.pratoDaFoto}>
+                      {fotosAbertas.get(b.foto) && (
+                        <FotoDoPrato uri={fotosAbertas.get(b.foto) as string} />
+                      )}
+                      {b.itens.map(i => (
+                        <LinhaItem key={i.id} item={i} foto={null} onCorrigir={() => abrirAcoes(i)} />
+                      ))}
+                    </View>
+                  ) : (
+                    b.itens.map(i => (
+                      <LinhaItem
+                        key={i.id}
+                        item={i}
+                        foto={null}
+                        onCorrigir={() => abrirAcoes(i)}
+                      />
+                    ))
+                  ),
+                )}
               </View>
             ))
           )}
@@ -1394,6 +1415,10 @@ function LinhaItem({
       )}
 
       <View style={styles.textoItem}>
+        {/* O nome ENCOLHE e o selo não.
+            Sem isto, nome de duas linhas — "Vinagrete de tomate e cebola" —
+            empurrava o selo para cima do número de calorias, e os dois ficavam
+            impressos um sobre o outro. */}
         <View style={styles.linhaNomeItem}>
           <Text style={styles.nomeItem} numberOfLines={2}>
             {item.nome}
@@ -1420,6 +1445,47 @@ function LinhaItem({
 
       <Ionicons name="chevron-forward" size={16} color={paleta().inkFraco} />
     </Pressable>
+  )
+}
+
+/* Os itens de um bloco, quebrados em pedaços por foto.
+ *
+ * Consecutivos e com o MESMO caminho viram um pedaço só. Consecutivos importa:
+ * duas fotos do mesmo prato em horas diferentes são dois registros, e juntá-las
+ * porque o caminho é igual misturaria o almoço com a janta.
+ *
+ * Quem não tem foto sai em pedaços de um item, para a lista continuar sendo uma
+ * lista simples onde não há prato nenhum. */
+function blocosDoGrupo(itens: ItemConsumo[]): { chave: string; foto: string | null; itens: ItemConsumo[] }[] {
+  const blocos: { chave: string; foto: string | null; itens: ItemConsumo[] }[] = []
+  for (const i of itens) {
+    const ultimo = blocos[blocos.length - 1]
+    if (i.fotoPath && ultimo?.foto === i.fotoPath) ultimo.itens.push(i)
+    else blocos.push({ chave: String(i.id), foto: i.fotoPath ?? null, itens: [i] })
+  }
+  return blocos
+}
+
+/* A foto do prato, do tamanho de uma foto.
+ *
+ * Miniatura de 40 pixels não mostra prato nenhum — serve para dizer "veio de
+ * foto", que é trabalho do selo. Aqui ela existe para a pessoa RECONHECER o que
+ * comeu, e para a nutricionista ver a porção. Isso pede largura.
+ *
+ * `onError` guarda o endereço que falhou, e não um booleano: o endereço vence em
+ * uma hora, e um novo tem de entrar tentando de novo. */
+function FotoDoPrato({ uri }: { uri: string }) {
+  const styles = estilos()
+  const [falhou, setFalhou] = useState<string | null>(null)
+  if (uri === falhou) return null
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.fotoDoPrato}
+      onError={() => setFalhou(uri)}
+      accessibilityIgnoresInvertColors
+      accessibilityLabel="Foto do prato registrado"
+    />
   )
 }
 
@@ -2459,9 +2525,25 @@ const estilos = estilosDe(t =>
   /* ── Itens do dia ── */
   linhaItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   textoItem: { flex: 1 },
-  nomeItem: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  /* `flexShrink` aqui e `flexShrink: 0` no selo é o que impede a etiqueta
+     "foto · média" de ser empurrada para cima do número de calorias por um nome
+     comprido. Sem isso, "Vinagrete de tomate e cebola" imprimia os dois no
+     mesmo lugar. */
+  nomeItem: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: t.cores.ink },
   /* Quadrada e pequena: ela é referência, e não o conteúdo da linha. Grande
      demais empurraria o nome e a caloria, que é o que se lê. */
+  /* O prato: uma foto por registro, encabeçando os itens que saíram dela. */
+  pratoDaFoto: { marginBottom: 2 },
+  fotoDoPrato: {
+    width: '100%',
+    /* Proporção, e não altura fixa: altura fixa corta cabeça e pé de foto em
+       pé, e prato fotografado de cima costuma sair em pé. */
+    aspectRatio: 4 / 3,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+
   miniatura: {
     width: 42,
     height: 42,
@@ -2496,6 +2578,7 @@ const estilos = estilosDe(t =>
   diferencaTroca: { fontSize: 13, fontWeight: '700', color: t.inkMedio },
 
   seloFoto: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
@@ -2506,7 +2589,17 @@ const estilos = estilosDe(t =>
   },
   textoSeloFoto: { fontSize: 9.5, fontWeight: '800', color: t.cores.verdeEscuro },
   detalheItem: { marginTop: 1, fontSize: 11.5, color: t.inkSuave },
-  kcalItem: { fontSize: 14, fontWeight: '800', color: t.cores.verde },
+  /* Largura mínima e alinhado à direita: sem isso "5" e "220" começam em
+     colunas diferentes, e a lista perde a régua que deixa comparar de relance.
+     `tabular-nums` mantém o dígito com a mesma largura. */
+  kcalItem: {
+    minWidth: 44,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: '800',
+    color: t.cores.verde,
+    fontVariant: ['tabular-nums'],
+  },
 
   /* ── Véu de análise ── */
   veu: {
