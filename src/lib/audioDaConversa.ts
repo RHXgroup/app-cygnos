@@ -1,3 +1,4 @@
+import { decode } from 'base64-arraybuffer'
 import { falha } from './erros'
 import { supabase } from './supabase'
 
@@ -77,17 +78,43 @@ export async function guardarAudioDaConversa(
   const caminho = `${contaId}/${anoMes}/${nomeUnico(aac ? 'aac' : 'm4a')}`
 
   try {
-    /* `fetch` no `file://` é como o ditado lê o que acabou de gravar — não há
-       `expo-file-system` no projeto, e não vale trazer um pacote nativo para
-       uma leitura que já funciona. */
-    const dados = await (await fetch(uri)).arrayBuffer()
+    /* ── O caminho de leitura, que erra se for o óbvio ────────────────────
+     *
+     * `fetch(uri).arrayBuffer()` é o que se escreveria em qualquer navegador,
+     * e no React Native ele NÃO serve: o `fetch` daqui é polyfill, e sobre um
+     * `file://` ou devolve vazio ou rejeita. O sintoma no aparelho foi "não
+     * consegui preparar o áudio" logo depois de gravar, sem erro nenhum antes.
+     *
+     * O caminho que funciona é o mesmo da foto do prato, que já roda há meses:
+     * base64 → `decode` → bytes. `FileReader` é a única leitura de arquivo
+     * disponível sem trazer pacote nativo, e o `blob()` do `fetch` ele lê. */
+    const blob = await (await fetch(uri)).blob()
 
-    /* Zero byte é gravação que não pegou, e subir isso produz um balão que
-       ninguém consegue tocar — pior que a falha, porque parece sucesso. */
-    if (dados.byteLength === 0) {
-      falha('A gravação saiu vazia.', new Error('arquivo de 0 byte em ' + uri))
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const leitor = new FileReader()
+      leitor.onerror = () => reject(leitor.error ?? new Error('FileReader falhou'))
+      leitor.onload = () => {
+        /* Vem como `data:audio/m4a;base64,AAAA…` — só o que está depois da
+           vírgula é o conteúdo. */
+        const texto = String(leitor.result ?? '')
+        const virgula = texto.indexOf(',')
+        resolve(virgula === -1 ? '' : texto.slice(virgula + 1))
+      }
+      leitor.readAsDataURL(blob)
+    })
+
+    /* Gravação que não pegou. Subir isso produz um balão que ninguém consegue
+       tocar — pior que a falha, porque parece sucesso.
+       O tamanho vai para o terminal do Metro com o prefixo [cygnos], como no
+       ditado: sem o número, "não deu" pode ser microfone mudo, arquivo vazio
+       ou upload recusado, e os três têm a mesma cara na tela. */
+    console.log('[cygnos] áudio da conversa:', blob.size, 'bytes,', base64.length, 'em base64')
+    if (!base64) {
+      falha('A gravação saiu vazia.', new Error('0 byte em ' + uri))
       return null
     }
+
+    const dados = decode(base64)
 
     const { error } = await supabase.storage
       .from(BUCKET)

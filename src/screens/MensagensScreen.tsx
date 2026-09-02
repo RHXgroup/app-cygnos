@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   Image,
   AppState,
   Linking,
@@ -367,6 +368,24 @@ export function MensagensScreen({
    * então o caminho já precisa existir antes do envio.
    *
    * Falhar em subir não bloqueia a conversa: ela continua podendo escrever. */
+  /* PERGUNTA de onde vem a foto, em vez de esconder a galeria num toque
+   * longo.
+   *
+   * Estava assim: tocar abria a câmera, SEGURAR abria a galeria. Ninguém
+   * segura um botão para descobrir o que acontece — e quem tinha a foto já
+   * tirada concluía, com razão, que o app só aceita foto nova.
+   *
+   * Toque longo serve para atalho de quem já sabe, nunca para o único caminho
+   * de uma das duas opções. */
+  function escolherDeOnde() {
+    if (subindoAnexo || enviando) return
+    Alert.alert('Mandar uma foto', 'De onde você quer pegar?', [
+      { text: 'Tirar agora', onPress: () => void anexarFoto('camera') },
+      { text: 'Escolher da galeria', onPress: () => void anexarFoto('galeria') },
+      { text: 'Cancelar', style: 'cancel' },
+    ])
+  }
+
   async function anexarFoto(origem: 'camera' | 'galeria') {
     const escolha = await escolherFoto(origem)
     if (escolha.tipo === 'cancelado') return
@@ -618,17 +637,18 @@ export function MensagensScreen({
             style={[styles.barraEnvio, { marginBottom: respiro }, gravando && styles.escondida]}
           >
             <Pressable
-              onPress={() => anexarFoto('camera')}
-              onLongPress={() => anexarFoto('galeria')}
+              onPress={escolherDeOnde}
               disabled={subindoAnexo || enviando}
               style={({ pressed }) => [styles.botaoClipe, pressed && { opacity: 0.6 }]}
               accessibilityRole="button"
-              accessibilityLabel="Mandar uma foto. Segure para escolher da galeria."
+              accessibilityLabel="Mandar uma foto"
             >
               {subindoAnexo ? (
                 <ActivityIndicator size="small" color={paleta().cores.verde} />
               ) : (
-                <Ionicons name="camera-outline" size={21} color={paleta().cores.verde} />
+                /* Clipe, e não câmera: o desenho da câmera prometia foto
+                   nova e só foto nova, que era metade do que o botão faz. */
+                <Ionicons name="attach" size={22} color={paleta().cores.verde} />
               )}
             </Pressable>
 
@@ -735,7 +755,19 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
 
   return (
     <View style={[styles.linhaBalao, minha && styles.linhaBalaoMinha]}>
-      <View style={[styles.balao, minha ? styles.balaoMeu : styles.balaoDela]}>
+      {/* Com foto, o balão tem largura PRÓPRIA.
+          `maxWidth` sozinho deixa a largura ser ditada pelo conteúdo, e o
+          conteúdo mais largo de um balão com legenda curta é a legenda: quem
+          escreveu "oi" e anexou o prato recebia a foto do tamanho da palavra,
+          espremida e cortada. Com foto, a largura é fixa e a legenda se acomoda
+          embaixo — que é a ordem certa, porque a imagem é o assunto. */}
+      <View
+        style={[
+          styles.balao,
+          minha ? styles.balaoMeu : styles.balaoDela,
+          mensagem.anexoTipo === 'foto' && styles.balaoComFoto,
+        ]}
+      >
         {/* A FOTO vem antes do texto, porque é a legenda que explica a imagem e
             não o contrário. Sem endereço — ainda assinando, ou falhou — o balão
             desenha só o texto: uma imagem que não carrega deixa um buraco do
@@ -858,6 +890,7 @@ const estilos = estilosDe(t =>
     linhaBalao: { flexDirection: 'row' },
     linhaBalaoMinha: { justifyContent: 'flex-end' },
     balao: { maxWidth: '82%', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 16 },
+    balaoComFoto: { width: '72%' },
     balaoDela: { backgroundColor: t.cores.cartao, borderBottomLeftRadius: 5 },
     balaoMeu: { backgroundColor: t.cores.verde, borderBottomRightRadius: 5 },
     textoBalao: { fontSize: 14.5, lineHeight: 20, color: t.cores.ink },
@@ -889,7 +922,10 @@ const estilos = estilosDe(t =>
      dedo de quem está rolando. */
   fotoDoBalao: {
     width: '100%',
-    height: 170,
+    /* Proporção, e não altura fixa: 170 de altura numa foto em pé corta cabeça
+       e pé. `aspectRatio` deixa a imagem ocupar a largura do balão e ficar com
+       a altura que a proporção pedir. */
+    aspectRatio: 4 / 3,
     borderRadius: 12,
     marginBottom: 6,
     backgroundColor: 'rgba(0,0,0,0.06)',
