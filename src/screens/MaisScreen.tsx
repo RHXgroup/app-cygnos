@@ -565,34 +565,6 @@ export function MaisScreen({
       </View>
 
       <View style={styles.cartao}>
-        <Text style={styles.tituloCartao}>Conta</Text>
-        <Text style={styles.email}>{email}</Text>
-
-        <Pressable
-          onPress={() => supabase.auth.signOut()}
-          style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
-          accessibilityRole="button"
-          accessibilityLabel="Sair da conta"
-        >
-          <Ionicons name="log-out-outline" size={17} color={paleta().cores.verde} />
-          <Text style={styles.textoBotaoSair}>Sair da conta</Text>
-        </Pressable>
-
-        {/* Fora do botão de sair e sem a moldura dele, de propósito: são ações
-            de peso muito diferente, e dois botões iguais lado a lado convidam ao
-            toque errado justamente naquele que não tem desfazer. */}
-        <Pressable
-          onPress={onAbrirExcluirConta}
-          style={styles.linkExcluir}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel="Excluir conta"
-        >
-          <Text style={styles.textoLinkExcluir}>Excluir conta</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.cartao}>
         <Text style={styles.tituloCartao}>Aparência</Text>
         <Text style={styles.explicacaoLembrete}>
           O claro segue as cores da marca; o escuro é o padrão do app.
@@ -658,6 +630,41 @@ export function MaisScreen({
           onPress={() => abrirLink(LINKS.termos)}
         />
       </View>
+
+      {/* ── A CONTA fica por ÚLTIMO ─────────────────────────────────────
+          Sair e excluir são as duas únicas ações desta tela sem uso diário, e
+          uma delas não tem desfazer. No meio da rolagem elas apareciam entre
+          coisas que a pessoa vem ajustar toda semana — lembrete, meta de água,
+          cor —, e ficavam no caminho do dedo de quem só estava passando.
+
+          Fim da tela é onde se procura o que se usa uma vez. */}
+      <View style={styles.cartao}>
+        <Text style={styles.tituloCartao}>Conta</Text>
+        <Text style={styles.email}>{email}</Text>
+
+        <Pressable
+          onPress={() => supabase.auth.signOut()}
+          style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
+          accessibilityRole="button"
+          accessibilityLabel="Sair da conta"
+        >
+          <Ionicons name="log-out-outline" size={17} color={paleta().cores.verde} />
+          <Text style={styles.textoBotaoSair}>Sair da conta</Text>
+        </Pressable>
+
+        {/* Fora do botão de sair e sem a moldura dele, de propósito: são ações
+            de peso muito diferente, e dois botões iguais lado a lado convidam ao
+            toque errado justamente naquele que não tem desfazer. */}
+        <Pressable
+          onPress={onAbrirExcluirConta}
+          style={styles.linkExcluir}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Excluir conta"
+        >
+          <Text style={styles.textoLinkExcluir}>Excluir conta</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   )
 }
@@ -690,6 +697,22 @@ function SeletorDeCor() {
   const styles = estilos()
   const atual = acentoEfetivo()
   const [matiz, setMatiz] = useState(() => hslDoAtual(atual))
+
+  /* A faixa SEGUE a cor que está valendo.
+   *
+   * `matiz` nascia da cor do momento e depois vivia sozinho. Tocar na folha —
+   * "voltar para a cor da marca" — limpava o acento e o app inteiro voltava ao
+   * verde, mas esta faixa continuava parada onde a pessoa tinha deixado: quem
+   * escolheu vermelho e voltou para o Cygnos via a marca no vermelho e os
+   * quatro tons embaixo em vermelho, como se não tivesse voltado nada.
+   *
+   * Vale para qualquer caminho, e não só para a folha: a cor também muda ao
+   * trocar de tema, porque o app ajusta o tom para ele funcionar no fundo novo.
+   * Derivar daqui cobre os dois sem que ninguém precise lembrar de chamar
+   * `setMatiz` no lugar certo — que é justamente o que não aconteceu. */
+  useEffect(() => {
+    setMatiz(hslDoAtual(atual))
+  }, [atual])
 
   return (
     <View style={styles.blocoCor}>
