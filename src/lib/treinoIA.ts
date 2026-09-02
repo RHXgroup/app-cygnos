@@ -27,12 +27,21 @@ import { supabase } from './supabase'
  * e por isso dá para exercitá-lo com JSON de verdade fora do aparelho. */
 
 export type PedidoDeTreino = {
-  /* O que a pessoa disse que quer, falado ou escrito. É a entrada principal, e
-     a única obrigatória. */
+  /* O que a pessoa disse que quer, falado ou escrito. Detalha o resto, e deixou
+     de ser obrigatório: um campo de texto em branco não é uma pergunta, e quem
+     não sabe o que escrever ali concluía que a IA não monta nada. */
   pedido: string
+  /* Musculação, cardio, funcional… A pergunta mais básica de todas, e ela não
+     existia: sem ela a IA escolhia sozinha o tipo do treino, o que é escolher
+     pela pessoa a coisa que mais muda o resultado. */
+  tipo: string
   dias: number
   minutos: number | null
   onde: string
+  /* O QUE ELA TEM para treinar. Sem isto, "em casa" não diz nada: um treino de
+     barra fixa para quem não tem barra é um treino que não acontece — e a
+     pessoa conclui que o app não serve, não que faltou uma pergunta. */
+  equipamento: string[]
   experiencia: string
   /* Lesão e limitação. Vai para a função como regra absoluta do prompt — e é o
      campo em que errar tem consequência física, não só de dado errado. */

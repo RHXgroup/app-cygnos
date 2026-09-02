@@ -51,6 +51,24 @@ const DIAS_ROTULO: Record<DiaSemana, string> = {
   0: 'Dom', 1: 'Seg', 2: 'Ter', 3: 'Qua', 4: 'Qui', 5: 'Sex', 6: 'Sáb',
 }
 
+/* Os tipos que mudam o desenho do treino, e não uma lista de modalidades.
+   "CrossFit" e "funcional" pedem a mesma estrutura; "musculação" e "cardio"
+   não. Quem quiser nomear a modalidade escreve no campo de texto. */
+const TIPOS = ['Musculação', 'Cardio', 'Funcional / CrossFit', 'Mobilidade', 'Misto']
+
+/* O que existe para usar. Múltipla escolha, porque quase ninguém tem só uma
+   coisa — e "só o peso do corpo" é resposta legítima, não ausência de resposta:
+   é o que decide entre agachamento livre e leg press. */
+const EQUIPAMENTOS = [
+  'Só o peso do corpo',
+  'Halteres',
+  'Barra e anilhas',
+  'Elásticos',
+  'Barra fixa',
+  'Máquinas',
+  'Esteira ou bike',
+]
+
 const ONDE = ['Em casa', 'Na academia', 'Ao ar livre']
 const EXPERIENCIA = ['Nunca treinei', 'Já treinei antes', 'Treino há bastante tempo']
 
@@ -109,6 +127,9 @@ export function RotinaPorIA({
    * encolher num build de verdade. */
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
+
+  const [tipo, setTipo] = useState(TIPOS[0])
+  const [equipamento, setEquipamento] = useState<string[]>([])
 
   const [pedindo, setPedindo] = useState(false)
   /* QUAL das duas esperas está rolando. As duas usam `pedindo` para travar a
@@ -189,17 +210,26 @@ export function RotinaPorIA({
    * "quero ganhar massa nas costas"), que é onde ele vale. */
   function pedidoDasEscolhas(): string {
     const partes = [
-      `Treino ${dias === 1 ? '1 dia' : `${dias} dias`} por semana`,
+      `${tipo}, ${dias === 1 ? '1 dia' : `${dias} dias`} por semana`,
       minutos ? `de cerca de ${minutos} minutos` : null,
       onde ? onde.toLowerCase() : null,
+      equipamento.length ? `com ${equipamento.join(', ').toLowerCase()}` : null,
       experiencia ? `para quem ${experiencia.toLowerCase()}` : null,
     ].filter(Boolean)
     return partes.join(', ') + '.'
   }
 
   async function montar() {
-    /* Vazio não é erro: vira o pedido feito das escolhas. */
-    const texto = pedido.trim() || pedidoDasEscolhas()
+    /* As escolhas vão SEMPRE, e não só quando o texto está vazio.
+     *
+     * `tipo` e `equipamento` são campos novos do pedido, e quem lê o prompt é
+     * uma função do servidor que ainda não sabe deles. Mandando pelo texto, a
+     * pergunta funciona hoje — sem depender de uma publicação em produção, que
+     * é justamente o que não pode acontecer agora.
+     *
+     * A ordem importa: o que a pessoa escreveu vem primeiro, porque é o mais
+     * específico, e as escolhas entram como contexto depois. */
+    const texto = [pedido.trim(), pedidoDasEscolhas()].filter(Boolean).join(' — ')
 
     setErro('')
     setPedindo(true)
@@ -207,6 +237,8 @@ export function RotinaPorIA({
     await guardarLimitacao()
     const p: PedidoDeTreino = {
       pedido: texto,
+      tipo,
+      equipamento,
       dias,
       minutos: minutos ? Number(minutos) : null,
       onde,
@@ -374,7 +406,27 @@ export function RotinaPorIA({
                 </Text>
               </View>
 
-              <Text style={styles.rotulo}>O que você quer treinar?</Text>
+              {/* ── A PERGUNTA MAIS BÁSICA, e ela não existia ──────────────
+                  A tela pedia dias, tempo, lugar, experiência e lesão — e nunca
+                  QUE TREINO. Sem isso a IA escolhia sozinha justamente a coisa
+                  que mais muda o resultado, e quem queria cardio recebia
+                  musculação sem nunca ter tido onde dizer. */}
+              <Text style={styles.rotulo}>Que tipo de treino?</Text>
+              <View style={styles.fileira}>
+                {TIPOS.map(x => (
+                  <Pressable
+                    key={x}
+                    onPress={() => setTipo(x)}
+                    style={[styles.ficha, tipo === x && styles.fichaAtiva]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: tipo === x }}
+                  >
+                    <Text style={[styles.textoFicha, tipo === x && styles.textoFichaAtivo]}>{x}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.rotulo}>Quer detalhar alguma coisa?</Text>
               <TextInput
                 style={styles.campoGrande}
                 value={pedido}
@@ -382,7 +434,7 @@ export function RotinaPorIA({
                   setPedido(t)
                   if (erro) setErro('')
                 }}
-                placeholder="Ex.: CrossFit para ganhar massa magra, foco em peito"
+                placeholder="Ex.: foco em peito e costas, quero voltar devagar"
                 placeholderTextColor={paleta().inkFraco}
                 multiline
                 textAlignVertical="top"
@@ -394,7 +446,7 @@ export function RotinaPorIA({
                   for — a única parte que as fichinhas abaixo não conseguem
                   dizer. */}
               <Text style={styles.ajuda}>
-                Se você não disser, eu monto pelas suas escolhas aqui embaixo.
+                Opcional. As escolhas acima e abaixo já bastam para eu montar.
               </Text>
               <View style={styles.linhaDitado}>
                 <Ditado
@@ -449,6 +501,40 @@ export function RotinaPorIA({
                   </Pressable>
                 ))}
               </View>
+
+              {/* ── O QUE ELA TEM ─────────────────────────────────────────
+                  "Em casa" sozinho não diz nada. Um treino de barra fixa para
+                  quem não tem barra é um treino que não acontece — e a pessoa
+                  conclui que o app não serve, e não que faltou uma pergunta.
+
+                  Múltipla escolha porque quase ninguém tem só uma coisa, e "só
+                  o peso do corpo" é resposta legítima: é o que decide entre
+                  agachamento livre e leg press. */}
+              <Text style={styles.rotulo}>O que você tem para treinar?</Text>
+              <View style={styles.fileira}>
+                {EQUIPAMENTOS.map(x => {
+                  const marcado = equipamento.includes(x)
+                  return (
+                    <Pressable
+                      key={x}
+                      onPress={() =>
+                        setEquipamento(atual =>
+                          marcado ? atual.filter(e => e !== x) : [...atual, x],
+                        )
+                      }
+                      style={[styles.ficha, marcado && styles.fichaAtiva]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: marcado }}
+                    >
+                      <Text style={[styles.textoFicha, marcado && styles.textoFichaAtivo]}>{x}</Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+              <Text style={styles.ajuda}>
+                Pode marcar mais de um. Se não marcar nada, eu monto com o que costuma existir no
+                lugar que você escolheu.
+              </Text>
 
               <Text style={styles.rotulo}>Sua experiência</Text>
               <View style={styles.fileira}>
