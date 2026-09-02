@@ -28,9 +28,16 @@ export type TipoDeBotao = 'primario' | 'secundario' | 'texto' | 'perigo'
  * secundário fica em 46 de propósito: ele é a saída, e não deve competir de
  * tamanho com a ação.
  *
- * **Desabilitado é 0.45 e continua LEGÍVEL.** Botão apagado a ponto de não se
- * ler não comunica "falta alguma coisa" — comunica "quebrou". Quem lê o rótulo
- * entende o que vai acontecer quando ele acender.
+ * **Desabilitado é COR, e não transparência.** Eu tinha escrito `opacity: 0.45`
+ * com um comentário dizendo que continuava legível. Medi no navegador: o
+ * contraste dava **1,43**, quando o mínimo para texto é 4,5 — branco lavado
+ * sobre verde lavado, ilegível. Opacidade compõe o texto E o fundo contra a
+ * página, então ela destrói a razão entre os dois; era exatamente o que eu
+ * afirmei que não aconteceria.
+ *
+ * Com fundo e texto declarados, o contraste é escolhido em vez de sobrar. E o
+ * rótulo continua legível de propósito: botão apagado a ponto de não se ler não
+ * diz "falta alguma coisa", diz "quebrou".
  *
  * **Pressionado escurece, não encolhe.** Escala precisa de animação para não
  * parecer defeito, e animação em botão de formulário atrasa a resposta. Cor
@@ -67,7 +74,7 @@ export function Botao({
 }) {
   const styles = estilos()
   const inerte = ocupado || desligado
-  const cor = corDoTexto(tipo)
+  const cor = desligado ? paleta().inkMedio : corDoTexto(tipo)
 
   return (
     <Pressable
@@ -112,7 +119,13 @@ const corDoTexto = (tipo: TipoDeBotao): string =>
     ? paleta().cores.branco
     : tipo === 'perigo'
       ? paleta().cores.erroTexto
-      : paleta().cores.verde
+      : /* `verdeEscuro`, e não `verde`.
+           O botão de texto não tem fundo próprio: ele se apoia no fundo da
+           PÁGINA, que é mais escuro que o cartão. Medido no navegador, `verde`
+           ali dava 4,36 — abaixo dos 4,5 exigidos —, enquanto o mesmo verde
+           sobre o cartão do secundário dava 4,73 e passava. O tom mais fechado
+           iguala os dois em legibilidade sem mudar a cor da marca. */
+        paleta().cores.verdeEscuro
 
 const pressionado = (tipo: TipoDeBotao, styles: ReturnType<typeof estilos>) =>
   tipo === 'primario' ? styles.primarioPressionado : styles.claroPressionado
@@ -148,7 +161,8 @@ const estilos = estilosDe(t =>
     },
     claroPressionado: { opacity: 0.65 },
 
-    /* Legível de propósito. Ver o comentário do cabeçalho. */
-    desligado: { opacity: 0.45 },
+    /* Cor, e não opacidade. Ver o comentário do cabeçalho — este ponto foi
+       medido no navegador e o número desmentiu a primeira versão. */
+    desligado: { backgroundColor: t.cores.borda, borderWidth: 0 },
   }),
 )
