@@ -49,6 +49,7 @@ import {
 } from '../lib/metas'
 import { dataISO, dataNumerica } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from '../components/Botao'
 
 const MARGEM = 20
 const PADDING_CARTAO = 16
@@ -482,19 +483,11 @@ export function PesoScreen({
                       Preencha só o que você mediu. O que ficar em branco não entra — e não vira
                       zero.
                     </Text>
-                    <Pressable
+                    <Botao
+                      rotulo="Salvar medidas de hoje"
+                      ocupado={salvando}
                       onPress={registrarAsMedidas}
-                      disabled={salvando}
-                      style={({ pressed }) => [
-                        styles.botaoMedidas,
-                        pressed && { opacity: 0.75 },
-                      ]}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.textoBotaoMedidas}>
-                        {salvando ? 'Salvando…' : 'Salvar medidas de hoje'}
-                      </Text>
-                    </Pressable>
+                    />
                   </>
                 ) : medidas.length === 0 ? (
                   <Text style={styles.ajuda}>
@@ -894,15 +887,6 @@ linhaRitmo: {
     fontWeight: '700',
     color: t.cores.ink,
   },
-  botaoMedidas: {
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.cores.verde,
-    marginTop: 2,
-  },
-  textoBotaoMedidas: { fontSize: 15, fontWeight: '700', color: t.cores.branco },
   linhaMedida: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -25,6 +25,7 @@ import {
   type ExercicioComAlerta,
   type RotinaConvertida,
 } from '../lib/rotinaDaIA'
+import { Botao } from './Botao'
 
 /* Pedir a rotina de treino falando, e conferir antes de virar rotina.
  *
@@ -604,19 +605,13 @@ export function RotinaPorIA({
                   o lugar do botão volta a ser o que ele sempre deveria ter
                   sido: depois da última pergunta, onde ele significa "terminei
                   de responder". */}
-              <Pressable
+              <Botao
+                rotulo="Montar minha rotina"
+                acessibilidade="Montar minha rotina com a IA"
+                icone="sparkles"
+                ocupado={pedindo}
                 onPress={montar}
-                disabled={pedindo}
-                style={[styles.botao, pedindo && styles.botaoOcupado]}
-                accessibilityRole="button"
-                accessibilityLabel="Montar minha rotina com a IA"
-              >
-                {pedindo ? (
-                  <ActivityIndicator color={paleta().cores.branco} />
-                ) : (
-                  <Text style={styles.textoBotao}>Montar minha rotina</Text>
-                )}
-              </Pressable>
+              />
               {pedindo ? <Text style={styles.ajuda}>Isso leva alguns segundos.</Text> : null}
             </>
           ) : (
@@ -761,21 +756,16 @@ export function RotinaPorIA({
                 </Text>
               ) : null}
 
-              <Pressable
-                onPress={usar}
-                disabled={exercicios.length === 0}
-                style={[styles.botao, exercicios.length === 0 && styles.botaoOcupado]}
-                accessibilityRole="button"
-              >
-                <Text style={styles.textoBotao}>
-                  {exercicios.length === 0
+              <Botao
+                rotulo={
+                  exercicios.length === 0
                     ? 'Você tirou todos'
-                    : `Usar esta rotina (${exercicios.length})`}
-                </Text>
-              </Pressable>
-              <Pressable onPress={() => setRotina(null)} style={styles.botaoTexto}>
-                <Text style={styles.textoBotaoTexto}>Pedir outra</Text>
-              </Pressable>
+                    : `Usar esta rotina (${exercicios.length})`
+                }
+                desligado={exercicios.length === 0}
+                onPress={usar}
+              />
+              <Botao rotulo="Pedir outra" tipo="texto" onPress={() => setRotina(null)} />
             </>
           )}
         </ScrollView>
@@ -964,19 +954,7 @@ const estilos = estilosDe(t =>
     textoFicha: { fontSize: 14, color: t.inkMedio, fontWeight: '600' },
     textoFichaAtivo: { color: t.cores.ink, fontWeight: '800' },
 
-    erro: { fontSize: 13, color: t.cores.erroTexto, lineHeight: 18 },
-
-    botao: {
-      backgroundColor: t.cores.verde,
-      borderRadius: 14,
-      paddingVertical: 15,
-      alignItems: 'center',
-      marginTop: 14,
-    },
-    botaoOcupado: { opacity: 0.6 },
-    textoBotao: { color: t.cores.branco, fontSize: 15, fontWeight: '800' },
-    botaoTexto: { alignItems: 'center', paddingVertical: 12 },
-    textoBotaoTexto: { color: t.inkMedio, fontSize: 14, fontWeight: '700' },
+    erro: { fontSize: 13, color: t.cores.erroTexto, lineHeight: 18 },
 
     divisao: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
     observacao: { fontSize: 13, color: t.inkMedio, lineHeight: 19, marginBottom: 4 },
