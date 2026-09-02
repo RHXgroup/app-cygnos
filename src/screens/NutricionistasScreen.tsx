@@ -86,6 +86,9 @@ export function NutricionistasScreen({
      escolha do RegistrarScreen. */
   const [aberto, setAberto] = useState<ChaveConteudo | null>(null)
   const [agendando, setAgendando] = useState(false)
+  /* A rede aberta por cima da ficha dela. Só existe quando há vínculo: sem
+     vínculo o catálogo já É a tela. */
+  const [vendoRede, setVendoRede] = useState(false)
   const [consultas, setConsultas] = useState<MinhaConsulta[]>([])
   /* Os pedidos que ele já fez, e para quem o painel de pedir está aberto.
      Só existem sem vínculo: depois do aceite, isto some com a lista. */
@@ -122,6 +125,12 @@ export function NutricionistasScreen({
         setAberto(null)
         return true
       }
+      /* A rede é uma camada por cima da ficha: o voltar devolve à minha
+         nutricionista, e não fecha a tela inteira. Armadilha 1. */
+      if (vendoRede) {
+        setVendoRede(false)
+        return true
+      }
       if (agendando) {
         /* Mesmo caminho do botão de voltar da tela de agendamento, versão por
            versão: quem pediu horário e saiu pelo botão do aparelho precisa ver o
@@ -134,7 +143,7 @@ export function NutricionistasScreen({
     })
 
     return () => sub.remove()
-  }, [aberto, agendando, pedindo])
+  }, [aberto, agendando, pedindo, vendoRede])
 
   /* E recarrega também ao voltar do segundo plano.
    *
@@ -254,12 +263,12 @@ export function NutricionistasScreen({
           style={styles.botaoVoltar}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Voltar"
+          accessibilityLabel={vendoRede ? 'Voltar para a minha nutricionista' : 'Voltar'}
         >
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>
-          {vinculada ? 'Minha nutricionista' : 'Nutricionistas Cygnos'}
+          {vendoRede || !vinculada ? 'Nutricionistas Cygnos' : 'Minha nutricionista'}
         </Text>
         <View style={styles.botaoVoltar} />
       </View>
@@ -287,7 +296,7 @@ export function NutricionistasScreen({
           showsVerticalScrollIndicator={false}
           refreshControl={puxarParaAtualizar}
         >
-          {vinculada ? (
+          {vinculada && !vendoRede ? (
             <Ficha
               nutri={vinculada}
               conteudo={conteudo}
@@ -315,33 +324,62 @@ export function NutricionistasScreen({
             />
           ) : null}
 
-          {/* A REDE, mesmo com vínculo.
+          {/* A REDE, mesmo com vínculo — mas NÃO na mesma rolagem.
            *
-           * Era `vinculada ? <Ficha/> : <Lista/>` — uma ou outra, nunca as
-           * duas. A vitrine sumia junto com a escolha, e trocar de profissional
-           * virava salto no escuro: era preciso encerrar para só então poder
+           * ── A primeira versão ────────────────────────────────────────────
+           * Era `vinculada ? <Ficha/> : <Lista/>`: uma ou outra, nunca as duas.
+           * A vitrine sumia junto com a escolha, e trocar de profissional
+           * virava salto no escuro — era preciso encerrar para só então poder
            * olhar quem mais existe, e nesse intervalo ficar sem ninguém.
            *
-           * O banco já tinha sido consertado para devolver o catálogo inteiro
-           * (migration 20260901040000). Esta tela mantinha a mesma trava do
-           * lado de cá, e por isso a correção lá não aparecia.
+           * ── A segunda, que consertou aquilo e criou isto ────────────────
+           * Passei a desenhar as duas seguidas. No aparelho ficou ruim de um
+           * jeito que não dava para prever lendo o código: abaixo da ficha da
+           * profissional dela — que já é longa, com acompanhamento, consultas
+           * e especialidades — vinha uma parede com seis fichas de outras
+           * pessoas e a lista de pedidos. Quem abre "Minha nutricionista"
+           * quer ver a SUA, e recebia um catálogo por cima.
            *
-           * ── E sem oferecer um segundo vínculo ────────────────────────────
+           * ── A terceira: uma porta, e não uma parede ─────────────────────
+           * Com vínculo, a rede vira UMA linha que se abre. A vitrine continua
+           * a um toque, que era o ponto de tê-la trazido de volta, e a tela da
+           * profissional dela volta a ser só dela.
+           *
+           * Sem vínculo nada disso vale: aí o catálogo É a tela, e abrir uma
+           * porta para o único conteúdo que existe seria um degrau à toa.
+           *
+           * ── E sem oferecer um segundo vínculo ───────────────────────────
            * A regra é um ativo por vez, e ela é do banco. A lista aqui é para
            * VER: as fichas abrem, o pedido não. Oferecer um botão que o
            * servidor vai recusar é pior do que não oferecer — ela toca, leva
            * um erro, e conclui que o app está quebrado. */}
-          {vinculada && outras.length > 0 && (
-            <View style={styles.blocoOutras}>
-              <Text style={styles.tituloOutras}>Outras nutricionistas Cygnos</Text>
-              <Text style={styles.ajudaOutras}>
-                Você pode conhecer as fichas. Para trocar de profissional, é preciso encerrar o
-                acompanhamento atual primeiro.
-              </Text>
-            </View>
+          {vinculada && !vendoRede && outras.length > 0 && (
+            <Pressable
+              onPress={() => setVendoRede(true)}
+              style={({ pressed }) => [styles.portaDaRede, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Conhecer outras ${outras.length} nutricionistas do Cygnos`}
+            >
+              <Ionicons name="people-outline" size={20} color={paleta().cores.verde} />
+              <View style={styles.textosPorta}>
+                <Text style={styles.tituloPorta}>Outras nutricionistas Cygnos</Text>
+                <Text style={styles.ajudaPorta}>
+                  {outras.length} {outras.length === 1 ? 'profissional' : 'profissionais'} · só para
+                  conhecer as fichas
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={paleta().inkFraco} />
+            </Pressable>
           )}
 
-          {(vinculada ? outras.length > 0 : true) && (
+          {vinculada && vendoRede && (
+            <Text style={styles.ajudaOutras}>
+              Você pode conhecer as fichas. Para trocar de profissional, é preciso encerrar o
+              acompanhamento atual primeiro.
+            </Text>
+          )}
+
+          {(vinculada ? vendoRede && outras.length > 0 : true) && (
             <Lista
               podePedir={!vinculada}
               nutris={vinculada ? outras : (catalogo?.lista ?? [])}
@@ -1485,6 +1523,21 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.erroFundo,
     padding: 14,
   },
+  portaDaRede: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+    marginTop: 16,
+  },
+  textosPorta: { flex: 1 },
+  tituloPorta: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  ajudaPorta: { fontSize: 12, color: t.inkMedio, marginTop: 2 },
+
   blocoOutras: { marginTop: 26, marginBottom: 4, gap: 5 },
   tituloOutras: { fontSize: 16, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.2 },
   ajudaOutras: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
