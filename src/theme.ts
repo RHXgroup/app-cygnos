@@ -46,6 +46,17 @@ export type Cores = {
   superficie: string
   trilho: string
   borda: string
+  /* O fundo de um botão DESLIGADO.
+   *
+   * Existe porque a forma usada até aqui — `opacity` no botão inteiro — não
+   * funciona: ela compõe o texto E o fundo contra a página, e destrói a razão
+   * entre os dois. Medido no navegador, um primário a 0.45 dava contraste
+   * 1,43, quando o mínimo legível é 4,5.
+   *
+   * Este tom foi escolhido pela conta, e não pelo olho: branco sobre ele dá
+   * 4,76. Serve nos dois temas porque não depende do fundo da página — é
+   * superfície preenchida, como o verde. */
+  desligado: string
   ink: string
   branco: string
   deep: string
@@ -109,6 +120,7 @@ export const ESCURO: Paleta = {
     superficie: '#1E2319',
     trilho: '#2A3123',
     borda: 'rgba(255,255,255,0.09)',
+    desligado: '#6E7568',
 
     ink: '#F1F5EC',
     branco: '#FFFFFF',
@@ -194,6 +206,7 @@ export const CLARO: Paleta = {
     superficie: '#FFFFFF',
     trilho: '#DFE3D4',
     borda: 'rgba(47,55,34,0.12)',
+    desligado: '#6E7568',
 
     /* Musgo escuro, e não quase-preto: é o texto do sistema web, e é ele que
        faz o app parecer da mesma casa. 10,8:1 sobre o fundo. */

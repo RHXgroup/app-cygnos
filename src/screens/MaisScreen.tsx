@@ -1211,7 +1211,10 @@ linhaTema: { flexDirection: 'row', gap: 10, marginTop: 12 },
   botaoTemaEscolhido: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
   textoBotaoTemaEscolhido: { color: t.cores.sobreLimao },
   botaoLembreteAtivo: { backgroundColor: t.cores.limao, borderColor: t.cores.limao },
-  botaoLembreteDesligado: { opacity: 0.45 },
+  /* Fundo apagado, e nao `opacity`: opacidade compoe texto e fundo contra a
+       pagina e destroi a razao entre os dois — medido em 1,43 num caso, com 4,5
+       de minimo. `desligado` foi escolhido pela conta: branco sobre ele da 4,76. */
+  botaoLembreteDesligado: { backgroundColor: t.cores.desligado },
   textoBotaoLembreteAtivo: { color: t.cores.sobreLimao },
   avisoLembrete: { fontSize: 12.5, color: t.inkSuave, lineHeight: 18, marginTop: 10 },
   linkMeta: {

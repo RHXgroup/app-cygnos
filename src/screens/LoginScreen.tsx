@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from '../components/Botao'
 
 function saudacaoDoDia() {
   const h = new Date().getHours()
@@ -216,21 +217,12 @@ export function LoginScreen({
             </View>
           )}
 
-          <Pressable
+          <Botao
+            rotulo="Entrar"
+            ocupado={carregando}
+            desligado={!podeEnviar}
             onPress={entrar}
-            disabled={!podeEnviar}
-            style={({ pressed }) => [
-              styles.botaoPrimario,
-              pressed && styles.botaoPrimarioPressionado,
-              !podeEnviar && styles.botaoDesabilitado,
-            ]}
-          >
-            {carregando ? (
-              <ActivityIndicator color={paleta().cores.branco} />
-            ) : (
-              <Text style={styles.textoBotaoPrimario}>Entrar</Text>
-            )}
-          </Pressable>
+          />
 
           <Pressable
             onPress={onIrParaCadastro}
@@ -251,13 +243,11 @@ export function LoginScreen({
 
         {/* Placeholder combinado: a entrada da nutricionista usa outro fluxo
             (Código MT + usuário + senha) e fica para uma etapa seguinte. */}
-        <Pressable
+        <Botao
+          rotulo="Sou nutricionista"
+          tipo="secundario"
           onPress={() => setErro('A entrada de nutricionista ainda não está disponível no app.')}
-          style={({ pressed }) => [styles.botaoSecundario, pressed && styles.botaoSecundarioPressionado]}
-          accessibilityRole="button"
-        >
-          <Text style={styles.textoBotaoSecundario}>Sou nutricionista</Text>
-        </Pressable>
+        />
 
         <Text style={styles.rodape}>Cygnos, sistemas de saúde com clareza</Text>
       </ScrollView>
@@ -330,17 +320,6 @@ const estilos = estilosDe(t =>
     paddingVertical: 12,
   },
   textoErro: { fontSize: 13, lineHeight: 19, color: t.cores.erroTexto },
-  botaoPrimario: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: t.cores.verde,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  botaoPrimarioPressionado: { backgroundColor: t.cores.verdeEscuro },
-  botaoDesabilitado: { opacity: 0.45 },
-  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: t.cores.branco },
   caixaAviso: {
     borderRadius: 12,
     borderWidth: 1,
@@ -359,16 +338,6 @@ const estilos = estilosDe(t =>
   divisor: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
   linhaDivisor: { flex: 1, height: 1, backgroundColor: t.cores.line },
   textoDivisor: { fontSize: 12, color: t.inkFraco },
-  botaoSecundario: {
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: t.cores.deep,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  botaoSecundarioPressionado: { backgroundColor: t.cores.moss },
-  textoBotaoSecundario: { fontSize: 15, fontWeight: '600', color: t.cores.deep },
   rodape: {
     marginTop: 32,
     textAlign: 'center',

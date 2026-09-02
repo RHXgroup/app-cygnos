@@ -1061,7 +1061,10 @@ const estilos = estilosDe(t =>
       justifyContent: 'center',
       backgroundColor: t.cores.verde,
     },
-    botaoEnviarApagado: { opacity: 0.4 },
+    /* Fundo apagado, e nao `opacity`: opacidade compoe texto e fundo contra a
+         pagina e destroi a razao entre os dois — medido em 1,43 num caso, com 4,5
+         de minimo. `desligado` foi escolhido pela conta: branco sobre ele da 4,76. */
+    botaoEnviarApagado: { backgroundColor: t.cores.desligado },
 
     vazio: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 20, gap: 10 },
     circulo: {

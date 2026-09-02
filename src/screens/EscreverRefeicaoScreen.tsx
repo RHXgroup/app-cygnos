@@ -568,7 +568,10 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.verde,
     marginTop: 6,
   },
-  botaoDesligado: { opacity: 0.4 },
+  /* Fundo apagado, e nao `opacity`: opacidade compoe texto e fundo contra a
+       pagina e destroi a razao entre os dois — medido em 1,43 num caso, com 4,5
+       de minimo. `desligado` foi escolhido pela conta: branco sobre ele da 4,76. */
+  botaoDesligado: { backgroundColor: t.cores.desligado },
   pressionado: { opacity: 0.75 },
   textoBotaoConferir: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
 

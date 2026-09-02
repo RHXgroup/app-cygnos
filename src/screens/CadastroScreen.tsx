@@ -27,6 +27,7 @@ import {
   validarUsername,
 } from '../lib/formulario'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from '../components/Botao'
 
 type Campo = 'nome' | 'email' | 'username' | 'cpf' | 'telefone' | 'nascimento' | 'senha' | 'genero'
 type Erros = Partial<Record<Campo, string>>
@@ -173,9 +174,7 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
           Enviamos um e-mail para {email.trim().toLowerCase()}. Abra a mensagem e toque no link
           para ativar sua conta.
         </Text>
-        <Pressable onPress={onVoltar} style={styles.botaoPrimario}>
-          <Text style={styles.textoBotaoPrimario}>Voltar para o login</Text>
-        </Pressable>
+        <Botao rotulo="Voltar para o login" onPress={onVoltar} />
       </View>
     )
   }
@@ -345,21 +344,7 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
             </View>
           )}
 
-          <Pressable
-            onPress={cadastrar}
-            disabled={carregando}
-            style={({ pressed }) => [
-              styles.botaoPrimario,
-              pressed && styles.botaoPrimarioPressionado,
-              carregando && styles.botaoDesabilitado,
-            ]}
-          >
-            {carregando ? (
-              <ActivityIndicator color={paleta().cores.branco} />
-            ) : (
-              <Text style={styles.textoBotaoPrimario}>Criar conta</Text>
-            )}
-          </Pressable>
+          <Botao rotulo="Criar conta" ocupado={carregando} onPress={cadastrar} />
 
           {/* Abaixo do botão e não acima: o aceite é pelo ato de criar a conta,
               então o texto tem de estar ao lado do gesto que o dá. Sem caixa de
@@ -430,19 +415,6 @@ const estilos = estilosDe(t =>
     paddingVertical: 12,
   },
   textoErro: { fontSize: 13, lineHeight: 19, color: t.cores.erroTexto },
-
-  botaoPrimario: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: t.cores.verde,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    paddingHorizontal: 24,
-  },
-  botaoPrimarioPressionado: { backgroundColor: t.cores.verdeEscuro },
-  botaoDesabilitado: { opacity: 0.6 },
-  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: t.cores.branco },
   aceite: { fontSize: 12, lineHeight: 18, color: t.inkSuave, textAlign: 'center' },
   linkAceite: { fontWeight: '700', color: t.cores.deep, textDecorationLine: 'underline' },
   linkVoltar: { alignItems: 'center', paddingVertical: 8 },

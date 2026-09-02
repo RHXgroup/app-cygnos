@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { carregarLimitacoes, salvarLimitacoes } from '../lib/limitacoes'
 import { adaptarExercicio, type Alternativa } from '../lib/treinoIA'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from './Botao'
 
 /* Trocar um exercício por outro que a limitação da pessoa permite.
  *
@@ -190,18 +191,11 @@ export function AdaptarExercicio({
 
               {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
-              <Pressable
+              <Botao
+                rotulo="Guardar e ver alternativas"
+                ocupado={pedindo}
                 onPress={guardarLimitacaoESeguir}
-                disabled={pedindo}
-                style={[styles.botao, pedindo && styles.botaoOcupado]}
-                accessibilityRole="button"
-              >
-                {pedindo ? (
-                  <ActivityIndicator color={paleta().cores.branco} />
-                ) : (
-                  <Text style={styles.textoBotao}>Guardar e ver alternativas</Text>
-                )}
-              </Pressable>
+              />
             </>
           ) : pedindo ? (
             <View style={styles.pensando}>
@@ -319,15 +313,6 @@ const estilos = estilosDe(t =>
     porque: { fontSize: 12.5, color: t.inkMedio, lineHeight: 18 },
 
     erro: { fontSize: 13, color: t.cores.erroTexto, lineHeight: 18 },
-    botao: {
-      backgroundColor: t.cores.verde,
-      borderRadius: 14,
-      paddingVertical: 15,
-      alignItems: 'center',
-      marginTop: 10,
-    },
-    botaoOcupado: { opacity: 0.6 },
-    textoBotao: { color: t.cores.branco, fontSize: 15, fontWeight: '800' },
     botaoTexto: { alignItems: 'center', paddingVertical: 14 },
     textoBotaoTexto: { color: t.inkMedio, fontSize: 13, fontWeight: '700' },
   }),

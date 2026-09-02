@@ -1464,7 +1464,10 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.verde,
   },
   botaoPedirPressionado: { backgroundColor: t.cores.verdeEscuro },
-  botaoPedirApagado: { opacity: 0.6 },
+  /* Fundo apagado, e nao `opacity`: opacidade compoe texto e fundo contra a
+       pagina e destroi a razao entre os dois — medido em 1,43 num caso, com 4,5
+       de minimo. `desligado` foi escolhido pela conta: branco sobre ele da 4,76. */
+  botaoPedirApagado: { backgroundColor: t.cores.desligado },
   textoPedir: { fontSize: 15.5, fontWeight: '800', color: t.cores.branco },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },

@@ -17,6 +17,7 @@ import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from '../lib/conta'
 import { validarSenha } from '../lib/formulario'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from '../components/Botao'
 
 /* Recuperação de senha em três etapas, por código de seis dígitos.
  *
@@ -395,25 +396,14 @@ export function RecuperarSenhaScreen({
             </View>
           )}
 
-          <Pressable
+          <Botao
+            rotulo={
+              etapa === 'pedir' ? 'Enviar código' : etapa === 'codigo' ? 'Continuar' : 'Salvar e entrar'
+            }
+            ocupado={carregando}
+            desligado={!podeAvancar(etapa, identificador, codigo, senha, confirmacao, carregando)}
             onPress={etapa === 'pedir' ? pedirCodigo : etapa === 'codigo' ? conferirCodigo : salvarSenha}
-            disabled={!podeAvancar(etapa, identificador, codigo, senha, confirmacao, carregando)}
-            style={({ pressed }) => [
-              styles.botaoPrimario,
-              pressed && styles.botaoPrimarioPressionado,
-              !podeAvancar(etapa, identificador, codigo, senha, confirmacao, carregando) &&
-                styles.botaoDesabilitado,
-            ]}
-            accessibilityRole="button"
-          >
-            {carregando ? (
-              <ActivityIndicator color={paleta().cores.branco} />
-            ) : (
-              <Text style={styles.textoBotaoPrimario}>
-                {etapa === 'pedir' ? 'Enviar código' : etapa === 'codigo' ? 'Continuar' : 'Salvar e entrar'}
-              </Text>
-            )}
-          </Pressable>
+          />
 
           <Pressable onPress={cancelar} style={styles.linkVoltar} accessibilityRole="button">
             <Text style={styles.textoLinkSuave}>
@@ -533,17 +523,6 @@ const estilos = estilosDe(t =>
     paddingVertical: 12,
   },
   textoErro: { fontSize: 13.5, lineHeight: 19, color: t.cores.erroTexto },
-
-  botaoPrimario: {
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: t.cores.verde,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  botaoPrimarioPressionado: { backgroundColor: t.cores.verdeEscuro },
-  botaoDesabilitado: { opacity: 0.5 },
-  textoBotaoPrimario: { fontSize: 16, fontWeight: '700', color: t.cores.branco },
 
   linkVoltar: { alignSelf: 'center', paddingVertical: 6 },
   textoLinkSuave: { fontSize: 14, color: t.inkSuave },

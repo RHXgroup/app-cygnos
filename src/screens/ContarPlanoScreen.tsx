@@ -18,6 +18,7 @@ import { carregarIntencoes, lerIntencao, marcarCumprida, salvarIntencoes, apagar
   type IntencaoSalva } from '../lib/intencao'
 import type { Convertida, Intencao, TipoIntencao } from '../lib/intencaoDaIA'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from '../components/Botao'
 
 /* Contar um plano: o que vai acontecer, e não o que aconteceu.
  *
@@ -394,20 +395,12 @@ export function ContarPlanoScreen({
 
             {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
-            <Pressable
+            <Botao
+              rotulo={aceitas.length === 0 ? 'Você tirou tudo' : 'Está certo, guarda'}
+              ocupado={salvando}
+              desligado={aceitas.length === 0}
               onPress={salvar}
-              disabled={aceitas.length === 0 || salvando}
-              style={[styles.botao, (aceitas.length === 0 || salvando) && styles.botaoOcupado]}
-              accessibilityRole="button"
-            >
-              {salvando ? (
-                <ActivityIndicator color={paleta().cores.branco} />
-              ) : (
-                <Text style={styles.textoBotao}>
-                  {aceitas.length === 0 ? 'Você tirou tudo' : 'Está certo, guarda'}
-                </Text>
-              )}
-            </Pressable>
+            />
             <Pressable onPress={() => setLida(null)} style={styles.botaoTexto}>
               <Text style={styles.textoBotaoTexto}>Contar de outro jeito</Text>
             </Pressable>
@@ -490,7 +483,10 @@ const estilos = estilosDe(t =>
       alignItems: 'center',
       marginTop: 12,
     },
-    botaoOcupado: { opacity: 0.6 },
+    /* Fundo apagado, e nao `opacity`: opacidade compoe texto e fundo contra a
+         pagina e destroi a razao entre os dois — medido em 1,43 num caso, com 4,5
+         de minimo. `desligado` foi escolhido pela conta: branco sobre ele da 4,76. */
+    botaoOcupado: { backgroundColor: t.cores.desligado },
     /* Cinza de verdade, e não só apagado: um botão verde que não responde ao
        toque se lê como app travado. */
     botaoDesligado: { backgroundColor: t.cores.trilho },
