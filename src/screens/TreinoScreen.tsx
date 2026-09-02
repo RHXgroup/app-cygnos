@@ -98,6 +98,29 @@ export function TreinoScreen({
   const doHoje = rotina
     .filter(e => e.dia === (new Date().getDay() as DiaSemana))
     .sort((a, b) => a.ordem - b.ordem)
+  /* ── O PRÓXIMO dia com treino montado ──────────────────────────────────
+   *
+   * A tela dizia "Sem treino montado para hoje" e parava aí. Quem tinha uma
+   * rotina inteira montada — em quatro dias da semana — lia isso como "a rotina
+   * não entrou", porque a única evidência da rotina estava na OUTRA aba, e nada
+   * dizia para ir lá.
+   *
+   * Foi exatamente o que aconteceu: a IA montou e pôs no sábado, e a tela de
+   * quarta-feira não deu nenhum sinal de que existia sábado.
+   *
+   * Procura a partir de amanhã e dá a volta na semana. `undefined` quando não
+   * há rotina nenhuma — aí a frase continua sendo a de sempre, porque aí não
+   * ter treino hoje é a verdade inteira. */
+  const proximoDia = (() => {
+    if (rotina.length === 0) return undefined
+    const hoje = new Date().getDay()
+    for (let i = 1; i <= 7; i++) {
+      const d = ((hoje + i) % 7) as DiaSemana
+      if (rotina.some(e => e.dia === d)) return d
+    }
+    return undefined
+  })()
+
   /* O que a IA precisa saber da pessoa. Vem do cálculo energético e do último
      peso do diário — o mesmo par que a sugestão de plano usa, e pelo mesmo
      motivo: o peso do cálculo pode ser de meses atrás. Nulo é aceitável; a
@@ -280,7 +303,9 @@ export function TreinoScreen({
                   ? 'Você já treinou hoje'
                   : doHoje.length > 0
                     ? focoDeHoje || `${doHoje.length} ${doHoje.length === 1 ? 'exercício' : 'exercícios'}`
-                    : 'Sem treino montado para hoje'}
+                    : proximoDia !== undefined
+                      ? `Nada para hoje · o próximo é ${DIAS_LONGOS[proximoDia].toLowerCase()}`
+                      : 'Sem treino montado para hoje'}
               </Text>
               <Text style={styles.subHoje}>
                 {naSemana === 0

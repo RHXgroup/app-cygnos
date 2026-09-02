@@ -209,8 +209,21 @@ export function RotinaPorIA({
    * Então, sem texto, o pedido é MONTADO a partir do que ela escolheu. O
    * campo continua ali para quem quiser pedir algo específico ("CrossFit",
    * "quero ganhar massa nas costas"), que é onde ele vale. */
+  /* HOJE vai no pedido.
+   *
+   * A IA escolhe em que dias da semana os treinos caem, e sem saber que dia é
+   * hoje ela escolhe no vazio — foi assim que um pedido de quarta-feira nasceu
+   * inteiro no sábado, e a pessoa concluiu que a rotina não tinha entrado.
+   *
+   * Dizer o dia não obriga a começar hoje: obriga a escolher SABENDO. Quem pede
+   * quatro dias numa quarta espera, com razão, que um deles seja perto. */
+  const HOJE_E = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][
+    new Date().getDay()
+  ]
+
   function pedidoDasEscolhas(): string {
     const partes = [
+      `Hoje é ${HOJE_E}`,
       `${tipo}, ${dias === 1 ? '1 dia' : `${dias} dias`} por semana`,
       minutos ? `de cerca de ${minutos} minutos` : null,
       onde ? onde.toLowerCase() : null,

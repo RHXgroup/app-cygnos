@@ -40,6 +40,7 @@ import { METAS_VAZIAS, carregarMetas, type Metas } from '../lib/metas'
 import { mascaraHora, validarHora } from '../lib/formulario'
 import { DIAS_CURTOS, dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { Botao } from '../components/Botao'
 
 /* O sono, uma noite por vez.
  *
@@ -119,6 +120,18 @@ export function SonoScreen({
   const [erro, setErro] = useState('')
   const [mudou, setMudou] = useState(false)
 
+  /* O que estava gravado quando esta noite foi carregada.
+   *
+   * Sem isto o botão ficava aceso para sempre: a noite estava salva, o topo
+   * dizia "já registrada", e mesmo assim "Atualizar esta noite" continuava
+   * chamando ação — o que se lê como "não salvou". Um botão que pede o que já
+   * foi feito ensina a pessoa a desconfiar do que a tela diz.
+   *
+   * Guardo a ASSINATURA dos campos, e não os campos: comparar uma string é o
+   * suficiente para saber se tem o que gravar, e não some quando um campo novo
+   * entrar na tela — ele entra na assinatura junto. */
+  const [gravado, setGravado] = useState<string | null>(null)
+
   /* A noite aberta. Nunca passa da noite padrão: não dá para registrar uma noite
      que ainda não aconteceu. */
   const [dia, setDia] = useState(() => noitePadrao())
@@ -168,12 +181,37 @@ export function SonoScreen({
     setCochilos(salva?.cochilosMin ?? null)
     setFatores(salva?.fatores ?? [])
     setObservacao(salva?.observacao ?? '')
+    /* A assinatura do que ESTÁ gravado. Noite que ainda não existe fica `null`,
+       e aí o botão diz "Salvar" e não "Atualizar". */
+    setGravado(
+      salva
+        ? JSON.stringify([
+            dia,
+            salva.deitou,
+            salva.levantou,
+            salva.latenciaMin ?? null,
+            salva.despertares ?? null,
+            salva.qualidade ?? null,
+            salva.acordou ?? null,
+            salva.cochilosMin ?? null,
+            salva.fatores ?? [],
+            salva.observacao ?? '',
+          ])
+        : null,
+    )
   }, [salva?.id, dia])
 
   const horasOk = validarHora(deitou) === null && validarHora(levantou) === null
   const naCama = horasOk ? tempoNaCama(deitou, levantou) : 0
   const dormindo = horasOk ? tempoDormindo({ deitou, levantou, latenciaMin: latencia }) : 0
   const efic = horasOk ? eficiencia({ deitou, levantou, latenciaMin: latencia }) : null
+
+  /* Tudo que vai para o banco, em ordem fixa. Se mudar o que `salvarNoite`
+     recebe, esta linha muda junto — e é de propósito que ela esteja LOGO ACIMA
+     dela, para as duas serem lidas no mesmo olhar. */
+  const assinatura = JSON.stringify([
+    dia, deitou, levantou, latencia, despertares, qualidade, acordou, cochilos, fatores, observacao,
+  ])
 
   async function salvar() {
     if (!horasOk) return
@@ -202,6 +240,9 @@ export function SonoScreen({
     }
 
     setMudou(true)
+    /* O que acabou de subir vira o "gravado". Sem esta linha o botão continuaria
+       aceso logo depois de salvar, que é exatamente a queixa. */
+    setGravado(assinatura)
     /* Substitui a noite do dia em vez de acrescentar: o banco fez upsert, e sem
        o filtro a mesma noite apareceria duas vezes no histórico. */
     setNoites(atuais => [r.noite, ...atuais.filter(n => n.data !== r.noite.data)])
@@ -255,6 +296,16 @@ export function SonoScreen({
       ) : (
         <>
           <ScrollView
+            /* `flex: 1` NA ROLAGEM.
+             *
+             * Sem isto a ScrollView se dimensiona pelo conteúdo, e o rodapé
+             * fixo — que é irmão dela — para onde o conteúdo achar que acabou:
+             * no MEIO da tela. Foi o que apareceu na foto, com "Atualizar esta
+             * noite" boiando por cima do formulário.
+             *
+             * Mesmo defeito que a tela de montar rotina teve hoje. Pinar um
+             * rodapé exige que o vizinho de cima tenha permissão de encolher. */
+            style={styles.rolagem}
             contentContainerStyle={styles.conteudo}
             showsVerticalScrollIndicator={false}
             bounces={false}
@@ -549,24 +600,23 @@ export function SonoScreen({
           </ScrollView>
 
           <View style={[styles.rodape, { paddingBottom: Math.max(bottom, 16) }]}>
-            <Pressable
+            {/* Três estados, e não dois.
+                "Atualizar" com nada para atualizar é o que fazia a tela parecer
+                que não tinha salvado: o topo dizia "já registrada" e o botão
+                continuava pedindo ação. Agora, sem alteração pendente, ele diz
+                que está guardado e para de chamar. */}
+            <Botao
+              rotulo={
+                !salva
+                  ? 'Salvar esta noite'
+                  : assinatura === gravado
+                    ? 'Noite guardada'
+                    : 'Atualizar esta noite'
+              }
+              ocupado={salvando}
+              desligado={!horasOk || (salva !== null && assinatura === gravado)}
               onPress={salvar}
-              disabled={!horasOk || salvando}
-              style={({ pressed }) => [
-                styles.botao,
-                (!horasOk || salvando) && styles.botaoDesligado,
-                pressed && styles.botaoPressionado,
-              ]}
-              accessibilityRole="button"
-            >
-              {salvando ? (
-                <ActivityIndicator color={paleta().cores.branco} />
-              ) : (
-                <Text style={styles.textoBotao}>
-                  {salva ? 'Atualizar esta noite' : 'Salvar esta noite'}
-                </Text>
-              )}
-            </Pressable>
+            />
           </View>
         </>
       )}
@@ -748,6 +798,7 @@ function Passo({
 const estilos = estilosDe(t =>
   StyleSheet.create({
   tela: { flex: 1, backgroundColor: t.cores.fundo },
+  rolagem: { flex: 1 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {
@@ -950,15 +1001,5 @@ const estilos = estilosDe(t =>
     borderTopColor: t.cores.borda,
     backgroundColor: t.cores.fundo,
   },
-  botao: {
-    height: 54,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.cores.verde,
-  },
-  botaoPressionado: { backgroundColor: t.cores.verdeEscuro },
-  botaoDesligado: { backgroundColor: t.cores.trilho },
-  textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
   }),
 )
