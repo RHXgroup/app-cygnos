@@ -40,12 +40,20 @@ import {
 } from '../lib/fotoDoDiario'
 import { comoElaResponde } from '../lib/ritmoDaConversa'
 import { estilosDe, paleta } from '../lib/tema'
+import { Confirmacao } from '../components/Confirmacao'
 import { AudioDoBalao } from '../components/AudioDoBalao'
 import { Escolha } from '../components/Escolha'
 import { useAudioRecorder, useAudioRecorderState } from 'expo-audio'
 import { LIMITE_DO_RECADO, MINIMO_DO_RECADO, guardarAudioDaConversa } from '../lib/audioDaConversa'
 import { falha } from '../lib/erros'
-import { OPCOES_DITADO, mmss, prepararMicrofone } from '../lib/voz'
+import {
+  EXPLICACAO_DO_MICROFONE,
+  OPCOES_DITADO,
+  marcarMicrofoneExplicado,
+  mmss,
+  precisaExplicarMicrofone,
+  prepararMicrofone,
+} from '../lib/voz'
 import { useDesvioDoTeclado } from '../lib/teclado'
 
 /* A conversa com a nutricionista.
@@ -271,12 +279,21 @@ export function MensagensScreen({
     [],
   )
 
+  const [explicandoMicrofone, setExplicandoMicrofone] = useState(false)
+
   async function comecarAGravar() {
     if (gravando || enviando || subindoAnexo) return
 
-    /* A explicação vem ANTES da caixa do sistema, e é a mesma do ditado: a
-       caixa do Android não se estiliza e não diz para que serve, mas tudo em
-       volta dela é nosso. */
+    /* A nossa explicação primeiro, a do sistema depois. */
+    if (await precisaExplicarMicrofone()) {
+      setExplicandoMicrofone(true)
+      return
+    }
+    await seguirComMicrofone()
+  }
+
+  async function seguirComMicrofone() {
+
     const permissao = await prepararMicrofone()
     if (permissao.tipo !== 'ok') {
       setErro(permissao.mensagem)
@@ -698,6 +715,26 @@ export function MensagensScreen({
           </View>
         </>
       )}
+
+
+      {/* A explicação ANTES da caixa do sistema, com a cara do app.
+          A do Android não se estiliza e no Android nem o texto é nosso — o que
+          dá para escolher é o que a pessoa lê antes dela. E é aqui que vale:
+          "por que um aplicativo de nutrição quer o meu microfone?" é a pergunta
+          que existe de verdade, e quem não tem a resposta nega e depois não
+          acha onde liberar. */}
+      <Confirmacao
+        visivel={explicandoMicrofone}
+        titulo="Falar em vez de digitar"
+        mensagem={EXPLICACAO_DO_MICROFONE}
+        rotuloConfirmar="Pode pedir"
+        rotuloCancelar="Agora não"
+        onCancelar={() => setExplicandoMicrofone(false)}
+        onConfirmar={() => {
+          setExplicandoMicrofone(false)
+          void marcarMicrofoneExplicado().then(seguirComMicrofone)
+        }}
+      />
 
       <Escolha
         visivel={escolhendoFoto}

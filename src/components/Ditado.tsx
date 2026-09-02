@@ -6,10 +6,14 @@ import {
   LIMITE_SEGUNDOS,
   OPCOES_DITADO,
   prepararMicrofone,
+  precisaExplicarMicrofone,
+  marcarMicrofoneExplicado,
+  EXPLICACAO_DO_MICROFONE,
   mmss,
   transcrever,
 } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
+import { Confirmacao } from './Confirmacao'
 
 /* O botão de falar em vez de digitar.
  *
@@ -143,7 +147,20 @@ export function Ditado({
        cada renderização, e listá-la faria o efeito rodar sem parar. */
   }, [estado, segundos])
 
+  /* Duas etapas: a nossa explicação, e depois a do sistema.
+     `seguirComMicrofone` é o que roda DEPOIS do "pode pedir" — e também é o
+     caminho direto de quem já explicou uma vez. */
+  const [explicandoMicrofone, setExplicandoMicrofone] = useState(false)
+
   async function comecar() {
+    if (await precisaExplicarMicrofone()) {
+      setExplicandoMicrofone(true)
+      return
+    }
+    await seguirComMicrofone()
+  }
+
+  async function seguirComMicrofone() {
     const permissao = await prepararMicrofone()
     if (permissao.tipo === 'negada') {
       onErro(permissao.mensagem)
@@ -307,6 +324,26 @@ export function Ditado({
           <Text style={styles.textoOuvir}>Ouvir a gravação</Text>
         </Pressable>
       )}
+
+      {/* A explicação ANTES da caixa do sistema, com a cara do app.
+          A do Android não se estiliza e nem o texto dela é nosso — o que dá
+          para escolher é o que a pessoa lê antes. E é aqui que vale: "por que
+          um aplicativo de nutrição quer o meu microfone?" é a pergunta que
+          existe de verdade, e quem não tem a resposta nega e depois não acha
+          onde liberar. */}
+      <Confirmacao
+        visivel={explicandoMicrofone}
+        titulo="Falar em vez de digitar"
+        mensagem={EXPLICACAO_DO_MICROFONE}
+        rotuloConfirmar="Pode pedir"
+        rotuloCancelar="Agora não"
+        onCancelar={() => setExplicandoMicrofone(false)}
+        onConfirmar={() => {
+          setExplicandoMicrofone(false)
+          void marcarMicrofoneExplicado().then(seguirComMicrofone)
+        }}
+      />
+
     </>
   )
 }

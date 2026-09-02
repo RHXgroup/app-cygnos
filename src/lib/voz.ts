@@ -1,4 +1,3 @@
-import { Alert } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   RecordingPresets,
@@ -125,47 +124,44 @@ export type ResultadoPermissao =
  * concedida, o sistema nem pergunta mais — então isto some sozinho. */
 const CHAVE_JA_EXPLIQUEI = 'microfone.expliquei'
 
-async function explicarAntes(): Promise<boolean> {
+/* A lib RESPONDE se precisa explicar; quem DESENHA é a tela.
+ *
+ * Isto aqui chamava `Alert.alert` — a caixa do Android, com fundo claro,
+ * tipografia do sistema e botões azuis em caixa alta, no meio de um app escuro.
+ * Uma caixa que não se parece com o app parece aviso do celular, e foi lida
+ * exatamente assim.
+ *
+ * Uma lib não tem como desenhar a caixa da casa: ela não renderiza. Então ela
+ * devolve a pergunta, e a tela mostra o `Confirmacao`, que é o componente que
+ * existe no projeto justamente para substituir o Alert. */
+export async function precisaExplicarMicrofone(): Promise<boolean> {
+  /* Só quando o sistema ainda vai perguntar. Já concedida, a caixa dele não
+     aparece e a explicação seria conversa sobre coisa nenhuma. */
+  const antes = await getRecordingPermissionsAsync().catch(() => null)
+  if (!antes || antes.granted || !antes.canAskAgain) return false
   try {
-    if (await AsyncStorage.getItem(CHAVE_JA_EXPLIQUEI)) return true
+    return !(await AsyncStorage.getItem(CHAVE_JA_EXPLIQUEI))
   } catch {
-    /* Sem armazenamento, explica de novo. Explicar duas vezes é chato;
-       não explicar é o que faz a pessoa negar. */
+    /* Sem armazenamento, explica de novo. Explicar duas vezes é chato; não
+       explicar é o que faz a pessoa negar. */
+    return true
   }
-
-  const seguiu = await new Promise<boolean>(resolve => {
-    Alert.alert(
-      'Falar em vez de digitar',
-      'O Cygnos usa o microfone só enquanto você segura para falar, e manda o ' +
-        'áudio para transcrever o que você disse. Ele não fica escutando, e nada ' +
-        'é guardado depois que o texto aparece.\n\n' +
-        'O aparelho vai pedir a permissão na tela seguinte.',
-      [
-        { text: 'Agora não', style: 'cancel', onPress: () => resolve(false) },
-        { text: 'Pode pedir', onPress: () => resolve(true) },
-      ],
-      { cancelable: false },
-    )
-  })
-
-  if (seguiu) {
-    /* Guarda só depois do SIM: quem disse "agora não" volta a ver a explicação
-       da próxima vez, que é justamente quando ela pode mudar de ideia. */
-    await AsyncStorage.setItem(CHAVE_JA_EXPLIQUEI, '1').catch(() => {})
-  }
-  return seguiu
 }
 
-export async function prepararMicrofone(): Promise<ResultadoPermissao> {
-  /* Só quando o sistema ainda vai perguntar. Já concedida, a caixa não aparece
-     e a explicação seria conversa sobre coisa nenhuma. */
-  const antes = await getRecordingPermissionsAsync().catch(() => null)
-  if (antes && !antes.granted && antes.canAskAgain) {
-    if (!(await explicarAntes())) {
-      return { tipo: 'negada', mensagem: 'Sem problema — é só digitar.' }
-    }
-  }
+/* Guarda só depois do SIM: quem disse "agora não" volta a ver a explicação da
+   próxima vez, que é justamente quando ela pode mudar de ideia. */
+export async function marcarMicrofoneExplicado(): Promise<void> {
+  await AsyncStorage.setItem(CHAVE_JA_EXPLIQUEI, '1').catch(() => {})
+}
 
+/* O texto da explicação mora aqui, e não em cada tela: são duas telas pedindo o
+   microfone hoje, e duas versões da mesma promessa de privacidade divergem. */
+export const EXPLICACAO_DO_MICROFONE =
+  'O Cygnos usa o microfone só enquanto você segura para falar, e manda o áudio ' +
+  'para transcrever o que você disse. Ele não fica escutando, e nada é guardado ' +
+  'depois que o texto aparece.\n\nO aparelho vai pedir a permissão na tela seguinte.'
+
+export async function prepararMicrofone(): Promise<ResultadoPermissao> {
   const permissao = await requestRecordingPermissionsAsync()
   if (!permissao.granted) {
     return {

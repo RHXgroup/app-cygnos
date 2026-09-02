@@ -352,7 +352,7 @@ export function RotinaPorIA({
            * Pinar um rodapé exige que o vizinho de cima tenha permissão de
            * encolher. Sem `flex: 1` ele não tem. */
           style={styles.rolagem}
-          contentContainerStyle={[styles.conteudo, { paddingBottom: 24 }]}
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 24 + bottom + respiro }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -588,6 +588,35 @@ export function RotinaPorIA({
 
               {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
+              {/* ── O BOTÃO FICA NO FIM DO FORMULÁRIO, e isso já teve as
+                  duas versões erradas hoje ──────────────────────────────────
+                  Primeiro ele estava aqui e NÃO DAVA PARA CHEGAR nele: o
+                  teclado cobria o fim da tela, e no Expo Go a janela não
+                  encolhe, então nem rolar resolvia. Diagnostiquei como "está
+                  escondido" e fixei no rodapé.
+                  Aí ele passou a CORTAR O FORMULÁRIO NO MEIO. Quem abria via
+                  tipo de treino, o campo de texto e o botão -- e não tinha como
+                  saber que dias, tempo, lugar, equipamento, experiência e lesão
+                  existiam por baixo dele. Um botão de enviar no meio de um
+                  formulário diz "acabou aqui".
+                  A doença era o teclado, e não a posição. Com o desvio medido
+                  (`respiro` no fim do conteúdo) o fim da tela é alcançável, e
+                  o lugar do botão volta a ser o que ele sempre deveria ter
+                  sido: depois da última pergunta, onde ele significa "terminei
+                  de responder". */}
+              <Pressable
+                onPress={montar}
+                disabled={pedindo}
+                style={[styles.botao, pedindo && styles.botaoOcupado]}
+                accessibilityRole="button"
+                accessibilityLabel="Montar minha rotina com a IA"
+              >
+                {pedindo ? (
+                  <ActivityIndicator color={paleta().cores.branco} />
+                ) : (
+                  <Text style={styles.textoBotao}>Montar minha rotina</Text>
+                )}
+              </Pressable>
               {pedindo ? <Text style={styles.ajuda}>Isso leva alguns segundos.</Text> : null}
             </>
           ) : (
@@ -751,40 +780,6 @@ export function RotinaPorIA({
           )}
         </ScrollView>
 
-        {/* ── A AÇÃO PRINCIPAL NÃO PODE DEPENDER DE ROLAGEM ──────────────
-         *
-         * "Montar minha rotina" era o último elemento de um formulário de sete
-         * blocos, dentro da rolagem. Quem abria a tela via o atalho da ficha e
-         * os primeiros campos, e concluía que não existe onde mandar montar —
-         * literalmente "cadê o botão de montar o plano?".
-         *
-         * Duas coisas somavam para isso. O formulário é longo, então o botão
-         * nascia fora da vista; e o teclado cobria o fim da tela, então nem
-         * rolar até ele bastava.
-         *
-         * Fixo no rodapé resolve os dois de uma vez: a tela passa a DIZER, o
-         * tempo todo, o que ela faz. Um formulário cuja ação some é um
-         * formulário que parece não ter ação.
-         *
-         * Só no formulário: na conferência da rotina o rodapé é outro, e dois
-         * botões fixos disputando o mesmo canto é pior que rolar. */}
-        {rotina === null && (
-          <View style={[styles.rodape, { paddingBottom: 12 + bottom + respiro }]}>
-            <Pressable
-              onPress={montar}
-              disabled={pedindo}
-              style={[styles.botao, pedindo && styles.botaoOcupado]}
-              accessibilityRole="button"
-              accessibilityLabel="Montar minha rotina com a IA"
-            >
-              {pedindo ? (
-                <ActivityIndicator color={paleta().cores.branco} />
-              ) : (
-                <Text style={styles.textoBotao}>Montar minha rotina</Text>
-              )}
-            </Pressable>
-          </View>
-        )}
       </View>
     </Modal>
   )
@@ -802,17 +797,7 @@ const estilos = estilosDe(t =>
     },
     botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
-    /* Encostado no fim da tela, com uma linha em cima separando do que rola por
-     baixo — sem ela o botão parece flutuar sobre o texto quando a lista passa. */
-  rodape: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: t.cores.borda,
-    backgroundColor: t.cores.fundo,
-  },
-
-  rolagem: { flex: 1 },
+    rolagem: { flex: 1 },
   conteudo: { paddingHorizontal: 20, gap: 10 },
 
     /* ── O atalho é CARTÃO, e não dois botões soltos ────────────────────
