@@ -41,6 +41,7 @@ import { MetasScreen, type AlvoMetas } from './src/screens/MetasScreen'
 import { MeusCadastrosScreen } from './src/screens/MeusCadastrosScreen'
 import { ReceitasScreen } from './src/screens/ReceitasScreen'
 import { NutricionistasScreen } from './src/screens/NutricionistasScreen'
+import { PlanoTerapeuticoScreen } from './src/screens/PlanoTerapeuticoScreen'
 import { PerfilScreen } from './src/screens/PerfilScreen'
 import { RecuperarSenhaScreen } from './src/screens/RecuperarSenhaScreen'
 import { PesoScreen } from './src/screens/PesoScreen'
@@ -275,6 +276,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   /* Aberta pelo "Nutricionistas Cygnos" do Mais, e não pela ficha da própria:
      a mesma tela, entrando por outra porta. */
   const [redeAberta, setRedeAberta] = useState(false)
+  const [planoTerapeuticoAberto, setPlanoTerapeuticoAberto] = useState(false)
   const [mensagensAbertas, setMensagensAbertas] = useState(false)
   const [avisosAbertos, setAvisosAbertos] = useState(false)
   const [excluirContaAberta, setExcluirContaAberta] = useState(false)
@@ -507,6 +509,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         [planoEmEdicao !== null, () => setPlanoEmEdicao(null)],
         [cadastrosAberto, () => setCadastrosAberto(false)],
         [excluirContaAberta, () => setExcluirContaAberta(false)],
+        [planoTerapeuticoAberto, () => setPlanoTerapeuticoAberto(false)],
         [nutricionistasAbertas, () => setNutricionistasAbertas(false)],
         [mensagensAbertas, () => setMensagensAbertas(false)],
         [avisosAbertos, () => setAvisosAbertos(false)],
@@ -618,6 +621,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                   setRedeAberta(true)
                   setNutricionistasAbertas(true)
                 }}
+                onAbrirPlanoTerapeutico={() => setPlanoTerapeuticoAberto(true)}
                 onAbrirAvisos={() => setAvisosAbertos(true)}
                 onAbrirExcluirConta={() => setExcluirContaAberta(true)}
                 onAbrirCadastros={() => setCadastrosAberto(true)}
@@ -681,6 +685,12 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 setVersaoMetas(v => v + 1)
               }}
             />
+          </Sobreposta>
+        )}
+
+        {planoTerapeuticoAberto && (
+          <Sobreposta>
+            <PlanoTerapeuticoScreen onFechar={() => setPlanoTerapeuticoAberto(false)} />
           </Sobreposta>
         )}
 
@@ -966,6 +976,7 @@ function TelaDaAba({
   onAbrirCodigo,
   onAbrirNutricionistas,
   onAbrirRede,
+  onAbrirPlanoTerapeutico,
   onAbrirAvisos,
   onAbrirExcluirConta,
   onAbrirCadastros,
@@ -1007,6 +1018,7 @@ function TelaDaAba({
   onAbrirCodigo: () => void
   onAbrirNutricionistas: () => void
   onAbrirRede: () => void
+  onAbrirPlanoTerapeutico: () => void
   /* O destino do sino do topo. */
   onAbrirAvisos: () => void
   onAbrirExcluirConta: () => void
@@ -1091,6 +1103,7 @@ function TelaDaAba({
       return (
         <MaisScreen
           onAbrirRede={onAbrirRede}
+          onAbrirPlanoTerapeutico={onAbrirPlanoTerapeutico}
           versaoVinculo={versaoVinculo}
           /* Os dois contadores que mudam o horário de um lembrete: o plano dá a
              hora da refeição, a meta de água e o sono dão o ritmo dos copos. */

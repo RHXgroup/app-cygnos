@@ -66,6 +66,7 @@ export function MaisScreen({
   versaoMetas,
   onAbrirNutricionistas,
   onAbrirRede,
+  onAbrirPlanoTerapeutico,
   onAbrirCodigo,
   onAbrirExcluirConta,
   onAbrirMensagens,
@@ -87,6 +88,7 @@ export function MaisScreen({
   versaoMetas: number
   onAbrirNutricionistas: () => void
   onAbrirRede: () => void
+  onAbrirPlanoTerapeutico: () => void
   onAbrirCodigo: () => void
   onAbrirExcluirConta: () => void
   /* Mensagens deixou de ser aba e virou linha aqui. O contador vem junto:
@@ -407,6 +409,28 @@ export function MaisScreen({
         onAbrir={onAbrirNutricionistas}
         onAbrirCodigo={onAbrirCodigo}
       />
+
+      {/* ── O PLANO TERAPÊUTICO ──────────────────────────────────────────
+          Fica logo abaixo da nutricionista porque é DELA que ele vem, e porque
+          é tarefa do dia — o que oferecer em casa, hoje. Não é ajuste de app,
+          então não desce para o fim junto com aparência e conta.
+
+          A tela decide sozinha se tem o que mostrar; aqui a linha existe
+          sempre. Esconder a entrada quando não há plano faria a mãe que acabou
+          de sair do consultório procurar uma opção que sumiu — e ela não sabe
+          que a nutricionista ainda não publicou. */}
+      <View style={styles.cartao}>
+        <Text style={styles.tituloCartao}>Plano da nutricionista</Text>
+        <Text style={styles.textoPrivacidade}>
+          Os alimentos para oferecer em casa, e como foi cada vez.
+        </Text>
+        <LinhaLink
+          icone="restaurant-outline"
+          rotulo="Ver e registrar em casa"
+          onPress={onAbrirPlanoTerapeutico}
+          interno
+        />
+      </View>
 
       {/* Só aparece quando há algo a responder, e some sozinha depois.
           Uma linha permanente de "questionário" ensinaria a ignorá-la: quando o
