@@ -91,6 +91,11 @@ export function RotinaPorIA({
   const [limitacoes, setLimitacoes] = useState('')
 
   const [pedindo, setPedindo] = useState(false)
+  /* QUAL das duas esperas está rolando. As duas usam `pedindo` para travar a
+     tela, mas dizem coisas diferentes: ler uma ficha fotografada e montar a
+     rotina do zero são trabalhos distintos, e chamar os dois de "Lendo a
+     ficha" foi parte do que fez esta tela parecer que só sabe ler ficha. */
+  const [lendoFicha, setLendoFicha] = useState(false)
   const [erro, setErro] = useState('')
   const [rotina, setRotina] = useState<RotinaConvertida | null>(null)
   /* A lista EDITÁVEL da conferência.
@@ -148,14 +153,37 @@ export function RotinaPorIA({
     await salvarLimitacoes(contaId, limitacoes)
   }
 
+  /* ── O texto livre virou OPCIONAL, e essa era a trava ─────────────────
+   *
+   * `montar` recusava com menos de cinco letras no campo de texto: quem
+   * escolhia quatro dias, uma hora, academia, "já treinei antes" e lesão no
+   * ombro tocava em "Montar minha rotina" e recebia "Me diga o que você quer
+   * treinar" -- com tudo preenchido logo acima.
+   *
+   * O efeito não foi a pessoa escrever: foi concluir que a IA não monta nada,
+   * que só lê ficha de academia. E é o contrário — os campos sozinhos já
+   * dizem mais do que a maioria escreveria à mão.
+   *
+   * Então, sem texto, o pedido é MONTADO a partir do que ela escolheu. O
+   * campo continua ali para quem quiser pedir algo específico ("CrossFit",
+   * "quero ganhar massa nas costas"), que é onde ele vale. */
+  function pedidoDasEscolhas(): string {
+    const partes = [
+      `Treino ${dias === 1 ? '1 dia' : `${dias} dias`} por semana`,
+      minutos ? `de cerca de ${minutos} minutos` : null,
+      onde ? onde.toLowerCase() : null,
+      experiencia ? `para quem ${experiencia.toLowerCase()}` : null,
+    ].filter(Boolean)
+    return partes.join(', ') + '.'
+  }
+
   async function montar() {
-    const texto = pedido.trim()
-    if (texto.length < 5) {
-      setErro('Me diga o que você quer treinar. Pode falar, se preferir.')
-      return
-    }
+    /* Vazio não é erro: vira o pedido feito das escolhas. */
+    const texto = pedido.trim() || pedidoDasEscolhas()
+
     setErro('')
     setPedindo(true)
+    setLendoFicha(false)
     await guardarLimitacao()
     const p: PedidoDeTreino = {
       pedido: texto,
@@ -183,9 +211,14 @@ export function RotinaPorIA({
     /* Antes de abrir a câmera: a função da foto lê a limitação do banco, e
        gravá-la depois seria gravar tarde demais. */
     await guardarLimitacao()
+    setLendoFicha(true)
     setPedindo(true)
     const r = await lerFichaDaFoto(origem)
     setPedindo(false)
+    /* Desliga junto com a espera, e não só quando alguém montar depois: uma
+       bandeira que fica ligada sozinha é a que faz a tela dizer a frase errada
+       no próximo uso. */
+    setLendoFicha(false)
     if (r.tipo === 'cancelado') return
     if (r.tipo === 'ok') {
       setRotina(r.rotina)
@@ -284,31 +317,33 @@ export function RotinaPorIA({
                * como UMA linha discreta: atalho tem tamanho de atalho, e o
                * caminho principal é o que tem de ocupar a tela. */}
               <View style={styles.atalhoFicha}>
-                <Text style={styles.textoAtalho}>Já tem ficha da academia?</Text>
-                <Pressable
-                  onPress={() => importarFicha('camera')}
-                  disabled={pedindo}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && { opacity: 0.6 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Fotografar a ficha da academia"
-                >
-                  <Text style={styles.linkAtalho}>Fotografar</Text>
-                </Pressable>
-                <Text style={styles.textoAtalho}>·</Text>
-                <Pressable
-                  onPress={() => importarFicha('galeria')}
-                  disabled={pedindo}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && { opacity: 0.6 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Escolher um print da ficha na galeria"
-                >
-                  <Text style={styles.linkAtalho}>Usar um print</Text>
-                </Pressable>
+                <Text style={styles.tituloAtalho}>Já treina com ficha da academia?</Text>
+                <View style={styles.fotoLinha}>
+                  <Pressable
+                    onPress={() => importarFicha('camera')}
+                    disabled={pedindo}
+                    style={({ pressed }) => [styles.botaoFoto, pressed && { opacity: 0.7 }]}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="camera-outline" size={17} color={paleta().cores.verde} />
+                    <Text style={styles.textoBotaoFoto}>Fotografar</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => importarFicha('galeria')}
+                    disabled={pedindo}
+                    style={({ pressed }) => [styles.botaoFoto, pressed && { opacity: 0.7 }]}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="image-outline" size={17} color={paleta().cores.verde} />
+                    <Text style={styles.textoBotaoFoto}>Usar um print</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.ajudaAtalho}>
+                  Se não tiver, deixe para lá — eu monto do zero aqui embaixo.
+                </Text>
               </View>
 
-              <Text style={styles.rotulo}>O que você quer treinar?</Text>
+              <Text style={styles.rotulo}>Quer pedir alguma coisa específica?</Text>
               <TextInput
                 style={styles.campoGrande}
                 value={pedido}
@@ -316,7 +351,7 @@ export function RotinaPorIA({
                   setPedido(t)
                   if (erro) setErro('')
                 }}
-                placeholder="Ex.: quero ganhar massa nos braços e nas costas, tenho halteres em casa"
+                placeholder="Opcional. Ex.: CrossFit, ou ganhar massa nas costas, ou só tenho halteres"
                 placeholderTextColor={paleta().inkFraco}
                 multiline
                 textAlignVertical="top"
@@ -411,12 +446,18 @@ export function RotinaPorIA({
               </Text>
 
               {pedindo ? (
-                /* Ler a ficha leva de cinco a quinze segundos, e sem isto a tela
-                   fica parada depois que a câmera fecha — a pessoa acha que
-                   não funcionou e toca de novo, gastando outra chamada. */
+                /* Leva de cinco a quinze segundos, e sem isto a tela fica parada
+                   depois que a câmera fecha — a pessoa acha que não funcionou e
+                   toca de novo, gastando outra chamada.
+                   E o texto diz QUAL das duas coisas está acontecendo: dizer
+                   "Lendo a ficha" enquanto monta a partir das escolhas foi parte
+                   do que fez esta tela passar a impressão de que a IA só sabe
+                   ler ficha de academia. */
                 <View style={styles.lendo}>
                   <ActivityIndicator color={paleta().cores.verde} />
-                  <Text style={styles.textoLendo}>Lendo a ficha…</Text>
+                  <Text style={styles.textoLendo}>
+                    {lendoFicha ? 'Lendo a ficha…' : 'Montando a sua rotina…'}
+                  </Text>
                 </View>
               ) : null}
 
@@ -615,15 +656,38 @@ const estilos = estilosDe(t =>
     tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
     conteudo: { paddingHorizontal: 20, gap: 10 },
 
-    atalhoFicha: {
+    /* ── O atalho é CARTÃO, e não dois botões soltos ────────────────────
+   *
+   * Como dois botões grandes soltos no topo, ele parecia o assunto da tela e
+   * fazia a IA passar por leitora de ficha. Como texto puro, virou enfeite que
+   * ninguém vê. Dentro de um cartão com título e uma linha embaixo dizendo que
+   * dá para ignorar, ele fica achável e claramente lateral — que é o que um
+   * atalho é. */
+  atalhoFicha: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+    gap: 9,
+    marginBottom: 16,
+  },
+  tituloAtalho: { fontSize: 13, fontWeight: '700', color: t.cores.ink },
+  ajudaAtalho: { fontSize: 11.5, color: t.inkFraco, lineHeight: 16 },
+  fotoLinha: { flexDirection: 'row', gap: 9 },
+  botaoFoto: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 6,
-    marginBottom: 14,
+    paddingVertical: 10,
+    borderRadius: 11,
+    backgroundColor: t.cores.verdeMenta,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
   },
-  textoAtalho: { fontSize: 12.5, color: t.inkMedio },
-  linkAtalho: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
+  textoBotaoFoto: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
 
     explicacao: { fontSize: 14, color: t.inkMedio, lineHeight: 20, marginBottom: 4 },
     rotulo: { fontSize: 13, fontWeight: '700', color: t.cores.ink, marginTop: 10 },
