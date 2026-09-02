@@ -309,9 +309,17 @@ export function RotinaPorIA({
         </View>
 
         <ScrollView
-          /* O respiro entra como espaço NO FIM do conteúdo, e não como margem
-             da tela: assim o botão sobe acima do teclado por rolagem, que é o
-             gesto que a pessoa já está fazendo. */
+          /* `flex: 1` NA ROLAGEM, e não só no container.
+           *
+           * Sem isto a ScrollView se dimensiona pelo conteúdo, e o rodapé fixo
+           * — que é irmão dela — para onde o conteúdo achar que acabou: no MEIO
+           * da tela, cobrindo os campos que vinham depois. Quem abria via o
+           * botão de montar por cima de "onde você treina" e concluía, com
+           * razão, que a tela não pergunta isso.
+           *
+           * Pinar um rodapé exige que o vizinho de cima tenha permissão de
+           * encolher. Sem `flex: 1` ele não tem. */
+          style={styles.rolagem}
           contentContainerStyle={[styles.conteudo, { paddingBottom: 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -366,7 +374,7 @@ export function RotinaPorIA({
                 </Text>
               </View>
 
-              <Text style={styles.rotulo}>Quer pedir alguma coisa específica?</Text>
+              <Text style={styles.rotulo}>O que você quer treinar?</Text>
               <TextInput
                 style={styles.campoGrande}
                 value={pedido}
@@ -374,12 +382,20 @@ export function RotinaPorIA({
                   setPedido(t)
                   if (erro) setErro('')
                 }}
-                placeholder="Opcional. Ex.: CrossFit, ou ganhar massa nas costas, ou só tenho halteres"
+                placeholder="Ex.: CrossFit para ganhar massa magra, foco em peito"
                 placeholderTextColor={paleta().inkFraco}
                 multiline
                 textAlignVertical="top"
                 maxLength={500}
               />
+              {/* Diz que dá para pular, sem tirar a pergunta do lugar de
+                  pergunta principal. "Opcional" no rótulo faria o campo parecer
+                  dispensável, e ele é onde se pede CrossFit, corrida, o que
+                  for — a única parte que as fichinhas abaixo não conseguem
+                  dizer. */}
+              <Text style={styles.ajuda}>
+                Se você não disser, eu monto pelas suas escolhas aqui embaixo.
+              </Text>
               <View style={styles.linhaDitado}>
                 <Ditado
                   onTexto={t => {
@@ -710,6 +726,7 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.fundo,
   },
 
+  rolagem: { flex: 1 },
   conteudo: { paddingHorizontal: 20, gap: 10 },
 
     /* ── O atalho é CARTÃO, e não dois botões soltos ────────────────────
