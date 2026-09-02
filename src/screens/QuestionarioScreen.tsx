@@ -662,11 +662,11 @@ const estilos = estilosDe(t =>
     trilho: {
       height: 4,
       marginHorizontal: 20,
-      borderRadius: 2,
+      borderRadius: 4,
       backgroundColor: t.cores.trilho,
       overflow: 'hidden',
     },
-    progresso: { height: 4, borderRadius: 2, backgroundColor: t.cores.verde },
+    progresso: { height: 4, borderRadius: 4, backgroundColor: t.cores.verde },
 
     conteudo: { paddingHorizontal: 20, paddingTop: 16, gap: 16 },
     centro: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
@@ -700,7 +700,7 @@ const estilos = estilosDe(t =>
     chip: {
       paddingHorizontal: 14,
       paddingVertical: 10,
-      borderRadius: 11,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: t.cores.borda,
       backgroundColor: t.cores.cartao,
@@ -713,7 +713,7 @@ const estilos = estilosDe(t =>
     degrau: {
       flex: 1,
       height: 42,
-      borderRadius: 9,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: t.cores.borda,
       alignItems: 'center',

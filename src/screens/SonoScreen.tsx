@@ -790,11 +790,11 @@ const estilos = estilosDe(t =>
   linhaEficiencia: { marginTop: 12 },
   trilhoEficiencia: {
     height: 6,
-    borderRadius: 3,
+    borderRadius: 4,
     backgroundColor: 'rgba(255,255,255,0.28)',
     overflow: 'hidden',
   },
-  preenchimentoEficiencia: { height: '100%', borderRadius: 3, backgroundColor: t.cores.superficie },
+  preenchimentoEficiencia: { height: '100%', borderRadius: 4, backgroundColor: t.cores.superficie },
   textoEficiencia: { marginTop: 6, fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.9)' },
 
   /* ── Blocos ── */
@@ -837,7 +837,7 @@ const estilos = estilosDe(t =>
   botaoPasso: {
     width: 40,
     height: 40,
-    borderRadius: 13,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: t.cores.verdeMenta,
@@ -897,8 +897,8 @@ const estilos = estilosDe(t =>
   faixa: { marginTop: 14, gap: 5 },
   linhaFaixa: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   diaFaixa: { width: 26, fontSize: 10.5, color: t.inkFraco },
-  trilhoFaixa: { flex: 1, height: 10, borderRadius: 5, backgroundColor: t.cores.trilho },
-  tracoFaixa: { position: 'absolute', top: 0, height: 10, borderRadius: 5, backgroundColor: t.cores.limao },
+  trilhoFaixa: { flex: 1, height: 10, borderRadius: 4, backgroundColor: t.cores.trilho },
+  tracoFaixa: { position: 'absolute', top: 0, height: 10, borderRadius: 4, backgroundColor: t.cores.limao },
   /* Alinhado ao trilho, não ao bloco: as marcas precisam cair sobre o eixo, e o
      rótulo do dia ocupa a largura dele mais o espaço. */
   eixoFaixa: { flexDirection: 'row', justifyContent: 'space-between', marginLeft: 34, marginTop: 2 },
@@ -930,7 +930,7 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.verdeClaro,
   },
   textoSeloQualidade: { fontSize: 10.5, fontWeight: '800', color: t.cores.verdeEscuro },
-  apagar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  apagar: { width: 26, height: 26, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   apagarPressionado: { backgroundColor: t.cores.trilho },
 
   blocoErro: {

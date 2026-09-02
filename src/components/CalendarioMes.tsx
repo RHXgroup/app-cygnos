@@ -339,11 +339,11 @@ const estilos = estilosDe(t =>
     dia: {
       width: 30,
       height: 30,
-      borderRadius: 15,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    diaHoje: { backgroundColor: t.cores.ink, borderRadius: 15 },
+    diaHoje: { backgroundColor: t.cores.ink, borderRadius: 14 },
 
     numero: { fontSize: 14.5, fontWeight: '600', color: t.cores.ink },
     /* Número NA COR, e não branco sobre preenchimento. Branco sobre vermelho é
@@ -367,8 +367,8 @@ const estilos = estilosDe(t =>
     },
     /* A janela fértil virou ponto, e não anel: ela é ESTIMATIVA, e um anel em
        volta do número pesava tanto quanto o dia que ela registrou. */
-    pontoFertil: { width: 4, height: 4, borderRadius: 2, backgroundColor: t.cores.verde },
-    pontoAnotado: { width: 4, height: 4, borderRadius: 2, backgroundColor: t.inkFraco },
+    pontoFertil: { width: 4, height: 4, borderRadius: 4, backgroundColor: t.cores.verde },
+    pontoAnotado: { width: 4, height: 4, borderRadius: 4, backgroundColor: t.inkFraco },
 
     legenda: {
       flexDirection: 'row',
@@ -383,7 +383,7 @@ const estilos = estilosDe(t =>
     /* Um retângulo pequeno da MESMA cor da faixa do calendário. Um círculo
        aqui e uma faixa lá seriam duas formas para a mesma coisa, e a pessoa
        teria de fazer a ligação sozinha. */
-    amostraFaixa: { width: 14, height: 9, borderRadius: 3 },
+    amostraFaixa: { width: 14, height: 9, borderRadius: 4 },
     textoLegenda: { fontSize: 11, color: t.inkMedio },
   }),
 )

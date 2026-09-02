@@ -443,7 +443,7 @@ const estilos = estilosDe(t =>
   mira: {
     width: '78%',
     height: 150,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: t.cores.limao,
     backgroundColor: 'transparent',
@@ -502,7 +502,7 @@ const estilos = estilosDe(t =>
   atalho: {
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 11,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.superficie,
@@ -536,7 +536,7 @@ const estilos = estilosDe(t =>
   campoFormulario: {
     width: 88,
     backgroundColor: t.cores.superficie,
-    borderRadius: 9,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: t.cores.borda,
     paddingHorizontal: 10,
@@ -560,7 +560,7 @@ const estilos = estilosDe(t =>
     gap: 8,
     paddingVertical: 14,
     paddingHorizontal: 22,
-    borderRadius: 13,
+    borderRadius: 12,
     backgroundColor: t.cores.verde,
     marginTop: 8,
   },

@@ -1026,7 +1026,7 @@ const estilos = estilosDe(t =>
     botaoNumero: {
       width: 42,
       height: 42,
-      borderRadius: 11,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: t.cores.superficie,
@@ -1095,7 +1095,7 @@ const estilos = estilosDe(t =>
     botaoAjuste: {
       paddingHorizontal: 16,
       paddingVertical: 10,
-      borderRadius: 11,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: t.cores.borda,
     },
@@ -1107,7 +1107,7 @@ const estilos = estilosDe(t =>
     gap: 9,
       alignSelf: 'stretch',
       backgroundColor: t.cores.verde,
-      borderRadius: 18,
+      borderRadius: 16,
       height: 76,
       alignItems: 'center',
       justifyContent: 'center',

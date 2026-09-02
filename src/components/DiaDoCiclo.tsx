@@ -610,7 +610,7 @@ const estilos = estilosDe(t =>
     etiqueta: {
       paddingHorizontal: 13,
       paddingVertical: 8,
-      borderRadius: 10,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: t.cores.borda,
       backgroundColor: t.cores.cartao,

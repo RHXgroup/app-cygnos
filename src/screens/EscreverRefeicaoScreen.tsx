@@ -555,7 +555,7 @@ const estilos = estilosDe(t =>
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: 13,
+    borderRadius: 12,
     backgroundColor: t.cores.verde,
   },
   botaoAdicionar: {
@@ -564,7 +564,7 @@ const estilos = estilosDe(t =>
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: 13,
+    borderRadius: 12,
     backgroundColor: t.cores.verde,
     marginTop: 6,
   },

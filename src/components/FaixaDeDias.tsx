@@ -88,7 +88,7 @@ const estilos = estilosDe(t =>
   bolha: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: t.cores.cartao,

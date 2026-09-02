@@ -327,7 +327,7 @@ const estilos = estilosDe(t =>
     icone: {
       width: 34,
       height: 34,
-      borderRadius: 17,
+      borderRadius: 16,
       backgroundColor: t.cores.verdeMenta,
       alignItems: 'center',
       justifyContent: 'center',

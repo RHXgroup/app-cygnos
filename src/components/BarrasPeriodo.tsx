@@ -105,8 +105,8 @@ const estilos = estilosDe(t =>
   },
   coluna: { flex: 1, alignItems: 'center' },
   trilho: { height: ALTURA, width: '100%', justifyContent: 'flex-end' },
-  barra: { width: '100%', borderRadius: 5, minHeight: 3 },
-  semRegistro: { height: 3, width: '100%', borderRadius: 2, backgroundColor: t.cores.trilho },
+  barra: { width: '100%', borderRadius: 4, minHeight: 3 },
+  semRegistro: { height: 3, width: '100%', borderRadius: 4, backgroundColor: t.cores.trilho },
   rotulo: { marginTop: 6, height: 12, fontSize: 9.5, color: t.inkSuave },
   }),
 )

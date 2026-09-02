@@ -142,7 +142,7 @@ const estilos = estilosDe(t =>
     right: -4,
     width: 9,
     height: 9,
-    borderRadius: 5,
+    borderRadius: 4,
     backgroundColor: t.cores.limao,
     /* Anel da cor da barra: sobre o ícone claro, ponto sem contorno some no
        desenho em vez de saltar dele. */

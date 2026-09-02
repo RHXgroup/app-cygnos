@@ -921,7 +921,7 @@ linhaRitmo: {
     lineHeight: 18,
     color: t.inkMedio,
     backgroundColor: t.cores.verdeClaro,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginTop: 10,

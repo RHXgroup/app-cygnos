@@ -203,7 +203,7 @@ const estilos = estilosDe(t =>
     cartao: {
       gap: 12,
       backgroundColor: t.cores.cicloFundo,
-      borderRadius: 18,
+      borderRadius: 16,
       padding: 17,
     },
     titulo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -217,7 +217,7 @@ const estilos = estilosDe(t =>
     caixa: {
       width: 62,
       backgroundColor: t.cores.cartao,
-      borderRadius: 11,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: t.cores.borda,
       paddingHorizontal: 12,

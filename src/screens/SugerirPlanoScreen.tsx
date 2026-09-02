@@ -430,7 +430,7 @@ const estilos = estilosDe(t =>
     justifyContent: 'center',
     gap: 8,
     height: 50,
-    borderRadius: 15,
+    borderRadius: 14,
     backgroundColor: t.cores.verde,
   },
   pressionado: { opacity: 0.8 },

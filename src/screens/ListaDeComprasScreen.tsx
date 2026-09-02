@@ -229,7 +229,7 @@ const estilos = estilosDe(t =>
   caixa: {
     width: 22,
     height: 22,
-    borderRadius: 7,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: t.cores.trilho,
     alignItems: 'center',

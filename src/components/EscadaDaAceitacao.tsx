@@ -142,7 +142,7 @@ const estilos = estilosDe(t =>
   selo: {
     width: 42,
     height: 42,
-    borderRadius: 13,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -160,7 +160,7 @@ const estilos = estilosDe(t =>
   },
   colunaTrilha: { flex: 1, justifyContent: 'flex-end' },
   marca: {
-    borderRadius: 5,
+    borderRadius: 4,
     backgroundColor: t.cores.trilho,
   },
 
@@ -168,7 +168,7 @@ const estilos = estilosDe(t =>
   seloHoje: {
     width: 56,
     height: 56,
-    borderRadius: 18,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },

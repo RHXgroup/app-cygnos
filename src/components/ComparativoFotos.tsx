@@ -357,7 +357,7 @@ const estilos = estilosDe(t =>
     paddingHorizontal: 12,
     height: 36,
     justifyContent: 'center',
-    borderRadius: 11,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.cartao,

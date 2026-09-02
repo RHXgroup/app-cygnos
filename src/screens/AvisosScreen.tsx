@@ -237,7 +237,7 @@ const estilos = estilosDe(t =>
   circulo: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: t.cores.superficie,
     alignItems: 'center',
     justifyContent: 'center',
@@ -251,7 +251,7 @@ const estilos = estilosDe(t =>
   etiqueta: {
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 7,
+    borderRadius: 8,
     backgroundColor: t.cores.verdeClaro,
   },
   textoEtiqueta: { fontSize: 10.5, fontWeight: '800', color: t.cores.limao, letterSpacing: 0.3 },

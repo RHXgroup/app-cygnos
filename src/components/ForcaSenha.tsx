@@ -56,7 +56,7 @@ const estilos = estilosDe(t =>
   barra: {
     flex: 1,
     height: 5,
-    borderRadius: 3,
+    borderRadius: 4,
     backgroundColor: t.cores.moss,
   },
   rotuloForca: { fontSize: 12.5, fontWeight: '700', minWidth: 44, textAlign: 'right' },

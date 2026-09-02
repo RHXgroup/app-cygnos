@@ -948,7 +948,7 @@ const estilos = estilosDe(t =>
   tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
 
   passos: { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingBottom: 14 },
-  passo: { flex: 1, height: 4, borderRadius: 2, backgroundColor: t.cores.trilho },
+  passo: { flex: 1, height: 4, borderRadius: 4, backgroundColor: t.cores.trilho },
   passoFeito: { backgroundColor: t.cores.verde },
 
   conteudo: { paddingHorizontal: 20, paddingBottom: 24, gap: 14 },
@@ -1104,7 +1104,7 @@ const estilos = estilosDe(t =>
   check: {
     width: 24,
     height: 24,
-    borderRadius: 7,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: t.cores.trilho,
     alignItems: 'center',

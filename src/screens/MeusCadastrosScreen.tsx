@@ -859,7 +859,7 @@ const estilos = estilosDe(t =>
   detalheErro: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto },
 
   cartao: {
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: t.cores.cartao,
     borderWidth: 1,
     borderColor: t.cores.borda,
@@ -910,12 +910,12 @@ const estilos = estilosDe(t =>
   valorNumero: { marginTop: 1, fontSize: 15, fontWeight: '800', color: t.cores.ink },
   valorAlvo: { color: t.cores.verde },
 
-  apagar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  apagar: { width: 30, height: 30, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   apagarPressionado: { backgroundColor: t.cores.trilho },
 
   blocoMetas: {
     padding: 16,
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: t.cores.cartao,
     borderWidth: 1,
     borderColor: t.cores.borda,

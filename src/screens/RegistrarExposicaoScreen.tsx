@@ -340,7 +340,7 @@ const estilos = estilosDe(t =>
       alignItems: 'center',
       gap: 9,
       paddingVertical: 18,
-      borderRadius: 18,
+      borderRadius: 16,
       backgroundColor: t.cores.superficie,
     },
     reacaoPressionada: { backgroundColor: t.cores.trilho },

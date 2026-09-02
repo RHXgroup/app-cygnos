@@ -112,17 +112,17 @@ const estilos = estilosDe(t =>
     cartao: {
       gap: 11,
       backgroundColor: t.cores.verdeClaro,
-      borderRadius: 18,
+      borderRadius: 16,
       padding: 15,
     },
     pressionado: { opacity: 0.85 },
 
     topo: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-    foto: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.cores.cartao },
+    foto: { width: 38, height: 38, borderRadius: 20, backgroundColor: t.cores.cartao },
     semFoto: {
       width: 38,
       height: 38,
-      borderRadius: 19,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: t.cores.verde,

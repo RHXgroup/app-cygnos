@@ -634,7 +634,7 @@ const estilos = estilosDe(t =>
   caixa: {
     width: 22,
     height: 22,
-    borderRadius: 7,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: t.cores.trilho,
     backgroundColor: t.cores.superficie,
@@ -649,7 +649,7 @@ const estilos = estilosDe(t =>
   campoNome: {
     flex: 1,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.superficie,
@@ -661,7 +661,7 @@ const estilos = estilosDe(t =>
   campoHora: {
     width: 76,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.superficie,

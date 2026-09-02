@@ -228,7 +228,7 @@ const estilos = estilosDe(t =>
     alignSelf: 'stretch',
     marginTop: 20,
     padding: 16,
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: t.cores.cartao,
     borderWidth: 1,
     borderColor: t.cores.borda,

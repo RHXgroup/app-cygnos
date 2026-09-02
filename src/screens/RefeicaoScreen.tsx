@@ -159,7 +159,7 @@ const estilos = estilosDe(t =>
   variacao: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   /* Um ponto em vez de bullet de texto: alinha com a linha do nome sem depender
      da altura da fonte do aparelho. */
-  marcador: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.cores.verdeClaro },
+  marcador: { width: 6, height: 6, borderRadius: 4, backgroundColor: t.cores.verdeClaro },
   textoVariacao: { flex: 1 },
   nomeVariacao: { fontSize: 14, fontWeight: '600', color: t.cores.ink, lineHeight: 19 },
   detalheVariacao: { marginTop: 1, fontSize: 12, color: t.inkSuave },

@@ -424,7 +424,7 @@ const estilos = estilosDe(t =>
     paddingHorizontal: 14,
   },
   linhaGravando: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  ponto: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.cores.erroTexto },
+  ponto: { width: 9, height: 9, borderRadius: 4, backgroundColor: t.cores.erroTexto },
   textoGravando: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
   /* Dígito de largura fixa: sem isto o "1" é mais estreito que o "8" e o
      cronômetro balança de um lado para o outro a cada segundo, empurrando o
