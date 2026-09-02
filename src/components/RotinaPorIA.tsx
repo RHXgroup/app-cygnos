@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +11,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useDesvioDoTeclado } from '../lib/teclado'
 import { Ditado } from './Ditado'
 import { estilosDe, paleta } from '../lib/tema'
 import type { DiaSemana } from '../lib/plano'
@@ -89,6 +88,27 @@ export function RotinaPorIA({
    * lá. Quem contasse do ombro e depois importasse a ficha da academia não
    * recebia aviso nenhum. */
   const [limitacoes, setLimitacoes] = useState('')
+
+  /* ── O TECLADO cobria o fim do formulário ──────────────────────────────
+   *
+   * Esta tela usava `KeyboardAvoidingView` com `behavior="height"` no Android,
+   * que é justamente o caminho que a armadilha 2 do AGENTS diz não funcionar.
+   * No Expo Go a janela NÃO encolhe quando o teclado sobe: o que fica embaixo
+   * dele não é alcançável por rolagem, porque a rolagem continua achando que a
+   * tela inteira cabe.
+   *
+   * E o que ficava embaixo era o BOTÃO DE MONTAR — o último elemento do
+   * formulário, logo depois do campo de lesão. Quem preenchia os campos, tocava
+   * no último e ia procurar o botão, não achava botão nenhum. Foi lido, com
+   * razão, como "não existe onde mandar montar".
+   *
+   * A conta é `teclado + área segura`, e as duas SOMAM: `endCoordinates.height`
+   * vem sem a barra de navegação que fica por baixo. Quem desvia só pela altura
+   * do teclado fica 48 por baixo. `useDesvioDoTeclado` já faz a soma, e a
+   * altura medida no `onLayout` é o que protege o dia em que a janela passar a
+   * encolher num build de verdade. */
+  const [alturaDaTela, setAlturaDaTela] = useState(0)
+  const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
 
   const [pedindo, setPedindo] = useState(false)
   /* QUAL das duas esperas está rolando. As duas usam `pedindo` para travar a
@@ -266,9 +286,9 @@ export function RotinaPorIA({
         else onFechar()
       }}
     >
-      <KeyboardAvoidingView
+      <View
         style={[styles.tela, { paddingTop: top + 8 }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}
       >
         <View style={styles.cabecalho}>
           <Pressable
@@ -289,7 +309,10 @@ export function RotinaPorIA({
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 24 }]}
+          /* O respiro entra como espaço NO FIM do conteúdo, e não como margem
+             da tela: assim o botão sobe acima do teclado por rolagem, que é o
+             gesto que a pessoa já está fazendo. */
+          contentContainerStyle={[styles.conteudo, { paddingBottom: 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -463,18 +486,6 @@ export function RotinaPorIA({
 
               {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
-              <Pressable
-                onPress={montar}
-                disabled={pedindo}
-                style={[styles.botao, pedindo && styles.botaoOcupado]}
-                accessibilityRole="button"
-              >
-                {pedindo ? (
-                  <ActivityIndicator color={paleta().cores.branco} />
-                ) : (
-                  <Text style={styles.textoBotao}>Montar minha rotina</Text>
-                )}
-              </Pressable>
               {pedindo ? <Text style={styles.ajuda}>Isso leva alguns segundos.</Text> : null}
             </>
           ) : (
@@ -637,7 +648,42 @@ export function RotinaPorIA({
             </>
           )}
         </ScrollView>
-      </KeyboardAvoidingView>
+
+        {/* ── A AÇÃO PRINCIPAL NÃO PODE DEPENDER DE ROLAGEM ──────────────
+         *
+         * "Montar minha rotina" era o último elemento de um formulário de sete
+         * blocos, dentro da rolagem. Quem abria a tela via o atalho da ficha e
+         * os primeiros campos, e concluía que não existe onde mandar montar —
+         * literalmente "cadê o botão de montar o plano?".
+         *
+         * Duas coisas somavam para isso. O formulário é longo, então o botão
+         * nascia fora da vista; e o teclado cobria o fim da tela, então nem
+         * rolar até ele bastava.
+         *
+         * Fixo no rodapé resolve os dois de uma vez: a tela passa a DIZER, o
+         * tempo todo, o que ela faz. Um formulário cuja ação some é um
+         * formulário que parece não ter ação.
+         *
+         * Só no formulário: na conferência da rotina o rodapé é outro, e dois
+         * botões fixos disputando o mesmo canto é pior que rolar. */}
+        {rotina === null && (
+          <View style={[styles.rodape, { paddingBottom: 12 + bottom + respiro }]}>
+            <Pressable
+              onPress={montar}
+              disabled={pedindo}
+              style={[styles.botao, pedindo && styles.botaoOcupado]}
+              accessibilityRole="button"
+              accessibilityLabel="Montar minha rotina com a IA"
+            >
+              {pedindo ? (
+                <ActivityIndicator color={paleta().cores.branco} />
+              ) : (
+                <Text style={styles.textoBotao}>Montar minha rotina</Text>
+              )}
+            </Pressable>
+          </View>
+        )}
+      </View>
     </Modal>
   )
 }
@@ -654,7 +700,17 @@ const estilos = estilosDe(t =>
     },
     botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     tituloTela: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink },
-    conteudo: { paddingHorizontal: 20, gap: 10 },
+    /* Encostado no fim da tela, com uma linha em cima separando do que rola por
+     baixo — sem ela o botão parece flutuar sobre o texto quando a lista passa. */
+  rodape: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: t.cores.borda,
+    backgroundColor: t.cores.fundo,
+  },
+
+  conteudo: { paddingHorizontal: 20, gap: 10 },
 
     /* ── O atalho é CARTÃO, e não dois botões soltos ────────────────────
    *
