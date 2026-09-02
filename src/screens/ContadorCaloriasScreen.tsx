@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   Image,
   Pressable,
@@ -51,7 +52,7 @@ import { refeicaoDoPlano } from '../lib/refeicaoDoPlano'
 import { porcao } from '../lib/alimentos'
 import type { AlimentoEscolhido, Nutrientes } from '../lib/plano'
 import { horaCurta, milhar } from '../lib/formatar'
-import { estilosDe, paleta } from '../lib/tema'
+import { estilosDe, paleta } from '../lib/tema'
 import {
   apagarFotoDoDiario,
   enderecosDasFotos,
@@ -183,6 +184,26 @@ export function ContadorCaloriasScreen({
      item sumiu. */
   /* As quatro formas menos usadas ficam recolhidas, como no "+". */
   const [maisFormas, setMaisFormas] = useState(false)
+
+  /* PERGUNTA de onde vem a foto, em vez de esconder a galeria num toque longo.
+   *
+   * Era: tocar abria a câmera, SEGURAR abria a galeria — e uma frase solta lá
+   * embaixo, depois de todo o bloco, explicando isso. Dois problemas de uma
+   * vez: ninguém segura um botão para descobrir o que acontece, e a explicação
+   * estava longe do botão que explicava, num pedaço da tela que já tratava de
+   * outro assunto.
+   *
+   * A pergunta resolve os dois: o caminho aparece sozinho, e a frase deixa de
+   * ser necessária. Mesma correção feita na conversa com a nutricionista, pelo
+   * mesmo motivo. */
+  function perguntarDeOndeVemAFoto() {
+    if (analisando) return
+    Alert.alert('Foto do prato', 'De onde você quer pegar?', [
+      { text: 'Tirar agora', onPress: () => void fotografar('camera') },
+      { text: 'Escolher da galeria', onPress: () => void fotografar('galeria') },
+      { text: 'Cancelar', style: 'cancel' },
+    ])
+  }
   /* A resposta ao último registro. Some sozinha — ver `gravar`. */
   const [retorno, setRetorno] = useState<Retorno | null>(null)
   const prazoDoRetorno = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -826,8 +847,7 @@ export function ContadorCaloriasScreen({
               titulo="Foto"
               detalhe="A IA estima"
               ocupada={analisando}
-              onPress={() => fotografar('camera')}
-              onLongPress={() => fotografar('galeria')}
+              onPress={perguntarDeOndeVemAFoto}
             />
             <Porta
               icone="nutrition-outline"
@@ -838,7 +858,30 @@ export function ContadorCaloriasScreen({
             />
           </View>
 
-          {maisFormas ? (
+          {/* O CABEÇALHO fica, aberto ou fechado.
+           *
+           * Era `maisFormas ? <lista> : <botão>`: abrir trocava o botão pela
+           * lista, e com o botão sumia o único jeito de fechar de novo. Quem
+           * abria por curiosidade ficava com as quatro linhas na tela para
+           * sempre.
+           *
+           * Interruptor que só liga não é interruptor. */}
+          <Pressable
+            onPress={() => setMaisFormas(m => !m)}
+            style={({ pressed }) => [styles.maisFormas, pressed && styles.chipPressionado]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: maisFormas }}
+            accessibilityLabel="Outras formas de registrar"
+          >
+            <Text style={styles.textoMaisFormas}>Outras formas de registrar</Text>
+            <Ionicons
+              name={maisFormas ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={paleta().inkSuave}
+            />
+          </Pressable>
+
+          {maisFormas && (
             <View style={styles.listaFormas}>
               <LinhaForma
                 icone="search-outline"
@@ -865,20 +908,8 @@ export function ContadorCaloriasScreen({
                 styles={styles}
               />
             </View>
-          ) : (
-            <Pressable
-              onPress={() => setMaisFormas(true)}
-              style={({ pressed }) => [styles.maisFormas, pressed && styles.chipPressionado]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.textoMaisFormas}>Outras formas de registrar</Text>
-              <Ionicons name="chevron-down" size={16} color={paleta().inkSuave} />
-            </Pressable>
           )}
 
-          <Text style={styles.dicaPortas}>
-            Segure em "Foto" para escolher uma imagem da galeria em vez de tirar na hora.
-          </Text>
 
           {pendentes > 0 && (
             <Pressable
@@ -2388,7 +2419,6 @@ const estilos = estilosDe(t =>
   },
   textoMaisFormas: { fontSize: 13.5, fontWeight: '600', color: t.inkSuave },
 
-  dicaPortas: { marginTop: -6, fontSize: 11, lineHeight: 15, color: t.inkFraco },
 
   blocoErro: {
     padding: 14,
