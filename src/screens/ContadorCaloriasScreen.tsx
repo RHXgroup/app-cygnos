@@ -53,6 +53,7 @@ import { porcao } from '../lib/alimentos'
 import type { AlimentoEscolhido, Nutrientes } from '../lib/plano'
 import { horaCurta, milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { Escolha } from '../components/Escolha'
 import {
   apagarFotoDoDiario,
   enderecosDasFotos,
@@ -196,14 +197,18 @@ export function ContadorCaloriasScreen({
    * A pergunta resolve os dois: o caminho aparece sozinho, e a frase deixa de
    * ser necessária. Mesma correção feita na conversa com a nutricionista, pelo
    * mesmo motivo. */
-  function perguntarDeOndeVemAFoto() {
-    if (analisando) return
-    Alert.alert('Foto do prato', 'De onde você quer pegar?', [
-      { text: 'Tirar agora', onPress: () => void fotografar('camera') },
-      { text: 'Escolher da galeria', onPress: () => void fotografar('galeria') },
-      { text: 'Cancelar', style: 'cancel' },
-    ])
-  }
+  /* A caixa é a DA CASA, e não o `Alert.alert` do sistema.
+   *
+   * O Android desenha o Alert com fundo claro, tipografia dele e botões azuis
+   * em caixa alta. No meio de um app escuro isso não passa por parte do app:
+   * foi lido, literalmente, como "notificação da Samsung" — e a leitura está
+   * certa, porque é a caixa do sistema mesmo.
+   *
+   * `Confirmacao` já dizia isso em comentário e `NutricionistasScreen`
+   * registrava que aquele tinha sido o ÚLTIMO Alert.alert do app. Eu escrevi
+   * dois novos no mesmo dia. Agora existe `Escolha` para pergunta com mais de
+   * duas saídas, que era o buraco que me fez pegar o atalho. */
+  const [escolhendoFoto, setEscolhendoFoto] = useState(false)
   /* A resposta ao último registro. Some sozinha — ver `gravar`. */
   const [retorno, setRetorno] = useState<Retorno | null>(null)
   const prazoDoRetorno = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -847,7 +852,7 @@ export function ContadorCaloriasScreen({
               titulo="Foto"
               detalhe="A IA estima"
               ocupada={analisando}
-              onPress={perguntarDeOndeVemAFoto}
+              onPress={() => !analisando && setEscolhendoFoto(true)}
             />
             <Porta
               icone="nutrition-outline"
@@ -1125,6 +1130,27 @@ export function ContadorCaloriasScreen({
           bottom={bottom + 16}
         />
       )}
+
+      <Escolha
+        visivel={escolhendoFoto}
+        titulo="Foto do prato"
+        mensagem="Eu leio a foto e estimo o que tem nela. Você confere antes de entrar no diário."
+        opcoes={[
+          {
+            rotulo: 'Tirar agora',
+            detalhe: 'Abre a câmera',
+            icone: 'camera-outline',
+            onEscolher: () => void fotografar('camera'),
+          },
+          {
+            rotulo: 'Escolher da galeria',
+            detalhe: 'Uma foto que você já tirou',
+            icone: 'images-outline',
+            onEscolher: () => void fotografar('galeria'),
+          },
+        ]}
+        onCancelar={() => setEscolhendoFoto(false)}
+      />
     </View>
   )
 }

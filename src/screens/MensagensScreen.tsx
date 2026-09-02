@@ -1,7 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Image,
   AppState,
   Linking,
@@ -42,6 +41,7 @@ import {
 import { comoElaResponde } from '../lib/ritmoDaConversa'
 import { estilosDe, paleta } from '../lib/tema'
 import { AudioDoBalao } from '../components/AudioDoBalao'
+import { Escolha } from '../components/Escolha'
 import { useAudioRecorder, useAudioRecorderState } from 'expo-audio'
 import { LIMITE_DO_RECADO, MINIMO_DO_RECADO, guardarAudioDaConversa } from '../lib/audioDaConversa'
 import { falha } from '../lib/erros'
@@ -377,14 +377,7 @@ export function MensagensScreen({
    *
    * Toque longo serve para atalho de quem já sabe, nunca para o único caminho
    * de uma das duas opções. */
-  function escolherDeOnde() {
-    if (subindoAnexo || enviando) return
-    Alert.alert('Mandar uma foto', 'De onde você quer pegar?', [
-      { text: 'Tirar agora', onPress: () => void anexarFoto('camera') },
-      { text: 'Escolher da galeria', onPress: () => void anexarFoto('galeria') },
-      { text: 'Cancelar', style: 'cancel' },
-    ])
-  }
+  const [escolhendoFoto, setEscolhendoFoto] = useState(false)
 
   async function anexarFoto(origem: 'camera' | 'galeria') {
     const escolha = await escolherFoto(origem)
@@ -637,7 +630,7 @@ export function MensagensScreen({
             style={[styles.barraEnvio, { marginBottom: respiro }, gravando && styles.escondida]}
           >
             <Pressable
-              onPress={escolherDeOnde}
+              onPress={() => !subindoAnexo && !enviando && setEscolhendoFoto(true)}
               disabled={subindoAnexo || enviando}
               style={({ pressed }) => [styles.botaoClipe, pressed && { opacity: 0.6 }]}
               accessibilityRole="button"
@@ -705,6 +698,27 @@ export function MensagensScreen({
           </View>
         </>
       )}
+
+      <Escolha
+        visivel={escolhendoFoto}
+        titulo="Mandar uma foto"
+        mensagem="Ela vai junto com o que você escrever."
+        opcoes={[
+          {
+            rotulo: 'Tirar agora',
+            detalhe: 'Abre a câmera',
+            icone: 'camera-outline',
+            onEscolher: () => void anexarFoto('camera'),
+          },
+          {
+            rotulo: 'Escolher da galeria',
+            detalhe: 'Uma foto que você já tirou',
+            icone: 'images-outline',
+            onEscolher: () => void anexarFoto('galeria'),
+          },
+        ]}
+        onCancelar={() => setEscolhendoFoto(false)}
+      />
     </View>
   )
 }

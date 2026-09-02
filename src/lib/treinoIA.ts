@@ -168,7 +168,14 @@ export async function lerFichaDaFoto(
       ? await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
           allowsEditing: false,
-          quality: 1,
+          /* 0.7, e nao 1.
+             A imagem e reduzida para 1600 de largura logo abaixo, entao a
+             qualidade maxima na captura nao chega ao resultado -- ela so faz o
+             arquivo temporario e o bitmap decodificado ficarem grandes no pior
+             momento possivel, que e com a camera do sistema em primeiro plano.
+             O Android mata o app que esta atras quando falta memoria, e o
+             sintoma disso e o app REINICIANDO ao voltar da foto. */
+          quality: 0.7,
           /* Tela cheia, e não o padrão: apresentação em folha por cima de outra
              é o que fazia a promise da câmera nunca resolver. */
           presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
@@ -176,7 +183,14 @@ export async function lerFichaDaFoto(
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
           allowsEditing: false,
-          quality: 1,
+          /* 0.7, e nao 1.
+             A imagem e reduzida para 1600 de largura logo abaixo, entao a
+             qualidade maxima na captura nao chega ao resultado -- ela so faz o
+             arquivo temporario e o bitmap decodificado ficarem grandes no pior
+             momento possivel, que e com a camera do sistema em primeiro plano.
+             O Android mata o app que esta atras quando falta memoria, e o
+             sintoma disso e o app REINICIANDO ao voltar da foto. */
+          quality: 0.7,
         })
 
   if (escolha.canceled || !escolha.assets?.[0]) return { tipo: 'cancelado' }

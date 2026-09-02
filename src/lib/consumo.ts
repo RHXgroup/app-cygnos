@@ -641,7 +641,13 @@ export async function analisarFoto(
   const opcoes: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images'],
     allowsEditing: false,
-    quality: 1,
+    /* 0.7, e nao 1. A imagem e reduzida para 1024 de largura logo adiante,
+       entao a qualidade maxima na captura nao chega ao resultado -- ela so
+       faz o arquivo temporario e o bitmap decodificado ficarem grandes com a
+       camera do sistema em primeiro plano. O Android mata o app que esta
+       atras quando falta memoria, e o sintoma e o app REINICIANDO ao voltar
+       da foto. */
+    quality: 0.7,
     /* Tela cheia, e não o padrão: apresentação em folha por cima de outra
        apresentação é o que fazia a promise da câmera nunca resolver. */
     presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
