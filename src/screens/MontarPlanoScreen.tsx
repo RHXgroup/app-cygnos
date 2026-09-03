@@ -161,6 +161,12 @@ export function MontarPlanoScreen({
       </View>
 
       <ScrollView
+        /* `flex: 1` na ROLAGEM, e nao so no container.
+               Sem isto ela se dimensiona pelo conteudo e o rodape fixo -- irmao
+               dela -- para onde o conteudo achar que acabou: no MEIO da tela.
+               `contentContainerStyle` NAO resolve: ele estiliza o conteudo
+               dentro da rolagem, e nao a rolagem. */
+        style={styles.rolagem}
         contentContainerStyle={styles.conteudo}
         showsVerticalScrollIndicator={false}
         bounces={false}
@@ -306,6 +312,7 @@ export function MontarPlanoScreen({
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
+    rolagem: { flex: 1 },
   blocoAurora: {
     padding: 14,
     borderRadius: 16,

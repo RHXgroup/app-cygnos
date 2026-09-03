@@ -341,14 +341,16 @@ export function MensagensScreen({
     }
 
     setSubindoAnexo(true)
-    const caminho = await guardarAudioDaConversa(contaId, uri)
+    const r = await guardarAudioDaConversa(contaId, uri)
     setSubindoAnexo(false)
 
-    if (!caminho) {
-      setErro('Não consegui preparar o áudio. Você pode escrever e tentar de novo depois.')
+    if (r.tipo === 'erro') {
+      /* A frase vem de lá, e é diferente por causa: quem lê precisa saber se
+         tenta de novo, se fecha outro aplicativo, ou se avisa a gente. */
+      setErro(r.mensagem)
       return
     }
-    setAnexo({ path: caminho, tipo: 'audio' })
+    setAnexo({ path: r.caminho, tipo: 'audio' })
   }
 
   async function enviar() {

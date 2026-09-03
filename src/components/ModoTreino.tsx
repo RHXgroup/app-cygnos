@@ -646,6 +646,12 @@ export function ModoTreino({
         ) : (
           <>
             <ScrollView
+              /* `flex: 1` na ROLAGEM, e nao so no container.
+               Sem isto ela se dimensiona pelo conteudo e o rodape fixo -- irmao
+               dela -- para onde o conteudo achar que acabou: no MEIO da tela.
+               `contentContainerStyle` NAO resolve: ele estiliza o conteudo
+               dentro da rolagem, e nao a rolagem. */
+              style={styles.rolagem}
               contentContainerStyle={styles.conteudo}
               showsVerticalScrollIndicator={false}
             >
@@ -976,6 +982,7 @@ function Ajuste({
 const estilos = estilosDe(t =>
   StyleSheet.create({
     tela: { flex: 1, backgroundColor: t.cores.fundo },
+    rolagem: { flex: 1 },
     cabecalho: {
       flexDirection: 'row',
       alignItems: 'center',

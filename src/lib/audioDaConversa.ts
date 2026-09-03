@@ -66,11 +66,26 @@ const nomeUnico = (extensao: string) =>
  * de quem chamou. Sem isso, alguém chamando a função direto apontaria a
  * mensagem para o arquivo de outra conta e faria a própria nutricionista abrir
  * a gravação de um terceiro. */
+/* ── TRÊS causas, e uma frase só era o problema ────────────────────────────
+ *
+ * Falhava em três lugares — ler o arquivo, o arquivo sair vazio, o servidor
+ * recusar — e os três produziam "Não consegui preparar o áudio". Quem testou
+ * não tinha como dizer qual foi, e eu não tinha como consertar sem adivinhar.
+ *
+ * Agora cada uma tem a sua frase. Continuam todas em português e sem jargão: a
+ * diferença é útil para quem lê TAMBÉM, porque "a gravação saiu sem som" e "o
+ * servidor não aceitou" pedem coisas diferentes de quem está com o telefone na
+ * mão. */
+export type ResultadoDoAudio =
+  | { tipo: 'ok'; caminho: string }
+  | { tipo: 'erro'; mensagem: string }
+
 export async function guardarAudioDaConversa(
   contaId: string,
   uri: string,
-): Promise<string | null> {
-  if (!contaId || !uri) return null
+): Promise<ResultadoDoAudio> {
+  if (!contaId || !uri)
+    return { tipo: 'erro', mensagem: 'A gravação não chegou até aqui. Tente gravar de novo.' }
 
   const aac = uri.toLowerCase().endsWith('.aac')
   const agora = new Date()
@@ -111,7 +126,10 @@ export async function guardarAudioDaConversa(
     console.log('[cygnos] áudio da conversa:', blob.size, 'bytes,', base64.length, 'em base64')
     if (!base64) {
       falha('A gravação saiu vazia.', new Error('0 byte em ' + uri))
-      return null
+      return {
+        tipo: 'erro',
+        mensagem: 'A gravação saiu sem som. Verifique se algum outro aplicativo está usando o microfone.',
+      }
     }
 
     const dados = decode(base64)
@@ -122,11 +140,20 @@ export async function guardarAudioDaConversa(
 
     if (error) {
       falha('Não consegui guardar o áudio.', error)
-      return null
+      return {
+        tipo: 'erro',
+        /* O servidor recusou. A causa mais provável é o balde não aceitar o
+           tipo do arquivo — ele foi criado pelo painel, para foto, e pode ter
+           lista de tipos permitidos. O texto cru está no console. */
+        mensagem: 'O servidor não aceitou o áudio. Me avise que isso é configuração, não o seu aparelho.',
+      }
     }
-    return caminho
+    return { tipo: 'ok', caminho }
   } catch (e) {
     falha('Não consegui preparar o áudio.', e)
-    return null
+    return {
+      tipo: 'erro',
+      mensagem: 'Não consegui ler a gravação do aparelho. Tente gravar de novo.',
+    }
   }
 }

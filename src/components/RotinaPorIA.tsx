@@ -52,10 +52,34 @@ const DIAS_ROTULO: Record<DiaSemana, string> = {
   0: 'Dom', 1: 'Seg', 2: 'Ter', 3: 'Qua', 4: 'Qui', 5: 'Sex', 6: 'Sáb',
 }
 
-/* Os tipos que mudam o desenho do treino, e não uma lista de modalidades.
-   "CrossFit" e "funcional" pedem a mesma estrutura; "musculação" e "cardio"
-   não. Quem quiser nomear a modalidade escreve no campo de texto. */
-const TIPOS = ['Musculação', 'Cardio', 'Funcional / CrossFit', 'Mobilidade', 'Misto']
+/* ── Os tipos, e por que a lista cresceu ──────────────────────────────────
+ *
+ * Eram cinco, com "Funcional / CrossFit" numa ficha só. O argumento era que os
+ * dois pedem a mesma estrutura — circuito, tempo, corpo inteiro — e que separar
+ * mudaria o rótulo sem mudar o resultado.
+ *
+ * Quem treina discordou, duas vezes. E está certo: CrossFit tem levantamento
+ * olímpico, WOD nomeado e caixa; funcional é padrão de movimento e carga leve.
+ * Quem faz um não reconhece o outro como o seu treino, e uma ficha que junta os
+ * dois faz a pessoa achar que o app não sabe do que ela está falando — o que é
+ * pior do que um rótulo a mais.
+ *
+ * A regra para entrar aqui continua sendo mudar o DESENHO do treino, e não o
+ * nome dele. Corrida e calistenia entram por isso: séries e repetições não
+ * descrevem nenhuma das duas. O resto — modalidade específica, esporte, aula —
+ * vai no campo de texto, que é onde cabe. */
+const TIPOS = [
+  'Musculação',
+  'Cardio',
+  'Corrida',
+  'Funcional',
+  'CrossFit',
+  'HIIT',
+  'Calistenia',
+  'Pilates',
+  'Mobilidade',
+  'Misto',
+]
 
 /* O que existe para usar. Múltipla escolha, porque quase ninguém tem só uma
    coisa — e "só o peso do corpo" é resposta legítima, não ausência de resposta:

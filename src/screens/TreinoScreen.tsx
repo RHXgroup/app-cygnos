@@ -111,6 +111,14 @@ export function TreinoScreen({
    * Procura a partir de amanhã e dá a volta na semana. `undefined` quando não
    * há rotina nenhuma — aí a frase continua sendo a de sempre, porque aí não
    * ter treino hoje é a verdade inteira. */
+  /* Em que dia a aba "Minha rotina" abre.
+   *
+   * Nulo quer dizer "hoje", que é o padrão de quem entra ali para mexer. Vira
+   * um dia quando a pessoa chega pelo atalho do próximo treino: quem tocou em
+   * "o próximo é sábado" quer VER sábado, e abrir na quarta seria devolver a
+   * mesma pergunta. */
+  const [diaDaRotina, setDiaDaRotina] = useState<DiaSemana | null>(null)
+
   const proximoDia = (() => {
     if (rotina.length === 0) return undefined
     const hoje = new Date().getDay()
@@ -304,9 +312,32 @@ export function TreinoScreen({
                   : doHoje.length > 0
                     ? focoDeHoje || `${doHoje.length} ${doHoje.length === 1 ? 'exercício' : 'exercícios'}`
                     : proximoDia !== undefined
-                      ? `Nada para hoje · o próximo é ${DIAS_LONGOS[proximoDia].toLowerCase()}`
+                      ? 'Nada para hoje'
                       : 'Sem treino montado para hoje'}
               </Text>
+
+              {/* DIZER onde está não basta: tem de LEVAR.
+                  A tela informava "o próximo é sábado" e parava aí, e o único
+                  caminho até lá passava por "Montar na mão" — que é o nome
+                  errado para "ver a minha semana", e por isso ninguém tentava.
+                  Agora a própria frase é o caminho. */}
+              {!treinouHoje && doHoje.length === 0 && proximoDia !== undefined && (
+                <Pressable
+                  onPress={() => {
+                    setDiaDaRotina(proximoDia)
+                    setAba('rotina')
+                  }}
+                  style={({ pressed }) => [styles.atalhoProximo, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver o treino de ${DIAS_LONGOS[proximoDia]}`}
+                >
+                  <Ionicons name="calendar-outline" size={15} color={paleta().cores.branco} />
+                  <Text style={styles.textoAtalhoProximo}>
+                    Ver o treino de {DIAS_LONGOS[proximoDia].toLowerCase()}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color={paleta().cores.branco} />
+                </Pressable>
+              )}
               <Text style={styles.subHoje}>
                 {naSemana === 0
                   ? 'Nenhum treino nos últimos 7 dias'
@@ -425,7 +456,10 @@ export function TreinoScreen({
                   style={styles.linkRotina}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.textoLink}>Montar na mão</Text>
+                  {/* "Montar na mão" descrevia o que se faz LÁ DENTRO, e não
+                      para onde o toque leva. Quem só queria ver o treino de
+                      sábado não clicava, porque não queria montar nada. */}
+                  <Text style={styles.textoLink}>Ver a minha semana</Text>
                   <Ionicons name="chevron-forward" size={15} color={paleta().cores.verde} />
                 </Pressable>
               </View>
@@ -480,6 +514,7 @@ export function TreinoScreen({
           </>
         ) : (
           <Rotina
+            diaInicial={diaDaRotina}
             contaId={contaId}
             exercicios={rotina}
             onMudou={setRotina}
@@ -965,6 +1000,7 @@ function RegistrarTreino({
 /* ── A rotina da semana ────────────────────────────────────────────────────*/
 
 function Rotina({
+  diaInicial,
   contaId,
   exercicios,
   onMudou,
@@ -983,9 +1019,20 @@ function Rotina({
      o voltar do aparelho, lá na tela de treino — ver o comentário de
      `camadaDaRotina`. */
   camadaAberta: MutableRefObject<(() => void) | null>
+  /* O dia em que abrir. Nulo é hoje. */
+  diaInicial: DiaSemana | null
 }) {
   const styles = estilos()
-  const [dia, setDia] = useState<DiaSemana>(() => new Date().getDay() as DiaSemana)
+  const [dia, setDia] = useState<DiaSemana>(
+    () => diaInicial ?? (new Date().getDay() as DiaSemana),
+  )
+
+  /* Segue o pedido de fora quando ele MUDA, e não a cada renderização: sem a
+     dependência, trocar de dia aqui dentro seria desfeito no render seguinte e
+     a fileira ficaria presa. */
+  useEffect(() => {
+    if (diaInicial !== null) setDia(diaInicial)
+  }, [diaInicial])
   const [nome, setNome] = useState('')
   const [series, setSeries] = useState('')
   const [repeticoes, setRepeticoes] = useState('')
@@ -1420,6 +1467,18 @@ function comoData(iso: string): Date {
 const estilos = estilosDe(t =>
   StyleSheet.create({
   tela: { flex: 1, backgroundColor: t.cores.fundo },
+  atalhoProximo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  textoAtalhoProximo: { fontSize: 13, fontWeight: '700', color: t.cores.branco },
 
   cabecalho: {
     flexDirection: 'row',
