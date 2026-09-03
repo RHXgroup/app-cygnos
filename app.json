@@ -52,8 +52,7 @@
           "icon": "./assets/notification-icon.png",
           "color": "#15803D"
         }
-      ],
-      "expo-status-bar"
+      ]
     ],
     "extra": {
       "eas": {

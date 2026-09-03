@@ -1136,7 +1136,7 @@ const estilos = estilosDe(t =>
    *
    * O fundo aqui, e não em cada tela, porque o buraco é da moldura: quem esquecer
    * de pintar a sua continua coberto. */
-  sobreposta: { ...StyleSheet.absoluteFill, backgroundColor: t.cores.fundo },
+  sobreposta: { ...StyleSheet.absoluteFillObject, backgroundColor: t.cores.fundo },
   /* Login e cadastro ficam um degrau acima do fundo da área logada, para o
      cartão de formulário não sumir dentro da tela. */
   telaAuth: { flex: 1, backgroundColor: t.cores.mist },

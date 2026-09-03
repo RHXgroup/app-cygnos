@@ -2642,7 +2642,7 @@ const estilos = estilosDe(t =>
 
   /* ── Véu de análise ── */
   veu: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.62)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2658,7 +2658,7 @@ const estilos = estilosDe(t =>
   textoAnalise: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
 
   /* ── Folhas ── */
-  fundoFolha: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
+  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
     position: 'absolute',
     left: 0,

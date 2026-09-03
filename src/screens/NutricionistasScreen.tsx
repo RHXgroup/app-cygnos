@@ -1413,7 +1413,7 @@ const estilos = estilosDe(t =>
   desfazer: { fontSize: 13, fontWeight: '700', color: t.cores.verde },
 
   /* ── Painel de pedir contato ── */
-  painel: { ...StyleSheet.absoluteFill, backgroundColor: t.cores.fundo },
+  painel: { ...StyleSheet.absoluteFillObject, backgroundColor: t.cores.fundo },
   conteudoPainel: { paddingHorizontal: 20, paddingBottom: 24 },
   blocoPedido: { alignItems: 'center', paddingVertical: 16, gap: 2 },
   nomePedido: {
