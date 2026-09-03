@@ -673,31 +673,47 @@ export async function analisarFoto(
   try {
     /* Só a largura no resize: passar as duas dimensões esticaria uma foto
        retangular para um quadrado, e comida deformada é comida mal estimada. */
+    /* SEM `base64`.
+     *
+     * Esta linha é a causa do app reiniciar ao voltar da câmera. Com ela, três
+     * cópias da mesma foto ficam vivas ao mesmo tempo na memória do telefone —
+     * o bitmap redimensionado, o JPEG e a string base64, que é 33% MAIOR que o
+     * arquivo — logo depois de a câmera do sistema ter ocupado o aparelho. O
+     * Android mata o processo que ficou atrás, e o app volta do zero.
+     *
+     * Baixar a resolução não resolveu porque o problema não é o tamanho da
+     * foto: é a string. Agora o telefone manda os BYTES e o servidor faz a
+     * conversão, onde memória sobra. */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR } }],
-      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+      { compress: 0.8, format: SaveFormat.JPEG },
     )
 
-    if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
+    const forma = new FormData()
+    forma.append('imagem', {
+      uri: reduzida.uri,
+      name: 'prato.jpg',
+      type: 'image/jpeg',
+    } as unknown as Blob)
+
+    if (contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)) {
+      /* Contexto vai como texto no mesmo envio. Vazio não vai: o servidor
+         montaria uma frase pela metade, e frase pela metade o modelo completa
+         sozinho — que é pior do que não mandar nada. */
+      forma.append(
+        'contexto',
+        JSON.stringify({
+          refeicao: contexto.refeicao,
+          costuma: contexto.costuma.slice(0, 8),
+          plano: (contexto.doPlano ?? []).slice(0, 8),
+          fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
+        }),
+      )
+    }
 
     const { data, error } = await supabase.functions.invoke('analisar-alimento', {
-      body: {
-        imageBase64: reduzida.base64,
-        mimeType: 'image/jpeg',
-        /* Só vai o que existe. Contexto vazio faria o servidor montar uma frase
-           pela metade, e frase pela metade o modelo completa sozinho — que é
-           pior do que não mandar nada. */
-        contexto:
-          contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)
-            ? {
-                refeicao: contexto.refeicao,
-                costuma: contexto.costuma.slice(0, 8),
-                plano: (contexto.doPlano ?? []).slice(0, 8),
-                fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
-              }
-            : undefined,
-      },
+      body: forma,
     })
 
     if (error) {
@@ -725,7 +741,9 @@ export async function analisarFoto(
 
     return {
       tipo: 'ok',
-      base64: reduzida.base64,
+      /* O CAMINHO, e não a string: quem sobe a foto converte na hora do
+         upload, com a câmera já fechada. Ver `guardarFotoDoDiario`. */
+      base64: reduzida.uri,
       estimativa: {
         descricao: data.descricao ?? 'Alimento',
         itens,

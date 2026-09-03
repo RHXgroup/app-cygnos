@@ -406,6 +406,12 @@ export function ModoTreino({
     void setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: false,
+      /* MANTÉM a gravação ligada.
+         `setAudioModeAsync` troca o modo INTEIRO, e não só o que se passa: sem
+         esta linha, `allowsRecording` volta a falso toda vez que o modo é
+         escrito — e o gravador da escuta contínua para de captar sem erro
+         nenhum. */
+      allowsRecording: true,
       /* Não interrompe música: quem treina ouvindo som quer o apito POR CIMA,
          e não no lugar. */
       interruptionMode: 'mixWithOthers',
@@ -566,6 +572,11 @@ export function ModoTreino({
   const meterVivo = useRef<number | undefined>(undefined)
   meterVivo.current = estadoDoGravador.metering
 
+  /* O ambiente medido, para a tela poder mostrar o limiar. Atualizado uma vez
+     por segundo pelo próprio intervalo — mais que isso re-renderizaria a tela
+     dez vezes por segundo por causa de um número de diagnóstico. */
+  const [ambienteVisivel, setAmbienteVisivel] = useState(-50)
+
   const vozLigadaVivo = useRef(false)
   const entendendoVivo = useRef(false)
   /* ── COMO CONDUZIR O TREINO ────────────────────────────────────────────
@@ -696,6 +707,7 @@ export function ModoTreino({
          afogam o terminal e escondem o resto. */
       if (agora - ultimoRelato > 1000) {
         ultimoRelato = agora
+        setAmbienteVisivel(escuta.ambiente)
         console.log(
           '[cygnos] escuta:',
           meterVivo.current === undefined ? 'SEM MEDIDOR' : meterVivo.current.toFixed(1) + ' dB',
@@ -1287,6 +1299,23 @@ export function ModoTreino({
                     <Text style={styles.respostaVoz}>{respostaDaVoz}</Text>
                   )}
 
+                  {/* ── OS NÚMEROS NA TELA ────────────────────────────────
+                      A escuta falha em silêncio: sem medidor, nada acontece e
+                      a tela continua dizendo "Ouvindo". Duas rodadas de teste
+                      se perderam assim, e o documento do projeto é explícito —
+                      quando a segunda tentativa falha, imprima os números em
+                      vez de escrever a terceira teoria.
+                      Fica só no modo voz, e some quando ele é desligado. */}
+                  {vozLigada && (
+                    <Text style={styles.medidorVoz}>
+                      {estadoDoGravador.metering === undefined
+                        ? 'sem medidor · o aparelho não está entregando o nível'
+                        : `${estadoDoGravador.metering.toFixed(0)} dB · limiar ${limiarDe(
+                            ambienteVisivel,
+                          ).toFixed(0)} · ${estadoDoGravador.isRecording ? 'gravando' : 'PARADO'}`}
+                    </Text>
+                  )}
+
                   <View style={styles.linhaNavegar}>
                     <Pressable
                       onPress={() => setIndice(i => Math.max(0, i - 1))}
@@ -1551,6 +1580,13 @@ const estilos = estilosDe(t =>
   textoChaveVoz: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
   textoChaveVozLigada: { color: t.cores.branco },
   respostaVoz: { marginTop: 8, fontSize: 13, color: t.inkMedio, textAlign: 'center' },
+  medidorVoz: {
+    marginTop: 4,
+    fontSize: 11,
+    color: t.inkFraco,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
 
   linhaNavegar: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
     botaoNavegar: {

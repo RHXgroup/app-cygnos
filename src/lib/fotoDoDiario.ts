@@ -134,13 +134,21 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
   try {
     /* Só a largura: passar as duas dimensões esticaria uma foto retangular para
        um quadrado. */
+    /* SEM `base64`, e o campo devolve o CAMINHO.
+     *
+     * A string base64 é 33% maior que o arquivo e nasce ao lado do bitmap e do
+     * JPEG — três cópias vivas no instante em que a câmera do sistema devolve o
+     * controle e a memória está no fim. É o que fazia o Android matar o app.
+     *
+     * `guardarFotoDoDiario` aceita caminho e converte na hora do upload, com a
+     * câmera já fechada. O nome do campo continua `base64` para não mexer nos
+     * três chamadores de uma vez — e ela aceita os dois formatos. */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR } }],
-      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+      { compress: 0.8, format: SaveFormat.JPEG },
     )
-    if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
-    return { tipo: 'ok', base64: reduzida.base64 }
+    return { tipo: 'ok', base64: reduzida.uri }
   } catch (e) {
     falha('Não consegui preparar a foto.', e)
     return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente outra.' }
@@ -157,11 +165,43 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
  *
  * Recebe base64 porque é o que `analisarFoto` já produziu para mandar à IA:
  * pedir o arquivo de novo seria ler e comprimir a mesma imagem duas vezes. */
+/* Aceita o CAMINHO do arquivo, e não a string base64.
+ *
+ * Receber base64 obrigava quem chama a criar a string cedo — logo depois da
+ * câmera, quando a memória do telefone está no pior momento. Era uma das três
+ * cópias vivas ao mesmo tempo que faziam o Android matar o app.
+ *
+ * Aqui a conversão acontece no momento do upload, com a câmera já fechada. É o
+ * mesmo caminho do áudio da conversa: blob → FileReader → base64 → bytes. */
 export async function guardarFotoDoDiario(
   contaId: string,
-  base64: string,
+  uriOuBase64: string,
 ): Promise<string | null> {
-  if (!contaId || !base64) return null
+  if (!contaId || !uriOuBase64) return null
+
+  /* Aceita os dois enquanto houver chamador antigo: caminho começa com file://
+     ou content://, base64 não. */
+  const ehCaminho = /^(file|content|assets-library|ph):/i.test(uriOuBase64)
+  let base64 = uriOuBase64
+  if (ehCaminho) {
+    try {
+      const blob = await (await fetch(uriOuBase64)).blob()
+      base64 = await new Promise<string>((resolve, reject) => {
+        const leitor = new FileReader()
+        leitor.onerror = () => reject(leitor.error ?? new Error('FileReader falhou'))
+        leitor.onload = () => {
+          const texto = String(leitor.result ?? '')
+          const virgula = texto.indexOf(',')
+          resolve(virgula === -1 ? '' : texto.slice(virgula + 1))
+        }
+        leitor.readAsDataURL(blob)
+      })
+    } catch (e) {
+      falha('Não consegui ler a foto do aparelho.', e)
+      return null
+    }
+    if (!base64) return null
+  }
 
   const agora = new Date()
   const anoMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`
