@@ -408,7 +408,7 @@ export function MensagensScreen({
 
     setSubindoAnexo(true)
     setErro('')
-    const caminho = await guardarFotoDoDiario(contaId, escolha.base64)
+    const caminho = await guardarFotoDoDiario(contaId, escolha.uri)
     setSubindoAnexo(false)
 
     if (!caminho) {

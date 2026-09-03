@@ -65,7 +65,13 @@ const nomeUnico = () =>
  * repetir a escolha da imagem em cada tela é como as duas divergem no dia em
  * que alguém mexer no tamanho ou na compressão. */
 export type FotoEscolhida =
-  | { tipo: 'ok'; base64: string }
+  /* O CAMINHO do arquivo. Já foi `base64` — e continuou com esse nome depois
+     de passar a carregar um caminho, o que é a armadilha 5 no pior formato: o
+     tipo é `string` nos dois casos, então o compilador não vê diferença, e
+     quem lesse `escolha.base64` teria toda razão de mandar isso para uma
+     função que espera texto de imagem. Renomeado antes de alguém acreditar no
+     nome. */
+  | { tipo: 'ok'; uri: string }
   | { tipo: 'cancelado' }
   | { tipo: 'erro'; mensagem: string }
 
@@ -141,14 +147,14 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
      * controle e a memória está no fim. É o que fazia o Android matar o app.
      *
      * `guardarFotoDoDiario` aceita caminho e converte na hora do upload, com a
-     * câmera já fechada. O nome do campo continua `base64` para não mexer nos
+     * câmera já fechada. O campo passou a se chamar `uri`, porque ele carrega
      * três chamadores de uma vez — e ela aceita os dois formatos. */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR } }],
       { compress: 0.8, format: SaveFormat.JPEG },
     )
-    return { tipo: 'ok', base64: reduzida.uri }
+    return { tipo: 'ok', uri: reduzida.uri }
   } catch (e) {
     falha('Não consegui preparar a foto.', e)
     return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente outra.' }

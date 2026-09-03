@@ -171,7 +171,13 @@ export function ContadorCaloriasScreen({
    * So sobe DEPOIS do Registrar: subir antes encheria o bucket de foto que a
    * pessoa descartou, e ela descarta com frequencia -- e a foto errada e
    * justamente a que a nutricionista nao deveria ver. */
-  const [fotoEmBase64, setFotoEmBase64] = useState<string | null>(null)
+    /* O CAMINHO do arquivo, e não a imagem em texto.
+     Guardar a string aqui obrigava a montá-la logo depois da câmera, que é o
+     instante em que o Android mata o app por falta de memória — e app morto
+     não parece defeito de foto, parece a conversa não carregando.
+     `guardarFotoDoDiario` aceita caminho e converte na hora de salvar, quando
+     a memória da câmera já voltou. */
+  const [caminhoDaFoto, setCaminhoDaFoto] = useState<string | null>(null)
   /* Caminho no bucket → endereço assinado. Um mapa, e não um endereço por
      linha: `createSignedUrls` resolve todos de uma vez, e doze fotos seriam
      doze idas à rede na abertura da tela.
@@ -269,7 +275,7 @@ export function ContadorCaloriasScreen({
          saida que limpam coisas diferentes e como um deles vira defeito. */
       if (estimativa) {
         setEstimativa(null)
-        setFotoEmBase64(null)
+        setCaminhoDaFoto(null)
         return true
       }
       if (porta) {
@@ -525,7 +531,7 @@ export function ContadorCaloriasScreen({
     else if (r.tipo === 'ok') {
       setEstimativa(r.estimativa)
       setLinhasDaFoto(linhasIniciais(r.estimativa))
-      setFotoEmBase64(r.base64)
+      setCaminhoDaFoto(r.uri)
     }
     /* 'cancelado' não é erro: a pessoa desistiu da foto e a tela fica como
        estava, sem aviso nenhum. */
@@ -1055,13 +1061,13 @@ export function ContadorCaloriasScreen({
           refeicao={refeicao}
           onDescartar={() => {
             setEstimativa(null)
-            setFotoEmBase64(null)
+            setCaminhoDaFoto(null)
           }}
           onRegistrar={linhas => {
-            const imagem = fotoEmBase64
+            const imagem = caminhoDaFoto
             const confianca = estimativa.confianca
             setEstimativa(null)
-            setFotoEmBase64(null)
+            setCaminhoDaFoto(null)
             /* UMA linha por alimento, e nao um bloco.
                Todas dividem a MESMA foto: `gravar` sobe a imagem uma vez e
                carimba o caminho em todo item de origem 'foto'. E o que faz a

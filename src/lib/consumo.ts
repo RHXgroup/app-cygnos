@@ -597,13 +597,16 @@ export async function viesDaFoto(): Promise<number | null> {
 }
 
 export type ResultadoFoto =
-  /* O `base64` volta junto para a tela poder GUARDAR a imagem depois de a
-     pessoa confirmar. Antes ela era mandada para a IA e descartada.
+  /* O CAMINHO do arquivo, e não a imagem em texto.
    *
-   * Volta daqui em vez de ser lida de novo do arquivo: é a mesma imagem já
-   * reduzida e comprimida, e ler duas vezes custaria o dobro num aparelho
-   * fraco. */
-  | { tipo: 'ok'; estimativa: Estimativa; base64: string }
+   * A tela precisa da imagem para guardá-la depois que a pessoa confirma, e
+   * antes isto era a string base64 — construída aqui, no instante seguinte ao
+   * fechamento da câmera, que é justamente quando o aparelho está mais cheio.
+   *
+   * `guardarFotoDoDiario` aceita caminho e converte por conta própria, LÁ NA
+   * FRENTE, quando a memória da câmera já foi devolvida. O texto continua
+   * existindo; só deixa de existir no pior momento possível. */
+  | { tipo: 'ok'; estimativa: Estimativa; uri: string }
   | { tipo: 'cancelado' }
   | { tipo: 'erro'; mensagem: string }
 
@@ -684,27 +687,36 @@ export async function analisarFoto(
      * Baixar a resolução não resolveu porque o problema não é o tamanho da
      * foto: é a string. Agora o telefone manda os BYTES e o servidor faz a
      * conversão, onde memória sobra. */
-    /* DE VOLTA PARA base64, e a memória fica como estava.
+    /* ── SEM `base64`, E COM VOLTA SE DER ERRADO ────────────────────────
      *
-     * Eu troquei isto por `multipart/form-data` hoje, para o telefone não
-     * precisar montar a imagem em texto — a maior alocação do momento em que o
-     * Android mata o app ao voltar da câmera.
+     * `base64: true` era a causa de o app REINICIAR ao voltar da câmera. Com
+     * ele, três cópias da mesma foto ficam vivas ao mesmo tempo — o bitmap
+     * redimensionado, o JPEG, e a string, que é 33% MAIOR que o arquivo —
+     * logo depois de a câmera do sistema ter ocupado o aparelho inteiro. O
+     * Android mata o processo que ficou atrás, e o app volta do zero.
      *
-     * E a leitura parou de funcionar por inteiro. Não descobri por quê, e não
-     * dava para descobrir sem sessão: a função exige login, então eu não
-     * consigo exercitar o caminho novo daqui.
+     * E "o app volta do zero" não se parece com defeito de foto. Parece a
+     * conversa não carregando, o áudio não subindo, a mensagem sumindo — foi
+     * assim que chegou o relato, como três defeitos separados. É um só.
      *
-     * Foto que às vezes reinicia o app é ruim. Foto que NUNCA lê é pior. Volta
-     * para o que funcionava, e a economia de memória fica para quando der para
-     * testar de verdade — o caminho multipart continua aceito no servidor,
-     * esperando. */
+     * Baixar a resolução nunca resolveu porque o problema não é o tamanho da
+     * foto: é a string.
+     *
+     * ── Por que agora tem VOLTA ─────────────────────────────────────────
+     * Esta troca já foi feita uma vez hoje, e a leitura parou de funcionar por
+     * inteiro — eu revertí sem descobrir o motivo, porque a função exige
+     * sessão e eu não consigo exercitá-la daqui.
+     *
+     * Reverter foi certo naquele momento e errado como conserto: trocou "às
+     * vezes reinicia" por "nunca lê". Agora o caminho novo é tentado primeiro
+     * e o antigo fica de reserva. Se o servidor recusar os bytes, a foto é
+     * lida do mesmo jeito — gastando a memória de antes, que é ruim, e não
+     * falhando, que é pior. E o terminal diz por qual dos dois passou. */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR } }],
-      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+      { compress: 0.8, format: SaveFormat.JPEG },
     )
-
-    if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
 
     /* ── A ESPERA PRECISA TER FIM, E TER NOME ───────────────────────────
      *
@@ -722,24 +734,68 @@ export async function analisarFoto(
     const desistir = new AbortController()
     const prazo = setTimeout(() => desistir.abort(), 75_000)
 
-    const { data, error } = await supabase.functions.invoke('analisar-alimento', {
-      /* @ts-expect-error o supabase-js repassa o sinal ao fetch, mas ainda não
-         o declara no tipo das opções de `invoke`. */
-      signal: desistir.signal,
-      body: {
-        imageBase64: reduzida.base64,
-        mimeType: 'image/jpeg',
-        contexto:
-          contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)
-            ? {
-                refeicao: contexto.refeicao,
-                costuma: contexto.costuma.slice(0, 8),
-                plano: (contexto.doPlano ?? []).slice(0, 8),
-                fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
-              }
-            : undefined,
-      },
+    const oContexto =
+      contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)
+        ? {
+            refeicao: contexto.refeicao,
+            costuma: contexto.costuma.slice(0, 8),
+            plano: (contexto.doPlano ?? []).slice(0, 8),
+            fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
+          }
+        : undefined
+
+    /* @ts-expect-error o supabase-js repassa o sinal ao fetch, mas ainda não o
+       declara no tipo das opções de `invoke`. */
+    const opcoes = { signal: desistir.signal }
+
+    /* Os BYTES, montados como o ditado monta o áudio.
+     *
+     * A forma do arquivo é a mesma de `voz.ts`, e não uma invenção nova: aquele
+     * caminho sobe áudio para uma função Deno todo dia e funciona. Quando um
+     * jeito já está provado no mesmo projeto, copiá-lo vale mais do que
+     * escrever um segundo. */
+    const forma = new FormData()
+    forma.append('imagem', {
+      uri: reduzida.uri,
+      name: 'prato.jpg',
+      type: 'image/jpeg',
+    } as unknown as Blob)
+    if (oContexto) forma.append('contexto', JSON.stringify(oContexto))
+
+    let { data, error } = await supabase.functions.invoke('analisar-alimento', {
+      ...opcoes,
+      body: forma,
     })
+
+    /* ── A VOLTA ────────────────────────────────────────────────────────
+     *
+     * Só quando o servidor RECUSOU o formato — não quando desistimos por
+     * tempo, e não quando a rede caiu. Tentar de novo nesses dois casos
+     * dobraria a espera de quem já esperou demais, e a segunda tentativa
+     * falharia pelo mesmo motivo.
+     *
+     * O que sobra é o caso que me fez reverter isto hoje de manhã: o servidor
+     * não entendeu o pedido. Aí vai a imagem em texto, gastando a memória de
+     * antes — ruim, e melhor do que não ler. */
+    if (error && !desistir.signal.aborted) {
+      const status = (error as { context?: Response }).context?.status
+      if (status === undefined || status >= 400) {
+        falha('Foto: os bytes não foram aceitos (HTTP ' + String(status) + '), indo por texto', error)
+        const comTexto = await manipulateAsync(
+          escolha.assets[0].uri,
+          [{ resize: { width: LADO_MAIOR } }],
+          { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+        )
+        if (comTexto.base64) {
+          const segunda = await supabase.functions.invoke('analisar-alimento', {
+            ...opcoes,
+            body: { imageBase64: comTexto.base64, mimeType: 'image/jpeg', contexto: oContexto },
+          })
+          data = segunda.data
+          error = segunda.error
+        }
+      }
+    }
 
     clearTimeout(prazo)
 
@@ -800,7 +856,7 @@ export async function analisarFoto(
 
     return {
       tipo: 'ok',
-      base64: reduzida.base64,
+      uri: reduzida.uri,
       estimativa: {
         descricao: data.descricao ?? 'Alimento',
         itens,
