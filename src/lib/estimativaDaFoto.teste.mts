@@ -461,5 +461,57 @@ console.log('\nA funcao antiga, e a nova')
   ok('e o total nao dobra', totaisDaFoto(r).calorias === 210)
 }
 
+{
+  // ── O PRATO FEITO DE VERDADE, o que motivou tudo isto ───────────────────
+  //
+  // Seis itens numa foto real: file de frango grelhado, arroz branco, feijao
+  // carioca, farofa, alface e tomate. A farofa sumia da lista, e a caca a ela
+  // passou por tres correcoes no texto do servidor antes de alguem notar que a
+  // regra "farofa nao tem contorno" era a propria causa -- naquela foto ela e
+  // uma colherada moldada, com contorno perfeitamente desenhavel.
+  //
+  // Esta prova cobre o LADO DO APP dessa historia: se o servidor mandar os seis,
+  // seis chegam ao diario. O teto e oito nos dois lados, e um teto menor aqui
+  // apagaria em silencio o ultimo item da lista -- que e outra forma de a
+  // farofa sumir, e a que ninguem procuraria no texto da instrucao.
+  const pratoFeito = {
+    descricao: 'Prato feito',
+    confianca: 'media',
+    usou_contexto: false,
+    itens: [
+      { nome: 'File de frango grelhado', porcao_estimada: '1 file ~150 g', calorias: 248, proteinas: 46, carboidratos: 0, gorduras: 5.4, fibras: 0 },
+      { nome: 'Arroz branco cozido', porcao_estimada: '4 colheres ~120 g', calorias: 155, proteinas: 3, carboidratos: 34, gorduras: 0.3, fibras: 0.5 },
+      { nome: 'Feijao carioca', porcao_estimada: '1 concha ~80 g', calorias: 61, proteinas: 4, carboidratos: 11, gorduras: 0.4, fibras: 4 },
+      { nome: 'Farofa', porcao_estimada: '2 colheres ~40 g', calorias: 162, proteinas: 1.2, carboidratos: 24, gorduras: 6.8, fibras: 2 },
+      { nome: 'Alface', porcao_estimada: '3 folhas ~30 g', calorias: 5, proteinas: 0.4, carboidratos: 0.8, gorduras: null, fibras: 0.6 },
+      { nome: 'Tomate', porcao_estimada: '2 fatias ~40 g', calorias: 8, proteinas: 0.3, carboidratos: 1.6, gorduras: null, fibras: 0.5 },
+    ],
+  }
+
+  const lidos = itensDaEstimativa(pratoFeito)
+  ok('o prato feito devolve os seis itens', lidos.length === 6, String(lidos.length))
+  ok(
+    'a farofa esta na lista',
+    lidos.some(i => i.nome === 'Farofa'),
+    lidos.map(i => i.nome).join(' | '),
+  )
+  ok('a farofa e o quarto item', lidos[3]?.nome === 'Farofa', String(lidos[3]?.nome))
+  ok('a porcao dela sobreviveu', lidos[3]?.porcaoEstimada === '2 colheres ~40 g')
+
+  // Gordura desconhecida continua NULA. Zero somaria como verdade e produziria
+  // um total errado que ninguem questiona (item 6 do AGENTS.md) -- e o esquema
+  // do servidor aceita nulo justamente para o modelo nao ter de inventar.
+  ok('gordura desconhecida da alface continua nula', lidos[4]?.gorduras === null, String(lidos[4]?.gorduras))
+  ok('mas a caloria dela veio', lidos[4]?.calorias === 5)
+
+  // O teto e o MESMO dos dois lados. Se alguem baixar este numero sem baixar o
+  // da instrucao, o ultimo item da foto passa a sumir sem erro nenhum.
+  ok('o teto do app e oito, como o do servidor', MAXIMO_DE_ITENS === 8, String(MAXIMO_DE_ITENS))
+
+  // E seis itens cabem com folga: o prato feito nao chega perto do teto, entao
+  // nenhuma leitura normal e cortada.
+  ok('seis cabe no teto', 6 < MAXIMO_DE_ITENS)
+}
+
 console.log(`\n${passaram} passaram, ${falharam} falharam`)
 if (falharam > 0) process.exit(1)
