@@ -118,18 +118,68 @@ function notificacoes(): Promise<ModuloNotificacoes> {
       /* Como a notificação se comporta com o app aberto. Sem isto o Android
          engole a que chega em primeiro plano, e quem está com o app na mão — o
          caso mais comum na hora da refeição — não vê nada. */
-      n.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        }),
-      })
-      return n
+      /* CADA função é conferida antes de ser chamada.
+       *
+       * O Expo Go vem removendo pedaços do `expo-notifications` a cada SDK — o
+       * push saiu no 53, e no 57 sumiram outras. Uma chamada a algo que não
+       * existe mais vira `undefined is not a function` DENTRO desta promessa,
+       * ela rejeita, e a rejeição não tem dono: o app abre com cinco erros
+       * vermelhos e TODA ação seguinte falha, porque `notificacoes()` nunca
+       * resolve.
+       *
+       * Foi exatamente isso que aconteceu na migração para o 57, e o sintoma
+       * não parecia notificação: parecia que o app inteiro tinha quebrado. */
+      if (typeof n.setNotificationHandler === 'function') {
+        n.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+          }),
+        })
+      }
+      return protegido(n)
     })
+      /* E se o IMPORT falhar, o módulo vira o de mentira em vez de rejeitar.
+         Rejeitar aqui derruba todo mundo que espera por ele — e ninguém que
+         pede um lembrete deveria conseguir quebrar o diário. */
+      .catch(e => {
+        console.log('[cygnos] expo-notifications não carregou:', e)
+        return protegido({} as ModuloNotificacoes)
+      })
   }
   return modulo
+}
+
+/* ── O MÓDULO DE MENTIRA, para o que não existe mais ──────────────────────
+ *
+ * Devolve o módulo de verdade, e para toda função que NÃO existe devolve uma
+ * que não faz nada e responde vazio. Assim o app continua inteiro num Expo Go
+ * que perdeu metade da biblioteca — e o dia em que a Expo remover mais uma
+ * coisa não vira uma noite de teste perdida.
+ *
+ * Avisa UMA vez por nome no terminal. Sem o aviso isto vira mágica silenciosa,
+ * e mágica silenciosa esconde o dia em que a função sumiu de verdade. */
+const jaAvisei = new Set<string>()
+
+function protegido(n: ModuloNotificacoes): ModuloNotificacoes {
+  return new Proxy(n, {
+    get(alvo, nome: string) {
+      const v = (alvo as Record<string, unknown>)[nome]
+      if (typeof v !== 'undefined') return v
+
+      /* Constantes ausentes viram objeto vazio; funções viram no-op. Não dá
+         para saber qual era pelo nome, então devolve uma função — que é o que
+         quase tudo aqui é — e ela responde `[]`, que é o vazio que os
+         chamadores sabem tratar. */
+      if (!jaAvisei.has(nome)) {
+        jaAvisei.add(nome)
+        console.log('[cygnos] expo-notifications sem `' + nome + '` neste Expo Go — ignorando')
+      }
+      return async () => [] as unknown
+    },
+  })
 }
 
 async function lerIds(chave: string): Promise<string[]> {

@@ -684,36 +684,42 @@ export async function analisarFoto(
      * Baixar a resolução não resolveu porque o problema não é o tamanho da
      * foto: é a string. Agora o telefone manda os BYTES e o servidor faz a
      * conversão, onde memória sobra. */
+    /* DE VOLTA PARA base64, e a memória fica como estava.
+     *
+     * Eu troquei isto por `multipart/form-data` hoje, para o telefone não
+     * precisar montar a imagem em texto — a maior alocação do momento em que o
+     * Android mata o app ao voltar da câmera.
+     *
+     * E a leitura parou de funcionar por inteiro. Não descobri por quê, e não
+     * dava para descobrir sem sessão: a função exige login, então eu não
+     * consigo exercitar o caminho novo daqui.
+     *
+     * Foto que às vezes reinicia o app é ruim. Foto que NUNCA lê é pior. Volta
+     * para o que funcionava, e a economia de memória fica para quando der para
+     * testar de verdade — o caminho multipart continua aceito no servidor,
+     * esperando. */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR } }],
-      { compress: 0.8, format: SaveFormat.JPEG },
+      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
     )
 
-    const forma = new FormData()
-    forma.append('imagem', {
-      uri: reduzida.uri,
-      name: 'prato.jpg',
-      type: 'image/jpeg',
-    } as unknown as Blob)
-
-    if (contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)) {
-      /* Contexto vai como texto no mesmo envio. Vazio não vai: o servidor
-         montaria uma frase pela metade, e frase pela metade o modelo completa
-         sozinho — que é pior do que não mandar nada. */
-      forma.append(
-        'contexto',
-        JSON.stringify({
-          refeicao: contexto.refeicao,
-          costuma: contexto.costuma.slice(0, 8),
-          plano: (contexto.doPlano ?? []).slice(0, 8),
-          fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
-        }),
-      )
-    }
+    if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
 
     const { data, error } = await supabase.functions.invoke('analisar-alimento', {
-      body: forma,
+      body: {
+        imageBase64: reduzida.base64,
+        mimeType: 'image/jpeg',
+        contexto:
+          contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)
+            ? {
+                refeicao: contexto.refeicao,
+                costuma: contexto.costuma.slice(0, 8),
+                plano: (contexto.doPlano ?? []).slice(0, 8),
+                fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
+              }
+            : undefined,
+      },
     })
 
     if (error) {
@@ -741,9 +747,7 @@ export async function analisarFoto(
 
     return {
       tipo: 'ok',
-      /* O CAMINHO, e não a string: quem sobe a foto converte na hora do
-         upload, com a câmera já fechada. Ver `guardarFotoDoDiario`. */
-      base64: reduzida.uri,
+      base64: reduzida.base64,
       estimativa: {
         descricao: data.descricao ?? 'Alimento',
         itens,

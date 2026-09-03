@@ -766,10 +766,25 @@ export function ModoTreino({
       if (uri) {
         const r = await transcrever(uri, duracao)
         if (r.tipo === 'ok') responder(r.texto)
+        else {
+          /* A FALHA APARECE. Antes ela era engolida "para não atrapalhar quem
+             está no meio de uma série" — e o resultado foi pior: o medidor
+             mostrava que estava ouvindo, a pessoa falava, e nada acontecia,
+             sem uma palavra dizendo por quê. Ficar em silêncio só é gentileza
+             quando o resto funciona. */
+          setRespostaDaVoz(
+            r.tipo === 'erro'
+              ? r.mensagem
+              : r.tipo === 'nada_ouvido'
+                ? 'Não ouvi nada. Fale mais perto.'
+                : 'Fale um pouco mais.',
+          )
+          console.log('[cygnos] transcrição falhou:', r)
+        }
       }
-    } catch {
-      /* Silêncio de propósito: uma falha de recorte não pode virar aviso na
-         tela de quem está no meio de uma série. A escuta recomeça abaixo. */
+    } catch (e) {
+      setRespostaDaVoz('Não consegui mandar o áudio para entender.')
+      console.log('[cygnos] recorte da escuta falhou:', e)
     }
 
     /* Volta a ouvir, se a voz continua ligada. Pela referência, pelo mesmo
