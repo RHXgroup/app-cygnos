@@ -467,7 +467,7 @@ const estilos = estilosDe(t =>
   foto: { width: '100%', height: '100%' },
   textoAvatar: { fontSize: 32, fontWeight: '800', color: t.cores.verdeEscuro },
   veuAvatar: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.70)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -555,7 +555,7 @@ const estilos = estilosDe(t =>
   botaoSairPressionado: { opacity: 0.75 },
   textoBotaoSair: { fontSize: 15, fontWeight: '700', color: t.cores.erroTexto },
 
-  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
+  fundoFolha: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
     position: 'absolute',
     left: 0,

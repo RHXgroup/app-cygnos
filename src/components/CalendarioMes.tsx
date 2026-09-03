@@ -330,7 +330,7 @@ const estilos = estilosDe(t =>
     },
     /* A camada da faixa, atrás do número. Ocupa a célula inteira na horizontal
        para encostar na vizinha e formar a barra contínua. */
-    faixa: { ...StyleSheet.absoluteFillObject, top: 6, bottom: 12 },
+    faixa: { ...StyleSheet.absoluteFill, top: 6, bottom: 12 },
     faixaMenstruada: { backgroundColor: t.cores.cicloFundo },
     /* Previsto é a MESMA faixa, mais fraca. A borda tracejada de antes era
        truque de 2010, e chamava mais atenção do que o dia registrado. */

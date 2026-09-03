@@ -960,7 +960,7 @@ const estilos = estilosDe(t =>
   },
   textoContagem: { fontSize: 13, fontWeight: '600', color: t.inkMedio },
 
-  fundoPainel: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
+  fundoPainel: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
   painel: {
     position: 'absolute',
     left: 0,

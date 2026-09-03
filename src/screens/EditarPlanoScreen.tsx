@@ -732,7 +732,7 @@ const estilos = estilosDe(t =>
   botaoDesativado: { opacity: 0.45 },
   textoBotao: { fontSize: 15.5, fontWeight: '700', color: t.cores.branco },
 
-  fundoMenu: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
+  fundoMenu: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
   menu: {
     position: 'absolute',
     left: 0,
