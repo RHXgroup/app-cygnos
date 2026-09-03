@@ -3,6 +3,7 @@ import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
 import { rotinaDaIA, type RotinaConvertida, type RotinaDaIA } from './rotinaDaIA'
 import { supabase } from './supabase'
 import { semImagem } from './permissoes'
+import { falha } from './erros'
 
 /* A IA monta a rotina de treino de quem não tem personal.
  *
@@ -217,28 +218,67 @@ export async function lerFichaDaFoto(
 
   if (escolha.canceled || !escolha.assets?.[0]) return { tipo: 'cancelado' }
 
-  let base64: string
+  /* ── SEM `base64`, PORQUE ERA ELE QUE MATAVA O APP ────────────────────
+   *
+   * Aqui era a MAIOR alocação do aplicativo inteiro: a ficha vai a 1280 de
+   * lado, contra 900 do prato, e a string é 33% maior que o arquivo. Ela
+   * nascia ao lado do bitmap e do JPEG, no instante seguinte ao fechamento da
+   * câmera — quando o sistema acabou de ocupar tudo. O Android matava o
+   * processo, e a tela voltava sozinha para o começo.
+   *
+   * Foi relatado como "coloquei a foto no treino e não mudou nada", que é
+   * exatamente o que um app reiniciado parece: nada aconteceu.
+   *
+   * Agora vão os BYTES, e o servidor converte, onde memória sobra. */
+  let caminho: string
   try {
     /* Só a largura: passar as duas dimensões esticaria uma ficha retangular
        para um quadrado, e letra deformada é letra que não se lê. */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR_FICHA } }],
-      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+      { compress: 0.8, format: SaveFormat.JPEG },
     )
-    if (!reduzida.base64) {
-      return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente de novo.' }
-    }
-    base64 = reduzida.base64
+    caminho = reduzida.uri
   } catch {
     return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente de novo.' }
   }
 
   let bruto: RotinaDaIA
   try {
-    const { data, error } = await supabase.functions.invoke('app-ler-treino-foto', {
-      body: { imageBase64: base64, mimeType: 'image/jpeg' },
-    })
+    /* A forma do arquivo é a mesma de `voz.ts`, que sobe áudio para uma função
+       Deno todo dia. Jeito já provado no mesmo projeto vale mais do que um
+       segundo escrito do zero. */
+    const forma = new FormData()
+    forma.append('imagem', {
+      uri: caminho,
+      name: 'ficha.jpg',
+      type: 'image/jpeg',
+    } as unknown as Blob)
+
+    let { data, error } = await supabase.functions.invoke('app-ler-treino-foto', { body: forma })
+
+    /* A VOLTA, só quando o servidor RECUSA o formato. Se ele não entendeu os
+       bytes, a ficha é lida do mesmo jeito pelo caminho antigo — gastando a
+       memória de antes, que é ruim, e não falhando, que é pior. */
+    if (error) {
+      const status = (error as { context?: Response }).context?.status
+      if (status === undefined || status >= 400) {
+        falha('Ficha: os bytes não foram aceitos (HTTP ' + String(status) + '), indo por texto', error)
+        const comTexto = await manipulateAsync(
+          escolha.assets[0].uri,
+          [{ resize: { width: LADO_MAIOR_FICHA } }],
+          { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+        )
+        if (comTexto.base64) {
+          const segunda = await supabase.functions.invoke('app-ler-treino-foto', {
+            body: { imageBase64: comTexto.base64, mimeType: 'image/jpeg' },
+          })
+          data = segunda.data
+          error = segunda.error
+        }
+      }
+    }
 
     if (error) {
       const corpo = await (error as { context?: Response }).context?.json?.().catch(() => null)
