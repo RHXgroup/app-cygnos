@@ -338,64 +338,15 @@ export function DiaDoCiclo({
               </>
             ) : (
               <>
-            {umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
+            {/* ── O QUE NUNCA SAI vem ANTES dos sintomas ──────────────────
+                Estava no fim, depois de fluxo, dor, energia, digestão, humor e
+                vontade de comer. Quem só queria marcar que teve relação tinha de
+                passar por seis perguntas que não ia responder, e desistia antes —
+                concluindo que a marcação não existe. Ela existia, e estava a seis
+                seções de distância.
 
-            <Categoria titulo="Dor" styles={styles}>
-              {SINTOMAS.map(s => (
-                <Etiqueta
-                  key={s}
-                  ativa={d.sintomas.includes(s)}
-                  onPress={() => setD(x => ({ ...x, sintomas: alternar(x.sintomas, s) }))}
-                  styles={styles}
-                >
-                  {s}
-                </Etiqueta>
-              ))}
-            </Categoria>
-
-            {umaEscolha('Energia', ENERGIAS, d.energia, v => setD(x => ({ ...x, energia: v })))}
-            {umaEscolha('Digestão', DIGESTOES, d.digestao, v => setD(x => ({ ...x, digestao: v })))}
-            {umaEscolha('Humor', HUMORES, d.humor, v => setD(x => ({ ...x, humor: v })))}
-
-            {/* O campo que nenhum app de ciclo tem e nenhum app de nutrição tem.
-                Só faz sentido onde os dois moram juntos. */}
-            <Categoria titulo="Vontade de comer" styles={styles}>
-              {DESEJOS.map(v => (
-                <Etiqueta
-                  key={v}
-                  ativa={d.desejoAlimentar.includes(v)}
-                  onPress={() =>
-                    setD(x => ({ ...x, desejoAlimentar: alternar(x.desejoAlimentar, v) }))
-                  }
-                  styles={styles}
-                >
-                  {v}
-                </Etiqueta>
-              ))}
-            </Categoria>
-
-            <TextInput
-              value={d.observacao ?? ''}
-              onChangeText={t => setD(x => ({ ...x, observacao: t }))}
-              placeholder="Recado para a sua nutricionista"
-              placeholderTextColor={paleta().inkFraco}
-              keyboardAppearance="dark"
-              multiline
-              textAlignVertical="top"
-              maxLength={500}
-              style={styles.campo}
-              accessibilityLabel="Recado para a sua nutricionista"
-            />
-
-            {/* Discreto, e no fim do bloco que ele descreve: no topo virava um
-                aviso legal que se lê uma vez e nunca mais. */}
-            <View style={styles.nota}>
-              <Ionicons name="people-outline" size={14} color={paleta().inkFraco} />
-              <Text style={styles.textoNota}>
-                Tudo acima vai para a sua nutricionista, se você tiver ligado o compartilhamento.
-              </Text>
-            </View>
-
+                Os sintomas continuam logo abaixo, para quem quer detalhar. O que
+                muda é que responder virou escolha em vez de pedágio. */}
             {/* ── O que NUNCA sai ──────────────────────────────────────── */}
             <View style={styles.privado}>
               <View style={styles.tituloPrivado}>
@@ -468,6 +419,71 @@ export function DiaDoCiclo({
                 accessibilityLabel="Nota privada"
               />
             </View>
+
+            {/* O aviso do compartilhamento vira CABEÇALHO em vez de rodapé.
+                Como rodapé ele dizia "tudo ACIMA vai para a nutricionista", e essa
+                palavra prendia a ordem: o bloco privado era obrigado a vir depois.
+                Dito no topo, ele descreve o bloco que encabeça, e a ordem fica
+                livre para seguir o que a pessoa mais faz. */}
+            <View style={styles.nota}>
+              <Ionicons name="people-outline" size={14} color={paleta().inkFraco} />
+              <Text style={styles.textoNota}>
+                Daqui para baixo vai para a sua nutricionista, se você tiver ligado o
+                compartilhamento.
+              </Text>
+            </View>
+
+            {umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
+
+            <Categoria titulo="Dor" styles={styles}>
+              {SINTOMAS.map(s => (
+                <Etiqueta
+                  key={s}
+                  ativa={d.sintomas.includes(s)}
+                  onPress={() => setD(x => ({ ...x, sintomas: alternar(x.sintomas, s) }))}
+                  styles={styles}
+                >
+                  {s}
+                </Etiqueta>
+              ))}
+            </Categoria>
+
+            {umaEscolha('Energia', ENERGIAS, d.energia, v => setD(x => ({ ...x, energia: v })))}
+            {umaEscolha('Digestão', DIGESTOES, d.digestao, v => setD(x => ({ ...x, digestao: v })))}
+            {umaEscolha('Humor', HUMORES, d.humor, v => setD(x => ({ ...x, humor: v })))}
+
+            {/* O campo que nenhum app de ciclo tem e nenhum app de nutrição tem.
+                Só faz sentido onde os dois moram juntos. */}
+            <Categoria titulo="Vontade de comer" styles={styles}>
+              {DESEJOS.map(v => (
+                <Etiqueta
+                  key={v}
+                  ativa={d.desejoAlimentar.includes(v)}
+                  onPress={() =>
+                    setD(x => ({ ...x, desejoAlimentar: alternar(x.desejoAlimentar, v) }))
+                  }
+                  styles={styles}
+                >
+                  {v}
+                </Etiqueta>
+              ))}
+            </Categoria>
+
+            <TextInput
+              value={d.observacao ?? ''}
+              onChangeText={t => setD(x => ({ ...x, observacao: t }))}
+              placeholder="Recado para a sua nutricionista"
+              placeholderTextColor={paleta().inkFraco}
+              keyboardAppearance="dark"
+              multiline
+              textAlignVertical="top"
+              maxLength={500}
+              style={styles.campo}
+              accessibilityLabel="Recado para a sua nutricionista"
+            />
+
+
+
               </>
             )}
           </ScrollView>

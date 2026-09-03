@@ -154,7 +154,22 @@ export async function pedirRotina(p: PedidoDeTreino): Promise<ResultadoTreinoIA>
  * Gravar. Devolve a rotina no mesmo formato da rotina gerada, passa pelo mesmo
  * `rotinaDaIA` — que já tem teste — e a pessoa confere dia por dia antes de
  * virar rotina. */
-const LADO_MAIOR_FICHA = 1600
+/* 1280, e nao 1600.
+ *
+ * Este e o caminho de foto mais pesado do app: a imagem e redimensionada e
+ * depois virada em base64 INTEIRA na memoria, porque a funcao do servidor
+ * recebe `imageBase64`. A 1600 de largura sao ~3,4 milhoes de pixels, mais o
+ * JPEG, mais a string base64 — tudo vivo ao mesmo tempo, logo depois de a
+ * camera do sistema ter ocupado o aparelho.
+ *
+ * O sintoma disso e o app REINICIANDO ao voltar da camera: o Android mata o
+ * processo que ficou atras quando falta memoria.
+ *
+ * 1280 tira 36% dos pixels e continua lendo ficha de academia impressa, que e
+ * texto grande. Nao e conserto: e a folga que da para dar sem trocar o
+ * contrato com o servidor. No Expo Go a folga e menor do que sera num build,
+ * porque ele carrega o proprio ambiente junto. */
+const LADO_MAIOR_FICHA = 1280
 
 export async function lerFichaDaFoto(
   origem: 'galeria' | 'camera',
@@ -209,7 +224,7 @@ export async function lerFichaDaFoto(
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR_FICHA } }],
-      { compress: 0.85, format: SaveFormat.JPEG, base64: true },
+      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
     )
     if (!reduzida.base64) {
       return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente de novo.' }
