@@ -1227,8 +1227,15 @@ export function ModoTreino({
                       querer fazer com o dedo aqui. */}
                   {vozLigada && (
                     <View style={styles.espacoVoz}>
+                      {/* Sempre "ouvindo", mesmo enquanto entende.
+                          Alternar entre os dois a cada trecho fazia o botão
+                          piscar sem parar — o ciclo de parar-mandar-voltar é
+                          rápido e acontece toda vez que alguém fala perto. Do
+                          lado de fora isso se lê como travamento, e não como
+                          trabalho. O que muda de verdade é a resposta falada,
+                          e ela chega quando chega. */}
                       <BotaoDeVoz
-                        estado={entendendo ? 'pensando' : 'ouvindo'}
+                        estado="ouvindo"
                         rotulo="Ouvindo"
                         rotuloOuvindo={'Diga "Cygnos, terminei"'}
                         onPress={() => setModo('manual')}

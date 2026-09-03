@@ -398,6 +398,16 @@ export function DiaDoCiclo({
                   Mirar num switch de 50px com o polegar é o tipo de alvo que
                   erra — e aqui errar significa abrir e fechar um dado sensível
                   sem querer. */}
+              {/* ── O CORAÇÃO, e por que ele não é enfeite ────────────────
+                  Isto era uma linha de texto com um interruptor cinza ao lado,
+                  do lado de dentro de um cartão com cadeado. Lido junto, dava
+                  cara de formulário clínico — e o assunto é a vida sexual de
+                  quem está usando o app, num aplicativo que ela abre no ônibus.
+
+                  O coração muda o tom sem mudar a promessa: o cadeado continua
+                  no topo dizendo que nada dali sai. Marcado, ele PREENCHE e
+                  fica rosa; a mudança de vazio para cheio é o que confirma o
+                  toque sem precisar olhar o interruptor. */}
               <Pressable
                 onPress={() =>
                   setD(x => ({
@@ -411,7 +421,14 @@ export function DiaDoCiclo({
                 accessibilityState={{ checked: d.relacao === true }}
                 accessibilityLabel="Tive relação neste dia"
               >
-                <Text style={styles.rotuloSwitch}>Tive relação neste dia</Text>
+                <Ionicons
+                  name={d.relacao === true ? 'heart' : 'heart-outline'}
+                  size={19}
+                  color={d.relacao === true ? paleta().cores.cicloForte : paleta().inkFraco}
+                />
+                <Text style={[styles.rotuloSwitch, d.relacao === true && styles.rotuloSwitchMarcado]}>
+                  Tive relação neste dia
+                </Text>
                 <Switch
                   value={d.relacao === true}
                   onValueChange={v =>
@@ -773,6 +790,7 @@ const estilos = estilosDe(t =>
       marginTop: 2,
     },
     rotuloSwitch: { flex: 1, fontSize: 14.5, color: t.cores.ink },
+    rotuloSwitchMarcado: { fontWeight: '700', color: t.cores.cicloForte },
     chipsPrivado: { flexDirection: 'row', gap: 8 },
   }),
 )

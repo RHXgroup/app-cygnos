@@ -726,6 +726,33 @@ export function ContadorCaloriasScreen({
         onAdicionar={a => {
           const indice = trocandoItem
           setTrocandoItem(null)
+
+          /* ── ACRESCENTAR o que a leitura não viu ────────────────────────
+           *
+           * A IA erra por omissão tanto quanto por troca: num prato feito
+           * fotografado aqui, a farofa simplesmente não apareceu na lista. A
+           * folha deixava tirar e trocar, e não deixava pôr — então quem via a
+           * falta tinha de descartar a foto inteira e registrar tudo à mão.
+           *
+           * Índice além do fim quer dizer acréscimo. O MESMO caminho da troca,
+           * de propósito: os dois terminam numa linha com nome, porção e
+           * nutrientes, e um segundo fluxo divergiria do primeiro no dia em que
+           * um dos dois mudasse.
+           *
+           * `fator: 1` porque o número veio de tabela, e não de chute — não há
+           * o que corrigir. */
+          if (indice >= linhasDaFoto.length) {
+            setLinhasDaFoto(atuais => [
+              ...atuais,
+              {
+                item: { nome: a.nome, porcaoEstimada: a.descricao, ...absolutos(a) },
+                fator: 1,
+                dentro: true,
+              },
+            ])
+            return
+          }
+
           setLinhasDaFoto(atuais =>
             atuais.map((l, i) =>
               i === indice
@@ -1626,6 +1653,18 @@ function ConfirmarFoto({
             </Text>
           </View>
         )}
+
+        {/* Antes do rodapé e depois da lista: acrescentar é continuar a
+            lista, e um "adicionar" no fim de tudo se lê como outra ação. */}
+        <Pressable
+          onPress={() => onTrocar(linhas.length)}
+          style={({ pressed }) => [styles.acrescentarItem, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Acrescentar um alimento que a foto não pegou"
+        >
+          <Ionicons name="add" size={17} color={paleta().cores.verde} />
+          <Text style={styles.textoAcrescentarItem}>Acrescentar um alimento</Text>
+        </Pressable>
 
         <Text style={styles.rodapeFolha}>
           Toda estimativa por foto é aproximada. Vai entrar em <Text style={styles.negrito}>{refeicao}</Text>.
@@ -2669,6 +2708,20 @@ const estilos = estilosDe(t =>
   textoAvisoFolha: { flex: 1, fontSize: 12, lineHeight: 17, color: t.cores.verdeEscuro },
   rodapeFolha: { marginTop: 12, fontSize: 11.5, lineHeight: 16, color: t.inkFraco },
   negrito: { fontWeight: '800', color: t.inkMedio },
+
+  acrescentarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginTop: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: t.cores.borda,
+  },
+  textoAcrescentarItem: { fontSize: 13.5, fontWeight: '700', color: t.cores.verdeEscuro },
 
   botoesFolha: { flexDirection: 'row', gap: 10, marginTop: 14 },
   botaoDescartar: {

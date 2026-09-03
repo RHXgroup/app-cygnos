@@ -611,7 +611,19 @@ export type ResultadoFoto =
    pontos; aqui a imagem é lida por um modelo que precisa distinguir arroz de
    quinoa e estimar a altura de um monte de comida no prato. Acima disso o custo
    por foto sobe sem ganho — e a pessoa fotografa várias vezes por dia. */
-const LADO_MAIOR = 1024
+/* 900, e nao 1024.
+ *
+ * O app REINICIA ao voltar da camera em varios lugares, e o motivo e memoria:
+ * o Android mata o processo que ficou atras enquanto a camera do sistema
+ * ocupa o aparelho. A imagem e redimensionada e depois virada em base64
+ * INTEIRA na memoria -- tres representacoes do mesmo dado vivas ao mesmo
+ * tempo, no pior momento possivel.
+ *
+ * 900 tira 23% dos pixels e continua sendo mais do que o modelo usa para ler
+ * um prato: ele nao le rotulo, le forma e cor. Nao e conserto -- no Expo Go a
+ * folga e menor do que sera num build, porque ele carrega o proprio ambiente
+ * junto -- e uma folga que da para dar sem perder leitura. */
+const LADO_MAIOR = 900
 
 async function pedirPermissao(origem: 'galeria' | 'camera'): Promise<boolean> {
   const { granted } =

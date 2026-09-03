@@ -72,7 +72,19 @@ export type FotoEscolhida =
 /* 1024 no lado maior, os mesmos do prato. Aqui ninguém precisa distinguir arroz
    de quinoa, mas a ficha da academia é letra pequena fotografada de longe — e
    é justamente ela que não pode sair ilegível. */
-const LADO_MAIOR = 1024
+/* 900, e nao 1024.
+ *
+ * O app REINICIA ao voltar da camera em varios lugares, e o motivo e memoria:
+ * o Android mata o processo que ficou atras enquanto a camera do sistema
+ * ocupa o aparelho. A imagem e redimensionada e depois virada em base64
+ * INTEIRA na memoria -- tres representacoes do mesmo dado vivas ao mesmo
+ * tempo, no pior momento possivel.
+ *
+ * 900 tira 23% dos pixels e continua sendo mais do que o modelo usa para ler
+ * um prato: ele nao le rotulo, le forma e cor. Nao e conserto -- no Expo Go a
+ * folga e menor do que sera num build, porque ele carrega o proprio ambiente
+ * junto -- e uma folga que da para dar sem perder leitura. */
+const LADO_MAIOR = 900
 
 export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEscolhida> {
   const { granted } =
