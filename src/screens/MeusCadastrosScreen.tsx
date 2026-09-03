@@ -318,6 +318,11 @@ export function MeusCadastrosScreen({
         </View>
       ) : (
         <ScrollView
+          /* `flex: 1` na ROLAGEM: sem isto ela se dimensiona pelo conteudo e o
+               rodape fixo -- irmao dela -- para no MEIO da tela.
+               `contentContainerStyle` nao resolve: ele e do conteudo, nao da
+               rolagem. Terceira e quarta telas com o mesmo defeito. */
+          style={styles.rolagem}
           contentContainerStyle={styles.conteudo}
           showsVerticalScrollIndicator={false}
           bounces={false}
@@ -810,6 +815,7 @@ function CartaoPlano({
 const estilos = estilosDe(t =>
   StyleSheet.create({
   tela: { flex: 1, backgroundColor: t.cores.fundo },
+  rolagem: { flex: 1 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   cabecalho: {

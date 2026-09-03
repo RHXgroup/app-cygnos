@@ -408,6 +408,11 @@ export function BuscarAlimentoScreen({
         </View>
 
         <ScrollView
+          /* `flex: 1` na ROLAGEM: sem isto ela se dimensiona pelo conteudo e o
+               rodape fixo -- irmao dela -- para no MEIO da tela.
+               `contentContainerStyle` nao resolve: ele e do conteudo, nao da
+               rolagem. Terceira e quarta telas com o mesmo defeito. */
+          style={styles.rolagem}
           contentContainerStyle={styles.conteudo}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -879,6 +884,8 @@ const estilos = estilosDe(t =>
   verMais: { fontSize: 11.5, fontWeight: '700', color: t.cores.verde },
 
   tela: { flex: 1, backgroundColor: t.cores.fundo },
+
+  rolagem: { flex: 1 },
   corpo: { flex: 1 },
 
   cabecalho: {
