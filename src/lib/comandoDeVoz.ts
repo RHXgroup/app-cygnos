@@ -19,6 +19,7 @@ import { semAcento } from './texto.ts'
  * também é puro. */
 
 export type Comando =
+  | 'comecar'
   | 'fiz'
   | 'pausar'
   | 'continuar'
@@ -37,6 +38,35 @@ export type Comando =
  * "já fiz" podem aparecer na mesma frase, e quem diz "pula o descanso" não
  * está pedindo para contar outra série. */
 const FRASES: [Comando, string[]][] = [
+  /* COMECAR vem primeiro, e não é ordem arbitrária.
+     "vamos treinar" e "bora comecar" carregam palavras que `continuar` tambem
+     reivindica ('vamos', 'bora'), e quem diz isso com o treino ainda parado
+     quer começar, não retomar. Testado primeiro, ele ganha as frases longas e
+     deixa as curtas para o `continuar`.
+
+     E ele existe porque FALTAVA: a lista tinha sete comandos e nenhum abria o
+     treino. "Cygnos, iniciar treino" — que era o exemplo pedido, palavra por
+     palavra — caía no fim do laço e voltava nulo. A tela ouvia, transcrevia
+     certo, e respondia "não entendi"; de fora, parecia que a voz inteira não
+     funcionava. Um comando ausente é indistinguível de um microfone quebrado
+     para quem está usando. */
+  [
+    'comecar',
+    [
+      'iniciar treino',
+      'inicia o treino',
+      'iniciar o treino',
+      'comecar treino',
+      'comecar o treino',
+      'comeca o treino',
+      'vamos treinar',
+      'bora treinar',
+      'vamos comecar',
+      'bora comecar',
+      'iniciar',
+      'comecar',
+    ],
+  ],
   ['pular_descanso', ['pula', 'pular', 'sem descanso', 'ja to pronto', 'to pronto', 'proxima serie']],
   /* `espera` sozinho SAIU daqui.
      Ele casava com "espera aí", que é pedido de PAUSA e não de mais descanso —
@@ -118,6 +148,7 @@ export function comandoDoTexto(bruto: string): Comando | null {
  * a série foi contada. Ela precisa ver "contei a série" para poder desfazer se
  * não era isso. */
 export const RESPOSTA: Record<Comando, string> = {
+  comecar: 'Começando o treino',
   fiz: 'Contei a série',
   pausar: 'Pausado',
   continuar: 'Voltando',

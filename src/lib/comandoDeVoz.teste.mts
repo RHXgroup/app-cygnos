@@ -139,5 +139,71 @@ function ok(nome: string, cond: boolean, extra = '') {
   ok('so o nome nao faz nada', comandoDoTexto(semChamado('cygnos')) === null)
 }
 
+{
+  // ── COMECAR O TREINO ────────────────────────────────────────────────────
+  // O comando que faltava. "Cygnos, iniciar treino" era o exemplo pedido, e
+  // voltava nulo: sete comandos na lista e nenhum abria o treino. A tela dizia
+  // "nao entendi", e de fora isso e indistinguivel de microfone quebrado.
+  const abrem = [
+    'Cygnos, iniciar treino',
+    'cygnos inicia o treino',
+    'Cygnos, comecar o treino',
+    'signos comeca o treino',
+    'Cygnos, vamos treinar',
+    'cisnes bora treinar',
+    'Cygnos, vamos comecar',
+    'Cygnos, iniciar',
+    'Cygnos, comecar',
+  ]
+  for (const d of abrem) {
+    ok(`"${d}" tem chamado`, temChamado(d))
+    ok(
+      `"${d}" -> comecar`,
+      comandoDoTexto(semChamado(d)) === 'comecar',
+      String(comandoDoTexto(semChamado(d))),
+    )
+  }
+
+  // As curtas continuam sendo `continuar`: a tela decide, pelo `inicio`, se
+  // isso quer dizer retomar ou abrir. So as frases LONGAS foram tomadas.
+  for (const d of ['vamos', 'bora', 'continua', 'volta']) {
+    ok(`"${d}" continua sendo continuar`, comandoDoTexto(d) === 'continuar', String(comandoDoTexto(d)))
+  }
+
+  // E o comando novo nao pode ter roubado nenhum dos sete que ja existiam.
+  const naoMudaram: [string, string][] = [
+    ['terminei', 'fiz'],
+    ['ja fiz', 'fiz'],
+    ['pausa', 'pausar'],
+    ['espera ai', 'pausar'],
+    ['pula o descanso', 'pular_descanso'],
+    ['mais tempo', 'mais_descanso'],
+    ['menos tempo', 'menos_descanso'],
+    ['terminar o treino', 'terminar'],
+    ['chega por hoje', 'terminar'],
+  ]
+  for (const [d, esperado] of naoMudaram) {
+    ok(`"${d}" continua ${esperado}`, comandoDoTexto(d) === esperado, String(comandoDoTexto(d)))
+  }
+
+  // A negacao cancela tambem o comando novo.
+  ok('"nao vamos comecar ainda" nao abre', comandoDoTexto('nao vamos comecar ainda') === null)
+
+  // Toda resposta existe, inclusive a do comando novo: `RESPOSTA[c]` e lido
+  // direto na tela, e um buraco ali imprime "undefined" e fala "undefined".
+  for (const c of [
+    'comecar',
+    'fiz',
+    'pausar',
+    'continuar',
+    'mais_descanso',
+    'menos_descanso',
+    'pular_descanso',
+    'terminar',
+  ] as const) {
+    ok(`RESPOSTA tem ${c}`, typeof RESPOSTA[c] === 'string' && RESPOSTA[c].length > 0)
+  }
+}
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) process.exit(1)

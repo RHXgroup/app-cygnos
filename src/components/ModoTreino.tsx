@@ -835,9 +835,19 @@ export function ModoTreino({
   }
 
   function obedecer(c: Comando) {
-    if (c === 'fiz') fizASerie()
+    if (c === 'comecar') comecar()
+    else if (c === 'fiz') fizASerie()
     else if (c === 'pausar') setFase('parado')
-    else if (c === 'continuar') prepararSerie()
+    /* "continuar" com o treino nunca aberto só pode querer dizer começar.
+       Não é a mesma frase fazendo coisas diferentes conforme o segundo — é a
+       mesma frase fazendo a ÚNICA coisa possível em cada um dos dois estados,
+       porque não há o que retomar antes de haver começo. Sem isto, "Cygnos,
+       vamos" antes de começar chamava `prepararSerie` com `inicio` nulo: a
+       contagem regressiva rodava e o treino ficava sem hora de início. */
+    else if (c === 'continuar') {
+      if (inicio === null) comecar()
+      else prepararSerie()
+    }
     else if (c === 'mais_descanso') ajustarDescanso(15)
     else if (c === 'menos_descanso') ajustarDescanso(-15)
     else if (c === 'pular_descanso') setFimDoDescanso(Date.now())
