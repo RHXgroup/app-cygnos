@@ -41,7 +41,7 @@ import {
 } from '../lib/comandoDeVoz'
 import { OPCOES_DITADO, prepararMicrofone, transcrever } from '../lib/voz'
 import { BotaoDeVoz } from './BotaoDeVoz'
-import { ESTADO_INICIAL, ouvir } from '../lib/escutaContinua'
+import { ESTADO_INICIAL, limiarDe, ouvir } from '../lib/escutaContinua'
 
 /* O modo treino: o telefone conduz a sessão, em vez de esperar ser alimentado.
  *
@@ -518,6 +518,26 @@ export function ModoTreino({
      ler mais devagar perderia o começo das frases curtas — que é justamente o
      formato dos comandos. */
   const estadoDoGravador = useAudioRecorderState(gravadorDeComando, 100)
+
+  /* ── O MEDIDOR PRECISA DE UMA REFERÊNCIA VIVA ──────────────────────────
+   *
+   * Este foi o defeito que fez o modo voz não reagir a nada no aparelho: o
+   * `setInterval` é criado UMA vez, com dependência `[vozLigada]`, e a função
+   * que ele roda fecha sobre o valor de `estadoDoGravador` daquele instante —
+   * que é o estado do gravador antes de ele começar a gravar.
+   *
+   * O intervalo lia `metering` indefinido para sempre, `ouvir` respondia
+   * "nada" para sempre, e nenhum trecho era mandado. Nada quebrava, nada
+   * aparecia no console, e a tela dizia "Ouvindo" — que é o pior formato de
+   * defeito, porque parece funcionar.
+   *
+   * A referência é atualizada a cada renderização e lida de dentro do
+   * intervalo. Vale para tudo que o intervalo consulta e muda por fora. */
+  const meterVivo = useRef<number | undefined>(undefined)
+  meterVivo.current = estadoDoGravador.metering
+
+  const vozLigadaVivo = useRef(false)
+  const entendendoVivo = useRef(false)
   /* ── COMO CONDUZIR O TREINO ────────────────────────────────────────────
    *
    * Três jeitos, e os três vieram de quem usa:
@@ -542,6 +562,9 @@ export function ModoTreino({
   const [modo, setModo] = useState<ModoDeConduzir>('manual')
   const vozLigada = modo === 'voz'
   const podeFalar = modo !== 'mudo'
+  /* Mantidas em dia a cada renderização: o intervalo da escuta lê estas, e não
+     as variáveis, porque lá dentro elas estão congeladas. */
+  vozLigadaVivo.current = modo === 'voz'
   /* O modo MUDO cala o app inteiro.
    *
    * `falar` é função de módulo — não dá para desligar na definição sem passar
@@ -593,6 +616,7 @@ export function ModoTreino({
     let vivo = true
     let escuta = ESTADO_INICIAL
     let inicioDoTrecho = 0
+    let ultimoRelato = 0
 
     void (async () => {
       const permissao = await prepararMicrofone()
@@ -619,19 +643,42 @@ export function ModoTreino({
     const id = setInterval(() => {
       if (!vivo || !ouvindoAgora.current) return
       const agora = Date.now()
-      const r = ouvir(escuta, estadoDoGravador.metering, agora)
+      const r = ouvir(escuta, meterVivo.current, agora)
       escuta = r.estado
+
+      /* ── OS NÚMEROS NO TERMINAL ────────────────────────────────────────
+         A escuta falha em silêncio por natureza: se o medidor não chega, nada
+         acontece e a tela continua dizendo "Ouvindo". Foi assim que a primeira
+         versão passou por boa — o valor congelado no fecho do intervalo nunca
+         mudava, e não havia como perceber olhando.
+
+         Uma vez por segundo, e não a cada leitura: dez linhas por segundo
+         afogam o terminal e escondem o resto. */
+      if (agora - ultimoRelato > 1000) {
+        ultimoRelato = agora
+        console.log(
+          '[cygnos] escuta:',
+          meterVivo.current === undefined ? 'SEM MEDIDOR' : meterVivo.current.toFixed(1) + ' dB',
+          '· limiar', limiarDe(escuta.ambiente).toFixed(1),
+          '· falando', escuta.falando,
+        )
+      }
 
       if (r.decisao === 'comecou') {
         inicioDoTrecho = agora
+        console.log('[cygnos] escuta: fala COMEÇOU')
         return
       }
       if (r.decisao !== 'terminou' && r.decisao !== 'cortar_no_teto') return
 
       const duracao = (agora - inicioDoTrecho) / 1000
+      console.log('[cygnos] escuta: fala ACABOU com', duracao.toFixed(1), 's')
       /* Longo demais não é comando. Cortar aqui, ANTES de mandar, é o que
          segura o custo numa academia com gente conversando perto. */
-      if (duracao < COMANDO_CURTO_DEMAIS_S || duracao > COMANDO_LONGO_DEMAIS_S) return
+      if (duracao < COMANDO_CURTO_DEMAIS_S || duracao > COMANDO_LONGO_DEMAIS_S) {
+        console.log('[cygnos] escuta: descartado por duração')
+        return
+      }
 
       void recortarEEntender(duracao)
     }, 100)
@@ -654,7 +701,10 @@ export function ModoTreino({
    * entre parar e voltar é de milissegundos, e por isso o que se perde ali é
    * menor do que a pausa que a pessoa faz depois de falar. */
   async function recortarEEntender(duracao: number) {
-    if (entendendo) return
+    /* Pela REFERÊNCIA, e não pelo estado: quem chama é o intervalo, e lá o
+       estado está congelado no valor de quando ele foi criado. */
+    if (entendendoVivo.current) return
+    entendendoVivo.current = true
     setEntendendo(true)
     try {
       await gravadorDeComando.stop()
@@ -670,8 +720,9 @@ export function ModoTreino({
          tela de quem está no meio de uma série. A escuta recomeça abaixo. */
     }
 
-    /* Volta a ouvir, se a voz continua ligada. */
-    if (vozLigada) {
+    /* Volta a ouvir, se a voz continua ligada. Pela referência, pelo mesmo
+       motivo. */
+    if (vozLigadaVivo.current) {
       try {
         await gravadorDeComando.prepareToRecordAsync()
         gravadorDeComando.record()
@@ -681,6 +732,7 @@ export function ModoTreino({
         setModo('manual')
       }
     }
+    entendendoVivo.current = false
     setEntendendo(false)
   }
 
@@ -696,7 +748,11 @@ export function ModoTreino({
    * e responder a isso seria pior do que ignorar. É o filtro que separa "a
    * pessoa falou comigo" de "alguém falou perto de mim". */
   function responder(texto: string) {
-    if (!temChamado(texto)) return
+    console.log('[cygnos] ouvi:', JSON.stringify(texto))
+    if (!temChamado(texto)) {
+      console.log('[cygnos] sem a palavra Cygnos — ignorado')
+      return
+    }
 
     const c = comandoDoTexto(semChamado(texto))
     if (!c) {
