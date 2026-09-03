@@ -14,6 +14,7 @@ import {
 } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
 import { Confirmacao } from './Confirmacao'
+import { BotaoDeVoz } from './BotaoDeVoz'
 
 /* O botão de falar em vez de digitar.
  *
@@ -296,17 +297,7 @@ export function Ditado({
 
   return (
     <>
-      <Pressable
-        onPress={comecar}
-        style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
-        accessibilityRole="button"
-        accessibilityLabel="Falar o que você comeu"
-      >
-        <View style={styles.bolhaDoMicrofone}>
-          <Ionicons name="mic" size={19} color={paleta().cores.branco} />
-        </View>
-        <Text style={styles.texto}>Falar em vez de digitar</Text>
-      </Pressable>
+      <BotaoDeVoz estado="parado" rotulo="Falar em vez de digitar" onPress={comecar} />
 
       {gravacaoMuda && (
         <Pressable
@@ -366,15 +357,7 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.cartao,
   },
   /* O ícone dentro de um círculo cheio, e não solto sobre o fundo. É o que
-     separa "um ícone ao lado de um texto" de um botão com identidade. */
-  bolhaDoMicrofone: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.cores.verde,
-  },
+     separa "um ícone ao lado de um texto" de um botão com identidade. */
   pararLinha: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -382,8 +365,7 @@ const estilos = estilosDe(t =>
     gap: 7,
     marginTop: 10,
   },
-  pressionado: { opacity: 0.7 },
-  texto: { fontSize: 15, fontWeight: '700', color: t.cores.verde },
+  pressionado: { opacity: 0.7 },
 
   botaoOuvir: {
     flexDirection: 'row',

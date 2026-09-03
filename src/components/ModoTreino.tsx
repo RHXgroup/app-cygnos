@@ -28,6 +28,7 @@ import { FimDoTreino } from './FimDoTreino'
 import { dataISO } from '../lib/formatar'
 import { RESPOSTA, comandoDoTexto, naoEntendi, type Comando } from '../lib/comandoDeVoz'
 import { OPCOES_DITADO, prepararMicrofone, transcrever } from '../lib/voz'
+import { BotaoDeVoz } from './BotaoDeVoz'
 
 /* O modo treino: o telefone conduz a sessão, em vez de esperar ser alimentado.
  *
@@ -500,6 +501,8 @@ export function ModoTreino({
    * acontece sem dizer o que entendeu deixa a pessoa sem saber se a série foi
    * contada — e a série contada errado entra no histórico do treino. */
   const gravadorDeComando = useAudioRecorder(OPCOES_DITADO)
+  /* Desligada por padrão. Ver o comentário do interruptor no cabeçalho. */
+  const [vozLigada, setVozLigada] = useState(false)
   const [ouvindo, setOuvindo] = useState(false)
   const [entendendo, setEntendendo] = useState(false)
   const [respostaDaVoz, setRespostaDaVoz] = useState('')
@@ -707,7 +710,37 @@ export function ModoTreino({
             <Ionicons name="chevron-down" size={24} color={paleta().cores.ink} />
           </Pressable>
           <Text style={styles.relogioTopo}>{mmss(segundosDeTreino)}</Text>
-          <View style={styles.botaoVoltar} />
+
+          {/* ── LIGAR e DESLIGAR a voz, no topo ──────────────────────────
+              Antes o microfone só existia embaixo, no meio dos controles, e
+              quem não quisesse usar voz continuava vendo um botão que não vai
+              tocar nunca. E quem quisesse não tinha como saber que existia
+              antes de rolar até lá.
+              No cabeçalho ele vira ESCOLHA de como fazer o treino — que é o
+              que ele é — e some da área de ação quando está desligado.
+              Desligado por padrão: reconhecimento de fala erra, e um treino
+              conduzido por engano é pior do que um toque a mais. */}
+          <Pressable
+            onPress={() => {
+              setVozLigada(v => !v)
+              setRespostaDaVoz('')
+            }}
+            style={({ pressed }) => [
+              styles.chaveVoz,
+              vozLigada && styles.chaveVozLigada,
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: vozLigada }}
+            accessibilityLabel="Conduzir o treino por voz"
+          >
+            <Ionicons
+              name={vozLigada ? 'mic' : 'mic-off-outline'}
+              size={17}
+              color={vozLigada ? paleta().cores.branco : paleta().inkMedio}
+            />
+            <Text style={[styles.textoChaveVoz, vozLigada && styles.textoChaveVozLigada]}>Voz</Text>
+          </Pressable>
         </View>
 
         {exercicios.length === 0 ? (
@@ -978,36 +1011,20 @@ export function ModoTreino({
                       A resposta do que foi ouvido aparece aqui mesmo, colada
                       no botão — não adianta confirmar num canto que ninguém
                       olha no meio de uma série. */}
-                  <Pressable
-                    onPress={ouvirComando}
-                    disabled={entendendo}
-                    style={({ pressed }) => [
-                      styles.botaoVoz,
-                      ouvindo && styles.botaoVozOuvindo,
-                      pressed && styles.pressionado,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={ouvindo ? 'Parar de ouvir' : 'Falar um comando'}
-                  >
-                    {entendendo ? (
-                      <ActivityIndicator size="small" color={paleta().cores.verde} />
-                    ) : (
-                      <Ionicons
-                        name={ouvindo ? 'stop' : 'mic-outline'}
-                        size={17}
-                        color={ouvindo ? paleta().cores.branco : paleta().cores.verde}
-                      />
-                    )}
-                    <Text style={[styles.textoBotaoVoz, ouvindo && styles.textoBotaoVozOuvindo]}>
-                      {entendendo
-                        ? 'Entendendo…'
-                        : ouvindo
-                          ? 'Fale e toque para parar'
-                          : 'Falar em vez de tocar'}
-                    </Text>
-                  </Pressable>
+                  {vozLigada && (
+                  <View style={styles.espacoVoz}>
+                    <BotaoDeVoz
+                      estado={entendendo ? 'pensando' : ouvindo ? 'ouvindo' : 'parado'}
+                      rotulo="Falar em vez de tocar"
+                      rotuloOuvindo="Fale e toque para parar"
+                      onPress={ouvirComando}
+                    />
+                  </View>
+                  )}
 
-                  {!!respostaDaVoz && <Text style={styles.respostaVoz}>{respostaDaVoz}</Text>}
+                  {vozLigada && !!respostaDaVoz && (
+                    <Text style={styles.respostaVoz}>{respostaDaVoz}</Text>
+                  )}
 
                   <View style={styles.linhaNavegar}>
                     <Pressable
@@ -1252,21 +1269,21 @@ const estilos = estilosDe(t =>
     botaoPular: { paddingVertical: 12 },
     textoPular: { fontSize: 14, fontWeight: '700', color: t.inkMedio },
 
-    botaoVoz: {
+    espacoVoz: { marginTop: 10 },
+  chaveVoz: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 46,
-    borderRadius: 14,
-    marginTop: 10,
-    backgroundColor: t.cores.verdeMenta,
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: t.cores.verde,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
   },
-  botaoVozOuvindo: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
-  textoBotaoVoz: { fontSize: 13.5, fontWeight: '700', color: t.cores.verdeEscuro },
-  textoBotaoVozOuvindo: { color: t.cores.branco },
+  chaveVozLigada: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  textoChaveVoz: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
+  textoChaveVozLigada: { color: t.cores.branco },
   respostaVoz: { marginTop: 8, fontSize: 13, color: t.inkMedio, textAlign: 'center' },
 
   linhaNavegar: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },

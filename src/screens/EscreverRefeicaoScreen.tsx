@@ -202,9 +202,18 @@ export function EscreverRefeicaoScreen({
   const encontrados = linhas.filter(l => l.alimento).length
   const perdidos = linhas.filter(l => l.alimento === null).length
 
-  /* A busca à mão, por cima desta tela. O resultado volta para a MESMA linha —
-     ela deixa de ser "não encontrado" e passa a contar na soma, sem a pessoa
-     ter de reescrever a refeição inteira. */
+  /* A busca à mão, por cima desta tela.
+   *
+   * Dois usos, e o segundo é novo: TROCAR a linha que não foi encontrada, e
+   * ACRESCENTAR uma que a pessoa esqueceu de falar. O índice diz qual — se ele
+   * aponta para além do fim da lista, é acréscimo.
+   *
+   * O mesmo caminho para os dois de propósito. Um segundo fluxo de "adicionar
+   * alimento" divergiria do primeiro no dia em que um deles mudasse, e os dois
+   * terminam no mesmo lugar: uma linha com peso, nome e nutrientes.
+   *
+   * Sem isto, quem lembrava de uma coisa depois de ditar tinha de descartar
+   * tudo e falar de novo — foi a queixa de quem testou. */
   if (procurandoNaMao !== null) {
     const linha = linhas[procurandoNaMao]
     return (
@@ -215,6 +224,45 @@ export function EscreverRefeicaoScreen({
         onAdicionar={(escolhido: AlimentoEscolhido) => {
           const i = procurandoNaMao
           setProcurandoNaMao(null)
+
+          const doEscolhido = {
+            alimento: {
+              id: escolhido.alimentoId ?? 0,
+              nome: escolhido.nome,
+              marca: escolhido.marca,
+              calorias: escolhido.caloriasPor100g,
+              proteinas: escolhido.proteinasPor100g,
+              carboidratos: escolhido.carboidratosPor100g,
+              gorduras: escolhido.gordurasPor100g,
+              fibras: escolhido.fibrasPor100g,
+            } as Alimento,
+            gramasEscolhidos: escolhido.gramasTotais,
+          }
+
+          /* Além do fim = acréscimo. A linha nasce com o nome escolhido no
+             lugar do "que a pessoa falou", porque aqui ela não falou nada. */
+          if (i >= linhas.length) {
+            setLinhas(atuais => [
+              ...atuais,
+              {
+                ...doEscolhido,
+                lido: {
+                  nome: escolhido.nome,
+                  /* 1 unidade, e não zero: a linha acrescentada já vem com o
+                     peso escolhido na busca, e a quantidade aqui é só o rótulo
+                     que a tela mostra. Zero apareceria como "0 unidade". */
+                  quantidade: 1,
+                  medida: 'unidade',
+                  original: escolhido.descricao || escolhido.nome,
+                  /* Em peso: quem passou pela busca já respondeu quantos gramas
+                     são, e a tela não deve perguntar de novo. */
+                  emPeso: true,
+                },
+              },
+            ])
+            return
+          }
+
           setLinhas(atuais =>
             atuais.map((l, j) =>
               j === i
@@ -474,6 +522,20 @@ export function EscreverRefeicaoScreen({
               )
             })}
 
+            {/* ACRESCENTAR o que não foi dito.
+                A tela deixava tirar e trocar, e não deixava pôr. Quem lembrava
+                de uma coisa depois de ditar tinha de descartar tudo e falar de
+                novo — e quem descarta, quase sempre, não volta. */}
+            <Pressable
+              onPress={() => setProcurandoNaMao(linhas.length)}
+              style={({ pressed }) => [styles.acrescentar, pressed && styles.pressionado]}
+              accessibilityRole="button"
+              accessibilityLabel="Acrescentar um alimento que você não falou"
+            >
+              <Ionicons name="add" size={17} color={paleta().cores.verde} />
+              <Text style={styles.textoAcrescentar}>Acrescentar um alimento</Text>
+            </Pressable>
+
             <Pressable
               onPress={adicionar}
               disabled={encontrados === 0}
@@ -572,6 +634,19 @@ const estilos = estilosDe(t =>
        pagina e destroi a razao entre os dois — medido em 1,43 num caso, com 4,5
        de minimo. `desligado` foi escolhido pela conta: branco sobre ele da 4,76. */
   botaoDesligado: { backgroundColor: t.cores.desligado },
+  acrescentar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginBottom: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: t.cores.borda,
+  },
+  textoAcrescentar: { fontSize: 13.5, fontWeight: '700', color: t.cores.verdeEscuro },
   pressionado: { opacity: 0.75 },
   textoBotaoConferir: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
 
