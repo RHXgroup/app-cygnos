@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'
+import { createAudioPlayer, setAudioModeAsync, useAudioRecorder } from 'expo-audio'
 import * as Speech from 'expo-speech'
 import { PREPARO_MS, acaoDoMomento, restam, type Fase } from '../lib/faseDoTreino'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
@@ -26,6 +26,8 @@ import {
 } from '../lib/treino'
 import { FimDoTreino } from './FimDoTreino'
 import { dataISO } from '../lib/formatar'
+import { RESPOSTA, comandoDoTexto, naoEntendi, type Comando } from '../lib/comandoDeVoz'
+import { OPCOES_DITADO, prepararMicrofone, transcrever } from '../lib/voz'
 
 /* O modo treino: o telefone conduz a sessão, em vez de esperar ser alimentado.
  *
@@ -485,6 +487,94 @@ export function ModoTreino({
   const minutos = inicio === null ? 0 : Math.max(0, Math.round((agora - inicio) / 60000))
   const segundosDeTreino = inicio === null ? 0 : Math.floor((agora - inicio) / 1000)
 
+  /* ── FALAR em vez de tocar, durante o treino ───────────────────────────
+   *
+   * Toque-e-fala, e não escuta contínua: mãos-livres de verdade exige
+   * reconhecimento nativo, que não roda no Expo Go, e deixa o microfone aberto
+   * o treino inteiro — bateria e uma promessa de privacidade difícil de manter.
+   *
+   * Aqui a pessoa toca uma vez, fala duas palavras, e solta. Resolve o problema
+   * real: mexer no telefone com a mão suada, no meio da série.
+   *
+   * O que ela ouviu FICA NA TELA. Reconhecimento de fala erra, e uma ação que
+   * acontece sem dizer o que entendeu deixa a pessoa sem saber se a série foi
+   * contada — e a série contada errado entra no histórico do treino. */
+  const gravadorDeComando = useAudioRecorder(OPCOES_DITADO)
+  const [ouvindo, setOuvindo] = useState(false)
+  const [entendendo, setEntendendo] = useState(false)
+  const [respostaDaVoz, setRespostaDaVoz] = useState('')
+  const ouvindoAgora = useRef(false)
+
+  /* Solta o microfone ao sair, mesmo no meio. Recurso nativo aberto mantém o
+     ponto vermelho do sistema aceso depois que a pessoa já fechou o treino. */
+  useEffect(
+    () => () => {
+      if (ouvindoAgora.current) gravadorDeComando.stop().catch(() => {})
+    },
+    [],
+  )
+
+  async function ouvirComando() {
+    if (entendendo) return
+
+    if (ouvindo) {
+      /* Segundo toque: para, transcreve, obedece. */
+      ouvindoAgora.current = false
+      setOuvindo(false)
+      setEntendendo(true)
+      try {
+        await gravadorDeComando.stop()
+        const uri = gravadorDeComando.uri
+        const r = uri ? await transcrever(uri, 3) : { tipo: 'erro' as const, mensagem: '' }
+        if (r.tipo === 'ok') {
+          const c = comandoDoTexto(r.texto)
+          if (c) {
+            setRespostaDaVoz(RESPOSTA[c])
+            obedecer(c)
+          } else {
+            setRespostaDaVoz(naoEntendi(r.texto))
+          }
+        } else {
+          setRespostaDaVoz('Não consegui ouvir. Toque no botão mesmo.')
+        }
+      } catch {
+        setRespostaDaVoz('Não consegui ouvir. Toque no botão mesmo.')
+      }
+      setEntendendo(false)
+      return
+    }
+
+    const permissao = await prepararMicrofone()
+    if (permissao.tipo !== 'ok') {
+      setRespostaDaVoz(permissao.mensagem)
+      return
+    }
+    try {
+      await gravadorDeComando.prepareToRecordAsync()
+      gravadorDeComando.record()
+      ouvindoAgora.current = true
+      setOuvindo(true)
+      setRespostaDaVoz('')
+    } catch {
+      setRespostaDaVoz('Não consegui abrir o microfone.')
+    }
+  }
+
+  /* O comando faz o MESMO que o botão faria — chama a mesma função.
+   *
+   * Um segundo caminho para "contar a série" divergiria do primeiro no dia em
+   * que um deles mudasse, e o que diverge aqui entra no histórico do treino
+   * sem ninguém conferir. */
+  function obedecer(c: Comando) {
+    if (c === 'fiz') fizASerie()
+    else if (c === 'pausar') setFase('parado')
+    else if (c === 'continuar') prepararSerie()
+    else if (c === 'mais_descanso') ajustarDescanso(15)
+    else if (c === 'menos_descanso') ajustarDescanso(-15)
+    else if (c === 'pular_descanso') setFimDoDescanso(Date.now())
+    else if (c === 'terminar') terminar()
+  }
+
   function comecar() {
     setInicio(Date.now())
     setFase('treinando')
@@ -882,6 +972,43 @@ export function ModoTreino({
                     </Pressable>
                   )}
 
+                  {/* O microfone fica ABAIXO do botão grande, e não no lugar
+                      dele: falar é atalho para quem está com a mão ocupada, e
+                      o toque continua sendo o caminho principal.
+                      A resposta do que foi ouvido aparece aqui mesmo, colada
+                      no botão — não adianta confirmar num canto que ninguém
+                      olha no meio de uma série. */}
+                  <Pressable
+                    onPress={ouvirComando}
+                    disabled={entendendo}
+                    style={({ pressed }) => [
+                      styles.botaoVoz,
+                      ouvindo && styles.botaoVozOuvindo,
+                      pressed && styles.pressionado,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={ouvindo ? 'Parar de ouvir' : 'Falar um comando'}
+                  >
+                    {entendendo ? (
+                      <ActivityIndicator size="small" color={paleta().cores.verde} />
+                    ) : (
+                      <Ionicons
+                        name={ouvindo ? 'stop' : 'mic-outline'}
+                        size={17}
+                        color={ouvindo ? paleta().cores.branco : paleta().cores.verde}
+                      />
+                    )}
+                    <Text style={[styles.textoBotaoVoz, ouvindo && styles.textoBotaoVozOuvindo]}>
+                      {entendendo
+                        ? 'Entendendo…'
+                        : ouvindo
+                          ? 'Fale e toque para parar'
+                          : 'Falar em vez de tocar'}
+                    </Text>
+                  </Pressable>
+
+                  {!!respostaDaVoz && <Text style={styles.respostaVoz}>{respostaDaVoz}</Text>}
+
                   <View style={styles.linhaNavegar}>
                     <Pressable
                       onPress={() => setIndice(i => Math.max(0, i - 1))}
@@ -1125,7 +1252,24 @@ const estilos = estilosDe(t =>
     botaoPular: { paddingVertical: 12 },
     textoPular: { fontSize: 14, fontWeight: '700', color: t.inkMedio },
 
-    linhaNavegar: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
+    botaoVoz: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: 14,
+    marginTop: 10,
+    backgroundColor: t.cores.verdeMenta,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
+  },
+  botaoVozOuvindo: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  textoBotaoVoz: { fontSize: 13.5, fontWeight: '700', color: t.cores.verdeEscuro },
+  textoBotaoVozOuvindo: { color: t.cores.branco },
+  respostaVoz: { marginTop: 8, fontSize: 13, color: t.inkMedio, textAlign: 'center' },
+
+  linhaNavegar: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
     botaoNavegar: {
       width: 48,
       height: 44,
