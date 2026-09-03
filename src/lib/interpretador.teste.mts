@@ -130,5 +130,37 @@ function ok(nome: string, condicao: boolean, detalhe = '') {
   }
 }
 
+// ── 8. INTENÇÃO, e não só passado ────────────────────────────────────────────
+//
+// Metade do uso é ANTES de comer: quem planeja o jantar escreve "vou comer".
+// A lista de fala só tinha passado, e o efeito era enganoso porque só METADE
+// da frase falhava — "e tomar uma xícara de café" achava o café, enquanto
+// "vou comer duas fatias de pão com manteiga" ia inteira para a busca.
+{
+  console.log('\n8. intenção')
+  const casos: [string, string[]][] = [
+    [
+      'Vou comer duas fatias de pão com manteiga na chapa e tomar uma xícara de café',
+      ['pão com manteiga na chapa', 'café'],
+    ],
+    ['vou tomar um copo de leite', ['leite']],
+    ['quero comer 100g de arroz', ['arroz']],
+    ['queria uma banana', ['banana']],
+    ['pretendo comer frango grelhado', ['frango grelhado']],
+    // O passado continua funcionando: a lista cresceu, não trocou.
+    ['comi arroz e feijão', ['arroz', 'feijão']],
+    // "vou" no MEIO do nome não pode ser tirado — só do começo.
+    ['ovo mexido', ['ovo mexido']],
+  ]
+  for (const [texto, esperados] of casos) {
+    const nomes = lerRefeicao(texto).map(i => i.nome)
+    ok(
+      `"${texto.slice(0, 40)}…" → ${esperados.length} item(ns)`,
+      nomes.length === esperados.length && esperados.every((e, i) => nomes[i] === e),
+      JSON.stringify(nomes),
+    )
+  }
+}
+
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')
 process.exit(falhou > 0 ? 1 : 0)

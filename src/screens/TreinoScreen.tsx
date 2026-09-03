@@ -226,6 +226,16 @@ export function TreinoScreen({
         setIaAberta(false)
         return true
       }
+      /* A ABA é um degrau, e faltava.
+         Quem entrava em "Minha rotina" e apertava voltar era jogado para fora
+         da tela inteira, de volta ao Corpo — quando o esperado é voltar ao
+         treino de hoje, que é de onde se veio. É o mesmo defeito que a tela de
+         cadastros teve, e a armadilha 1 diz exatamente isto: descascar UMA
+         camada por vez. */
+      if (aba === 'rotina') {
+        setAba('hoje')
+        return true
+      }
       fechar()
       return true
     })
@@ -331,11 +341,11 @@ export function TreinoScreen({
                   accessibilityRole="button"
                   accessibilityLabel={`Ver o treino de ${DIAS_LONGOS[proximoDia]}`}
                 >
-                  <Ionicons name="calendar-outline" size={15} color={paleta().cores.branco} />
+                  <Ionicons name="calendar-outline" size={15} color={paleta().cores.verdeEscuro} />
                   <Text style={styles.textoAtalhoProximo}>
                     Ver o treino de {DIAS_LONGOS[proximoDia].toLowerCase()}
                   </Text>
-                  <Ionicons name="chevron-forward" size={14} color={paleta().cores.branco} />
+                  <Ionicons name="chevron-forward" size={14} color={paleta().cores.verdeEscuro} />
                 </Pressable>
               )}
               <Text style={styles.subHoje}>
@@ -1467,18 +1477,25 @@ function comoData(iso: string): Date {
 const estilos = estilosDe(t =>
   StyleSheet.create({
   tela: { flex: 1, backgroundColor: t.cores.fundo },
+  /* BRANCO SOBRE BRANCO, e eu não vi.
+     Escrevi este atalho com texto branco sobre um véu branco, supondo que o
+     bloco de cima fosse verde. Ele é `cores.cartao` — claro. Ficou ilegível, e
+     foi o que apareceu no aparelho: "está branco, não dá para ver nada".
+     Não custava conferir o fundo antes de escolher a cor do texto. */
   atalhoProximo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
     marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: t.cores.verdeMenta,
+    borderWidth: 1,
+    borderColor: t.cores.verde,
   },
-  textoAtalhoProximo: { fontSize: 13, fontWeight: '700', color: t.cores.branco },
+  textoAtalhoProximo: { fontSize: 13, fontWeight: '700', color: t.cores.verdeEscuro },
 
   cabecalho: {
     flexDirection: 'row',

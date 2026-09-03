@@ -151,6 +151,23 @@ const FALA = new RegExp(
       /* quando */
       '(n[oa]|de|pel[oa]|no|na) ?(caf[eé] da manh[aã]|manh[aã]|almo[cç]o|janta|jantar|lanche|ceia|tarde|noite|madrugada)',
       'caf[eé] da manh[aã]', 'almo[cç]o', 'janta', 'jantar', 'lanche( da tarde)?', 'ceia',
+      /* ── INTENÇÃO, e não só passado ────────────────────────────────────
+         A lista tinha "comi", "tomei", "jantei" — tudo passado. Mas metade do
+         uso é ANTES de comer: quem abre a tela para planejar o jantar escreve
+         "vou comer duas fatias de pão".
+
+         O efeito era estranho de diagnosticar porque só metade falhava: "e
+         tomar uma xícara de café" perdia o "tomar" e achava o café, enquanto
+         "vou comer duas fatias de pão com manteiga" ia INTEIRA para a busca,
+         como se fosse o nome de um alimento. A pessoa via um item certo ao
+         lado de uma frase inteira marcada como "não achei", e concluiu, com
+         razão, que o app não estava interpretando nada.
+
+         `vou`, `quero` e companhia entram sozinhos: o laço de `tirarFala`
+         descasca camada por camada, então "vou" sai numa volta e "comer" na
+         seguinte. */
+      'vou', 'vamos', 'quero', 'queria', 'pretendo', 'planejo', 'devo', 'irei',
+      'estou pensando em', 'penso em', 'to( indo)? (comer|tomar)', 'vou querer',
       /* verbo de comer e beber, em todas as formas que aparecem falando */
       'com[ií]', 'comer', 'comemos', 'comia', 'tom[ei]i?', 'tomar', 'tomei', 'beb[ií]',
       'beber', 'ingeri', 'consumi', 'almocei', 'jantei', 'lanchei', 'merendei',
