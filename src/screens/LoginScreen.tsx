@@ -1,9 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,8 +9,10 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
+import { useDesvioDoTeclado } from '../lib/teclado'
 import { Botao } from '../components/Botao'
 
 function saudacaoDoDia() {
@@ -54,6 +54,62 @@ export function LoginScreen({
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(false)
+
+  /* ── O TECLADO COBRIA A SENHA E O BOTÃO ENTRAR ──────────────────────────
+   *
+   * Aqui havia um `KeyboardAvoidingView` com `behavior="height"` no Android —
+   * exatamente o que a armadilha 2 manda não usar. Medido no emulador Android
+   * 15, tela de 640: com o teclado aberto, o campo de senha e o botão "Entrar"
+   * ficam INTEIRAMENTE atrás do teclado, e nem rolando dá para alcançar — o
+   * conteúdo cabe na janela (que não encolhe), então não há o que rolar, e
+   * `overScrollMode="never"` tira até o arrasto.
+   *
+   * Numa tela alta ninguém percebe. Numa curta, é a PRIMEIRA tela do app com a
+   * senha inalcançável — e quem esbarra nisso não tem como contornar.
+   *
+   * O desvio medido, como em `MensagensScreen` e `BuscarAlimentoScreen`: o
+   * teclado mais a área segura, que SOMAM. A altura vem do `onLayout` e não de
+   * `useWindowDimensions`, para o hook saber distinguir a janela que encolhe
+   * (num build de verdade) da que não encolhe (Expo Go) e não somar duas vezes. */
+  const { bottom } = useSafeAreaInsets()
+  const [alturaDaTela, setAlturaDaTela] = useState(0)
+  const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
+
+  /* O respiro sozinho não bastou, e a foto mostrou: ele deixa a rolagem
+     POSSÍVEL, e nada rola. O conteúdo continua onde estava, com a senha atrás
+     do teclado, e a pessoa teria de descobrir sozinha que precisa arrastar.
+
+     ── E rolar até o FIM foi a tentativa seguinte, também fotografada ──────
+     Passou do ponto: o fim do conteúdo é o rodapé, então os dois campos saíam
+     pela borda de cima. Ficava tudo alcançável e nada visível — pior de ler do
+     que o problema original, porque parece que a tela pulou sozinha.
+
+     Rola até o CAMPO TOCADO. Cada um guarda onde está no `onLayout`, e o alvo
+     é a distância que falta para a base dele caber logo acima do teclado. Zero
+     ou menos quer dizer que já cabe, e aí não mexe: rolar quando não precisa é
+     o mesmo susto, em menor escala. */
+  const rolagem = useRef<ScrollView>(null)
+  const ondeEstaOCampo = useRef<Record<string, number>>({})
+  const [emFoco, setEmFoco] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (respiro <= 0 || !emFoco || !alturaDaTela) return
+    const dentroDoFormulario = ondeEstaOCampo.current[emFoco]
+    if (dentroDoFormulario === undefined) return
+    const base = ondeComecaOFormulario.current + dentroDoFormulario
+    /* 16 de folga para a borda do campo não encostar no teclado. */
+    const alvo = base + 16 - (alturaDaTela - respiro)
+    if (alvo <= 0) return
+    const id = setTimeout(() => rolagem.current?.scrollTo({ y: alvo, animated: true }), 60)
+    return () => clearTimeout(id)
+  }, [respiro, emFoco, alturaDaTela])
+
+  /* A base do campo dentro do conteúdo rolável: o `onLayout` do bloco devolve
+     `y` relativo ao pai, e os dois blocos são irmãos diretos do formulário. */
+  const ondeComecaOFormulario = useRef(0)
+  const medir = (nome: string) => (e: { nativeEvent: { layout: { y: number; height: number } } }) => {
+    ondeEstaOCampo.current[nome] = e.nativeEvent.layout.y + e.nativeEvent.layout.height
+  }
 
   const podeEnviar = identificador.trim().length > 0 && senha.length > 0 && !carregando
 
@@ -106,12 +162,10 @@ export function LoginScreen({
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.flex} onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        ref={rolagem}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 40 + respiro }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         /* Sem isto o iOS deixa arrastar a tela para cima e para baixo mesmo com
@@ -134,8 +188,13 @@ export function LoginScreen({
           </Text>
         </View>
 
-        <View style={styles.formulario}>
-          <View>
+        <View
+          style={styles.formulario}
+          onLayout={e => {
+            ondeComecaOFormulario.current = e.nativeEvent.layout.y
+          }}
+        >
+          <View onLayout={medir('identificador')}>
             <Text style={styles.rotulo}>E-mail ou usuário</Text>
             <TextInput
               value={identificador}
@@ -158,11 +217,12 @@ export function LoginScreen({
               autoComplete="username"
               textContentType="username"
               returnKeyType="next"
+              onFocus={() => setEmFoco('identificador')}
               style={styles.campo}
             />
           </View>
 
-          <View>
+          <View onLayout={medir('senha')}>
             <Text style={styles.rotulo}>Senha</Text>
             <View style={styles.campoComBotao}>
               <TextInput
@@ -178,6 +238,7 @@ export function LoginScreen({
                 textContentType="password"
                 returnKeyType="go"
                 onSubmitEditing={entrar}
+                onFocus={() => setEmFoco('senha')}
                 style={[styles.campo, styles.campoSenha]}
               />
               <Pressable
@@ -251,7 +312,7 @@ export function LoginScreen({
 
         <Text style={styles.rodape}>Cygnos, sistemas de saúde com clareza</Text>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   )
 }
 
@@ -262,7 +323,8 @@ const estilos = estilosDe(t =>
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingTop: 40,
+    /* `paddingBottom` vem de fora, somado ao desvio do teclado. */
   },
   cabecalho: { alignItems: 'center', marginBottom: 32 },
   logo: { width: 72, height: 72, borderRadius: 20 },
