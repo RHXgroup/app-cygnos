@@ -48,7 +48,7 @@ export function AnelProgresso({ percentual }: { percentual: number }) {
 const estilos = estilosDe(t =>
   StyleSheet.create({
   bloco: { width: DIAMETRO, height: DIAMETRO, alignItems: 'center', justifyContent: 'center' },
-  centro: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  centro: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   texto: { fontSize: 15, fontWeight: '800', color: t.cores.limao },
   }),
 )

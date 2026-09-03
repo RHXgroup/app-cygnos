@@ -2585,7 +2585,7 @@ const estilos = estilosDe(t =>
 
   /* ── Folha da meta do dia ── */
   centroFolha: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: MARGEM },
-  fundoFolha: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
+  fundoFolha: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
   folha: {
     width: '100%',
     backgroundColor: t.cores.fundo,

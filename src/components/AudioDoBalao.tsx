@@ -56,7 +56,16 @@ export function AudioDoBalao({ caminho, minha }: { caminho: string; minha: boole
    * relógio parado, sim: parece que travou. */
   useEffect(() => {
     if (!tocando) return
-    const id = setInterval(() => setSegundos(s => s + 1), 1000)
+    const id = setInterval(() => {
+      setSegundos(s => s + 1)
+      /* Acabou: volta ao começo em vez de ficar parado no fim, senão o segundo
+         toque não toca nada e o botão parece morto. */
+      if (tocador.current && !tocador.current.playing) {
+        setTocando(false)
+        setSegundos(0)
+        tocador.current.seekTo(0)
+      }
+    }, 1000)
     return () => clearInterval(id)
   }, [tocando])
 
@@ -100,16 +109,13 @@ export function AudioDoBalao({ caminho, minha }: { caminho: string; minha: boole
       p.play()
       setTocando(true)
 
-      /* Acabou: volta ao começo em vez de ficar parado no fim, para o segundo
-         toque tocar de novo e não dar a impressão de botão morto. */
-      p.addListener('playbackStatusUpdate', s => {
-        if (!vivo.current) return
-        if (s.didJustFinish) {
-          setTocando(false)
-          setSegundos(0)
-          p.seekTo(0)
-        }
-      })
+      /* O fim é detectado pelo RELÓGIO que já existe, e não por um ouvinte.
+       *
+       * `player.addListener` mudou de forma entre as versões do `expo-audio`, e
+       * uma tela de conversa não deve quebrar por causa de uma assinatura de
+       * evento. O intervalo de um segundo abaixo já roda enquanto toca: ele
+       * pergunta se ainda está tocando, e é o suficiente para voltar ao começo
+       * quando acaba. Um segundo de atraso aqui não muda nada para quem ouve. */
     } catch (e) {
       /* Endereço vencido é o motivo mais provável de falhar aqui, e ele tem
          conserto: pede outro e tenta uma vez. Sem esta reassinatura, um balão

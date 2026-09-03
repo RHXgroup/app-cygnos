@@ -105,6 +105,6 @@ export function AnelCalorias({
 const estilos = estilosDe(t =>
   StyleSheet.create({
   bloco: { width: DIAMETRO, height: DIAMETRO, alignItems: 'center', justifyContent: 'center' },
-  centro: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  centro: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   }),
 )
