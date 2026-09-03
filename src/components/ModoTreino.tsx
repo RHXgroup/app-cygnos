@@ -147,7 +147,32 @@ async function acharVoz() {
  * A voz padrão sai fina e corrida, e é isso que faz soar de brinquedo. `pitch`
  * abaixo de 1 e `rate` em 0,95 dão o tom de quem está contando uma série, e não
  * lendo uma notificação. */
+/* ── O APP NÃO PODE OUVIR A SI MESMO ──────────────────────────────────────
+ *
+ * Com a escuta contínua ligada, o microfone capta a resposta falada do próprio
+ * app. Ela é transcrita, e como o app diz coisas como "Contei a série" e
+ * "Descanse 90 segundos", o texto de volta às vezes casa com um comando — e
+ * então ele obedece a si mesmo, fala de novo, ouve de novo. Foi o que apareceu
+ * no aparelho: a voz repetindo sem parar.
+ *
+ * Não há como o microfone distinguir a voz do alto-falante da voz da pessoa. O
+ * que dá para fazer é NÃO ESCUTAR enquanto ele fala — e por mais um instante
+ * depois, porque o fim da fala e o fim do som no ar não são o mesmo momento.
+ *
+ * Fica em módulo, e não no componente, porque quem fala é `falar`, que também
+ * é de módulo. Uma tela por vez conduz treino, então um valor só basta. */
+let falandoAgora = false
+export const appEstaFalando = (): boolean => falandoAgora
+
+const RABO_DE_ECO_MS = 400
+function aoTerminarDeFalar() {
+  setTimeout(() => {
+    falandoAgora = false
+  }, RABO_DE_ECO_MS)
+}
+
 function falar(texto: string) {
+  falandoAgora = true
   try {
     /* PARA o que estiver falando antes de falar de novo.
      *
@@ -164,6 +189,11 @@ function falar(texto: string) {
       voice: vozEscolhida,
       rate: 0.95,
       pitch: 0.92,
+      /* Avisa quando parou de falar. Quem escuta precisa saber, senão o app
+         ouve a PRÓPRIA VOZ — ver `falandoAgora`. */
+      onDone: aoTerminarDeFalar,
+      onStopped: aoTerminarDeFalar,
+      onError: aoTerminarDeFalar,
     })
   } catch {
     /* Sem voz, o apito e a vibração continuam avisando. Nada aqui pode parar
@@ -642,6 +672,16 @@ export function ModoTreino({
        isso. */
     const id = setInterval(() => {
       if (!vivo || !ouvindoAgora.current) return
+
+      /* Enquanto o app fala, a escuta para e ZERA.
+         Zerar importa tanto quanto parar: sem isso, o trecho que começou antes
+         da fala continuaria aberto e o silêncio depois dela o fecharia — com a
+         voz do próprio app dentro. */
+      if (appEstaFalando()) {
+        escuta = ESTADO_INICIAL
+        return
+      }
+
       const agora = Date.now()
       const r = ouvir(escuta, meterVivo.current, agora)
       escuta = r.estado
@@ -1490,7 +1530,12 @@ const estilos = estilosDe(t =>
     botaoPular: { paddingVertical: 12 },
     textoPular: { fontSize: 14, fontWeight: '700', color: t.inkMedio },
 
-    espacoVoz: { marginTop: 10 },
+    /* `alignSelf: 'stretch'` — sem isto o botão encolhe até o conteúdo.
+     O container dos controles centraliza os filhos, e o rótulo do BotaoDeVoz é
+     `flex: 1`: num pai que não estica, `flex: 1` colapsa para zero e o botão
+     vira um quadradinho com o ícone e NENHUM texto. Foi o que apareceu no
+     aparelho — a pessoa via um quadrado verde e nada dizendo "Ouvindo". */
+  espacoVoz: { marginTop: 10, alignSelf: 'stretch' },
   chaveVoz: {
     flexDirection: 'row',
     alignItems: 'center',
