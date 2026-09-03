@@ -11,12 +11,14 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CampoTexto } from '../components/CampoTexto'
 import { ForcaSenha } from '../components/ForcaSenha'
 import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from '../lib/conta'
 import { validarSenha } from '../lib/formulario'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
+import { useDesvioDoTeclado } from '../lib/teclado'
 import { Botao } from '../components/Botao'
 
 /* Recuperação de senha em três etapas, por código de seis dígitos.
@@ -66,6 +68,28 @@ export function RecuperarSenhaScreen({
   onConcluido: () => void
 }) {
   const styles = estilos()
+  /* ── O TECLADO COBRIA OS CAMPOS, IGUAL À TELA DE ENTRAR ─────────────────
+   *
+   * Esta tela era a gêmea da de entrar: mesmo `KeyboardAvoidingView` com
+   * `behavior="height"` no Android — que depende de a janela encolher, e no
+   * Expo Go ela não encolhe —, mesmo conteúdo centralizado que cabe inteiro, e
+   * mesmo `overScrollMode="never"` tirando até o arrasto. Resultado: com o
+   * teclado aberto os campos ficavam atrás dele e não havia como chegar neles.
+   *
+   * A correção aqui é a SIMPLES de propósito, e não a mesma da tela de entrar.
+   * Lá cada campo guarda a própria posição e a rolagem para nele; aqui há
+   * quatro etapas com campos diferentes, montados por um componente — medir um
+   * a um seria mais código a mais lugares para errar, numa tela que eu não
+   * consigo abrir para conferir.
+   *
+   * Com o teclado aberto: o conteúdo deixa de ser centralizado e sobe para o
+   * topo, e o respiro embaixo cria rolagem de verdade. Todo campo fica
+   * alcançável, e nada pula sozinho — o que é previsível vale mais do que o
+   * que é esperto, quando não dá para testar. */
+  const { bottom } = useSafeAreaInsets()
+  const [alturaDaTela, setAlturaDaTela] = useState(0)
+  const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
+
   const [etapa, setEtapa] = useState<Etapa>('pedir')
   const [identificador, setIdentificador] = useState('')
   /* O e-mail que recebeu o código. Fica null quando o login informado não
@@ -256,16 +280,18 @@ export function RecuperarSenhaScreen({
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.flex} onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          respiro > 0 && { justifyContent: 'flex-start' as const, paddingBottom: 32 + respiro },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         alwaysBounceVertical={false}
-        overScrollMode="never"
+        /* Só enquanto não há teclado. Com ele aberto a rolagem é a única saída,
+           e "never" a proibia justamente na hora em que ela é necessária. */
+        overScrollMode={respiro > 0 ? 'auto' : 'never'}
       >
         <View style={styles.cabecalho}>
           <Image
@@ -413,7 +439,7 @@ export function RecuperarSenhaScreen({
           </Pressable>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   )
 }
 
