@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LogBox, Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 import { falha } from './erros'
+import { moduloProtegido } from './moduloProtegido'
 import { ACAO_COPO, copoDoAviso } from './copoDoAviso'
 import { textoDaSequencia } from './sequenciaDaPessoa' 
 
@@ -152,35 +153,16 @@ function notificacoes(): Promise<ModuloNotificacoes> {
   return modulo
 }
 
-/* ── O MÓDULO DE MENTIRA, para o que não existe mais ──────────────────────
- *
- * Devolve o módulo de verdade, e para toda função que NÃO existe devolve uma
- * que não faz nada e responde vazio. Assim o app continua inteiro num Expo Go
- * que perdeu metade da biblioteca — e o dia em que a Expo remover mais uma
- * coisa não vira uma noite de teste perdida.
- *
- * Avisa UMA vez por nome no terminal. Sem o aviso isto vira mágica silenciosa,
- * e mágica silenciosa esconde o dia em que a função sumiu de verdade. */
-const jaAvisei = new Set<string>()
-
-function protegido(n: ModuloNotificacoes): ModuloNotificacoes {
-  return new Proxy(n, {
-    get(alvo, nome: string) {
-      const v = (alvo as Record<string, unknown>)[nome]
-      if (typeof v !== 'undefined') return v
-
-      /* Constantes ausentes viram objeto vazio; funções viram no-op. Não dá
-         para saber qual era pelo nome, então devolve uma função — que é o que
-         quase tudo aqui é — e ela responde `[]`, que é o vazio que os
-         chamadores sabem tratar. */
-      if (!jaAvisei.has(nome)) {
-        jaAvisei.add(nome)
-        console.log('[cygnos] expo-notifications sem `' + nome + '` neste Expo Go — ignorando')
-      }
-      return async () => [] as unknown
-    },
-  })
-}
+/* O embrulho mora em `moduloProtegido`, sem import nenhum, para poder ser
+   TESTADO — este arquivo importa AsyncStorage e o próprio expo-notifications, e
+   qualquer um dos dois arrasta o aparelho inteiro para dentro do Node.
+   Não é zelo: a primeira versão dele fingia ter `then`, o motor concluiu que o
+   módulo era uma promessa, e `await notificacoes()` passou a esperar para
+   sempre — o mesmo travamento que ele existe para consertar, escondido. */
+const protegido = (n: ModuloNotificacoes): ModuloNotificacoes =>
+  moduloProtegido(n, nome =>
+    console.log('[cygnos] expo-notifications sem `' + nome + '` neste Expo Go — ignorando'),
+  )
 
 async function lerIds(chave: string): Promise<string[]> {
   try {
