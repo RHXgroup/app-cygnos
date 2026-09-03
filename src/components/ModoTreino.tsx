@@ -1295,9 +1295,14 @@ export function ModoTreino({
                     </View>
                   )}
 
-                  {vozLigada && !!respostaDaVoz && (
-                    <Text style={styles.respostaVoz}>{respostaDaVoz}</Text>
-                  )}
+                  {/* A mensagem aparece MESMO COM A VOZ DESLIGADA.
+                      Achado testando a tela no navegador: quando a permissão do
+                      microfone falha, o modo volta sozinho para "Mão" — e a
+                      explicação sumia junto, porque ela só era desenhada no modo
+                      voz. A pessoa tocava em Voz, o botão voltava para Mão, e
+                      não havia nada dizendo por quê.
+                      É o pior formato de falha: parece que o toque não pegou. */}
+                  {!!respostaDaVoz && <Text style={styles.respostaVoz}>{respostaDaVoz}</Text>}
 
                   {/* ── OS NÚMEROS NA TELA ────────────────────────────────
                       A escuta falha em silêncio: sem medidor, nada acontece e

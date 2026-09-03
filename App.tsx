@@ -65,6 +65,7 @@ import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/te
  * initialMetrics entrega os insets já no primeiro quadro, em vez de esperar
  * uma ida e volta de medição. */
 export default function App() {
+
   /* A troca de tema redesenha a árvore. Redesenha, e não remonta.
    *
    * A diferença é tudo. A primeira versão disto punha `geracao` como `key` da
