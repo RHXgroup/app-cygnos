@@ -66,6 +66,36 @@ const FRASES: [Comando, string[]][] = [
  * e ninguém confere depois. Na dúvida, não faz nada. */
 const NEGACOES = ['nao ', 'ainda nao', 'nem ', 'para de', 'deixa pra la', 'esquece']
 
+/* ── A PALAVRA-CHAVE, e o que ela faz e não faz ───────────────────────────
+ *
+ * Ela NÃO economiza chamada. Para saber que a pessoa disse "Cygnos" é preciso
+ * transcrever primeiro — não há detecção de palavra sem passar pelo Whisper
+ * aqui. Quem economiza é o filtro de duração, em `escutaContinua`.
+ *
+ * O que ela evita é AGIR por engano. Num modo mãos-livres dentro de uma
+ * academia, o microfone ouve a conversa alheia inteira, e "terminei" dito por
+ * outra pessoa contaria uma série que não aconteceu — que entra no histórico
+ * do treino e ninguém confere depois.
+ *
+ * ── E o Whisper vai errar o nome ─────────────────────────────────────────
+ * "Cygnos" não é palavra do dicionário, e transcrição devolve o que soa: signos,
+ * cisnes, cignus, sygnos. Exigir a grafia certa faria a palavra-chave falhar
+ * mais do que a conversa alheia acertar. A lista aceita o que SOA parecido. */
+const CHAMADOS = ['cygnos', 'cignos', 'signos', 'cisnos', 'cisnes', 'cygnus', 'cignus', 'sygnos', 'signus']
+
+export const temChamado = (bruto: string): boolean => {
+  const t = semAcento(bruto)
+  return CHAMADOS.some(c => t.includes(c))
+}
+
+/* Tira o chamado e o que vier grudado nele, para o resto ser lido como
+   comando. "cygnos terminei" precisa virar "terminei". */
+export const semChamado = (bruto: string): string => {
+  let t = semAcento(bruto)
+  for (const c of CHAMADOS) t = t.split(c).join(' ')
+  return t.replace(/\s+/g, ' ').trim()
+}
+
 export function comandoDoTexto(bruto: string): Comando | null {
   const t = semAcento(bruto)
   if (!t) return null

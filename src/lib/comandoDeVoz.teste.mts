@@ -1,4 +1,11 @@
-import { comandoDoTexto, naoEntendi, RESPOSTA, type Comando } from './comandoDeVoz.ts'
+import {
+  comandoDoTexto,
+  naoEntendi,
+  RESPOSTA,
+  semChamado,
+  temChamado,
+  type Comando,
+} from './comandoDeVoz.ts'
 
 let passou = 0
 let falhou = 0
@@ -99,6 +106,37 @@ function ok(nome: string, cond: boolean, extra = '') {
   }
   ok('não entendi repete o que ouviu', naoEntendi('banana').includes('banana'))
   ok('sem áudio tem frase própria', naoEntendi('  ') === 'Não ouvi nada.')
+}
+
+// ── 6. A PALAVRA-CHAVE ──────────────────────────────────────────────────────
+//
+// Ela nao economiza chamada -- para saber que foi dita e preciso transcrever
+// antes. O que ela evita e AGIR por engano: num modo maos-livres dentro de uma
+// academia o microfone ouve a conversa alheia inteira, e "terminei" dito por
+// outra pessoa contaria uma serie que nao aconteceu.
+{
+  console.log('\n6. chamado')
+  const ditos = [
+    'Cygnos, terminei',
+    'cygnos terminei',
+    // o Whisper vai errar o nome, e errar assim:
+    'signos terminei',
+    'Cisnes, terminei',
+    'cignus, terminei',
+    'sygnos terminei',
+  ]
+  for (const d of ditos) {
+    ok(`"${d}" tem chamado`, temChamado(d), 'nao reconheceu')
+    ok(`"${d}" -> fiz`, comandoDoTexto(semChamado(d)) === 'fiz', String(comandoDoTexto(semChamado(d))))
+  }
+
+  // conversa alheia nao tem chamado, e por isso nao age
+  for (const d of ['terminei', 'ja acabei essa serie', 'pausa ai mano']) {
+    ok(`"${d}" sem chamado`, !temChamado(d))
+  }
+
+  // o chamado sozinho nao e comando
+  ok('so o nome nao faz nada', comandoDoTexto(semChamado('cygnos')) === null)
 }
 
 console.log(`\n${passou} passaram, ${falhou} falharam`)

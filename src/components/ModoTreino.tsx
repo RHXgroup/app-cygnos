@@ -11,7 +11,12 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { createAudioPlayer, setAudioModeAsync, useAudioRecorder } from 'expo-audio'
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio'
 import * as Speech from 'expo-speech'
 import { PREPARO_MS, acaoDoMomento, restam, type Fase } from '../lib/faseDoTreino'
 import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
@@ -26,9 +31,17 @@ import {
 } from '../lib/treino'
 import { FimDoTreino } from './FimDoTreino'
 import { dataISO } from '../lib/formatar'
-import { RESPOSTA, comandoDoTexto, naoEntendi, type Comando } from '../lib/comandoDeVoz'
+import {
+  RESPOSTA,
+  comandoDoTexto,
+  naoEntendi,
+  semChamado,
+  temChamado,
+  type Comando,
+} from '../lib/comandoDeVoz'
 import { OPCOES_DITADO, prepararMicrofone, transcrever } from '../lib/voz'
 import { BotaoDeVoz } from './BotaoDeVoz'
+import { ESTADO_INICIAL, ouvir } from '../lib/escutaContinua'
 
 /* O modo treino: o telefone conduz a sessão, em vez de esperar ser alimentado.
  *
@@ -241,7 +254,7 @@ export function ModoTreino({
     ultimoFalado.current = null
     setFimDoPreparo(Date.now() + PREPARO_MS)
     setFase('preparando')
-    falar(anuncio)
+    dizer(anuncio)
   }
 
   /* Dois tocadores, e não um: trocar a fonte de um tocador só custa recarregar
@@ -456,12 +469,12 @@ export function ModoTreino({
 
     if (a.contar !== null && ultimoFalado.current !== a.contar) {
       ultimoFalado.current = a.contar
-      falar(String(a.contar))
+      dizer(String(a.contar))
     }
 
     if (a.falar === 'descanso acabou') {
       ultimoFalado.current = null
-      falar('Descanso acabou')
+      dizer('Descanso acabou')
     }
 
     if (a.falar === 'vai') {
@@ -469,7 +482,7 @@ export function ModoTreino({
          pegar a barra, e é justamente o que ela não pode olhar agora. */
       const carga = exercicio ? cargaDe(exercicio) : null
       const reps = exercicio ? repsDe(exercicio) : null
-      falar(
+      dizer(
         carga && reps
           ? `Vai. ${carga} quilos, ${reps} repetições.`
           : reps
@@ -501,8 +514,45 @@ export function ModoTreino({
    * acontece sem dizer o que entendeu deixa a pessoa sem saber se a série foi
    * contada — e a série contada errado entra no histórico do treino. */
   const gravadorDeComando = useAudioRecorder(OPCOES_DITADO)
-  /* Desligada por padrão. Ver o comentário do interruptor no cabeçalho. */
-  const [vozLigada, setVozLigada] = useState(false)
+  /* 100 ms: é o passo com que a escuta decide se a fala começou ou acabou, e
+     ler mais devagar perderia o começo das frases curtas — que é justamente o
+     formato dos comandos. */
+  const estadoDoGravador = useAudioRecorderState(gravadorDeComando, 100)
+  /* ── COMO CONDUZIR O TREINO ────────────────────────────────────────────
+   *
+   * Três jeitos, e os três vieram de quem usa:
+   *
+   *   'voz'    — o microfone fica aberto, e "Cygnos, terminei" conduz tudo. O
+   *              app responde falando. Mãos livres de verdade.
+   *   'manual' — botões, e o app continua FALANDO a contagem e o descanso. É
+   *              como era antes, e é bom quando dá para ouvir mas não dá para
+   *              falar (academia cheia, gente perto).
+   *   'mudo'   — botões, e o app não diz nada. Para quem está num lugar em que
+   *              o telefone falando incomoda, ou com fone de ouvido de outra
+   *              coisa.
+   *
+   * Um controle só, e não dois interruptores: "voz" e "som" seriam quatro
+   * combinações, e uma delas — voz ligada com som desligado — é o app ouvindo e
+   * não respondendo, que não serve para nada. Três estados nomeados dizem o que
+   * cada um faz sem a pessoa ter de combinar nada.
+   *
+   * Começa em 'manual', que é o comportamento que já existia: quem não mexer
+   * em nada não é surpreendido nem pelo microfone aberto nem pelo silêncio. */
+  type ModoDeConduzir = 'voz' | 'manual' | 'mudo'
+  const [modo, setModo] = useState<ModoDeConduzir>('manual')
+  const vozLigada = modo === 'voz'
+  const podeFalar = modo !== 'mudo'
+  /* O modo MUDO cala o app inteiro.
+   *
+   * `falar` é função de módulo — não dá para desligar na definição sem passar
+   * o modo por parâmetro em nove lugares. Este envelope é o ponto único por
+   * onde a tela fala, e é ele que respeita o modo. Quem chamar `falar` direto
+   * daqui para frente escapa do mudo, e por isso não deve haver quem chame. */
+  const dizer = (texto: string) => {
+    if (podeFalar) falar(texto)
+  }
+
+
   const [ouvindo, setOuvindo] = useState(false)
   const [entendendo, setEntendendo] = useState(false)
   const [respostaDaVoz, setRespostaDaVoz] = useState('')
@@ -517,57 +567,150 @@ export function ModoTreino({
     [],
   )
 
-  async function ouvirComando() {
-    if (entendendo) return
+  /* ── A ESCUTA CONTÍNUA ────────────────────────────────────────────────
+   *
+   * O gravador fica aberto enquanto a voz estiver ligada. A cada leitura do
+   * medidor, `escutaContinua` diz se um trecho de fala começou ou terminou —
+   * e só o que terminou vai para o Whisper.
+   *
+   * Três filtros, e cada um corta uma coisa diferente:
+   *   · o medidor corta silêncio e ruído curto, e é o que impede uma chamada
+   *     paga a cada poucos segundos durante uma hora de treino;
+   *   · a DURAÇÃO corta o que é longo demais para ser comando — conversa
+   *     alheia, música com voz, televisão;
+   *   · a PALAVRA-CHAVE corta o que sobrou e não era para o app.
+   *
+   * O terceiro não economiza chamada, e é de propósito: para saber que a
+   * pessoa disse "Cygnos" é preciso transcrever antes. Ele evita AGIR por
+   * engano, que é o erro caro aqui — "terminei" dito por outra pessoa na
+   * academia contaria uma série que não aconteceu. */
+  const COMANDO_CURTO_DEMAIS_S = 0.5
+  const COMANDO_LONGO_DEMAIS_S = 5
 
-    if (ouvindo) {
-      /* Segundo toque: para, transcreve, obedece. */
-      ouvindoAgora.current = false
-      setOuvindo(false)
-      setEntendendo(true)
-      try {
-        await gravadorDeComando.stop()
-        const uri = gravadorDeComando.uri
-        const r = uri ? await transcrever(uri, 3) : { tipo: 'erro' as const, mensagem: '' }
-        if (r.tipo === 'ok') {
-          const c = comandoDoTexto(r.texto)
-          if (c) {
-            setRespostaDaVoz(RESPOSTA[c])
-            obedecer(c)
-          } else {
-            setRespostaDaVoz(naoEntendi(r.texto))
-          }
-        } else {
-          setRespostaDaVoz('Não consegui ouvir. Toque no botão mesmo.')
-        }
-      } catch {
-        setRespostaDaVoz('Não consegui ouvir. Toque no botão mesmo.')
+  useEffect(() => {
+    if (!vozLigada) return
+
+    let vivo = true
+    let escuta = ESTADO_INICIAL
+    let inicioDoTrecho = 0
+
+    void (async () => {
+      const permissao = await prepararMicrofone()
+      if (!vivo) return
+      if (permissao.tipo !== 'ok') {
+        setRespostaDaVoz(permissao.mensagem)
+        setModo('manual')
+        return
       }
-      setEntendendo(false)
-      return
+      try {
+        await gravadorDeComando.prepareToRecordAsync()
+        gravadorDeComando.record()
+        ouvindoAgora.current = true
+        setOuvindo(true)
+      } catch {
+        setRespostaDaVoz('Não consegui abrir o microfone.')
+        setModo('manual')
+      }
+    })()
+
+    /* 100 ms é o passo do medidor. Mais lento perde o começo da fala; mais
+       rápido não acrescenta, porque o próprio medidor não atualiza mais que
+       isso. */
+    const id = setInterval(() => {
+      if (!vivo || !ouvindoAgora.current) return
+      const agora = Date.now()
+      const r = ouvir(escuta, estadoDoGravador.metering, agora)
+      escuta = r.estado
+
+      if (r.decisao === 'comecou') {
+        inicioDoTrecho = agora
+        return
+      }
+      if (r.decisao !== 'terminou' && r.decisao !== 'cortar_no_teto') return
+
+      const duracao = (agora - inicioDoTrecho) / 1000
+      /* Longo demais não é comando. Cortar aqui, ANTES de mandar, é o que
+         segura o custo numa academia com gente conversando perto. */
+      if (duracao < COMANDO_CURTO_DEMAIS_S || duracao > COMANDO_LONGO_DEMAIS_S) return
+
+      void recortarEEntender(duracao)
+    }, 100)
+
+    return () => {
+      vivo = false
+      clearInterval(id)
+      if (ouvindoAgora.current) {
+        ouvindoAgora.current = false
+        gravadorDeComando.stop().catch(() => {})
+      }
+      setOuvindo(false)
+    }
+  }, [vozLigada])
+
+  /* Para, manda o pedaço, e VOLTA A OUVIR.
+   *
+   * Parar e recomeçar a cada trecho é o único jeito de pegar um arquivo com o
+   * `expo-audio`: ele não entrega pedaço de gravação em andamento. O intervalo
+   * entre parar e voltar é de milissegundos, e por isso o que se perde ali é
+   * menor do que a pausa que a pessoa faz depois de falar. */
+  async function recortarEEntender(duracao: number) {
+    if (entendendo) return
+    setEntendendo(true)
+    try {
+      await gravadorDeComando.stop()
+      const uri = gravadorDeComando.uri
+      ouvindoAgora.current = false
+
+      if (uri) {
+        const r = await transcrever(uri, duracao)
+        if (r.tipo === 'ok') responder(r.texto)
+      }
+    } catch {
+      /* Silêncio de propósito: uma falha de recorte não pode virar aviso na
+         tela de quem está no meio de uma série. A escuta recomeça abaixo. */
     }
 
-    const permissao = await prepararMicrofone()
-    if (permissao.tipo !== 'ok') {
-      setRespostaDaVoz(permissao.mensagem)
-      return
+    /* Volta a ouvir, se a voz continua ligada. */
+    if (vozLigada) {
+      try {
+        await gravadorDeComando.prepareToRecordAsync()
+        gravadorDeComando.record()
+        ouvindoAgora.current = true
+      } catch {
+        setRespostaDaVoz('O microfone parou. Toque em Voz para ligar de novo.')
+        setModo('manual')
+      }
     }
-    try {
-      await gravadorDeComando.prepareToRecordAsync()
-      gravadorDeComando.record()
-      ouvindoAgora.current = true
-      setOuvindo(true)
-      setRespostaDaVoz('')
-    } catch {
-      setRespostaDaVoz('Não consegui abrir o microfone.')
-    }
+    setEntendendo(false)
   }
+
 
   /* O comando faz o MESMO que o botão faria — chama a mesma função.
    *
    * Um segundo caminho para "contar a série" divergiria do primeiro no dia em
    * que um deles mudasse, e o que diverge aqui entra no histórico do treino
    * sem ninguém conferir. */
+  /* O que fazer com o que foi transcrito.
+   *
+   * Sem a palavra-chave, NADA acontece e nada é dito — o app ouviu a academia,
+   * e responder a isso seria pior do que ignorar. É o filtro que separa "a
+   * pessoa falou comigo" de "alguém falou perto de mim". */
+  function responder(texto: string) {
+    if (!temChamado(texto)) return
+
+    const c = comandoDoTexto(semChamado(texto))
+    if (!c) {
+      setRespostaDaVoz(naoEntendi(texto))
+      dizer('Não entendi.')
+      return
+    }
+    setRespostaDaVoz(RESPOSTA[c])
+    /* Responde FALANDO antes de agir: quem está de mãos ocupadas precisa saber
+       que foi ouvido, e o "três, dois, um" que vem depois já é a ação. */
+    dizer(RESPOSTA[c])
+    obedecer(c)
+  }
+
   function obedecer(c: Comando) {
     if (c === 'fiz') fizASerie()
     else if (c === 'pausar') setFase('parado')
@@ -635,7 +778,7 @@ export function ModoTreino({
          É o momento em que ela precisa andar até outro aparelho, e o único jeito
          de saber para onde era voltar e ler a tela. */
       const proximo = exercicios[indice + 1]
-      falar(
+      dizer(
         `Acabou ${exercicio.nome}. Agora: ${proximo.nome}` +
           (proximo.series ? `, ${proximo.series} séries.` : '.'),
       )
@@ -663,7 +806,7 @@ export function ModoTreino({
     const ondeEstou = exercicio.series
       ? `Série ${jaFeitas} de ${exercicio.series}. `
       : `Série ${jaFeitas}. `
-    falar(`${ondeEstou}Descanse ${segundos} segundos.`)
+    dizer(`${ondeEstou}Descanse ${segundos} segundos.`)
 
     setFimDoDescanso(Date.now() + segundos * 1000)
     setFase('descansando')
@@ -720,26 +863,36 @@ export function ModoTreino({
               que ele é — e some da área de ação quando está desligado.
               Desligado por padrão: reconhecimento de fala erra, e um treino
               conduzido por engano é pior do que um toque a mais. */}
+          {/* Um toque roda os três. O rótulo diz o modo ATUAL, e não o
+              próximo: interruptor que mostra para onde vai obriga a pessoa a
+              deduzir onde está. */}
           <Pressable
             onPress={() => {
-              setVozLigada(v => !v)
+              setModo(m => (m === 'manual' ? 'voz' : m === 'voz' ? 'mudo' : 'manual'))
               setRespostaDaVoz('')
             }}
             style={({ pressed }) => [
               styles.chaveVoz,
-              vozLigada && styles.chaveVozLigada,
+              modo === 'voz' && styles.chaveVozLigada,
               pressed && { opacity: 0.7 },
             ]}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: vozLigada }}
-            accessibilityLabel="Conduzir o treino por voz"
+            accessibilityRole="button"
+            accessibilityLabel={
+              modo === 'voz'
+                ? 'Conduzindo por voz. Tocar para passar a silencioso.'
+                : modo === 'manual'
+                  ? 'Conduzindo na mão, com avisos falados. Tocar para usar a voz.'
+                  : 'Silencioso. Tocar para voltar aos avisos falados.'
+            }
           >
             <Ionicons
-              name={vozLigada ? 'mic' : 'mic-off-outline'}
+              name={modo === 'voz' ? 'mic' : modo === 'manual' ? 'volume-medium' : 'volume-mute'}
               size={17}
-              color={vozLigada ? paleta().cores.branco : paleta().inkMedio}
+              color={modo === 'voz' ? paleta().cores.branco : paleta().inkMedio}
             />
-            <Text style={[styles.textoChaveVoz, vozLigada && styles.textoChaveVozLigada]}>Voz</Text>
+            <Text style={[styles.textoChaveVoz, modo === 'voz' && styles.textoChaveVozLigada]}>
+              {modo === 'voz' ? 'Voz' : modo === 'manual' ? 'Mão' : 'Mudo'}
+            </Text>
           </Pressable>
         </View>
 
@@ -1011,15 +1164,20 @@ export function ModoTreino({
                       A resposta do que foi ouvido aparece aqui mesmo, colada
                       no botão — não adianta confirmar num canto que ninguém
                       olha no meio de uma série. */}
+                  {/* No modo voz isto deixou de ser BOTÃO e virou ESTADO: o
+                      microfone já está aberto, e a pessoa não precisa tocar em
+                      nada. O que ele diz é que está ouvindo — e o toque agora
+                      DESLIGA a voz, que é a única coisa que ainda faz sentido
+                      querer fazer com o dedo aqui. */}
                   {vozLigada && (
-                  <View style={styles.espacoVoz}>
-                    <BotaoDeVoz
-                      estado={entendendo ? 'pensando' : ouvindo ? 'ouvindo' : 'parado'}
-                      rotulo="Falar em vez de tocar"
-                      rotuloOuvindo="Fale e toque para parar"
-                      onPress={ouvirComando}
-                    />
-                  </View>
+                    <View style={styles.espacoVoz}>
+                      <BotaoDeVoz
+                        estado={entendendo ? 'pensando' : 'ouvindo'}
+                        rotulo="Ouvindo"
+                        rotuloOuvindo={'Diga "Cygnos, terminei"'}
+                        onPress={() => setModo('manual')}
+                      />
+                    </View>
                   )}
 
                   {vozLigada && !!respostaDaVoz && (
