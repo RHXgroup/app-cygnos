@@ -149,6 +149,7 @@ export function DiaDoCiclo({
   carregando,
   ehComecoDeCiclo,
   ehFertil,
+  estaMenstruada,
   salvando,
   onSalvar,
   onMarcarComeco,
@@ -167,6 +168,9 @@ export function DiaDoCiclo({
    * dizer. Vem PRONTO de cima, e não calculado aqui: quem sabe a janela é a
    * tela do ciclo, que tem a previsão e a duração medida. */
   ehFertil: boolean
+  /* Se este dia cai no fluxo. Vem pronto de cima, como `ehFertil`: quem sabe
+     quantos dias dura o fluxo desta pessoa é a tela do ciclo. */
+  estaMenstruada: boolean
   salvando: boolean
   onSalvar: (d: Dia) => void
   /* Marcar ou desmarcar que a menstruação começou NESTE dia. Separado do resto
@@ -188,6 +192,18 @@ export function DiaDoCiclo({
    * Ver é o gesto comum; editar é a exceção. */
   const [editando, setEditando] = useState(false)
 
+  /* ── OS SINTOMAS NÃO ABRINDO POR PADRÃO ────────────────────────────────
+   *
+   * Fluxo, dor, energia, digestão, humor e vontade de comer somam seis blocos
+   * de etiquetas. Em dia de menstruação eles são o assunto; fora dele são seis
+   * perguntas que ninguém vai responder, empilhadas entre a pessoa e o que ela
+   * abriu a tela para fazer.
+   *
+   * Então: abertos quando o dia É de fluxo, ou quando já tem alguma coisa
+   * respondida — porque esconder o que a pessoa preencheu seria pior do que
+   * mostrar demais. Fechados no resto, com uma linha para abrir. */
+  const [verSintomas, setVerSintomas] = useState(false)
+
   useEffect(() => {
     /* Reabrir sempre começa no resumo — mesmo que a última vez tenha terminado
        no editor. Herdar o modo faria o painel abrir diferente conforme o que
@@ -195,6 +211,17 @@ export function DiaDoCiclo({
     if (visivel) setEditando(false)
     if (visivel) setD(dia ?? diaVazio(data))
   }, [visivel, data, dia])
+
+  /* Abre sozinho em dia de fluxo, ou quando já há resposta gravada. O `||`
+     com `verSintomas` é o que deixa a pessoa abrir à mão nos outros dias. */
+  const temResposta =
+    d.fluxo !== null ||
+    (d.sintomas?.length ?? 0) > 0 ||
+    (d.humor?.length ?? 0) > 0 ||
+    (d.desejoAlimentar?.length ?? 0) > 0 ||
+    d.energia !== null ||
+    d.digestao !== null
+  const mostrarSintomas = verSintomas || estaMenstruada || temResposta
 
   const alternar = (lista: string[], item: string) =>
     lista.includes(item) ? lista.filter(x => x !== item) : [...lista, item]
@@ -349,16 +376,41 @@ export function DiaDoCiclo({
                 muda é que responder virou escolha em vez de pedágio. */}
             {/* ── O que NUNCA sai ──────────────────────────────────────── */}
             <View style={styles.privado}>
+              {/* O cadeado num CÍRCULO, e o texto em duas alturas.
+                  Antes eram três linhas de peso parecido — ícone pequeno,
+                  título e explicação — e o bloco parecia um aviso de sistema
+                  colado no meio do formulário. O selo dá âncora visual e deixa
+                  a promessa (que é o ponto do bloco) respirar. */}
               <View style={styles.tituloPrivado}>
-                <Ionicons name="lock-closed" size={15} color={paleta().cores.verde} />
-                <Text style={styles.textoTituloPrivado}>Só seu</Text>
+                <View style={styles.seloPrivado}>
+                  <Ionicons name="lock-closed" size={13} color={paleta().cores.branco} />
+                </View>
+                <View style={styles.textosPrivado}>
+                  <Text style={styles.textoTituloPrivado}>Só seu</Text>
+                  <Text style={styles.explicacaoPrivado}>
+                    Fica neste aparelho. Não vai para a sua nutricionista, e não existe opção para
+                    ligar isso.
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.explicacaoPrivado}>
-                Não vai para a sua nutricionista nem para ninguém, e não existe opção para ligar
-                isso.
-              </Text>
 
-              <View style={styles.linhaSwitch}>
+              {/* A LINHA INTEIRA liga, e não só o interruptor.
+                  Mirar num switch de 50px com o polegar é o tipo de alvo que
+                  erra — e aqui errar significa abrir e fechar um dado sensível
+                  sem querer. */}
+              <Pressable
+                onPress={() =>
+                  setD(x => ({
+                    ...x,
+                    relacao: x.relacao === true ? null : true,
+                    relacaoProtegida: x.relacao === true ? null : x.relacaoProtegida,
+                  }))
+                }
+                style={({ pressed }) => [styles.linhaSwitch, pressed && { opacity: 0.7 }]}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: d.relacao === true }}
+                accessibilityLabel="Tive relação neste dia"
+              >
                 <Text style={styles.rotuloSwitch}>Tive relação neste dia</Text>
                 <Switch
                   value={d.relacao === true}
@@ -373,9 +425,12 @@ export function DiaDoCiclo({
                     }))
                   }
                   trackColor={{ false: paleta().cores.trilho, true: paleta().cores.verde }}
-                  accessibilityLabel="Tive relação neste dia"
+                  /* Sem rótulo próprio: quem lê tela já ouviu o do Pressable de
+                     fora, e dois rótulos para o mesmo controle o fazem falar
+                     duas vezes. */
+                  accessibilityLabel=""
                 />
-              </View>
+              </Pressable>
 
               {d.relacao === true && (
                 <View style={styles.chipsPrivado}>
@@ -433,8 +488,27 @@ export function DiaDoCiclo({
               </Text>
             </View>
 
-            {umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
+            {/* A LINHA que abre, quando não abriu sozinho. Diz o que tem
+                dentro, para o toque não ser às cegas. */}
+            {!mostrarSintomas && (
+              <Pressable
+                onPress={() => setVerSintomas(true)}
+                style={({ pressed }) => [styles.abrirSintomas, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Anotar fluxo, dor, energia, humor e vontade de comer"
+              >
+                <Ionicons name="add-circle-outline" size={17} color={paleta().cores.verde} />
+                <Text style={styles.textoAbrirSintomas}>
+                  Anotar como você se sentiu (fluxo, dor, energia, humor)
+                </Text>
+              </Pressable>
+            )}
 
+            {mostrarSintomas &&
+              umaEscolha('Fluxo', FLUXOS, d.fluxo, v => setD(x => ({ ...x, fluxo: v })))}
+
+            {mostrarSintomas && (
+              <>
             <Categoria titulo="Dor" styles={styles}>
               {SINTOMAS.map(s => (
                 <Etiqueta
@@ -468,6 +542,8 @@ export function DiaDoCiclo({
                 </Etiqueta>
               ))}
             </Categoria>
+              </>
+            )}
 
             <TextInput
               value={d.observacao ?? ''}
@@ -655,15 +731,47 @@ const estilos = estilosDe(t =>
 
     privado: {
       marginTop: 2,
-      gap: 10,
+      gap: 12,
       backgroundColor: t.cores.verdeClaro,
       borderRadius: 16,
-      padding: 15,
+      borderWidth: 1,
+      borderColor: t.cores.verdeMenta,
+      padding: 16,
     },
-    tituloPrivado: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    tituloPrivado: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    seloPrivado: {
+      width: 26,
+      height: 26,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.verde,
+    },
+    textosPrivado: { flex: 1, gap: 3 },
     textoTituloPrivado: { fontSize: 14.5, fontWeight: '800', color: t.cores.ink },
     explicacaoPrivado: { fontSize: 12, color: t.inkMedio, lineHeight: 17 },
-    linhaSwitch: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    abrirSintomas: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 13,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: t.cores.borda,
+    },
+    textoAbrirSintomas: { flex: 1, fontSize: 13, fontWeight: '600', color: t.cores.verdeEscuro },
+
+    linhaSwitch: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 6,
+      borderTopWidth: 1,
+      borderTopColor: t.cores.verdeMenta,
+      marginTop: 2,
+    },
     rotuloSwitch: { flex: 1, fontSize: 14.5, color: t.cores.ink },
     chipsPrivado: { flexDirection: 'row', gap: 8 },
   }),

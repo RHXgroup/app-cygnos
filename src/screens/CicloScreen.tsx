@@ -721,6 +721,7 @@ export function CicloScreen({
              isso que `ehDiaFertil` existe -- e ela estava escrita e sem
              chamador nenhum. */
           ehFertil={ehDiaFertil(diaAberto, janela) && !pintados.menstruada.has(diaAberto)}
+          estaMenstruada={pintados.menstruada.has(diaAberto)}
           salvando={salvandoDia}
           onSalvar={d => void guardarDia(d)}
           onMarcarComeco={ligado => void marcarComeco(diaAberto, ligado)}
