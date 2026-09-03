@@ -39,7 +39,7 @@ import {
   temChamado,
   type Comando,
 } from '../lib/comandoDeVoz'
-import { OPCOES_DITADO, prepararMicrofone, transcrever } from '../lib/voz'
+import { MINIMO_SEGUNDOS, OPCOES_DITADO, prepararMicrofone, transcrever } from '../lib/voz'
 import { BotaoDeVoz } from './BotaoDeVoz'
 import { ESTADO_INICIAL, limiarDe, ouvir } from '../lib/escutaContinua'
 
@@ -648,7 +648,10 @@ export function ModoTreino({
    * pessoa disse "Cygnos" é preciso transcrever antes. Ele evita AGIR por
    * engano, que é o erro caro aqui — "terminei" dito por outra pessoa na
    * academia contaria uma série que não aconteceu. */
-  const COMANDO_CURTO_DEMAIS_S = 0.5
+  /* O piso vem de `voz`, e não é um número escrito aqui: quem recusa por
+     duração é o `transcrever`, e um valor menor deste lado só produz viagem de
+     ida com descarte na volta. */
+  const COMANDO_CURTO_DEMAIS_S = MINIMO_SEGUNDOS
   const COMANDO_LONGO_DEMAIS_S = 5
 
   useEffect(() => {

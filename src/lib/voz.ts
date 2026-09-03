@@ -94,7 +94,16 @@ export const LIMITE_SEGUNDOS = 60
 /* Abaixo disto não há fala nenhuma — é o toque acidental no botão. Mandar para
    o servidor devolveria texto vazio depois de três segundos de espera, e a
    pessoa leria isso como falha do app. */
-const MINIMO_SEGUNDOS = 1
+/* Abaixo disto o Whisper não tem o que ouvir, e mandar é gastar rede para
+   receber vazio.
+
+   EXPORTADO de propósito. Quem grava é que decide o que vale a pena mandar, e
+   por um tempo `ModoTreino` decidiu com um número próprio — 0,5 — sem saber que
+   aqui embaixo havia 1. Todo comando entre meio segundo e um segundo era
+   ouvido, cortado, enviado e jogado fora, e a tela dizia "fale um pouco mais"
+   para quem tinha acabado de falar. Dois números para a mesma pergunta sempre
+   divergem; agora é um só. */
+export const MINIMO_SEGUNDOS = 1
 
 export type ResultadoPermissao =
   | { tipo: 'ok' }

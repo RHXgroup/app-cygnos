@@ -706,7 +706,26 @@ export async function analisarFoto(
 
     if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
 
+    /* ── A ESPERA PRECISA TER FIM, E TER NOME ───────────────────────────
+     *
+     * A função do servidor lê o prato com um modelo que RACIOCINA antes de
+     * responder — trocado no dia em que a farofa deixou de virar kibe. Ele
+     * acerta o prato e demora muito mais que o anterior.
+     *
+     * Sem prazo, uma chamada que não volta deixa a pessoa olhando o rodinho
+     * para sempre: não há erro, não há resultado, e o único caminho é fechar o
+     * app. Foi relatado como "carrega, carrega e não consegue".
+     *
+     * 75 segundos é folgado de propósito — o objetivo não é apertar o
+     * servidor, é ter um fim. E o fim diz o que aconteceu: "demorou" é outra
+     * coisa de "não deu certo", e só a primeira admite tentar de novo. */
+    const desistir = new AbortController()
+    const prazo = setTimeout(() => desistir.abort(), 75_000)
+
     const { data, error } = await supabase.functions.invoke('analisar-alimento', {
+      /* @ts-expect-error o supabase-js repassa o sinal ao fetch, mas ainda não
+         o declara no tipo das opções de `invoke`. */
+      signal: desistir.signal,
       body: {
         imageBase64: reduzida.base64,
         mimeType: 'image/jpeg',
@@ -722,11 +741,45 @@ export async function analisarFoto(
       },
     })
 
+    clearTimeout(prazo)
+
     if (error) {
+      /* Desistimos nós, e não o servidor: a frase tem de dizer isso, senão a
+         pessoa acha que a foto é que estava ruim e tira outra igual. */
+      if (desistir.signal.aborted) {
+        falha('Foto: passou de 75s sem resposta', error)
+        return {
+          tipo: 'erro',
+          mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',
+        }
+      }
       /* O supabase-js embrulha a resposta de erro: sem abrir o context, toda
          falha do servidor viraria "FunctionsHttpError" na tela — e a função foi
          justamente corrigida para dizer o que aconteceu de verdade. */
-      const corpo = await (error as { context?: Response }).context?.json?.().catch(() => null)
+      const resposta = (error as { context?: Response }).context
+      const corpo = await resposta?.json?.().catch(() => null)
+
+      /* ── O MOTIVO REAL PRECISA APARECER EM ALGUM LUGAR ──────────────────
+       *
+       * Aqui o `error` era descartado inteiro, e a tela caía na frase genérica
+       * "Não consegui analisar a foto agora." Ela é honesta e é inútil: cobre
+       * o servidor fora do ar, a sessão vencida, a rede caída e o corpo grande
+       * demais com a MESMA palavra — e o motivo não sobrava nem no console.
+       *
+       * Custou rodadas de teste no aparelho de outra pessoa para descobrir o
+       * que uma linha teria dito. É a armadilha 12 ao contrário: a frase de
+       * gente estava certa, e faltava a outra metade do trabalho.
+       *
+       * O `status` separa os casos que se parecem na tela: sem `context` a
+       * requisição nem chegou ao servidor (rede), 401 é sessão, 5xx é a função
+       * lá dentro. */
+      const nome = (error as { name?: string }).name ?? 'erro'
+      const status = resposta?.status
+      falha(
+        'Foto não analisada · ' + nome + (status ? ' · HTTP ' + status : ' · sem resposta do servidor'),
+        { corpo, mensagem: (error as { message?: string }).message },
+      )
+
       return { tipo: 'erro', mensagem: corpo?.error ?? 'Não consegui analisar a foto agora.' }
     }
 
