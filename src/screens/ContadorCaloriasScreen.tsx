@@ -1573,6 +1573,11 @@ function ConfirmarFoto({
   const styles = estilos()
   const { bottom } = useSafeAreaInsets()
 
+  /* A capa é pequena por necessidade — a lista precisa do espaço. Mas quem
+     confere "isso aí é frango ou peixe?" precisa VER, e 132 pontos de altura
+     não bastam para decidir. Um toque abre a foto inteira por cima. */
+  const [fotoAberta, setFotoAberta] = useState(false)
+
   /* Todos entram marcados, e inteiros. É o caminho comum — a pessoa fotografou
      o que comeu — e obrigá-la a marcar item por item cobraria seis toques de
      quem não tinha nada a corrigir. */
@@ -1602,7 +1607,12 @@ function ConfirmarFoto({
          * branco se leia sobre QUALQUER foto, inclusive um prato claro com
          * luz de janela. Sem ele o texto some em metade dos pratos. */}
         {foto ? (
-          <View style={styles.capaFolha}>
+          <Pressable
+            style={styles.capaFolha}
+            onPress={() => setFotoAberta(true)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Ver a foto inteira"
+          >
             <Image source={{ uri: foto }} style={styles.capaImagem} resizeMode="cover" />
             <LinearGradient
               colors={['rgba(20,24,14,0)', 'rgba(20,24,14,0.45)', 'rgba(20,24,14,0.88)']}
@@ -1628,7 +1638,12 @@ function ConfirmarFoto({
               </View>
             </View>
             <View style={styles.puxadorSobreFoto} />
-          </View>
+            {/* A lupa diz que dá para tocar. Sem ela a capa parece decoração,
+                e ninguém toca em decoração. */}
+            <View style={styles.lupaDaCapa}>
+              <Ionicons name="expand-outline" size={15} color="#FFFFFF" />
+            </View>
+          </Pressable>
         ) : (
           <>
             <View style={styles.puxador} />
@@ -1659,7 +1674,6 @@ function ConfirmarFoto({
               onTrocar={() => onTrocar(i)}
             />
           ))}
-        </ScrollView>
 
         {/* O TOTAL repetido embaixo SÓ quando não há capa.
             Com a foto no topo ele já está lá, grande, e mostrar duas vezes o
@@ -1733,7 +1747,20 @@ function ConfirmarFoto({
         <Text style={styles.rodapeFolha}>
           Toda estimativa por foto é aproximada. Vai entrar em <Text style={styles.negrito}>{refeicao}</Text>.
         </Text>
+        </ScrollView>
 
+        {/* ── SÓ OS BOTÕES FICAM PARADOS ─────────────────────────────────
+         *
+         * Macros, aviso e rodapé eram FIXOS abaixo da lista, e espremiam ela
+         * numa janela de dois itens. Fotografado no aparelho: a lista mostrava
+         * "Vinagrete" e "Cheiro-verde" enquanto o botão dizia "Registrar 6
+         * itens" — e nada indicava que havia mais quatro acima. Quem olha
+         * conclui que a leitura achou dois alimentos.
+         *
+         * Agora a folha inteira rola e a lista deixa de ter um teto invisível.
+         * Os botões continuam parados porque o "Registrar" que sai da tela é o
+         * botão que não existe — foi por isso que a lista foi presa aqui em
+         * primeiro lugar, e a solução era soltar o resto, não prender ela. */}
         <View style={styles.botoesFolha}>
           <Pressable
             onPress={onDescartar}
@@ -1767,6 +1794,22 @@ function ConfirmarFoto({
           </Pressable>
         </View>
       </View>
+
+      {/* ── A FOTO INTEIRA ────────────────────────────────────────────────
+       *
+       * Por cima de tudo, no preto, sem nada além da imagem: quem abriu quer
+       * olhar o prato, e qualquer coisa em volta disputa o olhar com o que
+       * está sendo conferido.
+       *
+       * Fecha em QUALQUER toque, e não num "x" no canto: o gesto de quem
+       * terminou de olhar é tocar a tela, e procurar um botão é trabalho a
+       * mais para desfazer o que a pessoa acabou de fazer. */}
+      {fotoAberta && !!foto && (
+        <Pressable style={styles.fotoInteira} onPress={() => setFotoAberta(false)}>
+          <Image source={{ uri: foto }} style={styles.imagemInteira} resizeMode="contain" />
+          <Text style={styles.dicaFechar}>Toque para fechar</Text>
+        </Pressable>
+      )}
     </View>
   )
 }
@@ -2516,6 +2559,40 @@ const estilos = estilosDe(t =>
     overflow: 'hidden',
   },
   capaImagem: { width: '100%', height: '100%' },
+  lupaDaCapa: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(20,24,14,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fotoInteira: {
+    /* Escrito à mão, e não `StyleSheet.absoluteFillObject`: ele foi REMOVIDO
+       no React Native 0.86, que veio com o SDK 57. O `absoluteFill` que ficou
+       é um id registrado, e não um objeto — espalhar ele com `...` não copia
+       nada e o resultado é um bloco sem posição, que desenha no meio do fluxo
+       em vez de por cima da tela. */
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(8,10,6,0.96)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagemInteira: { width: '100%', height: '82%' },
+  dicaFechar: {
+    position: 'absolute',
+    bottom: 34,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.55)',
+  },
   capaTextos: {
     position: 'absolute',
     left: 20,
