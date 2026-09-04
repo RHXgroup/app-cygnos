@@ -785,46 +785,42 @@ export async function analisarFoto(
      * caminho sobe áudio para uma função Deno todo dia e funciona. Quando um
      * jeito já está provado no mesmo projeto, copiá-lo vale mais do que
      * escrever um segundo. */
-    /* ── OS NÚMEROS NA TELA, EM VEZ DA TERCEIRA TEORIA ──────────────────
+    /* ── UM `Blob` DE VERDADE, PORQUE O SDK 57 TROCOU O `fetch` ─────────
      *
-     * "Failed to send a request" é o `fetch` do React Native desistindo ANTES
-     * de sair do aparelho, e o motivo mais comum é ele não conseguir LER o
-     * arquivo que foi posto no envio — endereço sem `file://`, arquivo que já
-     * sumiu, ou tamanho zero.
+     * Aqui ia `{ uri, name, type }` — a forma que o React Native entende, e a
+     * mesma que `voz.ts` usa. Ela parou de funcionar na migração para o 57, e
+     * o motivo apareceu num aviso do próprio Expo, vindo de
+     * `expo/src/winter/fetch/FetchResponse.ts`:
      *
-     * A primeira teoria (o `AbortSignal`) estava errada, e custou uma rodada.
-     * A armadilha 2 do AGENTS.md diz o que fazer quando a segunda tentativa
-     * falha: parar de trocar de mecanismo e IMPRIMIR OS NÚMEROS. É isto. */
-    let tamanho = -1
-    try {
-      tamanho = (await (await fetch(reduzida.uri)).blob()).size
-    } catch (e) {
-      console.log('[cygnos] foto: nem consegui LER o arquivo local:', e)
-    }
-    console.log(
-      '[cygnos] foto: uri =',
-      JSON.stringify(reduzida.uri),
-      '· bytes =',
-      tamanho,
-      '· contexto =',
-      oContexto ? 'sim' : 'nao',
-    )
-
+     * O SDK 57 SUBSTITUI o `fetch` do aplicativo pelo dele, que segue o padrão
+     * da web à risca. E o padrão não conhece `{ uri, name, type }` — isso é
+     * extensão do React Native. O envio falhava antes de sair do aparelho,
+     * como "FunctionsFetchError: Failed to send a request".
+     *
+     * Foram TRÊS teorias até esta: o cancelamento, o arquivo, e o formato.
+     * As duas primeiras custaram uma rodada de teste cada, e a certa veio de um
+     * aviso amarelo que ninguém tinha lido — não de mais uma dedução.
+     *
+     * Ler o arquivo para um `Blob` custa uma cópia, e o próprio Expo avisa que
+     * ela passa por base64 lá dentro. Mas ela acontece DEPOIS de a câmera ter
+     * devolvido a memória, e não ao lado do bitmap — que era o que matava o
+     * app. O instante importa mais que o total. */
     const forma = new FormData()
-    forma.append('imagem', {
-      uri: reduzida.uri,
-      name: 'prato.jpg',
-      type: 'image/jpeg',
-    } as unknown as Blob)
-    /* O `contexto` vai como campo de TEXTO junto do arquivo. `voz.ts`, que
-       funciona, manda só o arquivo — então esta é a outra diferença entre os
-       dois, e a linha acima diz se ele estava presente na tentativa que
-       falhou. */
-    if (oContexto) forma.append('contexto', JSON.stringify(oContexto))
+    let mandouBytes = false
+    try {
+      const arquivo = await (await fetch(reduzida.uri)).blob()
+      console.log('[cygnos] foto: blob de', arquivo.size, 'bytes')
+      forma.append('imagem', arquivo, 'prato.jpg')
+      if (oContexto) forma.append('contexto', JSON.stringify(oContexto))
+      mandouBytes = arquivo.size > 0
+    } catch (e) {
+      falha('Foto: não consegui montar os bytes, indo por texto', e)
+    }
 
-    const porBytes = await comPrazo(
-      supabase.functions.invoke('analisar-alimento', { body: forma }),
-    )
+    const porBytes = mandouBytes
+      ? await comPrazo(supabase.functions.invoke('analisar-alimento', { body: forma }))
+      : { data: null, error: new Error('sem bytes') as unknown as { context?: Response } }
+
     if (porBytes === demorou) {
       falha('Foto: passou de 75s sem resposta (bytes)', null)
       return {
