@@ -179,6 +179,12 @@ export function ContadorCaloriasScreen({
      `guardarFotoDoDiario` aceita caminho e converte na hora de salvar, quando
      a memória da câmera já voltou. */
   const [caminhoDaFoto, setCaminhoDaFoto] = useState<string | null>(null)
+  /* A MESMA imagem em texto que foi mandada para a leitura, guardada para o
+     momento de salvar.
+     A tela relia o arquivo do zero na hora de gravar, com `fetch('file://')` —
+     o caminho que quebrou no SDK 57 e fazia a refeição chegar ao diário SEM
+     foto. Guardar são umas trezentas mil letras; reler é uma chance de falhar. */
+  const [fotoEmTexto, setFotoEmTexto] = useState<string | null>(null)
   /* Caminho no bucket → endereço assinado. Um mapa, e não um endereço por
      linha: `createSignedUrls` resolve todos de uma vez, e doze fotos seriam
      doze idas à rede na abertura da tela.
@@ -277,6 +283,7 @@ export function ContadorCaloriasScreen({
       if (estimativa) {
         setEstimativa(null)
         setCaminhoDaFoto(null)
+            setFotoEmTexto(null)
         return true
       }
       if (porta) {
@@ -533,6 +540,7 @@ export function ContadorCaloriasScreen({
       setEstimativa(r.estimativa)
       setLinhasDaFoto(linhasIniciais(r.estimativa))
       setCaminhoDaFoto(r.uri)
+      setFotoEmTexto(r.base64)
     }
     /* 'cancelado' não é erro: a pessoa desistiu da foto e a tela fica como
        estava, sem aviso nenhum. */
@@ -1064,12 +1072,14 @@ export function ContadorCaloriasScreen({
           onDescartar={() => {
             setEstimativa(null)
             setCaminhoDaFoto(null)
+            setFotoEmTexto(null)
           }}
           onRegistrar={linhas => {
-            const imagem = caminhoDaFoto
+            const imagem = fotoEmTexto
             const confianca = estimativa.confianca
             setEstimativa(null)
             setCaminhoDaFoto(null)
+            setFotoEmTexto(null)
             /* UMA linha por alimento, e nao um bloco.
                Todas dividem a MESMA foto: `gravar` sobe a imagem uma vez e
                carimba o caminho em todo item de origem 'foto'. E o que faz a

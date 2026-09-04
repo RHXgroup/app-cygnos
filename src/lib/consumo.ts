@@ -606,7 +606,25 @@ export type ResultadoFoto =
    * `guardarFotoDoDiario` aceita caminho e converte por conta própria, LÁ NA
    * FRENTE, quando a memória da câmera já foi devolvida. O texto continua
    * existindo; só deixa de existir no pior momento possível. */
-  | { tipo: 'ok'; estimativa: Estimativa; uri: string }
+  | {
+      tipo: 'ok'
+      estimativa: Estimativa
+      /* O caminho do arquivo, para a folha DESENHAR a foto na capa. */
+      uri: string
+      /* E a imagem em texto, que já foi feita aqui para mandar à leitura.
+       *
+       * Volta junto em vez de a tela ler o arquivo de novo na hora de salvar.
+       * Reler custava um `fetch('file://...')` seguido de `blob()` — o mesmo
+       * caminho que falhou no envio depois da migração para o SDK 57, e que o
+       * próprio Expo avisa que passa por base64 por dentro. A foto do jantar
+       * chegava ao diário SEM imagem por causa disso.
+       *
+       * E segurar esta string não é o que matava o app: uma foto de 900 pontos
+       * dá umas trezentas mil letras, e o que estourava a memória era o BITMAP
+       * da câmera — dezenas de megabytes — vivo ao lado dela dentro do
+       * `manipulateAsync`. Aqui o bitmap já foi embora. */
+      base64: string
+    }
   | { tipo: 'cancelado' }
   | { tipo: 'erro'; mensagem: string }
 
@@ -885,6 +903,7 @@ export async function analisarFoto(
     return {
       tipo: 'ok',
       uri: reduzida.uri,
+      base64: comTexto.base64,
       estimativa: {
         descricao: data.descricao ?? 'Alimento',
         itens,
