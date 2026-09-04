@@ -814,7 +814,16 @@ export async function analisarFoto(
       if (oContexto) forma.append('contexto', JSON.stringify(oContexto))
       mandouBytes = arquivo.size > 0
     } catch (e) {
-      falha('Foto: não consegui montar os bytes, indo por texto', e)
+      /* `console.log`, e NAO `falha()`.
+         `falha()` usa `console.warn`, e todo `console.warn` no React Native vira
+         uma CAIXA AMARELA por cima do app. Eu pus estas linhas para investigar e
+         enchi a tela de quem estava usando: cada foto abria um alerta que nao
+         pedia nada e nao dava para fazer nada a respeito.
+         Cair para o texto nao e falha -- e a reserva funcionando, e a foto e
+         lida do mesmo jeito. Quem precisa saber disso sou eu, no terminal.
+         A regra: `falha()` e para o que a pessoa PRECISA saber porque muda o
+         que ela vai fazer. Diagnostico meu e `console.log`. */
+      console.log('[cygnos] Foto: não consegui montar os bytes, indo por texto', e)
     }
 
     const porBytes = mandouBytes
@@ -822,7 +831,7 @@ export async function analisarFoto(
       : { data: null, error: new Error('sem bytes') as unknown as { context?: Response } }
 
     if (porBytes === demorou) {
-      falha('Foto: passou de 75s sem resposta (bytes)', null)
+      console.log('[cygnos] Foto: passou de 75s sem resposta (bytes)', null)
       return {
         tipo: 'erro',
         mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',
@@ -843,7 +852,7 @@ export async function analisarFoto(
     if (error) {
       const status = (error as { context?: Response }).context?.status
       if (status === undefined || status >= 400) {
-        falha('Foto: os bytes não foram aceitos (HTTP ' + String(status) + '), indo por texto', error)
+        console.log('[cygnos] Foto: os bytes não foram aceitos (HTTP ' + String(status) + '), indo por texto', error)
         const comTexto = await manipulateAsync(
           escolha.assets[0].uri,
           [{ resize: { width: LADO_MAIOR } }],
@@ -856,7 +865,7 @@ export async function analisarFoto(
             }),
           )
           if (segunda === demorou) {
-            falha('Foto: passou de 75s sem resposta (texto)', null)
+            console.log('[cygnos] Foto: passou de 75s sem resposta (texto)', null)
             return {
               tipo: 'erro',
               mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',

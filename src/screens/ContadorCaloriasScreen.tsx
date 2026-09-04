@@ -1578,6 +1578,34 @@ function ConfirmarFoto({
      não bastam para decidir. Um toque abre a foto inteira por cima. */
   const [fotoAberta, setFotoAberta] = useState(false)
 
+  /* ── O VOLTAR PRECISA DESCASCAR A FOTO ANTES DA FOLHA ───────────────────
+   *
+   * Relatado: abrir a foto ampliada e apertar o voltar do aparelho CANCELAVA a
+   * importação inteira. A tela de cima trata `estimativa` e joga fora a leitura
+   * junto — ela não sabia que existia uma camada nova por cima.
+   *
+   * É o item 1 do AGENTS.md, e eu criei a camada sem o tratador dela na mesma
+   * alteração em que escrevi que ia seguir a regra.
+   *
+   * SEM lista de dependências, de propósito. O React roda os efeitos do FILHO
+   * antes dos do PAI, e o React Native chama os tratadores na ordem inversa do
+   * registro — então o pai, registrando por último, ganharia. Re-registrar a
+   * cada renderização é o que põe este na frente a partir da primeira
+   * re-renderização, que sempre acontece. Não é código morto nem descuido:
+   * apagar a lista é o que faz isto funcionar. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (fotoAberta) {
+        setFotoAberta(false)
+        return true
+      }
+      /* Nada aberto aqui: devolve para a tela de cima, que sabe fechar a folha
+         e limpar a estimativa. */
+      return false
+    })
+    return () => sub.remove()
+  })
+
   /* Todos entram marcados, e inteiros. É o caminho comum — a pessoa fotografou
      o que comeu — e obrigá-la a marcar item por item cobraria seis toques de
      quem não tinha nada a corrigir. */
