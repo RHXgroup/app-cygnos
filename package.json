@@ -41,7 +41,8 @@
     "web": "expo start --web",
     "test": "node scripts/testes.mjs",
     "contrato": "node --env-file=.env scripts/contrato.mjs",
-    "orfaos": "node scripts/orfaos.mjs"
+    "orfaos": "node scripts/orfaos.mjs",
+    "telas": "node scripts/telas.mjs"
   },
   "private": true
 }

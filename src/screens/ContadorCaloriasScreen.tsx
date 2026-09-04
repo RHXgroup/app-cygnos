@@ -1588,6 +1588,18 @@ function ConfirmarFoto({
      não bastam para decidir. Um toque abre a foto inteira por cima. */
   const [fotoAberta, setFotoAberta] = useState(false)
 
+  /* A foto pode SUMIR entre ler e confirmar.
+   *
+   * Ela mora no cache do sistema, e o Android limpa cache quando quer —
+   * inclusive no aperto de memória que a própria câmera provoca. Sem isto, a
+   * capa desenha um buraco de 132 pontos e a folha se lê como app quebrado
+   * (armadilha 7).
+   *
+   * Guarda QUAL endereço falhou, e não um sim/não: assim uma foto nova entra
+   * tentando de novo em vez de herdar a desistência da anterior. */
+  const [fotoQueFalhou, setFotoQueFalhou] = useState<string | null>(null)
+  const temCapa = !!foto && foto !== fotoQueFalhou
+
   /* ── O VOLTAR PRECISA DESCASCAR A FOTO ANTES DA FOLHA ───────────────────
    *
    * Relatado: abrir a foto ampliada e apertar o voltar do aparelho CANCELAVA a
@@ -1644,14 +1656,19 @@ function ConfirmarFoto({
          * O véu escuro embaixo não é enfeite — é o que garante que o número
          * branco se leia sobre QUALQUER foto, inclusive um prato claro com
          * luz de janela. Sem ele o texto some em metade dos pratos. */}
-        {foto ? (
+        {temCapa ? (
           <Pressable
             style={styles.capaFolha}
             onPress={() => setFotoAberta(true)}
             accessibilityRole="imagebutton"
             accessibilityLabel="Ver a foto inteira"
           >
-            <Image source={{ uri: foto }} style={styles.capaImagem} resizeMode="cover" />
+            <Image
+              source={{ uri: foto }}
+              style={styles.capaImagem}
+              resizeMode="cover"
+              onError={() => setFotoQueFalhou(foto)}
+            />
             <LinearGradient
               colors={['rgba(20,24,14,0)', 'rgba(20,24,14,0.45)', 'rgba(20,24,14,0.88)']}
               locations={[0, 0.45, 1]}
@@ -1842,9 +1859,19 @@ function ConfirmarFoto({
        * Fecha em QUALQUER toque, e não num "x" no canto: o gesto de quem
        * terminou de olhar é tocar a tela, e procurar um botão é trabalho a
        * mais para desfazer o que a pessoa acabou de fazer. */}
-      {fotoAberta && !!foto && (
+      {fotoAberta && temCapa && (
         <Pressable style={styles.fotoInteira} onPress={() => setFotoAberta(false)}>
-          <Image source={{ uri: foto }} style={styles.imagemInteira} resizeMode="contain" />
+          <Image
+            source={{ uri: foto }}
+            style={styles.imagemInteira}
+            resizeMode="contain"
+            /* Falhando aqui, fecha e marca: continuar aberto no preto, sem
+               imagem, é pior do que voltar para a lista. */
+            onError={() => {
+              setFotoQueFalhou(foto)
+              setFotoAberta(false)
+            }}
+          />
           <Text style={styles.dicaFechar}>Toque para fechar</Text>
         </Pressable>
       )}
