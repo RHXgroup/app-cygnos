@@ -785,97 +785,56 @@ export async function analisarFoto(
      * caminho sobe áudio para uma função Deno todo dia e funciona. Quando um
      * jeito já está provado no mesmo projeto, copiá-lo vale mais do que
      * escrever um segundo. */
-    /* ── UM `Blob` DE VERDADE, PORQUE O SDK 57 TROCOU O `fetch` ─────────
+    /* ── O ENVIO POR BYTES SAIU, E NAO VOLTA SEM MEDIDA ─────────────────
      *
-     * Aqui ia `{ uri, name, type }` — a forma que o React Native entende, e a
-     * mesma que `voz.ts` usa. Ela parou de funcionar na migração para o 57, e
-     * o motivo apareceu num aviso do próprio Expo, vindo de
-     * `expo/src/winter/fetch/FetchResponse.ts`:
+     * Foram DUAS tentativas hoje, as duas revertidas, e a segunda causou dano:
      *
-     * O SDK 57 SUBSTITUI o `fetch` do aplicativo pelo dele, que segue o padrão
-     * da web à risca. E o padrão não conhece `{ uri, name, type }` — isso é
-     * extensão do React Native. O envio falhava antes de sair do aparelho,
-     * como "FunctionsFetchError: Failed to send a request".
+     *   1a — `{ uri, name, type }`, a forma do React Native. Morria antes de
+     *        sair do aparelho: o SDK 57 troca o `fetch` pelo dele, que segue o
+     *        padrao da web e nao conhece esse formato.
      *
-     * Foram TRÊS teorias até esta: o cancelamento, o arquivo, e o formato.
-     * As duas primeiras custaram uma rodada de teste cada, e a certa veio de um
-     * aviso amarelo que ninguém tinha lido — não de mais uma dedução.
+     *   2a — um `Blob` de verdade, lido com `fetch(uri).blob()`. Isso FUNCIONA
+     *        como formato, e reintroduziu o travamento: o proprio Expo avisa,
+     *        na tela, que o Blob do React Native "copia a resposta para o
+     *        armazenamento nativo e le de volta ATRAVES DE BASE64". Ou seja, a
+     *        mesma alocacao gigante que matava o app, com outro nome — e no
+     *        mesmo instante ruim, logo depois da camera.
      *
-     * Ler o arquivo para um `Blob` custa uma cópia, e o próprio Expo avisa que
-     * ela passa por base64 lá dentro. Mas ela acontece DEPOIS de a câmera ter
-     * devolvido a memória, e não ao lado do bitmap — que era o que matava o
-     * app. O instante importa mais que o total. */
-    const forma = new FormData()
-    let mandouBytes = false
-    try {
-      const arquivo = await (await fetch(reduzida.uri)).blob()
-      console.log('[cygnos] foto: blob de', arquivo.size, 'bytes')
-      forma.append('imagem', arquivo, 'prato.jpg')
-      if (oContexto) forma.append('contexto', JSON.stringify(oContexto))
-      mandouBytes = arquivo.size > 0
-    } catch (e) {
-      /* `console.log`, e NAO `falha()`.
-         `falha()` usa `console.warn`, e todo `console.warn` no React Native vira
-         uma CAIXA AMARELA por cima do app. Eu pus estas linhas para investigar e
-         enchi a tela de quem estava usando: cada foto abria um alerta que nao
-         pedia nada e nao dava para fazer nada a respeito.
-         Cair para o texto nao e falha -- e a reserva funcionando, e a foto e
-         lida do mesmo jeito. Quem precisa saber disso sou eu, no terminal.
-         A regra: `falha()` e para o que a pessoa PRECISA saber porque muda o
-         que ela vai fazer. Diagnostico meu e `console.log`. */
-      console.log('[cygnos] Foto: não consegui montar os bytes, indo por texto', e)
-    }
+     * O app voltou a reiniciar ao ler foto. Relatado no aparelho.
+     *
+     * E o pior: nas duas vezes o servidor recusou e a leitura caiu para o
+     * texto de qualquer jeito. Paguei a memoria e nao ganhei nada.
+     *
+     * Fica UM caminho: a imagem em texto, montada num SEGUNDO
+     * `manipulateAsync`. O primeiro reduz sem base64 e devolve a memoria do
+     * bitmap; o segundo monta o texto depois, com a camera ja fechada. Foi
+     * assim que a reserva funcionou o dia todo sem derrubar o app — o problema
+     * nunca foi o texto existir, foi ele nascer ao lado do bitmap.
+     *
+     * Quem quiser tentar bytes de novo precisa primeiro de um jeito de ler o
+     * arquivo SEM passar por base64 (o pacote `expo-blob`, que o proprio aviso
+     * sugere) e de uma medida de memoria no aparelho. Sem as duas, nao. */
+    const comTexto = await manipulateAsync(
+      escolha.assets[0].uri,
+      [{ resize: { width: LADO_MAIOR } }],
+      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+    )
+    if (!comTexto.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
 
-    const porBytes = mandouBytes
-      ? await comPrazo(supabase.functions.invoke('analisar-alimento', { body: forma }))
-      : { data: null, error: new Error('sem bytes') as unknown as { context?: Response } }
-
-    if (porBytes === demorou) {
-      console.log('[cygnos] Foto: passou de 75s sem resposta (bytes)', null)
+    const envio = await comPrazo(
+      supabase.functions.invoke('analisar-alimento', {
+        body: { imageBase64: comTexto.base64, mimeType: 'image/jpeg', contexto: oContexto },
+      }),
+    )
+    if (envio === demorou) {
+      console.log('[cygnos] Foto: passou de 75s sem resposta')
       return {
         tipo: 'erro',
         mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',
       }
     }
-    let { data, error } = porBytes
+    const { data, error } = envio
 
-    /* ── A VOLTA ────────────────────────────────────────────────────────
-     *
-     * Só quando o servidor RECUSOU o formato — não quando desistimos por
-     * tempo, e não quando a rede caiu. Tentar de novo nesses dois casos
-     * dobraria a espera de quem já esperou demais, e a segunda tentativa
-     * falharia pelo mesmo motivo.
-     *
-     * O que sobra é o caso que me fez reverter isto hoje de manhã: o servidor
-     * não entendeu o pedido. Aí vai a imagem em texto, gastando a memória de
-     * antes — ruim, e melhor do que não ler. */
-    if (error) {
-      const status = (error as { context?: Response }).context?.status
-      if (status === undefined || status >= 400) {
-        console.log('[cygnos] Foto: os bytes não foram aceitos (HTTP ' + String(status) + '), indo por texto', error)
-        const comTexto = await manipulateAsync(
-          escolha.assets[0].uri,
-          [{ resize: { width: LADO_MAIOR } }],
-          { compress: 0.8, format: SaveFormat.JPEG, base64: true },
-        )
-        if (comTexto.base64) {
-          const segunda = await comPrazo(
-            supabase.functions.invoke('analisar-alimento', {
-              body: { imageBase64: comTexto.base64, mimeType: 'image/jpeg', contexto: oContexto },
-            }),
-          )
-          if (segunda === demorou) {
-            console.log('[cygnos] Foto: passou de 75s sem resposta (texto)', null)
-            return {
-              tipo: 'erro',
-              mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',
-            }
-          }
-          data = segunda.data
-          error = segunda.error
-        }
-      }
-    }
 
     if (error) {
       /* O supabase-js embrulha a resposta de erro: sem abrir o context, toda
