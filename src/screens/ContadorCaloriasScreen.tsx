@@ -2480,20 +2480,34 @@ const estilos = estilosDe(t =>
      Um alimento por linha, e não um bloco. A lista rola; o total e os botões
      ficam parados embaixo, senão um prato de oito itens empurraria o
      "Registrar" para fora da folha. */
-  listaDaFoto: { marginTop: 12, flexGrow: 0, flexShrink: 1 },
+  /* A LISTA CRESCE, e é ela que fica com o espaço que sobra.
+   *
+   * Era `flexGrow: 0`: a lista não crescia, encolhia, e todo o resto da folha
+   * tinha prioridade sobre ela. Enquanto a folha abria com um título de duas
+   * linhas isso passava; com a capa da foto de 168 pontos em cima, sobrou UM
+   * item e meio à vista, de seis — fotografado no aparelho.
+   *
+   * O que se confere aqui é a lista. Tudo o mais — total, macros, avisos,
+   * botões — é moldura, e moldura não pode ganhar espaço da coisa. */
+  listaDaFoto: { marginTop: 12, flexGrow: 1, flexShrink: 1 },
   listaDaFotoConteudo: { gap: 8, paddingBottom: 2 },
   /* ── A CAPA: o prato fotografado abre a folha ────────────────────────
-     A altura é fixa e curta de propósito. Uma capa alta empurraria a lista
-     para fora e obrigaria a rolar para ver o primeiro alimento — e o que se
-     confere é a lista, não a imagem. 168 mostra o prato inteiro na proporção
-     de quase toda foto de comida e ainda deixa três alimentos à vista. */
+     Curta de propósito: o que se confere é a lista, não a imagem.
+
+     Nasceu com 168 e um comentário meu afirmando que "ainda deixa três
+     alimentos à vista". Era palpite, e a foto do aparelho desmentiu — deixava
+     um e meio, de seis. 132 devolve dois itens inteiros, e junto com o
+     `flexGrow` da lista a folha volta a servir para conferir.
+
+     Ainda mostra o prato inteiro: foto de comida é quase sempre mais larga que
+     alta, e o que se corta em 132 é a toalha da mesa. */
   /* As margens negativas TÊM de casar com o recuo da folha, que é 20 nas
      laterais e 10 em cima. Um número diferente deixa uma faixa do fundo
      aparecendo dos lados da imagem, e ela se lê como defeito de carregamento.
      E o topo precisa do mesmo arredondamento da folha, senão a foto vaza os
      cantos — com `overflow: 'hidden'`, que é o que faz o corte valer. */
   capaFolha: {
-    height: 168,
+    height: 132,
     marginHorizontal: -20,
     marginTop: -10,
     marginBottom: 14,
@@ -2845,7 +2859,11 @@ const estilos = estilosDe(t =>
     left: 0,
     right: 0,
     bottom: 0,
-    maxHeight: '82%',
+    /* 88, e não 82. A folha ganhou a capa da foto e nada saiu de dentro dela;
+       os seis pontos a mais devolvem uma linha inteira da lista, e 88 ainda
+       deixa ver que existe tela por trás — que é o que diz que dá para
+       fechar arrastando. */
+    maxHeight: '88%',
     backgroundColor: t.cores.fundo,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
