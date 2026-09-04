@@ -785,12 +785,41 @@ export async function analisarFoto(
      * caminho sobe áudio para uma função Deno todo dia e funciona. Quando um
      * jeito já está provado no mesmo projeto, copiá-lo vale mais do que
      * escrever um segundo. */
+    /* ── OS NÚMEROS NA TELA, EM VEZ DA TERCEIRA TEORIA ──────────────────
+     *
+     * "Failed to send a request" é o `fetch` do React Native desistindo ANTES
+     * de sair do aparelho, e o motivo mais comum é ele não conseguir LER o
+     * arquivo que foi posto no envio — endereço sem `file://`, arquivo que já
+     * sumiu, ou tamanho zero.
+     *
+     * A primeira teoria (o `AbortSignal`) estava errada, e custou uma rodada.
+     * A armadilha 2 do AGENTS.md diz o que fazer quando a segunda tentativa
+     * falha: parar de trocar de mecanismo e IMPRIMIR OS NÚMEROS. É isto. */
+    let tamanho = -1
+    try {
+      tamanho = (await (await fetch(reduzida.uri)).blob()).size
+    } catch (e) {
+      console.log('[cygnos] foto: nem consegui LER o arquivo local:', e)
+    }
+    console.log(
+      '[cygnos] foto: uri =',
+      JSON.stringify(reduzida.uri),
+      '· bytes =',
+      tamanho,
+      '· contexto =',
+      oContexto ? 'sim' : 'nao',
+    )
+
     const forma = new FormData()
     forma.append('imagem', {
       uri: reduzida.uri,
       name: 'prato.jpg',
       type: 'image/jpeg',
     } as unknown as Blob)
+    /* O `contexto` vai como campo de TEXTO junto do arquivo. `voz.ts`, que
+       funciona, manda só o arquivo — então esta é a outra diferença entre os
+       dois, e a linha acima diz se ele estava presente na tentativa que
+       falhou. */
     if (oContexto) forma.append('contexto', JSON.stringify(oContexto))
 
     const porBytes = await comPrazo(
