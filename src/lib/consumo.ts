@@ -731,8 +731,43 @@ export async function analisarFoto(
      * 75 segundos é folgado de propósito — o objetivo não é apertar o
      * servidor, é ter um fim. E o fim diz o que aconteceu: "demorou" é outra
      * coisa de "não deu certo", e só a primeira admite tentar de novo. */
-    const desistir = new AbortController()
-    const prazo = setTimeout(() => desistir.abort(), 75_000)
+    /* ── O PRAZO NÃO PODE SER UM `AbortSignal` ──────────────────────────
+     *
+     * Ele era, e foi ISSO que derrubou o envio por bytes. Medido no aparelho:
+     *
+     *   [cygnos] Foto: os bytes não foram aceitos (HTTP undefined), indo por
+     *   texto [FunctionsFetchError: Failed to send a request]
+     *
+     * `HTTP undefined` quer dizer que a requisição nem saiu — falhou no
+     * telefone, antes da rede. No React Native, `fetch` com arquivo dentro de
+     * `FormData` toma um caminho nativo diferente, e juntar um `AbortSignal` a
+     * ele quebra no Android.
+     *
+     * A prova estava do lado: `voz.ts` sobe áudio por `FormData` para uma
+     * função Deno todo dia e funciona — e não passa sinal nenhum. A única
+     * diferença entre o que funcionava e o que não funcionava era esta linha.
+     *
+     * Foi também o que me fez reverter o caminho por bytes hoje de manhã, sem
+     * descobrir o motivo: o sintoma era "a leitura parou de funcionar por
+     * inteiro", e a causa não estava no envio, estava no cancelamento.
+     *
+     * Agora o prazo é uma CORRIDA. Quem chega primeiro decide, e a requisição
+     * não é tocada. O pior caso é uma resposta tardia que ninguém lê — barato
+     * perto de não conseguir mandar. */
+    const demorou = Symbol('demorou')
+    const comPrazo = async <T,>(p: Promise<T>): Promise<T | typeof demorou> => {
+      let id: ReturnType<typeof setTimeout> | undefined
+      try {
+        return await Promise.race([
+          p,
+          new Promise<typeof demorou>(r => {
+            id = setTimeout(() => r(demorou), 75_000)
+          }),
+        ])
+      } finally {
+        if (id) clearTimeout(id)
+      }
+    }
 
     const oContexto =
       contexto && (contexto.costuma.length > 0 || (contexto.doPlano?.length ?? 0) > 0)
@@ -743,10 +778,6 @@ export async function analisarFoto(
             fatorMedioDeCorrecao: contexto.fatorMedioDeCorrecao ?? null,
           }
         : undefined
-
-    /* @ts-expect-error o supabase-js repassa o sinal ao fetch, mas ainda não o
-       declara no tipo das opções de `invoke`. */
-    const opcoes = { signal: desistir.signal }
 
     /* Os BYTES, montados como o ditado monta o áudio.
      *
@@ -762,10 +793,17 @@ export async function analisarFoto(
     } as unknown as Blob)
     if (oContexto) forma.append('contexto', JSON.stringify(oContexto))
 
-    let { data, error } = await supabase.functions.invoke('analisar-alimento', {
-      ...opcoes,
-      body: forma,
-    })
+    const porBytes = await comPrazo(
+      supabase.functions.invoke('analisar-alimento', { body: forma }),
+    )
+    if (porBytes === demorou) {
+      falha('Foto: passou de 75s sem resposta (bytes)', null)
+      return {
+        tipo: 'erro',
+        mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',
+      }
+    }
+    let { data, error } = porBytes
 
     /* ── A VOLTA ────────────────────────────────────────────────────────
      *
@@ -777,7 +815,7 @@ export async function analisarFoto(
      * O que sobra é o caso que me fez reverter isto hoje de manhã: o servidor
      * não entendeu o pedido. Aí vai a imagem em texto, gastando a memória de
      * antes — ruim, e melhor do que não ler. */
-    if (error && !desistir.signal.aborted) {
+    if (error) {
       const status = (error as { context?: Response }).context?.status
       if (status === undefined || status >= 400) {
         falha('Foto: os bytes não foram aceitos (HTTP ' + String(status) + '), indo por texto', error)
@@ -787,28 +825,25 @@ export async function analisarFoto(
           { compress: 0.8, format: SaveFormat.JPEG, base64: true },
         )
         if (comTexto.base64) {
-          const segunda = await supabase.functions.invoke('analisar-alimento', {
-            ...opcoes,
-            body: { imageBase64: comTexto.base64, mimeType: 'image/jpeg', contexto: oContexto },
-          })
+          const segunda = await comPrazo(
+            supabase.functions.invoke('analisar-alimento', {
+              body: { imageBase64: comTexto.base64, mimeType: 'image/jpeg', contexto: oContexto },
+            }),
+          )
+          if (segunda === demorou) {
+            falha('Foto: passou de 75s sem resposta (texto)', null)
+            return {
+              tipo: 'erro',
+              mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',
+            }
+          }
           data = segunda.data
           error = segunda.error
         }
       }
     }
 
-    clearTimeout(prazo)
-
     if (error) {
-      /* Desistimos nós, e não o servidor: a frase tem de dizer isso, senão a
-         pessoa acha que a foto é que estava ruim e tira outra igual. */
-      if (desistir.signal.aborted) {
-        falha('Foto: passou de 75s sem resposta', error)
-        return {
-          tipo: 'erro',
-          mensagem: 'A leitura desta foto está demorando demais. Tente de novo em instantes.',
-        }
-      }
       /* O supabase-js embrulha a resposta de erro: sem abrir o context, toda
          falha do servidor viraria "FunctionsHttpError" na tela — e a função foi
          justamente corrigida para dizer o que aconteceu de verdade. */
