@@ -176,7 +176,17 @@ export function proximoPasso({
   if (consumo.length === 0 && minutos >= 11 * 60 && !diaFora) {
     return {
       chave: 'comida',
-      texto: 'Você ainda não anotou nada hoje',
+      /* CONVITE, e não constatação.
+       *
+       * Era "Você ainda não anotou nada hoje". A frase é verdadeira e inútil:
+       * a pessoa sabe. O que ela faz é abrir o app com uma cobrança na cara,
+       * e o app abre justamente no momento em que ela decidiu fazer alguma
+       * coisa — o pior instante possível para dizer o que ela não fez.
+       *
+       * A troca não é enfeite: cobrança dá vontade de fechar, e oferta dá
+       * vontade de tocar. Aqui o que se oferece é o TAMANHO do gesto, que é o
+       * que decide se alguém começa. */
+      texto: 'Uma foto do prato já começa o seu dia',
       destino: 'contador',
       icone: 'add-circle-outline',
     }
@@ -189,7 +199,9 @@ export function proximoPasso({
   if (treinaHoje && minutos >= 18 * 60 && !diaFora && !sessoes.some(s => s.data === hoje)) {
     return {
       chave: 'treino',
-      texto: 'Hoje é dia de treino na sua rotina',
+      /* "Hoje é dia de treino na sua rotina" era a agenda falando. Esta fala
+         do que a pessoa ganha, e nomeia o próximo passo em vez do dever. */
+      texto: 'Seu treino de hoje está esperando',
       destino: 'treino',
       icone: 'barbell-outline',
     }
@@ -200,7 +212,16 @@ export function proximoPasso({
   if (aguaAtrasadaMl !== null && aguaAtrasadaMl > 0) {
     return {
       chave: 'agua',
-      texto: `Faltam ${milhar(aguaAtrasadaMl)} ml para o seu ritmo de água`,
+      /* O número FICA, e o convite vem junto.
+       *
+       * A primeira reescrita tirou os ml para soar menos cobrança — e o teste
+       * reprovou, com razão: o número é a informação, e trocar informação por
+       * gentileza deixa a frase simpática e vazia. Quem lê precisa saber o
+       * tamanho da dívida para decidir se levanta agora ou daqui a pouco.
+       *
+       * O que muda é o que vem DEPOIS do número: em vez de terminar na falta,
+       * a frase termina no gesto que a resolve. */
+      texto: `Faltam ${milhar(aguaAtrasadaMl)} ml — um copo agora já recupera`,
       destino: 'agua',
       icone: 'water-outline',
     }
@@ -219,7 +240,9 @@ export function proximoPasso({
 
   return {
     chave: 'em_dia',
-    texto: 'Seu dia está em dia',
+    /* Quando não há o que pedir, o app RECONHECE. É o único momento em que
+       ele não quer nada — e é o que faz a pessoa querer voltar amanhã. */
+    texto: 'Está tudo em dia hoje. Bom trabalho.',
     destino: null,
     icone: 'checkmark-circle-outline',
   }
