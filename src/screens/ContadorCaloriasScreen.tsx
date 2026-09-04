@@ -2487,12 +2487,25 @@ const estilos = estilosDe(t =>
      para fora e obrigaria a rolar para ver o primeiro alimento — e o que se
      confere é a lista, não a imagem. 168 mostra o prato inteiro na proporção
      de quase toda foto de comida e ainda deixa três alimentos à vista. */
-  capaFolha: { height: 168, marginHorizontal: -18, marginTop: -12, marginBottom: 14 },
+  /* As margens negativas TÊM de casar com o recuo da folha, que é 20 nas
+     laterais e 10 em cima. Um número diferente deixa uma faixa do fundo
+     aparecendo dos lados da imagem, e ela se lê como defeito de carregamento.
+     E o topo precisa do mesmo arredondamento da folha, senão a foto vaza os
+     cantos — com `overflow: 'hidden'`, que é o que faz o corte valer. */
+  capaFolha: {
+    height: 168,
+    marginHorizontal: -20,
+    marginTop: -10,
+    marginBottom: 14,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
   capaImagem: { width: '100%', height: '100%' },
   capaTextos: {
     position: 'absolute',
-    left: 18,
-    right: 18,
+    left: 20,
+    right: 20,
     bottom: 13,
     flexDirection: 'row',
     alignItems: 'flex-end',
