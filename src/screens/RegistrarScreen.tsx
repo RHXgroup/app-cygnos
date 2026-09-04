@@ -17,6 +17,13 @@ import { estilosDe, paleta } from '../lib/tema'
 type Opcao = {
   chave: string
   rotulo: string
+  /* A frase embaixo do rótulo.
+     "Código de barras" é o nome da coisa; "Produto de mercado" é o que ela
+     resolve. A pessoa procura pelo problema que tem, e não pelo nome da
+     tecnologia — e o app falava por nome em toda esta tela enquanto falava por
+     problema no cartão da sequência. Duas vozes no mesmo app, e esta é a que
+     se toca cinco vezes por dia. */
+  frase?: string
   icone: keyof typeof Ionicons.glyphMap
 }
 
@@ -41,17 +48,33 @@ type Opcao = {
  * de dado e não de palpite: o app grava a `origem` de cada item do diário, e
  * uma semana de uso responde melhor. Até lá, estas são as que dispensam
  * digitar. */
+/* ── A FOTO SAI DA GRADE E VIRA O COMANDO ────────────────────────────────
+ *
+ * Ela dividia a linha com "Falar", do mesmo tamanho e do mesmo peso. Duas
+ * opções idênticas obrigam a ESCOLHER, e escolher cansa — cinco vezes por dia,
+ * cansa muito. Uma grande e duas menores ao lado tiram a decisão sem tirar a
+ * opção: quem quer falar continua achando na hora.
+ *
+ * E a foto é o que faz este app existir. É a ação que a análise de mercado
+ * inteira aponta como o motivo de as pessoas não desistirem de contar
+ * caloria — quem desiste desiste de PROCURAR, não de contar. */
+const PRINCIPAL: Opcao = {
+  chave: 'foto',
+  rotulo: 'Foto do prato',
+  icone: 'camera-outline',
+  frase: 'A leitura separa os alimentos e você confere',
+}
+
 const COMER: Opcao[] = [
-  { chave: 'falar', rotulo: 'Falar', icone: 'mic-outline' },
-  { chave: 'foto', rotulo: 'Foto', icone: 'camera-outline' },
-  { chave: 'doPlano', rotulo: 'Do meu plano', icone: 'nutrition-outline' },
+  { chave: 'falar', rotulo: 'Falar', icone: 'mic-outline', frase: 'Diga o que comeu' },
+  { chave: 'doPlano', rotulo: 'Do meu plano', icone: 'nutrition-outline', frase: 'O que estava previsto' },
 ]
 
 const COMER_MAIS: Opcao[] = [
-  { chave: 'buscar', rotulo: 'Buscar', icone: 'search-outline' },
-  { chave: 'repetir', rotulo: 'Repetir', icone: 'repeat-outline' },
-  { chave: 'codigo', rotulo: 'Código de barras', icone: 'barcode-outline' },
-  { chave: 'receitas', rotulo: 'Receitas', icone: 'book-outline' },
+  { chave: 'buscar', rotulo: 'Buscar na tabela', icone: 'search-outline' },
+  { chave: 'repetir', rotulo: 'Repetir', icone: 'repeat-outline', frase: 'O que você já comeu antes' },
+  { chave: 'codigo', rotulo: 'Código de barras', icone: 'barcode-outline', frase: 'Produto de mercado' },
+  { chave: 'receitas', rotulo: 'Receitas', icone: 'book-outline', frase: 'As suas e as dela' },
 ]
 
 /* O que se anota em segundos, quase todo dia. */
@@ -60,7 +83,7 @@ const ANOTAR: Opcao[] = [
      mesmo assim, e em primeiro lugar nele, porque é o gesto que a pessoa faz
      no mesmo momento — abre o app para anotar o almoço e lembra que amanhã
      janta fora. Um grupo só para ele seria uma linha sozinha. */
-  { chave: 'plano_futuro', rotulo: 'Contar um plano', icone: 'calendar-outline' },
+  { chave: 'plano_futuro', rotulo: 'Contar um plano', icone: 'calendar-outline', frase: 'Vou comer fora, vou viajar' },
   { chave: 'agua', rotulo: 'Água', icone: 'water-outline' },
   { chave: 'peso', rotulo: 'Peso', icone: 'speedometer-outline' },
   { chave: 'sono', rotulo: 'Sono', icone: 'moon-outline' },
@@ -71,14 +94,14 @@ const ANOTAR: Opcao[] = [
    porque estar por último não o esconde: quem veio definir uma meta veio de
    propósito, e rola a tela. */
 const DEFINIR: Opcao[] = [
-  { chave: 'plano', rotulo: 'Plano alimentar', icone: 'restaurant-outline' },
-  { chave: 'metas', rotulo: 'Metas', icone: 'flag-outline' },
-  { chave: 'energetico', rotulo: 'Cálculo energético', icone: 'flame-outline' },
+  { chave: 'plano', rotulo: 'Montar o meu plano', icone: 'restaurant-outline', frase: 'O que comer em cada refeição' },
+  { chave: 'metas', rotulo: 'Minhas metas', icone: 'flag-outline', frase: 'Calorias, água, peso' },
+  { chave: 'energetico', rotulo: 'Cálculo energético', icone: 'flame-outline', frase: 'Quanto o seu corpo gasta' },
 ]
 
 /* Cada forma de comer aponta para uma porta do diário. Aqui, e não espalhado no
    JSX, para a lista de portas e a lista de botões não divergirem. */
-const TODAS: Opcao[] = [...COMER, ...COMER_MAIS, ...ANOTAR, ...DEFINIR]
+const TODAS: Opcao[] = [PRINCIPAL, ...COMER, ...COMER_MAIS, ...ANOTAR, ...DEFINIR]
 
 const PORTA_DE: Record<string, PortaDoDiario> = {
   falar: 'escrever',
@@ -289,6 +312,24 @@ export function RegistrarScreen({
               é o que se faz cinco vezes por dia. Os outros dois são listas
               magras — cabem mais na tela e não competem pelo olhar. */}
           <Text style={styles.grupo}>Comi alguma coisa</Text>
+
+          {/* A FOTO, sozinha e larga. Ver a explicação em `PRINCIPAL`. */}
+          <Pressable
+            onPress={() => setEscolhida(PRINCIPAL)}
+            style={({ pressed }) => [styles.principal, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${PRINCIPAL.rotulo}. ${PRINCIPAL.frase ?? ''}`}
+          >
+            <View style={styles.circuloPrincipal}>
+              <Ionicons name={PRINCIPAL.icone} size={26} color={paleta().cores.verde} />
+            </View>
+            <View style={styles.textosPrincipal}>
+              <Text style={styles.rotuloPrincipal}>{PRINCIPAL.rotulo}</Text>
+              <Text style={styles.frasePrincipal}>{PRINCIPAL.frase}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={19} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+
           <View style={styles.grade}>
             {COMER.map(o => (
               <Pressable
@@ -296,7 +337,7 @@ export function RegistrarScreen({
                 onPress={() => setEscolhida(o)}
                 style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
                 accessibilityRole="button"
-                accessibilityLabel={o.rotulo}
+                accessibilityLabel={o.frase ? `${o.rotulo}. ${o.frase}` : o.rotulo}
               >
                 <View style={styles.circulo}>
                   <Ionicons name={o.icone} size={22} color={paleta().cores.verde} />
@@ -304,6 +345,11 @@ export function RegistrarScreen({
                 <Text style={styles.rotulo} numberOfLines={2}>
                   {o.rotulo}
                 </Text>
+                {!!o.frase && (
+                  <Text style={styles.fraseCartao} numberOfLines={2}>
+                    {o.frase}
+                  </Text>
+                )}
               </Pressable>
             ))}
           </View>
@@ -345,7 +391,7 @@ export function RegistrarScreen({
             ))}
           </View>
 
-          <Text style={styles.grupo}>Definir</Text>
+          <Text style={styles.grupo}>Definir uma vez</Text>
           <View style={styles.lista}>
             {DEFINIR.map(o => (
               <Linha key={o.chave} opcao={o} onPress={() => setEscolhida(o)} styles={styles} />
@@ -372,10 +418,16 @@ function Linha({
       onPress={onPress}
       style={({ pressed }) => [styles.linha, pressed && styles.cartaoPressionado]}
       accessibilityRole="button"
-      accessibilityLabel={opcao.rotulo}
+      accessibilityLabel={opcao.frase ? `${opcao.rotulo}. ${opcao.frase}` : opcao.rotulo}
     >
       <Ionicons name={opcao.icone} size={19} color={paleta().cores.verde} />
-      <Text style={styles.rotuloLinha}>{opcao.rotulo}</Text>
+      <View style={styles.textosLinha}>
+        <Text style={styles.rotuloLinha}>{opcao.rotulo}</Text>
+        {/* A frase só aparece onde o nome não basta. "Água" e "Peso" dispensam;
+            "Código de barras" não diz que serve para produto de mercado, e
+            "Contar um plano" não diz que é para quando você vai comer fora. */}
+        {!!opcao.frase && <Text style={styles.fraseLinha}>{opcao.frase}</Text>}
+      </View>
       <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
     </Pressable>
   )
@@ -453,7 +505,9 @@ const estilos = estilosDe(t =>
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
-  rotuloLinha: { flex: 1, fontSize: 15, fontWeight: '600', color: t.cores.ink },
+  textosLinha: { flex: 1, minWidth: 0 },
+  rotuloLinha: { fontSize: 15, fontWeight: '600', color: t.cores.ink },
+  fraseLinha: { marginTop: 1.5, fontSize: 11.5, color: t.inkSuave, lineHeight: 15 },
 
   maisFormas: {
     flexDirection: 'row',
@@ -469,5 +523,41 @@ const estilos = estilosDe(t =>
   textoMaisFormas: { fontSize: 13.5, fontWeight: '600', color: t.inkSuave },
 
   rotulo: { fontSize: 14, fontWeight: '700', color: t.cores.ink, lineHeight: 19 },
+  /* A frase embaixo do rótulo, nos cartões pequenos. Duas linhas no máximo:
+     na terceira ela deixa de ser uma dica e vira texto para ler. */
+  fraseCartao: { marginTop: 3, fontSize: 11.5, color: t.inkSuave, lineHeight: 15 },
+
+  /* ── O CARTÃO DA FOTO ──────────────────────────────────────────────────
+     Largura inteira e a cor da marca: é a única coisa desta tela pintada de
+     verde, e é isso que faz o olho ir nela sem ninguém precisar ler. Ver a
+     explicação em `PRINCIPAL`, no topo do arquivo. */
+  principal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    backgroundColor: t.cores.verde,
+    borderRadius: 18,
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    marginBottom: 12,
+  },
+  /* Círculo claro sobre o verde, com o ícone verde dentro: ícone branco sobre
+     verde tem menos contraste do que parece, e some em tela no sol. */
+  circuloPrincipal: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: t.cores.branco,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textosPrincipal: { flex: 1, minWidth: 0 },
+  rotuloPrincipal: { fontSize: 16.5, fontWeight: '800', color: t.cores.branco },
+  frasePrincipal: {
+    marginTop: 2,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.82)',
+    lineHeight: 16,
+  },
   }),
 )
