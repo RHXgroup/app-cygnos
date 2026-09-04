@@ -159,10 +159,31 @@ function notificacoes(): Promise<ModuloNotificacoes> {
    Não é zelo: a primeira versão dele fingia ter `then`, o motor concluiu que o
    módulo era uma promessa, e `await notificacoes()` passou a esperar para
    sempre — o mesmo travamento que ele existe para consertar, escondido. */
+/* ── UMA LINHA POR SESSÃO, E NÃO UMA POR CHAMADA ─────────────────────────
+ *
+ * Isto imprimia a cada acesso a cada nome ausente. Fotografado no terminal do
+ * Metro: ler UMA foto produzia mais de vinte linhas iguais, e elas afogavam o
+ * `[cygnos] Foto ...` que eu tinha acabado de pôr ali justamente para
+ * diagnosticar a foto. O aviso destruía o que ele deveria ajudar a achar.
+ *
+ * A causa foi minha: ao mover o embrulho para `moduloProtegido`, o controle de
+ * "avisa uma vez" ficou para trás — o novo `aoFaltar` é chamado em TODA leitura,
+ * e o antigo tinha um `Set` que eu não levei junto.
+ *
+ * E a correção não é devolver o `Set`: é aceitar que o detalhe por nome não
+ * serve para ninguém. Que o Expo Go corta o expo-notifications já está dito no
+ * erro vermelho logo acima. Uma linha, uma vez, e o resto do terminal fica
+ * legível. */
+let jaAvisou = false
+
 const protegido = (n: ModuloNotificacoes): ModuloNotificacoes =>
-  moduloProtegido(n, nome =>
-    console.log('[cygnos] expo-notifications sem `' + nome + '` neste Expo Go — ignorando'),
-  )
+  moduloProtegido(n, () => {
+    if (jaAvisou) return
+    jaAvisou = true
+    console.log(
+      '[cygnos] expo-notifications está limitado neste Expo Go — o que faltar é ignorado.',
+    )
+  })
 
 async function lerIds(chave: string): Promise<string[]> {
   try {

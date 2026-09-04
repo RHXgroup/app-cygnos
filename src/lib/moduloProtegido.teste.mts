@@ -108,5 +108,45 @@ function ok(nome: string, condicao: boolean, extra = '') {
   ok('e da para virar texto sem explodir', typeof String(p) === 'string')
 }
 
+{
+  // ── O AVISO NAO PODE SAIR A CADA LEITURA ────────────────────────────────
+  //
+  // `aoFaltar` e chamado em TODA leitura de nome ausente -- de proposito: quem
+  // decide a frequencia e quem chama, e o embrulho nao guarda estado.
+  //
+  // Isso mordeu de verdade: ao mover o embrulho para ca, o "avisa uma vez" do
+  // chamador ficou para tras, e ler uma foto produzia mais de vinte linhas
+  // iguais no terminal do Metro -- afogando justamente a linha de diagnostico
+  // da foto que estava sendo procurada.
+  //
+  // A prova aqui fixa o CONTRATO: o embrulho avisa sempre, e cabe ao chamador
+  // filtrar. Se alguem inverter isso um dia, quebra aqui e nao no terminal de
+  // outra pessoa.
+  const chamadas: string[] = []
+  const p = moduloProtegido({} as Record<string, unknown>, n => chamadas.push(n))
+
+  const f = (p as Record<string, () => Promise<unknown>>).getPermissionsAsync
+  await f()
+  await (p as Record<string, () => Promise<unknown>>).getPermissionsAsync()
+  await (p as Record<string, () => Promise<unknown>>).requestPermissionsAsync()
+
+  ok('avisa em toda leitura, sem guardar estado', chamadas.length === 3, chamadas.join(','))
+  ok('e o nome vem certo', chamadas[2] === 'requestPermissionsAsync', chamadas[2])
+
+  // E o chamador consegue filtrar com um booleano -- e o resultado e UMA linha,
+  // que e o que `lembretes` faz.
+  let vezes = 0
+  let ja = false
+  const q = moduloProtegido({} as Record<string, unknown>, () => {
+    if (ja) return
+    ja = true
+    vezes++
+  })
+  for (const nome of ['a', 'b', 'c', 'a', 'b']) {
+    void (q as Record<string, unknown>)[nome]
+  }
+  ok('filtrando no chamador, sai UMA linha', vezes === 1, String(vezes))
+}
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) process.exit(1)
