@@ -35,6 +35,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "celular": "node scripts/celular.mjs",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
