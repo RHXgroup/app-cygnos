@@ -861,6 +861,38 @@ export function HomeScreen({
           Não aparece quando a pessoa está olhando outro dia: "almoço em 40
           min" não faz sentido em cima da terça passada. */}
 
+      {/* ── O PROGRESSO ABRE A TELA ────────────────────────────────────
+       *
+       * Este cartão era o QUINTO. Vinham antes a saudação, o resumo da semana,
+       * a frase de próximo passo e a faixa de dias — e ele chegava cortado
+       * pelo rodapé, na quarta rolagem.
+       *
+       * Fotografado no aparelho, é o que faz a tela abrir sem responder a
+       * única pergunta que a pessoa tem ao abrir: como estou hoje. O anel do
+       * canto superior direito mostra um percentual de quatro assuntos
+       * somados, pequeno demais para ser lido de relance e genérico demais
+       * para significar alguma coisa.
+       *
+       * A ordem agora é: quem é você, como está o seu dia, e só então o que
+       * fazer a seguir. Motivo antes de tarefa continua valendo — o motivo é
+       * o progresso, não o resumo da semana passada.
+       *
+       * A faixa de dias veio junto porque ela SELECIONA o que este cartão
+       * mostra: separadas, a pessoa mudava o dia e o número mudava fora da
+       * vista. */}
+      <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
+
+      {/* ── Dias da semana ── */}
+      {/* ── Calorias ── */}
+      <CartaoCalorias
+        consumo={consumo}
+        plano={planoVigente}
+        metas={metas}
+        dia={diaSelecionado}
+        onAbrirMetas={onAbrirMetas}
+        onAbrirContador={onAbrirContador}
+      />
+
       {/* O RECADO DELA, acima de tudo.
           É o único conteúdo desta tela que veio de uma PESSOA, e não de uma
           conta. Some sozinho quando não há recado — nada de moldura dizendo
@@ -958,18 +990,7 @@ export function HomeScreen({
         </Pressable>
       )}
 
-      {/* ── Dias da semana ── */}
-      <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
 
-      {/* ── Calorias ── */}
-      <CartaoCalorias
-        consumo={consumo}
-        plano={planoVigente}
-        metas={metas}
-        dia={diaSelecionado}
-        onAbrirMetas={onAbrirMetas}
-        onAbrirContador={onAbrirContador}
-      />
 
       {/* ── Plano alimentar ── */}
       <BlocoPlano
