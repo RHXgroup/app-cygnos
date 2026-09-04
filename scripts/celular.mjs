@@ -73,13 +73,18 @@ console.log('')
 /* `--lan` continua junto: ele é quem faz o Metro escutar em TODAS as placas.
    Sem ele o servidor sobe só em `::1` (IPv6 local), e aí o celular não alcança
    nem sabendo o endereço certo — outra tarde perdida, também registrada. */
-const filho = spawn(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['expo', 'start', '--lan', ...process.argv.slice(2)],
-  {
-    stdio: 'inherit',
-    env: { ...process.env, REACT_NATIVE_PACKAGER_HOSTNAME: achado.ip },
-  },
-)
+/* `shell: true`, e nao `npx.cmd`.
+ *
+ * A partir do Node 20, chamar um `.cmd` direto pelo `spawn` no Windows falha
+ * com `EINVAL` -- foi uma correcao de seguranca (CVE-2024-27980) que passou a
+ * recusar executaveis de shell sem shell. Medido aqui no Node 24.
+ *
+ * Com `shell: true` quem resolve o `npx` e o proprio interpretador de comandos,
+ * que e como a linha seria digitada a mao. */
+const filho = spawn('npx expo start --lan ' + process.argv.slice(2).join(' '), {
+  stdio: 'inherit',
+  shell: true,
+  env: { ...process.env, REACT_NATIVE_PACKAGER_HOSTNAME: achado.ip },
+})
 
 filho.on('exit', codigo => process.exit(codigo ?? 0))
