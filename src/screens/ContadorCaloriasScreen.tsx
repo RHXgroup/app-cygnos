@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BarraDesfazer, useApagarComDesfazer } from '../components/Desfazer'
@@ -1054,6 +1055,7 @@ export function ContadorCaloriasScreen({
       {/* ── Confirmar a estimativa da foto ── */}
       {estimativa && (
         <ConfirmarFoto
+          foto={caminhoDaFoto}
           estimativa={estimativa}
           linhas={linhasDaFoto}
           onLinhas={setLinhasDaFoto}
@@ -1540,6 +1542,7 @@ function FotoDoPrato({ uri }: { uri: string }) {
  * Quando ela diz "comi metade", isso é uma medida dela contra a leitura do
  * modelo, e vira o viés que calibra a próxima foto. Ver `paraGravar`. */
 function ConfirmarFoto({
+  foto,
   estimativa,
   linhas,
   onLinhas,
@@ -1548,6 +1551,11 @@ function ConfirmarFoto({
   onRegistrar,
   onDescartar,
 }: {
+  /* O CAMINHO da foto que acabou de ser lida.
+     Ela abre a folha, e não some quando a leitura termina: o que a pessoa está
+     conferindo é aquele prato, e ver a lista ao lado da imagem é o que permite
+     dizer "isso aí não é peixe" sem ter de lembrar o que fotografou. */
+  foto: string | null
   estimativa: Estimativa
   /* Controlada de fora: trocar um item abre a busca por cima, a folha desmonta,
      e sem isto ela voltaria zerada. */
@@ -1579,14 +1587,59 @@ function ConfirmarFoto({
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={styles.fundoFolha} onPress={onDescartar} />
       <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
-        <View style={styles.puxador} />
-
-        <Text style={styles.tituloFolha}>{estimativa.descricao}</Text>
-        <Text style={styles.porcaoFolha}>
-          {estimativa.itens.length === 1
-            ? 'Confira antes de registrar.'
-            : `${estimativa.itens.length} alimentos. Tire o que você não comeu e ajuste o resto.`}
-        </Text>
+        {/* ── O PRATO ABRE A FOLHA ──────────────────────────────────────
+         *
+         * A foto sumia no instante em que a leitura terminava, e a pessoa
+         * ficava conferindo uma lista de nomes sem ter ao lado o que foi
+         * fotografado. Ver "filé de peixe" com o frango na tela é o que
+         * permite corrigir; ver só a palavra obriga a lembrar.
+         *
+         * O total vai SOBRE a imagem, e não abaixo dela: é a resposta da
+         * pergunta que a pessoa tem ao fotografar, e ali ela é a primeira
+         * coisa que se lê.
+         *
+         * O véu escuro embaixo não é enfeite — é o que garante que o número
+         * branco se leia sobre QUALQUER foto, inclusive um prato claro com
+         * luz de janela. Sem ele o texto some em metade dos pratos. */}
+        {foto ? (
+          <View style={styles.capaFolha}>
+            <Image source={{ uri: foto }} style={styles.capaImagem} resizeMode="cover" />
+            <LinearGradient
+              colors={['rgba(20,24,14,0)', 'rgba(20,24,14,0.45)', 'rgba(20,24,14,0.88)']}
+              locations={[0, 0.45, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.capaTextos}>
+              <View style={styles.capaEsquerda}>
+                <Text style={styles.capaTitulo} numberOfLines={1}>
+                  {estimativa.descricao}
+                </Text>
+                <Text style={styles.capaSub} numberOfLines={1}>
+                  {estimativa.itens.length === 1
+                    ? 'Confira antes de registrar'
+                    : `${estimativa.itens.length} alimentos · toque no nome para trocar`}
+                </Text>
+              </View>
+              <View>
+                <Text style={styles.capaKcal}>
+                  {totais.calorias === null ? '—' : milhar(totais.calorias)}
+                </Text>
+                <Text style={styles.capaUnidade}>kcal</Text>
+              </View>
+            </View>
+            <View style={styles.puxadorSobreFoto} />
+          </View>
+        ) : (
+          <>
+            <View style={styles.puxador} />
+            <Text style={styles.tituloFolha}>{estimativa.descricao}</Text>
+            <Text style={styles.porcaoFolha}>
+              {estimativa.itens.length === 1
+                ? 'Confira antes de registrar.'
+                : `${estimativa.itens.length} alimentos · toque no nome para trocar`}
+            </Text>
+          </>
+        )}
 
         {/* A LISTA rola; o total e os botões ficam parados embaixo.
             Sem isso, um prato de oito itens empurraria o "Registrar" para fora
@@ -1600,6 +1653,7 @@ function ConfirmarFoto({
             <LinhaDaFoto
               key={`${l.item.nome}-${i}`}
               linha={l}
+              ultimo={i === linhas.length - 1}
               onFracao={fator => mexer(i, x => ({ ...x, fator }))}
               onAlternar={() => mexer(i, x => ({ ...x, dentro: !x.dentro }))}
               onTrocar={() => onTrocar(i)}
@@ -1607,14 +1661,18 @@ function ConfirmarFoto({
           ))}
         </ScrollView>
 
-        {/* O TOTAL do que sobrou marcado. Muda a cada toque, e é ele que
-            responde à pergunta que a pessoa realmente tem. */}
-        <View style={styles.arcoFolha}>
-          <Text style={styles.kcalFolha}>
-            {totais.calorias === null ? '—' : milhar(totais.calorias)}
-          </Text>
-          <Text style={styles.unidadeFolha}>kcal no total</Text>
-        </View>
+        {/* O TOTAL repetido embaixo SÓ quando não há capa.
+            Com a foto no topo ele já está lá, grande, e mostrar duas vezes o
+            mesmo número numa folha curta faz a pessoa procurar a diferença
+            entre os dois. */}
+        {!foto && (
+          <View style={styles.arcoFolha}>
+            <Text style={styles.kcalFolha}>
+              {totais.calorias === null ? '—' : milhar(totais.calorias)}
+            </Text>
+            <Text style={styles.unidadeFolha}>kcal no total</Text>
+          </View>
+        )}
 
         <View style={styles.macrosFolha}>
           <MacroFolha rotulo="Proteínas" valor={totais.proteinas} />
@@ -1721,11 +1779,15 @@ function ConfirmarFoto({
  * tecnologia (±28% na porção). */
 function LinhaDaFoto({
   linha,
+  ultimo,
   onFracao,
   onAlternar,
   onTrocar,
 }: {
   linha: LinhaEscolhida
+  /* O último não leva traço embaixo: separador no fim não separa de nada, e
+     desenha uma borda solta acima do total. */
+  ultimo: boolean
   onFracao: (fator: number) => void
   onAlternar: () => void
   /* Abre a busca para pôr outro alimento no lugar deste. */
@@ -1736,7 +1798,9 @@ function LinhaDaFoto({
   const mostrado = comFator(linha.item, linha.fator)
 
   return (
-    <View style={[styles.itemDaFoto, !linha.dentro && styles.itemDaFotoFora]}>
+    <View
+      style={[styles.itemDaFoto, ultimo && styles.itemDaFotoUltimo, !linha.dentro && styles.itemDaFotoFora]}
+    >
       <View style={styles.linhaTopoItem}>
         <Pressable
           style={styles.textosDoItem}
@@ -1761,9 +1825,16 @@ function LinhaDaFoto({
           )}
         </Pressable>
 
-        <Text style={styles.kcalDoItem}>
-          {linha.dentro ? (mostrado.calorias === null ? '—' : `${milhar(mostrado.calorias)} kcal`) : ''}
-        </Text>
+        {/* O NÚMERO grande e a unidade pequena embaixo.
+            Antes era "248 kcal" no mesmo corpo do resto do texto — o dado que
+            a pessoa procura estava escondido no meio de palavras. Dígitos de
+            largura fixa para as linhas alinharem em coluna. */}
+        <View style={styles.numeroDoItem}>
+          <Text style={styles.kcalDoItem}>
+            {linha.dentro ? (mostrado.calorias === null ? '—' : milhar(mostrado.calorias)) : '—'}
+          </Text>
+          <Text style={styles.unidadeDoItem}>kcal</Text>
+        </View>
 
         {/* Tirar, e devolver. Um item removido continua na lista, apagado: some-lo
             faria a pessoa que errou o toque perder o alimento sem ter como
@@ -1789,28 +1860,35 @@ function LinhaDaFoto({
            87% de um número que já é aproximado é precisão inventada. Ninguém
            olha um prato e pensa "comi 87%" — pensa "comi metade". */
         <View style={styles.fracoesDoItem}>
-          {FRACOES_DA_PORCAO.map(f => (
-            <Pressable
-              key={f.fator}
-              onPress={() => onFracao(f.fator)}
-              style={({ pressed }) => [
-                styles.fracaoPequena,
-                linha.fator === f.fator && styles.fracaoAtiva,
-                pressed && styles.chipPressionado,
-              ]}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: linha.fator === f.fator }}
-            >
-              <Text
-                style={[
-                  styles.textoFracaoPequena,
-                  linha.fator === f.fator && styles.textoFracaoAtiva,
+          <Text style={styles.rotuloComi}>Comi</Text>
+          <View style={styles.trilhaFracoes}>
+            {FRACOES_DA_PORCAO.map(f => (
+              <Pressable
+                key={f.fator}
+                onPress={() => onFracao(f.fator)}
+                style={({ pressed }) => [
+                  styles.fracaoPequena,
+                  linha.fator === f.fator && styles.fracaoAtivaPequena,
+                  pressed && { opacity: 0.6 },
                 ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: linha.fator === f.fator }}
+                /* O rótulo falado continua sendo a FRASE: "½" lido em voz alta
+                   não diz nada, e quem usa leitor de tela perde o sentido que
+                   a palavra "Comi" devolve para quem enxerga. */
+                accessibilityLabel={`Comi ${f.rotulo}`}
               >
-                {f.rotulo}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    styles.textoFracaoPequena,
+                    linha.fator === f.fator && styles.textoFracaoAtivaPequena,
+                  ]}
+                >
+                  {f.curto}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       ) : (
         <Text style={styles.foraDoItem}>Não entra no registro.</Text>
@@ -2404,14 +2482,61 @@ const estilos = estilosDe(t =>
      "Registrar" para fora da folha. */
   listaDaFoto: { marginTop: 12, flexGrow: 0, flexShrink: 1 },
   listaDaFotoConteudo: { gap: 8, paddingBottom: 2 },
-  itemDaFoto: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: t.cores.borda,
-    backgroundColor: t.cores.cartao,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  /* ── A CAPA: o prato fotografado abre a folha ────────────────────────
+     A altura é fixa e curta de propósito. Uma capa alta empurraria a lista
+     para fora e obrigaria a rolar para ver o primeiro alimento — e o que se
+     confere é a lista, não a imagem. 168 mostra o prato inteiro na proporção
+     de quase toda foto de comida e ainda deixa três alimentos à vista. */
+  capaFolha: { height: 168, marginHorizontal: -18, marginTop: -12, marginBottom: 14 },
+  capaImagem: { width: '100%', height: '100%' },
+  capaTextos: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    bottom: 13,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
   },
+  capaEsquerda: { flex: 1, minWidth: 0 },
+  capaTitulo: { fontSize: 19, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
+  capaSub: { marginTop: 2, fontSize: 11.5, color: 'rgba(255,255,255,0.75)' },
+  capaKcal: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 34,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+  capaUnidade: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.68)',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  /* O puxador some sobre a foto e vira branco: preto sobre imagem escura
+     desaparece, e sem ele a folha perde o sinal de que dá para arrastar. */
+  puxadorSobreFoto: {
+    position: 'absolute',
+    top: 10,
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+
+  /* LINHA, e não caixa.
+     Seis cartões com contorno viram uma grade, e a grade compete com a foto
+     que agora abre a folha. Um traço fino separa tão bem quanto e não pesa —
+     o último não tem traço, porque separador no fim não separa de nada. */
+  itemDaFoto: { paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: t.cores.borda },
+  itemDaFotoUltimo: { borderBottomWidth: 0 },
   /* Tirado, mas ainda visível: sumir com a linha faria quem errou o toque
      perder o alimento sem ter como voltar, e a foto não é analisada de novo. */
   itemDaFotoFora: { backgroundColor: t.cores.fundo, opacity: 0.6 },
@@ -2420,14 +2545,25 @@ const estilos = estilosDe(t =>
   linhaNomeItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   nomeDoItem: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: t.cores.ink },
   porcaoDoItem: { marginTop: 2, fontSize: 11.5, color: t.inkSuave },
-  kcalDoItem: {
-    fontSize: 12.5,
+  numeroDoItem: { alignItems: 'flex-end', minWidth: 52 },
+  unidadeDoItem: {
+    fontSize: 9,
     fontWeight: '700',
-    color: t.inkMedio,
-    /* Os números de linhas diferentes alinham pela direita — é o que deixa a
-       coluna legível de relance, que é como ela vai ser lida. */
+    color: t.inkFraco,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  kcalDoItem: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: t.cores.ink,
+    lineHeight: 17,
+    /* Largura fixa por dígito: é o que deixa a coluna de calorias alinhada
+       de uma linha para a outra, que é como ela vai ser lida — de relance. A
+       largura mínima mora no `numeroDoItem`, que embrulha número e unidade. */
+    fontVariant: ['tabular-nums'],
     textAlign: 'right',
-    minWidth: 62,
   },
   tirarItem: {
     width: 26,
@@ -2439,19 +2575,45 @@ const estilos = estilosDe(t =>
     borderWidth: 1,
     borderColor: t.cores.borda,
   },
-  fracoesDoItem: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9 },
+  /* "Comi" antes da trilha, e o número dentro dela.
+     Só os números — "½ 1 1½ 2" — não dizem de QUE é a conta, e foi assim que
+     a primeira versão desta tela ficou bonita e indecifrável. A palavra
+     aparece uma vez por linha, em vez de quatro vezes dentro dos botões. */
+  fracoesDoItem: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 9 },
+  rotuloComi: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: t.inkFraco,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  /* Trilha única, com o escolhido em relevo — e não quatro botões soltos.
+     O fundo cinza diz que os quatro são o mesmo controle; soltos, cada um
+     parecia uma ação independente. */
+  trilhaFracoes: {
+    flexDirection: 'row',
+    backgroundColor: t.cores.verdeMenta,
+    borderRadius: 10,
+    padding: 3,
+    gap: 2,
+  },
   /* Menor que a `fracao` da folha de item único: aqui são quatro por linha,
      repetidas em até oito linhas. O alvo do dedo continua acima de 40 pontos de
      altura contando o vão entre as linhas. */
   fracaoPequena: {
-    paddingHorizontal: 10,
+    minWidth: 42,
+    alignItems: 'center',
     paddingVertical: 7,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: t.cores.borda,
-    backgroundColor: t.cores.superficie,
   },
-  textoFracaoPequena: { fontSize: 11.5, fontWeight: '600', color: t.inkMedio },
+  textoFracaoPequena: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: t.inkMedio,
+    fontVariant: ['tabular-nums'],
+  },
+  fracaoAtivaPequena: { backgroundColor: t.cores.superficie },
+  textoFracaoAtivaPequena: { color: t.cores.verdeEscuro, fontWeight: '800' },
   foraDoItem: { marginTop: 7, fontSize: 11.5, color: t.inkFraco },
   textoFracao: { fontSize: 13, fontWeight: '600', color: t.inkMedio },
   textoFracaoAtiva: { color: t.cores.branco, fontWeight: '800' },

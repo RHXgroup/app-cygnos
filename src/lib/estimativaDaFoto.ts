@@ -165,11 +165,23 @@ export function itensDaEstimativa(data: unknown): ItemDaFoto[] {
  * É a mesma escada do `ajustar` que já existe para item registrado — duas telas
  * com escalas diferentes para a mesma ideia fariam a pessoa aprender duas
  * vezes. */
+/* Dois rótulos por fração, e não um.
+ *
+ * `rotulo` é a frase, e vai no nome do item gravado ("Arroz branco (metade)") —
+ * lá o espaço sobra e a palavra é o que se entende.
+ *
+ * `curto` é o botão. A folha da foto mostra QUATRO por alimento; com a frase
+ * inteira, um prato de seis alimentos virava vinte e quatro botões de palavra
+ * comprida, quebrando linha, e a lista não cabia na tela.
+ *
+ * Encolher sozinho não bastou: "½ 1 1½ 2" não diz DE QUE é a conta. Quem
+ * carrega o sentido agora é a palavra "Comi" antes do seletor, uma vez por
+ * linha em vez de quatro. */
 export const FRACOES_DA_PORCAO = [
-  { fator: 0.5, rotulo: 'metade' },
-  { fator: 1, rotulo: 'tudo' },
-  { fator: 1.5, rotulo: 'uma vez e meia' },
-  { fator: 2, rotulo: 'o dobro' },
+  { fator: 0.5, rotulo: 'metade', curto: '½' },
+  { fator: 1, rotulo: 'tudo', curto: '1' },
+  { fator: 1.5, rotulo: 'uma vez e meia', curto: '1½' },
+  { fator: 2, rotulo: 'o dobro', curto: '2' },
 ] as const
 
 /* O item reescalado.
