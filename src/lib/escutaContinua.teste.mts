@@ -89,10 +89,44 @@ function correr(leituras: [number | null, number][], inicial: Estado = ESTADO_IN
   for (let i = 0; i < 200; i++) leituras.push([-20, 100])
   const { decisoes } = correr(leituras)
   ok('corta no teto', decisoes.includes('cortar_no_teto'), decisoes.slice(0, 4).join(','))
+  /* 6 s, e nao 12. Quem recebe o corte descarta acima de 5 s
+     (COMANDO_LONGO_DEMAIS_S, em ModoTreino), entao o teto NUNCA produz um
+     trecho aproveitavel -- o que ele produz e a recalibragem do piso. Doze
+     segundos so dobravam a espera ate a escuta voltar a funcionar. */
   ok(
-    'o teto é de 12 segundos',
-    MAXIMO_DO_TRECHO_MS === 12_000 && SILENCIO_QUE_FECHA_MS === 700 && MINIMO_DE_FALA_MS === 350,
+    'o teto e de 6 segundos',
+    MAXIMO_DO_TRECHO_MS === 6_000 && SILENCIO_QUE_FECHA_MS === 700 && MINIMO_DE_FALA_MS === 350,
+    String(MAXIMO_DO_TRECHO_MS),
   )
+}
+
+// -- 4b. O PISO AFUNDADO se conserta sozinho ---------------------------------
+//
+// Fotografado no aparelho, na tela de treino: "-12 dB - limiar -84". Setenta e
+// dois decibeis de folga, ou seja TUDO contava como fala. A escuta nunca via
+// silencio, nunca fechava trecho, e a unica saida era o teto -- que era
+// descartado por duracao. Nada nunca era enviado, e a tela ficava eternamente
+// "gravando". Relatado como "so fica assim e nunca inicia".
+//
+// A adaptacao normal nao resgata isso: ela sobe 0,5% por leitura, e sair de -96
+// para perto de -12 levaria centenas de leituras, todas dentro de um trecho que
+// nunca fecha.
+{
+  console.log('\n4b. piso afundado')
+  let e = { falando: false, comecouEm: null, silencioDesde: null, ambiente: -96 }
+  let tetos = 0
+  let viuSilencio = false
+  for (let i = 0; i < 400; i++) {
+    const r = ouvir(e, -12, i * 100)
+    e = r.estado
+    if (r.decisao === 'cortar_no_teto') tetos++
+    // "Silencio" aqui e o detector parando de achar que ha fala continua.
+    if (tetos > 0 && !e.falando && limiarDe(e.ambiente) >= -12) viuSilencio = true
+  }
+  ok('o piso subiu', e.ambiente > -60, String(e.ambiente.toFixed(1)))
+  ok('e o limiar passou do nivel constante', limiarDe(e.ambiente) >= -12, String(limiarDe(e.ambiente).toFixed(1)))
+  ok('em poucos tetos, e nao em centenas', tetos <= 5, String(tetos) + ' tetos')
+  ok('a escuta voltou a enxergar silencio', viuSilencio)
 }
 
 // ── 5. O limiar SE ADAPTA ao lugar ──────────────────────────────────────────
@@ -126,11 +160,22 @@ function correr(leituras: [number | null, number][], inicial: Estado = ESTADO_IN
     `limiar ${limiarDe(e.ambiente).toFixed(1)} contra fala ${NIVEL_DE_FALA}`,
   )
 
-  /* E nem uma frase LONGA cega — doze segundos, o teto de um trecho. */
+  /* E uma frase de tamanho REAL nao cega: tres segundos, que ja e uma frase
+     longa dita de uma vez.
+
+     Antes este caso usava DOZE segundos, e passava. Ele deixou de passar quando
+     o teto virou recalibragem -- e a mudanca esta certa: doze segundos de som
+     CONSTANTE no mesmo nivel nao sao fala. Fala tem intervalo entre frases; som
+     continuo por tanto tempo e televisao, maquina, ou medidor quebrado. Nesse
+     caso subir o piso e o comportamento desejado, e e ele que conserta o piso
+     afundado do caso 4b.
+
+     O que continua tendo de valer e isto: uma frase de verdade nao pode cegar o
+     detector. */
   let e2 = ESTADO_INICIAL
-  for (let i = 0; i < 120; i++) e2 = ouvir(e2, NIVEL_DE_FALA, i * 100).estado
+  for (let i = 0; i < 30; i++) e2 = ouvir(e2, NIVEL_DE_FALA, i * 100).estado
   ok(
-    'nem doze segundos falando',
+    'nem tres segundos falando',
     limiarDe(e2.ambiente) < NIVEL_DE_FALA,
     `limiar ${limiarDe(e2.ambiente).toFixed(1)}`,
   )

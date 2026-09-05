@@ -38,9 +38,24 @@ export const MINIMO_DE_FALA_MS = 350
 export const SILENCIO_QUE_FECHA_MS = 700
 
 /* Teto por trecho. Alguém que fala sem parar — ou uma televisão ligada perto —
-   não pode gerar um arquivo de dois minutos: corta, manda o que tem, e recomeça
-   ouvindo. */
-export const MAXIMO_DO_TRECHO_MS = 12_000
+   não pode gerar um arquivo de dois minutos: corta e recomeça ouvindo.
+
+   ── 6 s, e não 12 ────────────────────────────────────────────────────────
+   Fotografado no aparelho: `-12 dB · limiar -84`. Setenta e dois decibéis de
+   folga, ou seja, TUDO contava como fala — a escuta nunca via silêncio, nunca
+   fechava trecho, e a única saída era o teto.
+
+   E o teto não salvava, porque quem o recebe descarta acima de 5 s
+   (`COMANDO_LONGO_DEMAIS_S`, em `ModoTreino`). Com 12 aqui e 5 lá, o corte no
+   teto produzia SEMPRE um trecho jogado fora. Nada nunca era enviado, e a tela
+   ficava eternamente "gravando" — que foi exatamente o relato: "só fica assim e
+   nunca inicia".
+
+   Continua acima dos 5 de propósito: seis segundos de som contínuo não são um
+   comando de duas palavras, e mandá-los gastaria chamada para receber lixo. O
+   que o teto faz agora é RECALIBRAR (ver `ouvir`), e seis em vez de doze é
+   metade do tempo até a escuta voltar a funcionar. */
+export const MAXIMO_DO_TRECHO_MS = 6_000
 
 export type Estado = {
   /* Se estamos dentro de um trecho de fala. */
@@ -115,8 +130,42 @@ export function ouvir(
   const desdeOComeco = agora - (estado.comecouEm ?? agora)
 
   if (desdeOComeco >= MAXIMO_DO_TRECHO_MS) {
+    /* ── BATER NO TETO É PROVA DE QUE O LIMIAR ESTÁ ERRADO ───────────────
+     *
+     * Ninguém diz um comando de duas palavras durante seis segundos seguidos.
+     * Chegar aqui quer dizer quase sempre a mesma coisa: o piso de ruído ficou
+     * abaixo do que o microfone realmente entrega, e por isso TUDO conta como
+     * fala.
+     *
+     * Fotografado: piso em -96 e nível em -12. A adaptação normal não resgata
+     * isso a tempo — ela sobe 0,5% por leitura, e sair de -96 para perto de -12
+     * levaria centenas de leituras, todas dentro de um trecho que nunca fecha.
+     *
+     * Então o teto puxa o piso METADE do caminho até o nível de agora.
+     *
+     * Metade, e não o nível inteiro: ancorar em `nivel` deixaria o limiar
+     * `nivel + 12`, ou seja, DOZE DECIBÉIS ACIMA do que se acabou de ouvir — e
+     * a próxima fala, no mesmo volume, não seria ouvida. O teste pegou isso na
+     * primeira tentativa, com o limiar em -3 contra fala a -15.
+     *
+     * Pela metade, o piso converge: -96 vira -54, depois -33, depois -22, e em
+     * três tetos (dezoito segundos) o limiar passa do nível e a escuta volta a
+     * enxergar silêncio. Lento o bastante para não cegar uma frase longa de
+     * verdade, rápido o bastante para não precisar fechar o app.
+     *
+     * É a única saída que se conserta sozinha: sem ela, um piso afundado
+     * deixava a escuta inútil até alguém fechar o app.
+     *
+     * O trecho em si continua sendo descartado por duração de quem chama — seis
+     * segundos de som contínuo não são um comando, e mandá-los gastaria chamada
+     * para receber lixo. */
     return {
-      estado: { falando: false, comecouEm: null, silencioDesde: null, ambiente },
+      estado: {
+        falando: false,
+        comecouEm: null,
+        silencioDesde: null,
+        ambiente: (estado.ambiente + nivel) / 2,
+      },
       decisao: 'cortar_no_teto',
     }
   }
