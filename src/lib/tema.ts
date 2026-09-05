@@ -203,3 +203,30 @@ export function estilosDe<T>(criar: (t: Paleta) => T): () => T {
     return guardado
   }
 }
+
+/* ── A CASCA DO CARTÃO, num lugar só ───────────────────────────────────────
+ *
+ * Medido antes de escrever, porque "está tudo fora de padrão" precisa virar
+ * número antes de virar conserto. Na tela inicial, oito blocos empilhados:
+ *
+ *   raio 20  os seis cartões, água, boas-vindas, passo, semana
+ *   raio 16  CartaoDaSequencia e CartaoDoRecado
+ *   padding  13, 14, 15 e 16, conforme o bloco
+ *
+ * Ninguém olha um cartão e pensa "esse raio é 16". Mas empilhados, dois cantos
+ * diferentes no meio de seis iguais é exatamente o que se lê como "um grande,
+ * outro pequeno, tudo fora de padrão" — que foi a descrição de quem usa.
+ *
+ * E `PADDING_CARTAO = 16` estava escrito TRÊS vezes, em três telas. Três cópias
+ * do mesmo número divergem no dia em que alguém corrige uma (armadilha 5).
+ *
+ * Mora aqui, e não num arquivo novo de tokens: `tema` já é o lugar de onde toda
+ * tela puxa aparência, e um segundo lugar seria a mesma armadilha outra vez. */
+export const RAIO_CARTAO = 20
+export const PADDING_CARTAO = 16
+
+/* O respiro ENTRE cartões, que é irmão do de dentro.
+ *
+ * 12 e não 16: a distância entre dois cartões precisa ser menor que a margem
+ * interna deles, senão a pilha se lê como itens soltos em vez de uma lista. */
+export const RESPIRO_ENTRE_CARTOES = 12

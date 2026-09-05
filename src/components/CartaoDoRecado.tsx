@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { urlDoAvatar } from '../lib/avatar'
 import { primeiroNomeDela, type RecadoDaNutri } from '../lib/recadoDaNutri'
-import { estilosDe, paleta } from '../lib/tema'
+import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 
 /* O recado da nutricionista, na tela que abre todo dia.
  *
@@ -112,8 +112,12 @@ const estilos = estilosDe(t =>
     cartao: {
       gap: 11,
       backgroundColor: t.cores.verdeClaro,
-      borderRadius: 16,
-      padding: 15,
+      /* A casca é a mesma dos outros, e o que distingue é a COR.
+         Estava com raio 16 e padding 15 no meio de uma pilha de 20 e 16 — o
+         canto mais fechado lia-se como descuido, não como intenção. O tingido
+         já basta para dizer que este veio de uma pessoa. */
+      borderRadius: RAIO_CARTAO,
+      padding: PADDING_CARTAO,
     },
     pressionado: { opacity: 0.85 },
 

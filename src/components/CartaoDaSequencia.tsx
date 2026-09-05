@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { fraseDaSequencia, type Sequencia } from '../lib/sequenciaDaPessoa'
-import { estilosDe, paleta } from '../lib/tema'
+import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 
 /* A sequência: há quantos dias ela não abandona isto.
  *
@@ -86,10 +86,13 @@ const estilos = estilosDe(t =>
       alignItems: 'center',
       gap: 13,
       backgroundColor: t.cores.cartao,
-      borderRadius: 16,
+      /* Mesma casca dos outros — ver o comentário em lib/tema. Estava 16/15/13
+         numa pilha de 20/16, e dois cantos diferentes no meio de seis iguais é
+         o que se lê como "tudo fora de padrão". */
+      borderRadius: RAIO_CARTAO,
       borderWidth: 1,
       borderColor: t.cores.borda,
-      paddingHorizontal: 15,
+      paddingHorizontal: PADDING_CARTAO,
       paddingVertical: 13,
     },
     /* O marco é o único momento em que o cartão preenche. Um por vez, e só no

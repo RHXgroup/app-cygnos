@@ -48,11 +48,12 @@ import {
   nomeDoObjetivo,
 } from '../lib/metas'
 import { dataISO, dataNumerica } from '../lib/formatar'
-import { estilosDe, paleta } from '../lib/tema'
+import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
 
 const MARGEM = 20
-const PADDING_CARTAO = 16
+/* Vem do tema. Estava escrito à mão aqui e em mais duas telas — ver o
+   comentário da casca do cartão em lib/tema. */
 
 /* Peso: um número por dia, e a comparação sempre contra o primeiro.
  *

@@ -100,7 +100,7 @@ import {
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
 import { proximoPasso } from '../lib/proximoPasso'
 import { daquiA, janelaAcordada, ritmoDaAgua } from '../lib/ritmoAgua'
-import { estilosDe, paleta } from '../lib/tema'
+import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
 
@@ -109,7 +109,8 @@ const ehHoje = (d: Date) => dataISO(d) === dataISO(new Date())
 /* Margem lateral da tela e respiro interno dos cartões. Ficam nomeados porque
    a largura do gráfico é calculada a partir deles. */
 const MARGEM = 20
-const PADDING_CARTAO = 16
+/* Vem do tema. Estava escrito à mão aqui e em mais duas telas — ver o
+   comentário da casca do cartão em lib/tema. */
 
 export function HomeScreen({
   sessao,

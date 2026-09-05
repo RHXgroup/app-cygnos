@@ -42,6 +42,8 @@ import {
   trocarAcento,
   trocarTema,
   type Tema,
+  PADDING_CARTAO,
+  RAIO_CARTAO,
 } from '../lib/tema'
 import { hexDeHsl } from '../lib/cor'
 import { ritmoDeAgua } from '../lib/ritmoDeAgua'
@@ -54,7 +56,8 @@ const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'su
 ]
 
 const MARGEM = 20
-const PADDING_CARTAO = 16
+/* Vem do tema. Estava escrito à mão aqui e em mais duas telas — ver o
+   comentário da casca do cartão em lib/tema. */
 
 /* A aba "Mais".
  *
