@@ -31,6 +31,47 @@ import { dataNumerica, milhar } from './formatar'
  * Só o resumo mora aqui — "existe? quantos? de quando?". O conteúdo de cada
  * item sai em função própria, quando cada tela de detalhe existir. */
 
+/* AS CATEGORIAS que a nutricionista publica para o paciente.
+ *
+ * ── Por que a lista mora aqui, e nao dentro da tela dela ─────────────────
+ * Relatado olhando a tela: o cartao "Meu nutricionista" mostra so o nome e uma
+ * setinha, e quem olha conclui -- com razao -- que "Alimentos para oferecer" e
+ * "Mensagens", que estao visiveis do lado de fora, sao TUDO o que existe. Por
+ * tras da setinha ha sete coisas, e a porta nao dizia nenhuma.
+ *
+ * O cartao passa a listar os rotulos daqui. Estando num lugar so, categoria
+ * nova aparece nos DOIS de uma vez -- e nao no dia em que alguem lembrar de
+ * atualizar o segundo. Foi a pergunta que veio junto do relato: "e quando tiver
+ * mais vai aparecer ai tambem?".
+ *
+ * O que NAO mora aqui e o texto de apoio de cada uma ("3 avaliacoes", "Ainda
+ * nao preenchida"): ele depende do resumo do banco, e so a tela dela tem esse
+ * resumo em maos. Rotulo e identidade, apoio e estado.
+ *
+ * A ORDEM importa e nao e alfabetica: anamnese abre porque e o comeco do
+ * acompanhamento, e receitas vem logo depois do plano porque a pergunta que
+ * segue "o que eu como" e "como eu faco isso". */
+export const CATEGORIAS_DA_NUTRI = [
+  { chave: 'anamnese', rotulo: 'Anamnese', icone: 'document-text-outline' },
+  { chave: 'antropometria', rotulo: 'Antropometria', icone: 'body-outline' },
+  { chave: 'fotos', rotulo: 'Evolucao fotografica', icone: 'camera-outline' },
+  { chave: 'exames', rotulo: 'Exames', icone: 'flask-outline' },
+  { chave: 'plano', rotulo: 'Planejamento alimentar', icone: 'restaurant-outline' },
+  { chave: 'energetico', rotulo: 'Calculo energetico', icone: 'flame-outline' },
+  { chave: 'receitas', rotulo: 'Receitas', icone: 'book-outline' },
+] as const
+
+/* O que a porta diz. Tres nomes e "e mais", porque a linha e uma so: listar os
+   sete quebraria em tres linhas dentro de um cartao que existe para mostrar uma
+   PESSOA, e a lista viraria o assunto no lugar dela.
+
+   Tres e nao dois: com dois, "e mais 5" e maior que o que ele mostra. */
+export const oQueTemAtras = (quantos = 3): string => {
+  const nomes = CATEGORIAS_DA_NUTRI.slice(0, quantos).map(c => c.rotulo.toLowerCase())
+  const restam = CATEGORIAS_DA_NUTRI.length - quantos
+  return restam > 0 ? `${nomes.join(', ')} e mais ${restam}` : nomes.join(', ')
+}
+
 export type ResumoContagem = {
   total: number
   /* ISO (yyyy-mm-dd) do registro mais recente, ou null quando não há nenhum. */

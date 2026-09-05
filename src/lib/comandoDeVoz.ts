@@ -50,7 +50,11 @@ const FRASES: [Comando, string[]][] = [
    * resolve os dois estados certo: sem treino aberto ele comeca, com treino
    * aberto ele prepara a serie. Um comando novo teria de repetir essa decisao,
    * e duas copias da mesma decisao divergem. */
-  ['continuar', ['iniciar serie', 'inicia a serie', 'iniciar a serie', 'comecar serie', 'comeca a serie', 'comecar a serie', 'bora pra serie', 'vamos pra serie']],
+  ['continuar', ['inicia a serie', 'iniciar serie', 'iniciar a serie', 'comeca a serie', 'comecar serie', 'comecar a serie', 'bora pra serie', 'vamos pra serie']],
+  /* `a serie` NAO entra nesta lista, por mais tentador que seja: "proxim`a
+     serie`" o contem, e "proxima serie" e pedido de PULAR O DESCANSO, testado
+     mais abaixo. O teste pegou na primeira execucao. Fragmento curto demais
+     rouba a frase do vizinho, e o vizinho aqui faz outra coisa. */
   /* COMECAR vem primeiro, e não é ordem arbitrária.
      "vamos treinar" e "bora comecar" carregam palavras que `continuar` tambem
      reivindica ('vamos', 'bora'), e quem diz isso com o treino ainda parado
@@ -65,19 +69,32 @@ const FRASES: [Comando, string[]][] = [
      para quem está usando. */
   [
     'comecar',
+    /* ── RAIZ, e nao a palavra inteira ─────────────────────────────────────
+       A comparacao e por CONTER, entao a raiz cobre as flexoes: `inicia` casa
+       com "inicia", "iniciar", "iniciando" e "iniciando a"; `comec` casa com
+       "comecar", "comeca", "comecei", "comecou".
+
+       Isto veio de um teste no aparelho: a pessoa disse "Cygnos, iniciar", o
+       audio chegou, foi transcrito e o CHAMADO foi reconhecido -- e mesmo assim
+       o app respondeu "nao entendi". So o verbo nao casou. Uma lista de palavras
+       inteiras aposta em o Whisper devolver exatamente a forma prevista, e ele
+       devolve o que soa: "inicia" por "iniciar" e uma troca de uma letra.
+
+       Custa pouco errar para mais aqui: o chamado ja filtrou conversa alheia, e
+       a negacao continua cancelando tudo. */
     [
       'iniciar treino',
       'inicia o treino',
-      'iniciar o treino',
       'comecar treino',
-      'comecar o treino',
       'comeca o treino',
       'vamos treinar',
       'bora treinar',
       'vamos comecar',
       'bora comecar',
-      'iniciar',
-      'comecar',
+      'inicia',
+      'comec',
+      'partiu',
+      'vamo la',
     ],
   ],
   ['pular_descanso', ['pula', 'pular', 'sem descanso', 'ja to pronto', 'to pronto', 'proxima serie']],
@@ -98,7 +115,9 @@ const FRASES: [Comando, string[]][] = [
     'terminar',
     ['terminar o treino', 'acabou o treino', 'encerrar', 'finalizar', 'chega por hoje', 'acabei o treino'],
   ],
-  ['fiz', ['fiz', 'feito', 'terminei', 'acabei', 'pronto', 'completei', 'ok']],
+  /* Tambem por raiz: `termin` cobre "terminei", "terminou", "terminado".
+     `terminar` o TREINO ja foi testado acima e ganha as frases longas. */
+  ['fiz', ['fiz', 'feito', 'termin', 'acabei', 'pronto', 'completei', 'ok']],
 ]
 
 /* Palavras que INVERTEM o pedido.

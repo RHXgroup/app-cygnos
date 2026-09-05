@@ -416,10 +416,10 @@ export function PerfilScreen({
                 </>
               )}
 
-              <Linha rotulo="E-mail" valor={sessao.user.email ?? '—'} />
-              <Linha rotulo="CPF" valor={mascaraCPF(conta.cpf)} />
-              <Linha rotulo="Nascimento" valor={dataBR(conta.data_nascimento)} />
-              <Linha rotulo="Gênero" valor={GENEROS[conta.genero] ?? conta.genero} ultima />
+              <Linha rotulo="E-mail" valor={sessao.user.email ?? '—'} travada={editando} />
+              <Linha rotulo="CPF" valor={mascaraCPF(conta.cpf)} travada={editando} />
+              <Linha rotulo="Nascimento" valor={dataBR(conta.data_nascimento)} travada={editando} />
+              <Linha rotulo="Gênero" valor={GENEROS[conta.genero] ?? conta.genero} travada={editando} ultima />
 
               {editando && (
                 <View style={styles.acoesEdicao}>
@@ -649,14 +649,39 @@ function OpcaoFolha({
   )
 }
 
-function Linha({ rotulo, valor, ultima }: { rotulo: string; valor: string; ultima?: boolean }) {
+/* Uma linha so de leitura.
+ *
+ * O CADEADO: em modo de edicao, nome e telefone viram campos e os outros quatro
+ * continuam texto -- com exatamente a mesma cara de antes. Relatado duas vezes:
+ * "nao mostra os campos que pode editar ou nao", "fica estranho, parece que nao
+ * esta funcionando".
+ *
+ * E parece mesmo: a pessoa toca em Editar, ve seis linhas iguais, toca no CPF,
+ * nada acontece, e conclui que o BOTAO nao funcionou -- em vez de concluir que
+ * aquele campo e fechado. A diferenca entre "travado" e "quebrado" tem de estar
+ * na tela, e nao na cabeca de quem escreveu.
+ *
+ * So aparece EM EDICAO. Fora dela nada e editavel, e um cadeado em toda linha
+ * nao distinguiria nada -- so sujaria a leitura. */
+function Linha({
+  rotulo,
+  valor,
+  ultima,
+  travada,
+}: {
+  rotulo: string
+  valor: string
+  ultima?: boolean
+  travada?: boolean
+}) {
   const styles = estilos()
   return (
     <View style={[styles.linha, !ultima && styles.linhaComDivisor]}>
-      <Text style={styles.rotuloLinha}>{rotulo}</Text>
-      <Text style={styles.valorLinha} numberOfLines={1}>
+      <Text style={[styles.rotuloLinha, travada && styles.rotuloTravado]}>{rotulo}</Text>
+      <Text style={[styles.valorLinha, travada && styles.valorTravado]} numberOfLines={1}>
         {valor}
       </Text>
+      {travada && <Ionicons name="lock-closed" size={13} color={paleta().inkFraco} />}
     </View>
   )
 }
@@ -771,6 +796,11 @@ const estilos = estilosDe(t =>
   /* ── A EDIÇÃO ────────────────────────────────────────────────────────────
      O campo herda a tipografia do `valorLinha` para o cartão não saltar ao
      entrar em edição -- ver o comentário do componente `Campo`. */
+  /* Apagado E com cadeado. Apagar sozinho se leria como "carregando"; o
+     cadeado sozinho se perde. Os dois juntos dizem a mesma coisa duas vezes,
+     que e o certo quando a conclusao errada custa uma reclamacao. */
+  rotuloTravado: { opacity: 0.55 },
+  valorTravado: { opacity: 0.55 },
   campoLinha: {
     flexShrink: 1,
     minWidth: 150,

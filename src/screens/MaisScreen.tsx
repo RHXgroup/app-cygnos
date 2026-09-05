@@ -12,6 +12,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Secao } from '../components/Secao'
+import { oQueTemAtras } from '../lib/conteudoNutri'
+import { carregarPlanoTerapeutico } from '../lib/planoTerapeutico'
 import { AvatarNutri } from '../components/AvatarNutri'
 import { LINKS, abrirLink } from '../lib/links'
 import { carregarCatalogo, type Catalogo } from '../lib/nutricionista'
@@ -159,6 +161,24 @@ export function MaisScreen({
    * quando a pessoa volta ao app, sem ela ter de procurar em lugar nenhum. */
   const [temQuestionario, setTemQuestionario] = useState(false)
 
+  /* ── A ENTRADA DOS ALIMENTOS SÓ EXISTE COM PLANO ────────────────────────
+   *
+   * Relatado: "esse meu alimentos aí não tem nada publicado e aparece".
+   *
+   * Ela aparecia SEMPRE, e por um motivo que era bom: esconder faria a mãe que
+   * acabou de sair do consultório procurar uma opção que sumiu, sem saber que a
+   * nutricionista ainda não publicou.
+   *
+   * Só que esse é um caso, e a linha aparecia para todos os outros — que abrem,
+   * leem "a sua nutricionista ainda não montou um plano de alimentos para
+   * oferecer em casa" e nunca mais vão precisar disso. Uma entrada permanente
+   * que quase sempre leva a um aviso de vazio ensina a ignorar o menu inteiro.
+   *
+   * A janela que o motivo antigo protegia é curta: o plano é publicado na
+   * consulta, e a mãe abre o app depois. Quando ele existir, a linha aparece
+   * sozinha na próxima leitura — e esta tela relê ao voltar do segundo plano. */
+  const [temAlimentos, setTemAlimentos] = useState(false)
+
   const buscar = useCallback(async () => {
     const r = await carregarCatalogo()
     if (r.tipo === 'erro') setErro(r.mensagem)
@@ -205,6 +225,9 @@ export function MaisScreen({
   useEffect(() => {
     let vivo = true
 
+    carregarPlanoTerapeutico()
+      .then(r => vivo && setTemAlimentos(r.tipo === 'ok' && r.objetivos.length > 0))
+      .catch(() => {})
     lembretesLigados().then(l => vivo && setLembretes(l))
     lembretesDeAguaLigados().then(l => vivo && setAgua(l))
     lembreteDaSequenciaLigado().then(l => vivo && setSequencia(l))
@@ -576,6 +599,7 @@ export function MaisScreen({
           Era um cartao com titulo e subtitulo; virou linha, igual a de
           Mensagens, porque as duas vem da mesma pessoa. O subtitulo desceu para
           a segunda linha, que e onde ele cabe sem virar outro formato. */}
+      {temAlimentos && (
       <Pressable
         onPress={onAbrirPlanoTerapeutico}
         style={({ pressed }) => [styles.linhaQuestionario, pressed && styles.linhaPressionada]}
@@ -591,6 +615,7 @@ export function MaisScreen({
         </View>
         <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
       </Pressable>
+      )}
 
       {/* Só aparece quando há algo a responder, e some sozinha depois.
           Uma linha permanente de "questionário" ensinaria a ignorá-la: quando o
@@ -1124,6 +1149,21 @@ function CartaoNutricionista({
             )}
           </View>
         </View>
+
+        {/* ── A PORTA DIZ O QUE TEM ATRAS ────────────────────────────────
+            Sem esta linha o cartao e um nome e uma setinha, e quem olha conclui
+            que o que esta visivel do lado de fora e tudo o que existe. Sao sete
+            coisas atras dela.
+
+            A lista vem de `CATEGORIAS_DA_NUTRI`, em conteudoNutri -- a mesma
+            que monta o menu la dentro. Num lugar so, categoria nova aparece nos
+            dois de uma vez. */}
+        <View style={styles.oQueTemAtras}>
+          <Ionicons name="folder-open-outline" size={13} color={paleta().inkSuave} />
+          <Text style={styles.textoOQueTemAtras} numberOfLines={1}>
+            {oQueTemAtras()}
+          </Text>
+        </View>
       </Pressable>
     )
   }
@@ -1180,6 +1220,17 @@ const estilos = estilosDe(t =>
 
   /* Cartão de uma linha, e não um item dentro de "Conta": é o primeiro assunto
      da aba, e o único que fala da PESSOA e não de configuração. */
+  oQueTemAtras: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderTopColor: t.cores.borda,
+  },
+  textoOQueTemAtras: { flex: 1, fontSize: 11.5, color: t.inkSuave },
+
   linhaPerfil: {
     flexDirection: 'row',
     alignItems: 'center',

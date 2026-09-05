@@ -253,5 +253,29 @@ function ok(nome: string, cond: boolean, extra = '') {
   ok('semChamado limpa', semChamado('cygnos iniciar serie').trim() === 'iniciar serie')
 }
 
+/* == AS RAIZES, e a colisao que elas quase criaram ===================== */
+{
+  // Veio de um teste no aparelho: a pessoa disse "Cygnos, iniciar", o audio
+  // chegou, foi transcrito, o chamado foi reconhecido -- e o app respondeu "nao
+  // entendi". So o verbo nao casou. Whisper devolve o que SOA, e "inicia" por
+  // "iniciar" e uma letra de diferenca.
+  ok('inicia (sem o r)', comandoDoTexto('cygnos inicia') === 'comecar')
+  ok('iniciando', comandoDoTexto('cygnos iniciando') === 'comecar')
+  ok('comeca', comandoDoTexto('cygnos comeca') === 'comecar')
+  ok('comecei', comandoDoTexto('cygnos comecei') === 'comecar')
+  ok('terminou', comandoDoTexto('cygnos terminou') === 'fiz')
+  ok('terminado', comandoDoTexto('cygnos terminado') === 'fiz')
+
+  // E a colisao que a raiz quase criou: `a serie` foi tentado na lista de
+  // continuar e roubou "proxim(a serie)", que e pular o descanso. Fragmento
+  // curto demais rouba a frase do vizinho.
+  ok('proxima serie continua pulando descanso', comandoDoTexto('proxima serie') === 'pular_descanso')
+  ok('iniciar serie continua sendo a serie', comandoDoTexto('cygnos iniciar serie') === 'continuar')
+
+  // A negacao continua ganhando das raizes.
+  ok('nao comeca ainda', comandoDoTexto('cygnos nao comeca ainda') === null)
+  ok('ainda nao terminei', comandoDoTexto('cygnos ainda nao terminei') === null)
+}
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) process.exit(1)
