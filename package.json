@@ -43,7 +43,8 @@
     "contrato": "node --env-file=.env scripts/contrato.mjs",
     "orfaos": "node scripts/orfaos.mjs",
     "telas": "node scripts/telas.mjs",
-    "raios": "node scripts/raios.mjs"
+    "raios": "node scripts/raios.mjs",
+    "foto": "node scripts/foto.mjs"
   },
   "private": true
 }
