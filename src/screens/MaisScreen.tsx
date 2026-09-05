@@ -445,7 +445,20 @@ export function MaisScreen({
         />
       }
     >
-      <Text style={styles.titulo}>Mais</Text>
+      {/* ── "VOCE", e nao "Mais" ────────────────────────────────────────
+       *
+       * O titulo repetia o nome da aba, e o nome da aba era "Mais" -- ou seja,
+       * a tela abria dizendo "o resto". Nutricionista, mensagens, lembretes,
+       * meta de agua, tema, privacidade e conta moram aqui, e nenhuma dessas
+       * coisas alguem procura debaixo da palavra "Mais".
+       *
+       * O e-mail embaixo nao e enfeite: e a unica tela do app que diz QUEM
+       * esta logado, e essa informacao estava enterrada no fim, dentro do
+       * cartao de Conta, junto do botao de sair. */}
+      <Text style={styles.titulo}>Você</Text>
+      <Text style={styles.subtitulo} numberOfLines={1}>
+        {email}
+      </Text>
 
       <CartaoNutricionista
         catalogo={catalogo}
@@ -734,7 +747,10 @@ export function MaisScreen({
           Fim da tela é onde se procura o que se usa uma vez. */}
       <View style={styles.cartao}>
         <Text style={styles.tituloCartao}>Conta</Text>
-        <Text style={styles.email}>{email}</Text>
+        {/* O e-mail subiu para o topo da tela, junto do "Você" — é ali que ele
+            responde "quem está logado", e aqui embaixo ele só repetia. Duas
+            vezes o mesmo dado na mesma tela faz procurar a diferença entre os
+            dois. */}
 
         <Pressable
           onPress={() => supabase.auth.signOut()}
@@ -1047,6 +1063,7 @@ const estilos = estilosDe(t =>
   tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: MARGEM, paddingBottom: 28, gap: 14 },
 
+  subtitulo: { marginTop: 2, marginBottom: 2, fontSize: 13, color: t.inkSuave },
   titulo: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
 
   linhaMensagens: {

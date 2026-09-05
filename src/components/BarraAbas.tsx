@@ -22,7 +22,22 @@ const ABAS: { chave: Aba; rotulo: string; icone: keyof typeof Ionicons.glyphMap 
   { chave: 'hoje', rotulo: 'Hoje', icone: 'home' },
   { chave: 'comer', rotulo: 'Comer', icone: 'restaurant-outline' },
   { chave: 'corpo', rotulo: 'Corpo', icone: 'pulse-outline' },
-  { chave: 'mais', rotulo: 'Mais', icone: 'menu-outline' },
+  /* "VOCE", e nao "Mais".
+   *
+   * "Mais" nao e um assunto -- e o resto. Nutricionista, mensagens, lembretes,
+   * meta de agua, tema, conta e termos moram todos ali, e ninguem procura uma
+   * coisa especifica dentro de uma palavra que nao descreve nada. Relatado
+   * assim: "os nossos menus sao muito perdidos".
+   *
+   * "Voce" descreve o que ha dentro: voce e quem cuida de voce. E o icone
+   * deixa de ser o hamburguer -- que promete "lista de opcoes", ou seja, de
+   * novo o resto -- e vira uma pessoa.
+   *
+   * A CHAVE continua 'mais' de proposito: ela e gravada no aparelho como a
+   * ultima aba aberta, e trocar o valor faria todo mundo que ja usa o app
+   * voltar para a inicial uma vez, sem motivo. O nome e para quem le; a chave
+   * e para quem grava. */
+  { chave: 'mais', rotulo: 'Você', icone: 'person-outline' },
 ]
 
 /* A ordem das abas é a mesma do deslizamento lateral. Exportada para o App não
