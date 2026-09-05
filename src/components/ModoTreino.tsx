@@ -667,7 +667,30 @@ export function ModoTreino({
      duração é o `transcrever`, e um valor menor deste lado só produz viagem de
      ida com descarte na volta. */
   const COMANDO_CURTO_DEMAIS_S = MINIMO_SEGUNDOS
-  const COMANDO_LONGO_DEMAIS_S = 5
+  /* ── 7 s, e o motivo mudou ─────────────────────────────────────────────
+   *
+   * Era 5, e o teto do trecho é 6 — então TODO corte no teto era descartado.
+   * Isso não é desperdício: é o recurso não funcionando.
+   *
+   * Lido no log do aparelho, com o piso já estável em -53:
+   *
+   *     fala COMEÇOU
+   *     -7.2 · -9.5 · -11.7 · -3.2 · -32.7 · -0.7 dB
+   *     fala ACABOU com 6.1 s
+   *     descartado por duração
+   *
+   * Naquele ambiente o som nunca fica abaixo do limiar por 700 ms seguidos,
+   * então o trecho só fecha no teto — e o comando de duas palavras está DENTRO
+   * daqueles seis segundos, indo para o lixo.
+   *
+   * O 5 existia para segurar o custo numa academia com gente conversando perto.
+   * Esse motivo continua valendo, e é por isso que o número não sumiu: ele
+   * subiu o mínimo para deixar o teto passar. Sete segundos de AAC são uns
+   * 110 KB — antes do conserto do gravador, um único envio levava um MEGA,
+   * porque o arquivo acumulava a sessão inteira.
+   *
+   * Nunca funcionar também é caro. */
+  const COMANDO_LONGO_DEMAIS_S = 7
 
   useEffect(() => {
     if (!vozLigada) return
