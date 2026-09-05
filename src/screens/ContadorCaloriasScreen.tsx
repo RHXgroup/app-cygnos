@@ -3038,11 +3038,20 @@ const estilos = estilosDe(t =>
     left: 0,
     right: 0,
     bottom: 0,
-    /* 88, e não 82. A folha ganhou a capa da foto e nada saiu de dentro dela;
-       os seis pontos a mais devolvem uma linha inteira da lista, e 88 ainda
-       deixa ver que existe tela por trás — que é o que diz que dá para
-       fechar arrastando. */
-    maxHeight: '88%',
+    /* 95%, e a razão mudou.
+     *
+     * Era 88 para "deixar ver que existe tela por trás". Fotografado no
+     * aparelho, o que se via por trás era uma faixa do cabeçalho VERDE do
+     * contador, colada em cima da foto do prato — duas superfícies fortes
+     * disputando o mesmo olhar, e a de baixo era a que importava.
+     *
+     * Escurecer o véu de 0,62 para 0,78 atenuou e não resolveu: verde vivo
+     * atravessa qualquer véu que ainda deixe ver.
+     *
+     * Os 5% que sobram continuam dizendo que há tela atrás — é o bastante para
+     * o gesto de arrastar fazer sentido, e pouco o bastante para não sobrar
+     * cor competindo com a imagem. */
+    maxHeight: '95%',
     backgroundColor: t.cores.fundo,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
