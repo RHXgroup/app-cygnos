@@ -560,7 +560,7 @@ const estilos = estilosDe(t =>
     gap: 8,
     paddingVertical: 14,
     paddingHorizontal: 22,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: t.cores.verde,
     marginTop: 8,
   },

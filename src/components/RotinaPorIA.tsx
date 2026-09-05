@@ -916,7 +916,7 @@ const estilos = estilosDe(t =>
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: t.cores.verdeMenta,
     borderWidth: 1,
     borderColor: t.cores.verde,

@@ -541,7 +541,7 @@ const estilos = estilosDe(t =>
   textoReenviarInativo: { color: t.inkFraco, fontWeight: '600' },
 
   caixaErro: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: t.cores.erroBorda,
     backgroundColor: t.cores.erroFundo,

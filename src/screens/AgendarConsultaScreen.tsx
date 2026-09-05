@@ -540,7 +540,7 @@ const estilos = estilosDe(t =>
     gap: 7,
     height: 46,
     marginTop: 20,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: t.cores.erroBorda,
     backgroundColor: t.cores.erroFundo,

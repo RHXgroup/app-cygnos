@@ -2282,9 +2282,11 @@ const estilos = estilosDe(t =>
   boasVindas: {
     gap: 7,
     padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: t.cores.verde,
+    /* Mesmo raio e mesmo tratamento do `passo`: os dois são a chamada para a
+       ação, e nunca aparecem juntos — um substitui o outro. Desenhos
+       diferentes para o mesmo papel é o que faz a tela parecer montada por
+       duas pessoas. */
+    borderRadius: 20,
     backgroundColor: t.cores.verdeMenta,
   },
   tituloBoasVindas: {
@@ -2306,15 +2308,27 @@ const estilos = estilosDe(t =>
   },
   textoBotaoBoasVindas: { fontSize: 14.5, fontWeight: '700', color: t.cores.branco },
 
+  /* ── UM DESENHO SÓ DE CARTÃO ─────────────────────────────────────────
+   *
+   * Esta tela tinha TRÊS: os cartões de conteúdo com raio 20, preenchidos e
+   * sem borda; e o próximo passo e as boas-vindas com raio 16 e um contorno
+   * verde de 1 pixel. Dois blocos delineados empilhados sobre cartões
+   * preenchidos, e foi assim que a tela foi descrita por quem usa: "tudo fora
+   * de padrão, o do meio parece remendado".
+   *
+   * O contorno era o que fazia o remendo. O destaque desta linha continua —
+   * ele vem do FUNDO tingido, que é o que a diferencia dos cartões creme — e
+   * some a moldura, que só dizia "fui colado aqui depois".
+   *
+   * O raio passa a 20 como o dos outros. Raio diferente é a coisa que ninguém
+   * nota conscientemente e todo mundo sente. */
   passo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: t.cores.verde,
+    borderRadius: 20,
     backgroundColor: t.cores.verdeMenta,
   },
   /* Sem nada a fazer, o bloco perde o destaque: ele deixou de ser um chamado e
@@ -2330,7 +2344,12 @@ const estilos = estilosDe(t =>
   },
   textoPasso: { flex: 1, fontSize: 14.5, fontWeight: '700', color: t.cores.ink, lineHeight: 19 },
   textoSaudacao: { flex: 1 },
-  ola: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
+  /* 22, e não 27.
+     A saudação dividia a linha com o anel da meta, e a diferença de tamanho
+     entre os dois desequilibrava o topo — um nome enorme ao lado de um anel
+     pequeno. E o nome não é a informação: agora que as calorias abrem a tela,
+     ele só precisa reconhecer quem chegou. */
+  ola: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.4 },
 
   cartao: {
     borderRadius: 20,
@@ -2389,7 +2408,7 @@ const estilos = estilosDe(t =>
   botaoCamera: {
     width: 36,
     height: 36,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: t.cores.limao,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2451,7 +2470,7 @@ const estilos = estilosDe(t =>
     gap: 7,
     marginTop: 12,
     paddingVertical: 11,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.superficie,
@@ -2550,7 +2569,7 @@ const estilos = estilosDe(t =>
     marginTop: 12,
     height: 32,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.24)',
   },
   botaoRegistrarPress: { backgroundColor: 'rgba(255,255,255,0.38)' },

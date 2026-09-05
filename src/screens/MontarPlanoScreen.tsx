@@ -349,7 +349,7 @@ const estilos = estilosDe(t =>
   hora: {
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: t.cores.verdeClaro,
   },
   textoHora: { fontSize: 12.5, fontWeight: '800', color: t.cores.verdeEscuro },
@@ -381,7 +381,7 @@ const estilos = estilosDe(t =>
     gap: 7,
     marginTop: 8,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: t.cores.borda,
   },

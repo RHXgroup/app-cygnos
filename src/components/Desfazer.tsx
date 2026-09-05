@@ -174,7 +174,7 @@ const estilos = estilosDe(t =>
     gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: t.cores.limao,
   },
   pressionado: { opacity: 0.75 },

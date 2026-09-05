@@ -656,7 +656,7 @@ const estilos = estilosDe(t =>
   campoNome: {
     flex: 1,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.superficie,

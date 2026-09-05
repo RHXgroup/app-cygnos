@@ -122,7 +122,7 @@ const estilos = estilosDe(t =>
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 13,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   pressionado: { opacity: 0.75 },

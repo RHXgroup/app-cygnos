@@ -888,7 +888,7 @@ const estilos = estilosDe(t =>
   botaoPasso: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: t.cores.verdeMenta,

@@ -772,7 +772,7 @@ const estilos = estilosDe(t =>
   explicacaoSugestao: { fontSize: 12.5, color: t.inkMedio, lineHeight: 18 },
   botaoSugestao: {
     backgroundColor: t.cores.verde,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 13,
     alignItems: 'center',
   },
@@ -781,7 +781,7 @@ const estilos = estilosDe(t =>
 
   campoNome: {
     height: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: t.cores.borda,
     backgroundColor: t.cores.superficie,

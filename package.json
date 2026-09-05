@@ -42,7 +42,8 @@
     "test": "node scripts/testes.mjs",
     "contrato": "node --env-file=.env scripts/contrato.mjs",
     "orfaos": "node scripts/orfaos.mjs",
-    "telas": "node scripts/telas.mjs"
+    "telas": "node scripts/telas.mjs",
+    "raios": "node scripts/raios.mjs"
   },
   "private": true
 }

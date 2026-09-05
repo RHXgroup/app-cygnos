@@ -724,7 +724,7 @@ cartaoPressionado: { backgroundColor: t.cores.superficie },
   iconeExame: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: t.cores.verdeMenta,
     alignItems: 'center',
     justifyContent: 'center',
