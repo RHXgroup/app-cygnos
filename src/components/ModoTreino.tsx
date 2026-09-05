@@ -620,6 +620,21 @@ export function ModoTreino({
   const [ouvindo, setOuvindo] = useState(false)
   const [entendendo, setEntendendo] = useState(false)
   const [respostaDaVoz, setRespostaDaVoz] = useState('')
+
+  /* ── O ÚLTIMO TEXTO OUVIDO, GRUDADO NA TELA ────────────────────────────
+   *
+   * A resposta acima (`respostaDaVoz`) some quando a próxima chega, e a linha
+   * de medidor é a única que fica. Duas rodadas de teste terminaram em "ele
+   * está ouvindo porém não inicia o comando" — que é verdade e não diz NADA
+   * sobre a causa, porque o texto que o servidor devolveu passava e ia embora.
+   *
+   * São três falhas possíveis depois de o áudio chegar, e as três se parecem de
+   * fora: o Whisper não devolveu nada, devolveu sem a palavra Cygnos, ou
+   * devolveu uma frase que não casou com comando nenhum. Guardar o texto separa
+   * as três numa foto de tela.
+   *
+   * `__DEV__` porque é diagnóstico: no build ele não existe. */
+  const [ultimoOuvido, setUltimoOuvido] = useState('')
   const ouvindoAgora = useRef(false)
 
   /* Solta o microfone ao sair, mesmo no meio. Recurso nativo aberto mantém o
@@ -783,6 +798,7 @@ export function ModoTreino({
                 : 'Fale um pouco mais.',
           )
           console.log('[cygnos] transcrição falhou:', r)
+          if (__DEV__) setUltimoOuvido('falhou: ' + r.tipo)
         }
       }
     } catch (e) {
@@ -819,6 +835,7 @@ export function ModoTreino({
    * pessoa falou comigo" de "alguém falou perto de mim". */
   function responder(texto: string) {
     console.log('[cygnos] ouvi:', JSON.stringify(texto))
+    if (__DEV__) setUltimoOuvido(texto.trim() || '(vazio)')
     if (!temChamado(texto)) {
       /* ── O SILÊNCIO AQUI ERA INDISTINGUÍVEL DE ESTAR QUEBRADO ──────────
        *
@@ -1391,6 +1408,16 @@ export function ModoTreino({
                         : `${estadoDoGravador.metering.toFixed(0)} dB · limiar ${limiarDe(
                             ambienteVisivel,
                           ).toFixed(0)} · ${estadoDoGravador.isRecording ? 'gravando' : 'PARADO'}`}
+                    </Text>
+                  )}
+
+                  {/* Ver o comentário de `ultimoOuvido`. Fica DEPOIS do
+                      medidor porque os dois juntos contam a história inteira: o
+                      de cima diz se o microfone está entregando som, o de baixo
+                      diz o que voltou do servidor. */}
+                  {__DEV__ && vozLigada && (
+                    <Text style={styles.medidorVoz} selectable>
+                      {ultimoOuvido ? `ouvi: "${ultimoOuvido}"` : 'ainda não voltou nada do servidor'}
                     </Text>
                   )}
 
