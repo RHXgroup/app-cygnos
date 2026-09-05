@@ -21,6 +21,7 @@ import { AnelCalorias } from '../components/AnelCalorias'
 import { CartaoDaSemana } from '../components/CartaoDaSemana'
 import { CartaoDaSequencia } from '../components/CartaoDaSequencia'
 import { CartaoDoRecado } from '../components/CartaoDoRecado'
+import { Secao } from '../components/Secao'
 import { AnelProgresso } from '../components/AnelProgresso'
 import { FaixaDeDias } from '../components/FaixaDeDias'
 import { MenuTopo } from '../components/MenuTopo'
@@ -906,7 +907,6 @@ export function HomeScreen({
            sobre qual dia é seria a primeira coisa a confundir. */
         titulo={rotuloDoDia(diaSelecionado, new Date())}
         icone="today-outline"
-        styles={styles}
       />
 
       {/* ── Calorias ── */}
@@ -929,7 +929,7 @@ export function HomeScreen({
           app — ou, pior, cobrança dela. */}
       {ehHoje(diaSelecionado) && recado !== null && (
         <>
-          <Secao titulo="Da sua nutricionista" icone="chatbubble-ellipses-outline" styles={styles} />
+          <Secao titulo="Da sua nutricionista" icone="chatbubble-ellipses-outline" />
           <CartaoDoRecado recado={recado} onAbrirMensagens={onAbrirMensagens} />
         </>
       )}
@@ -1054,7 +1054,7 @@ export function HomeScreen({
       </View>
 
       {/* ── Progresso ── */}
-      <Secao titulo="O seu corpo" icone="body-outline" styles={styles} />
+      <Secao titulo="O seu corpo" icone="body-outline" />
 
       <CartaoProgresso
         pesos={pesos}
@@ -1307,34 +1307,6 @@ function BlocoPlano({
  * O plano continua no cartão, numa linha discreta: é a referência do dia — o que
  * a pessoa combinou consigo mesma — e comparar o combinado com o comido é
  * exatamente o que uma nutricionista quer ver. */
-/* O título de uma seção da tela inicial.
- *
- * Pequeno, em caixa alta discreta e com o ícone antes — a mesma forma que os
- * apps de nutrição bem resolvidos usam, e por uma razão que não é estética: um
- * título assim se lê como PLACA, não como conteúdo, então o olho pula de placa
- * em placa e para no assunto que quer. Um título grande e escuro competiria com
- * os números dos cartões, que é o que a pessoa veio ver.
- *
- * Recebe `styles` em vez de chamar `estilos()` porque ele mora no mesmo arquivo
- * da tela e o cache é por paleta — pedir de novo aqui seria trabalho repetido
- * a cada quadro, sem ganho nenhum. */
-function Secao({
-  titulo,
-  icone,
-  styles,
-}: {
-  titulo: string
-  icone: keyof typeof Ionicons.glyphMap
-  styles: ReturnType<typeof estilos>
-}) {
-  return (
-    <View style={styles.secao}>
-      <Ionicons name={icone} size={13} color={paleta().inkSuave} />
-      <Text style={styles.tituloSecao}>{titulo}</Text>
-    </View>
-  )
-}
-
 function CartaoCalorias({
   consumo,
   plano,
@@ -2460,25 +2432,6 @@ const estilos = estilosDe(t =>
      ele só precisa reconhecer quem chegou. */
   ola: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.4 },
 
-  /* ── AS PLACAS DE SEÇÃO ──────────────────────────────────────────────
-     O recuo em cima é maior que embaixo de propósito: o título pertence ao que
-     vem DEPOIS dele, e um espaçamento igual dos dois lados o deixaria boiando
-     entre dois cartões, pertencendo aos dois e a nenhum. */
-  secao: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 20,
-    marginBottom: 2,
-    paddingHorizontal: 4,
-  },
-  tituloSecao: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: t.inkSuave,
-  },
   cartao: {
     borderRadius: 20,
     backgroundColor: t.cores.cartao,
