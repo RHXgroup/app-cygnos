@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { OBJETIVOS, nomeDoObjetivo as nomeDoObjetivoDaLista } from './objetivos'
 import { falha } from './erros'
 import { carregarConsumoPeriodo } from './consumo'
 import { carregarPeso } from './peso'
@@ -325,15 +326,25 @@ export async function salvarMetaAgua(
    conjunto, trocar de metas mudaria em silêncio o que foi marcado no Perfil —
    e um campo editado num lugar não pode mudar porque se mexeu em outro. */
 
-export type ObjetivoPeso = 'perda' | 'manter' | 'ganho' | null
+/* ── O TIPO ABRIU, e a lista de valores mudou de lugar ───────────────────
+ *
+ * Eram três literais fixos aqui. Agora são sete, definidos em `objetivos.ts`
+ * com nome, resumo, ícone e sentido do peso — e com as MESMAS chaves de
+ * `objetivos_nutricionais` no sistema, para os dois lados falarem a mesma
+ * língua.
+ *
+ * Vira `string` e não uma união dos sete de propósito: o valor vem do BANCO, e
+ * a nutricionista pode gravar um dos outros dezesseis objetivos clínicos que o
+ * app não oferece. Uma união faria o TypeScript prometer uma garantia que a
+ * coluna não dá — e é essa promessa falsa que produz a armadilha 10. Quem
+ * traduz é `objetivoDe`, que devolve null para o que não conhece. */
+export type ObjetivoPeso = string | null
 
-/* Como se lê o foco na tela. Verbo no infinitivo porque é sempre usado depois de
-   "Seu foco é…" ou dentro de um botão. */
-export const NOME_DO_OBJETIVO: Record<Exclude<ObjetivoPeso, null>, string> = {
-  perda: 'Perder peso',
-  manter: 'Manter o peso',
-  ganho: 'Ganhar peso',
-}
+/* Mantido só para quem ainda importa daqui. A lista de verdade é `OBJETIVOS`,
+   em `objetivos.ts`. */
+export const NOME_DO_OBJETIVO: Record<string, string> = Object.fromEntries(
+  OBJETIVOS.map(o => [o.chave, o.nome]),
+)
 
 /* Nunca o índice cru quando o valor veio do BANCO.
  *
@@ -344,8 +355,7 @@ export const NOME_DO_OBJETIVO: Record<Exclude<ObjetivoPeso, null>, string> = {
  * Ver a armadilha 10 do AGENTS.md. O texto de reserva admite que o app não
  * sabe, em vez de chutar um dos três: dizer "perder peso" para quem marcou
  * outra coisa é pior do que não dizer nada. */
-export const nomeDoObjetivo = (o: string | null): string =>
-  o === null ? 'sem foco definido' : (NOME_DO_OBJETIVO[o as Exclude<ObjetivoPeso, null>] ?? 'um foco que este app ainda não conhece')
+export const nomeDoObjetivo = (o: string | null): string => nomeDoObjetivoDaLista(o)
 
 export async function carregarObjetivoPeso(
   contaId: string,

@@ -17,9 +17,9 @@ import { falha } from '../lib/erros'
 import {
   AJUSTE_MAX,
   AJUSTE_MIN,
-  AJUSTE_SUGERIDO,
+  ajusteSugerido,
   ATIVIDADES,
-  MACROS_SUGERIDOS,
+  macrosSugeridos,
   alvoDe,
   alvoFoiTravado,
   atividadePor,
@@ -148,9 +148,9 @@ export function CalculoEnergeticoScreen({
       /* O ponto de partida do ajuste e dos macros sai do FOCO, que agora vem de
          app_contas — não do conjunto de metas. */
       const foco = c?.objetivo_peso ?? 'manter'
-      setAjuste(AJUSTE_SUGERIDO[foco])
-      setProteinaGkg(MACROS_SUGERIDOS[foco].proteinaGkg)
-      setCarboPct(MACROS_SUGERIDOS[foco].carboPct)
+      setAjuste(ajusteSugerido(foco))
+      setProteinaGkg(macrosSugeridos(foco).proteinaGkg)
+      setCarboPct(macrosSugeridos(foco).carboPct)
 
       if (metasR.tipo === 'ok') {
         /* Pode ser null: conta sem conjunto nenhum. Não é impedimento — salvar
@@ -641,7 +641,7 @@ function EtapaResultado({
   fator: number
   atividade: ChaveAtividade
   sobreAFormula: ReturnType<typeof formulaPara>
-  foco: 'perda' | 'manter' | 'ganho' | null
+  foco: ObjetivoPeso
   ajuste: number
   setAjuste: (n: number) => void
   alvo: number
@@ -661,7 +661,7 @@ function EtapaResultado({
 }) {
   const styles = estilos()
   const ritmo = ritmoSemanal(get, alvo)
-  const sugerido = AJUSTE_SUGERIDO[foco ?? 'manter']
+  const sugerido = ajusteSugerido(foco)
 
   return (
     <>

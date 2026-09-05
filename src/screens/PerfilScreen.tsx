@@ -29,6 +29,7 @@ import {
   type ObjetivoPeso,
 } from '../lib/metas'
 import { estilosDe, paleta } from '../lib/tema'
+import { OBJETIVOS, objetivoDe } from '../lib/objetivos'
 import { falha } from '../lib/erros'
 import { useDesvioDoTeclado } from '../lib/teclado'
 
@@ -477,46 +478,68 @@ export function PerfilScreen({
           {/* Depois do cadastro e antes do sair: é a única coisa editável desta
               tela, e ficaria escondida abaixo de um botão vermelho de saída. */}
           <View style={styles.blocoObjetivo}>
-            <Text style={styles.tituloObjetivo}>Foco do peso</Text>
+            {/* ── DE TRÊS PARA SETE, e por que a lista virou vertical ──────
+             *
+             * Eram três fichas lado a lado — "Perder", "Manter", "Ganhar" —, e
+             * o pedido foi bater com o que o sistema oferece. O sistema tem 23,
+             * dos quais 16 são PRESCRIÇÃO (gestação, doença renal, bariátrica);
+             * o motivo de só sete chegarem aqui está no cabeçalho de
+             * `objetivos.ts`.
+             *
+             * Sete não cabem numa fileira: em tela de celular cada ficha teria
+             * cinquenta pontos de largura e o nome sairia cortado. Vertical, e
+             * cada um com uma linha explicando — "Trocar gordura por músculo"
+             * não se entende só pelo nome, e escolher errado aqui muda o ajuste
+             * calórico que a tela de metas vai sugerir. */}
+            <Text style={styles.tituloObjetivo}>Seu objetivo</Text>
             <Text style={styles.ajudaObjetivo}>
-              Para onde você quer que seu peso vá. É o que deixa o app dizer se a sua evolução está
-              indo no sentido que você quer — e não só quanto ela mudou.
+              O que você quer alcançar. É daqui que sai o ponto de partida das suas metas — e é o que
+              deixa o app dizer se a sua evolução está indo no sentido que você quer.
             </Text>
 
-            <View style={styles.opcoesObjetivo}>
-              {(['perda', 'manter', 'ganho'] as const).map(chave => (
-                <Pressable
-                  key={chave}
-                  /* Tocar no que já está marcado desmarca. A dica embaixo diz
-                     isso por escrito — sem ela seria um gesto escondido, e quem
-                     marcou sem querer ficaria preso à escolha. */
-                  onPress={() => escolherObjetivo(objetivo === chave ? null : chave)}
-                  style={({ pressed }) => [
-                    styles.opcaoObjetivo,
-                    objetivo === chave && styles.opcaoObjetivoAtiva,
-                    pressed && styles.opcaoObjetivoPressionada,
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: objetivo === chave }}
-                  accessibilityLabel={NOME_DO_OBJETIVO[chave]}
-                >
-                  <Ionicons
-                    name={
-                      chave === 'perda' ? 'trending-down' : chave === 'ganho' ? 'trending-up' : 'remove'
-                    }
-                    size={19}
-                    color={objetivo === chave ? paleta().cores.branco : paleta().cores.verde}
-                  />
-                  <Text
-                    style={[
-                      styles.textoOpcaoObjetivo,
-                      objetivo === chave && styles.textoOpcaoObjetivoAtiva,
+            <View style={styles.listaObjetivos}>
+              {OBJETIVOS.map(o => {
+                const marcado = objetivoDe(objetivo)?.chave === o.chave
+                return (
+                  <Pressable
+                    key={o.chave}
+                    /* Tocar no que já está marcado desmarca. A dica embaixo diz
+                       isso por escrito — sem ela seria um gesto escondido, e
+                       quem marcou sem querer ficaria preso à escolha. */
+                    onPress={() => escolherObjetivo(marcado ? null : o.chave)}
+                    style={({ pressed }) => [
+                      styles.linhaObjetivo,
+                      marcado && styles.linhaObjetivoAtiva,
+                      pressed && styles.linhaObjetivoPressionada,
                     ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: marcado }}
+                    accessibilityLabel={`${o.nome}. ${o.resumo}`}
                   >
-                    {chave === 'perda' ? 'Perder' : chave === 'ganho' ? 'Ganhar' : 'Manter'}
-                  </Text>
-                </Pressable>
-              ))}
+                    <View style={[styles.iconeObjetivo, marcado && styles.iconeObjetivoAtivo]}>
+                      <Ionicons
+                        name={o.icone as keyof typeof Ionicons.glyphMap}
+                        size={17}
+                        color={marcado ? paleta().cores.branco : paleta().cores.verde}
+                      />
+                    </View>
+
+                    <View style={styles.textosObjetivo}>
+                      <Text style={styles.nomeObjetivo}>{o.nome}</Text>
+                      <Text style={styles.resumoObjetivo}>{o.resumo}</Text>
+                    </View>
+
+                    {/* A marca à direita, e não só o fundo tingido: numa lista
+                        de sete, "qual está escolhido" precisa de um sinal que
+                        se ache sem comparar as sete. */}
+                    <Ionicons
+                      name={marcado ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={20}
+                      color={marcado ? paleta().cores.verde : paleta().cores.borda}
+                    />
+                  </Pressable>
+                )
+              })}
             </View>
 
             {erroObjetivo ? (
@@ -791,6 +814,40 @@ const estilos = estilosDe(t =>
   },
   tituloObjetivo: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
   ajudaObjetivo: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
+  /* ── OS SETE OBJETIVOS ────────────────────────────────────────────────
+     Uma forma repetida: quadrado tingido com ícone · nome · resumo · marca.
+     Muda o texto, nunca o formato — que é o que faz uma lista de sete ser
+     percorrida de relance em vez de lida item por item. */
+  listaObjetivos: { gap: 6 },
+  linhaObjetivo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: t.cores.superficie,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  /* Tingido de leve, e não preenchido de verde como as três fichas antigas:
+     preenchido, o resumo em cinza sumiria — e é ele que explica a diferença
+     entre "ganhar peso" e "ganhar músculo". */
+  linhaObjetivoAtiva: { backgroundColor: t.cores.verdeClaro, borderColor: t.cores.verde },
+  linhaObjetivoPressionada: { opacity: 0.7 },
+  iconeObjetivo: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verdeMenta,
+  },
+  iconeObjetivoAtivo: { backgroundColor: t.cores.verde },
+  textosObjetivo: { flex: 1, gap: 1 },
+  nomeObjetivo: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+  resumoObjetivo: { fontSize: 11.5, lineHeight: 15, color: t.inkSuave },
+
   opcoesObjetivo: { flexDirection: 'row', gap: 8 },
   opcaoObjetivo: {
     flex: 1,

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { objetivoDe } from './objetivos'
 import { falha } from './erros'
 
 /* Cálculo energético: quanto o corpo gasta, e qual é o alvo a partir disso.
@@ -150,8 +151,26 @@ export const atividadePor = (chave: ChaveAtividade) =>
  *
  * Percentuais e não kcal fixas: -500 kcal é metade do gasto de uma pessoa
  * pequena e um quinto do de uma grande, e o mesmo número produziria dietas de
- * agressividade completamente diferente. */
-export const AJUSTE_SUGERIDO = { perda: -15, manter: 0, ganho: 12 } as const
+ * agressividade completamente diferente.
+ *
+ * ── Os números saíram daqui ─────────────────────────────────────────────
+ * Eram três literais, e DIVERGIAM dos do sistema: perda era -15 aqui e -20 em
+ * `objetivos_nutricionais`; a proteína da manutenção, 1,6 aqui e 1,4 lá. Duas
+ * tabelas do mesmo fato, em dois repositórios, e ninguém descobre por qual
+ * delas a conta passou (armadilha 5).
+ *
+ * Agora vêm de `objetivos.ts`, com os valores do sistema — a mesma fonte que a
+ * nutricionista usa. E passam a cobrir os SETE focos, não três.
+ *
+ * `manutencao` como reserva: foco desconhecido não pode virar um déficit
+ * escolhido pelo app. */
+export const ajusteSugerido = (foco: string | null | undefined): number =>
+  objetivoDe(foco)?.ajustePct ?? 0
+
+export const macrosSugeridos = (foco: string | null | undefined) => {
+  const o = objetivoDe(foco)
+  return { proteinaGkg: o?.proteinaGkg ?? 1.4, carboPct: o?.carboPct ?? 50 }
+}
 
 export const AJUSTE_MIN = -40
 export const AJUSTE_MAX = 40
@@ -186,14 +205,8 @@ export const ritmoSemanal = (get: number, alvo: number) =>
    sobra: gravar os três criaria a chance de eles não fecharem 100%. */
 export const KCAL_POR_GRAMA = { proteinas: 4, carboidratos: 4, gorduras: 9 } as const
 
-/* Pontos de partida por foco. Proteína mais alta em déficit para preservar massa
-   magra, que é o consenso; em ganho ela sobe pelo mesmo motivo, com o excedente
-   indo para o carboidrato. */
-export const MACROS_SUGERIDOS = {
-  perda: { proteinaGkg: 1.8, carboPct: 40 },
-  manter: { proteinaGkg: 1.6, carboPct: 50 },
-  ganho: { proteinaGkg: 1.8, carboPct: 50 },
-} as const
+/* Os pontos de partida por foco moram em `objetivos.ts`, junto do nome de cada
+   um — ver `ajusteSugerido` e `macrosSugeridos`, acima. */
 
 export type Macros = {
   proteinaG: number
