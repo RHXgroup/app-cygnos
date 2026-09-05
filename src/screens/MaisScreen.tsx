@@ -478,13 +478,19 @@ export function MaisScreen({
           de sair do consultório procurar uma opção que sumiu — e ela não sabe
           que a nutricionista ainda não publicou. */}
       <View style={styles.cartao}>
-        <Text style={styles.tituloCartao}>Plano da nutricionista</Text>
+        {/* Nao se chama mais "Plano da nutricionista" -- ver o comentario do
+            titulo em PlanoTerapeuticoScreen. Aquele nome ja e do plano
+            alimentar, na tela inicial, e ter os dois iguais fez o proprio dono
+            do produto perguntar o que era este aqui.
+
+            O subtitulo virou o titulo porque ele ja dizia a verdade. */}
+        <Text style={styles.tituloCartao}>Alimentos para oferecer em casa</Text>
         <Text style={styles.textoPrivacidade}>
-          Os alimentos para oferecer em casa, e como foi cada vez.
+          O que a sua nutricionista pediu para oferecer, e como foi cada vez.
         </Text>
         <LinhaLink
           icone="restaurant-outline"
-          rotulo="Ver e registrar em casa"
+          rotulo="Ver e registrar"
           onPress={onAbrirPlanoTerapeutico}
           interno
         />

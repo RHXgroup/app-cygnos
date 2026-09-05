@@ -167,7 +167,23 @@ export function PlanoTerapeuticoScreen({ onFechar }: { onFechar: () => void }) {
         >
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
-        <Text style={styles.tituloTela}>Plano da nutricionista</Text>
+        {/* "Alimentos para oferecer em casa", e NAO "Plano da nutricionista".
+         *
+         * O dono do produto abriu esta tela e perguntou o que era. Ele tinha
+         * razao: o app ja chama de "Plano da nutricionista" o PLANO ALIMENTAR,
+         * na tela inicial -- e o nome mais forte estava na coisa mais rara.
+         *
+         * Isto aqui nao e o plano dela. E a escada de aceitacao: os alimentos
+         * para oferecer em casa a uma crianca seletiva, e como foi cada vez.
+         * Quem nao tem esse caso lia "plano da nutricionista", abria esperando
+         * a propria dieta, e encontrava uma frase sobre um recurso que nunca
+         * vai valer para ele.
+         *
+         * O nome novo diz o que a tela faz, com as palavras que a propria tela
+         * ja usava duas linhas abaixo. E devolve "plano da nutricionista" ao
+         * unico lugar onde ele significa uma coisa so. Armadilha 5 do
+         * AGENTS.md, na camada onde o TypeScript nao alcanca: a tela. */}
+        <Text style={styles.tituloTela}>Alimentos para oferecer em casa</Text>
         <View style={styles.botaoVoltar} />
       </View>
 
