@@ -878,7 +878,10 @@ export function ModoTreino({
       ouvindoAgora.current = false
 
       if (uri) {
-        const r = await transcrever(uri, duracao)
+        /* 'treino' e nao o padrao: o servidor troca o contexto que manda ao
+           Whisper. Com o de refeicao, um comando voltava como a lista de
+           comidas do proprio prompt -- ver `AssuntoDoAudio`, em lib/voz. */
+        const r = await transcrever(uri, duracao, 'treino')
         if (r.tipo === 'ok') responder(r.texto)
         else {
           /* A FALHA APARECE. Antes ela era engolida "para não atrapalhar quem

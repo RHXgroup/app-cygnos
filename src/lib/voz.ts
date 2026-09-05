@@ -198,9 +198,25 @@ export type ResultadoTranscricao =
  * terço, e `functions.invoke` já monta o multipart sozinho quando recebe um
  * FormData. No React Native o campo de arquivo é `{ uri, name, type }` — não
  * existe Blob de arquivo local aqui. */
+/* O assunto do que vai ser transcrito.
+ *
+ * O servidor manda ao Whisper um `initial_prompt` — as palavras que ele deve
+ * esperar — e o modelo OBEDECE aquilo. O contexto de refeição é uma lista de
+ * comida, e com ele um comando de treino voltou assim:
+ *
+ *   "Comi picanha, costela, linguiça, coxinha, pão de queijo e pão de queijo."
+ *
+ * Aquilo é uma LINHA DO PRÓPRIO PROMPT, devolvida: o áudio não batia com nada e
+ * o modelo continuou de onde o contexto o deixou.
+ *
+ * Padrão 'refeicao' porque é o que o app fazia antes de este parâmetro existir —
+ * quem chamar sem dizer nada continua funcionando igual. */
+export type AssuntoDoAudio = 'refeicao' | 'treino'
+
 export async function transcrever(
   uri: string,
   duracaoSegundos: number,
+  assunto: AssuntoDoAudio = 'refeicao',
 ): Promise<ResultadoTranscricao> {
   if (duracaoSegundos < MINIMO_SEGUNDOS) return { tipo: 'curto_demais' }
 
@@ -251,6 +267,7 @@ export async function transcrever(
 
   const forma = new FormData()
   forma.append('audio', arquivo, aac ? 'ditado.aac' : 'ditado.m4a')
+  forma.append('contexto', assunto)
 
   try {
     const { data, error } = await supabase.functions.invoke('app-transcrever', { body: forma })

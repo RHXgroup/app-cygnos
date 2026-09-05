@@ -277,5 +277,32 @@ function ok(nome: string, cond: boolean, extra = '') {
   ok('ainda nao terminei', comandoDoTexto('cygnos ainda nao terminei') === null)
 }
 
+/* == AS TRANSCRICOES REAIS DO APARELHO ================================= */
+{
+  // Copiadas do log, como sairam. Nenhuma delas escreve "Cygnos" -- o Whisper
+  // devolve o que SOA, e prefere palavra de dicionario ao nome que nao conhece.
+  const doLog: [string, string | null][] = [
+    ['Signos terminais. Signos terminais.', 'fiz'],
+    ['seguindo inicia', 'comecar'],
+    ['Signos, iniciar', 'comecar'],
+    ['cygnos terminei', 'fiz'],
+  ]
+  for (const [ouvido, esperado] of doLog) {
+    const c = temChamado(ouvido) ? comandoDoTexto(semChamado(ouvido)) : null
+    ok('"' + ouvido.slice(0, 34) + '" -> ' + esperado, c === esperado, String(c))
+  }
+
+  // E o que NAO pode virar comando: alucinacao do Whisper em cima de ruido.
+  // Tambem do log, palavra por palavra.
+  const ruido = [
+    'Comi picanha, costela, linguica, coxinha, pao de queijo e pao de queijo.',
+    'Serie 1 de 4. Descanse 30 segundos. Prepare-se.',
+  ]
+  for (const r of ruido) {
+    const c = temChamado(r) ? comandoDoTexto(semChamado(r)) : null
+    ok('ruido nao vira comando: "' + r.slice(0, 30) + '"', c === null, String(c))
+  }
+}
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) process.exit(1)

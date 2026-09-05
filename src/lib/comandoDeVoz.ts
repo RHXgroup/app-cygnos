@@ -155,6 +155,15 @@ const CHAMADOS = [
      recusa negacao. Um falso positivo em "seguinos" nao dispara serie nenhuma
      se ninguem tiver dito um comando junto. */
   'ciguinos', 'siguinos', 'seguinos', 'sequinos', 'zignos', 'zignus',
+  /* Estas saíram do aparelho, e não da minha cabeça. Lidas no log:
+       "Signos terminais. Signos terminais."
+       "Seguem nos iniciar."
+       "seguindo inicia"
+     `seguindo` é palavra do dicionário, e por isso o Whisper a prefere ao nome
+     que ele não conhece. Custa pouco aceitá-la: o chamado sozinho não faz nada
+     -- ele só libera a frase para o `comandoDoTexto`, que ainda exige um comando
+     conhecido e recusa negação. */
+  'seguindo', 'seguind', 'sequindo', 'seguem nos', 'segue nos', 'sigo nos',
   'cygno', 'cigno', 'signo', 'sygno',
   'six nos', 'seis nos', 'si nos', 'ci nos',
 ]
