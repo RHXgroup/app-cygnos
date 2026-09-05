@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Secao } from '../components/Secao'
 import { AvatarNutri } from '../components/AvatarNutri'
 import { LINKS, abrirLink } from '../lib/links'
 import { carregarCatalogo, type Catalogo } from '../lib/nutricionista'
@@ -532,6 +533,26 @@ export function MaisScreen({
         <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
       </Pressable>
 
+      {/* ── UMA PLACA, E UMA FORMA SO ─────────────────────────────────────
+       *
+       * Descrito por quem usa: "mensagem fica aqui e dentro do meu nutri,
+       * alimentos para oferecer aqui e dentro do nutri não — isso que estou
+       * achando confuso".
+       *
+       * Ele estava certo, e o defeito era de FORMA antes de ser de lugar:
+       * "Mensagens" era uma linha, "Alimentos para oferecer" era um cartão
+       * inteiro com título e subtítulo, e as duas vêm da mesma pessoa. Duas
+       * formas para coisas do mesmo dono fazem procurar a diferença entre elas
+       * — e não há diferença.
+       *
+       * Agora tudo o que é dela mora sob esta placa e usa a MESMA linha:
+       * quadrado tingido com ícone, nome, e a seta. Muda o texto, nunca o
+       * formato.
+       *
+       * O cartão dela continua sendo cartão de propósito: ele não é uma ação, é
+       * a IDENTIDADE de uma pessoa — foto, nome, CRN e especialidades. */}
+      <Secao titulo="Sua nutricionista" icone="medkit-outline" recuo={0} />
+
       <CartaoNutricionista
         catalogo={catalogo}
         carregando={carregando}
@@ -549,24 +570,27 @@ export function MaisScreen({
           sempre. Esconder a entrada quando não há plano faria a mãe que acabou
           de sair do consultório procurar uma opção que sumiu — e ela não sabe
           que a nutricionista ainda não publicou. */}
-      <View style={styles.cartao}>
-        {/* Nao se chama mais "Plano da nutricionista" -- ver o comentario do
-            titulo em PlanoTerapeuticoScreen. Aquele nome ja e do plano
-            alimentar, na tela inicial, e ter os dois iguais fez o proprio dono
-            do produto perguntar o que era este aqui.
+      {/* Nao se chama mais "Plano da nutricionista" -- ver o comentario do
+          titulo em PlanoTerapeuticoScreen.
 
-            O subtitulo virou o titulo porque ele ja dizia a verdade. */}
-        <Text style={styles.tituloCartao}>Alimentos para oferecer em casa</Text>
-        <Text style={styles.textoPrivacidade}>
-          O que a sua nutricionista pediu para oferecer, e como foi cada vez.
-        </Text>
-        <LinhaLink
-          icone="restaurant-outline"
-          rotulo="Ver e registrar"
-          onPress={onAbrirPlanoTerapeutico}
-          interno
-        />
-      </View>
+          Era um cartao com titulo e subtitulo; virou linha, igual a de
+          Mensagens, porque as duas vem da mesma pessoa. O subtitulo desceu para
+          a segunda linha, que e onde ele cabe sem virar outro formato. */}
+      <Pressable
+        onPress={onAbrirPlanoTerapeutico}
+        style={({ pressed }) => [styles.linhaQuestionario, pressed && styles.linhaPressionada]}
+        accessibilityRole="button"
+        accessibilityLabel="Alimentos para oferecer em casa"
+      >
+        <View style={styles.iconeQuestionario}>
+          <Ionicons name="restaurant-outline" size={19} color={paleta().cores.verde} />
+        </View>
+        <View style={styles.textoQuestionario}>
+          <Text style={styles.tituloQuestionario}>Alimentos para oferecer em casa</Text>
+          <Text style={styles.subQuestionario}>O que ela pediu, e como foi cada vez</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+      </Pressable>
 
       {/* Só aparece quando há algo a responder, e some sozinha depois.
           Uma linha permanente de "questionário" ensinaria a ignorá-la: quando o
@@ -613,6 +637,40 @@ export function MaisScreen({
         )}
         <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
       </Pressable>
+
+      {/* ── A REDE, e por que ela subiu para cá ───────────────────────────
+       *
+       * Continua NÃO ficando dentro da tela da nutricionista, e o motivo é o
+       * de sempre: quem quer conhecer a rede não vai procurar dentro de "Minha
+       * nutricionista", e quem abre "Minha nutricionista" quer ver a dela.
+       *
+       * O que mudou foi a vizinhança. Ela estava entre Aparência e
+       * Privacidade — ou seja, entre dois ajustes de app —, e é o único item
+       * daquele trecho que fala de gente. Agora fecha a seção de quem cuida de
+       * você, que é o assunto dela.
+       *
+       * Última da seção de propósito: quem já tem nutricionista não precisa
+       * passar pela lista das outras para chegar nas mensagens. */}
+      <Pressable
+        onPress={onAbrirRede}
+        style={({ pressed }) => [styles.linhaQuestionario, pressed && styles.linhaPressionada]}
+        accessibilityRole="button"
+        accessibilityLabel="Ver as nutricionistas da rede Cygnos"
+      >
+        <View style={styles.iconeQuestionario}>
+          <Ionicons name="people-outline" size={19} color={paleta().cores.verde} />
+        </View>
+        <View style={styles.textoQuestionario}>
+          <Text style={styles.tituloQuestionario}>Nutricionistas Cygnos</Text>
+          <Text style={styles.subQuestionario}>Formação, especialidades e como cada uma atende</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+      </Pressable>
+
+      {/* A partir daqui nao e mais dela: e ajuste do aparelho e da conta. A
+          placa marca a virada -- sem ela, "Lembretes" logo depois de
+          "Mensagens" se le como mais uma coisa da nutricionista. */}
+      <Secao titulo="O app" icone="options-outline" recuo={0} />
 
       <View style={styles.cartao}>
         <Text style={styles.tituloCartao}>Lembretes</Text>
@@ -775,28 +833,7 @@ export function MaisScreen({
         <SeletorDeCor />
       </View>
 
-      {/* ── A REDE mora AQUI, e não dentro da tela da nutricionista ──────
-          Ela chegou a ficar lá dentro, como uma linha que abria por cima da
-          ficha da profissional da pessoa. Continuava escondida: quem quer
-          conhecer a rede não vai procurar dentro de "Minha nutricionista", e
-          quem abre "Minha nutricionista" quer ver a dela.
-
-          São dois assuntos, e agora são dois lugares. Aqui, antes de
-          Privacidade, é onde ficam as coisas do app que não são do dia. */}
-      <View style={styles.cartao}>
-        <Text style={styles.tituloCartao}>Nutricionistas Cygnos</Text>
-        <Text style={styles.textoPrivacidade}>
-          Conheça as fichas das profissionais da rede: formação, especialidades e como cada uma
-          atende.
-        </Text>
-
-        <LinhaLink
-          icone="people-outline"
-          rotulo="Ver as nutricionistas da rede"
-          onPress={onAbrirRede}
-          interno
-        />
-      </View>
+      <Secao titulo="Sua conta" icone="shield-checkmark-outline" recuo={0} />
 
       <View style={styles.cartao}>
         <Text style={styles.tituloCartao}>Privacidade</Text>
