@@ -71,7 +71,15 @@ export type FotoEscolhida =
      quem lesse `escolha.base64` teria toda razão de mandar isso para uma
      função que espera texto de imagem. Renomeado antes de alguém acreditar no
      nome. */
-  | { tipo: 'ok'; uri: string }
+  | {
+      tipo: 'ok'
+      /* O caminho, para a tela desenhar a prévia. */
+      uri: string
+      /* E a imagem em texto, feita num SEGUNDO passo, com a câmera já fechada.
+         Quem sobe recebe isto pronto e não relê o arquivo — reler custava um
+         `fetch('file://')` com `.blob()`, que é o que reiniciava o app. */
+      base64: string
+    }
   | { tipo: 'cancelado' }
   | { tipo: 'erro'; mensagem: string }
 
@@ -140,21 +148,39 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
   try {
     /* Só a largura: passar as duas dimensões esticaria uma foto retangular para
        um quadrado. */
-    /* SEM `base64`, e o campo devolve o CAMINHO.
+    /* ── DOIS PASSOS, E O TEXTO NO SEGUNDO ──────────────────────────────
      *
-     * A string base64 é 33% maior que o arquivo e nasce ao lado do bitmap e do
-     * JPEG — três cópias vivas no instante em que a câmera do sistema devolve o
-     * controle e a memória está no fim. É o que fazia o Android matar o app.
+     * Relatado: tirar foto na CONVERSA reiniciava o app. Mesmo defeito que já
+     * tinha sido corrigido na foto do prato, noutro arquivo — e por isso
+     * sobreviveu.
      *
-     * `guardarFotoDoDiario` aceita caminho e converte na hora do upload, com a
-     * câmera já fechada. O campo passou a se chamar `uri`, porque ele carrega
-     * três chamadores de uma vez — e ela aceita os dois formatos. */
+     * A primeira correção aqui tirou o `base64` daqui e passou o CAMINHO para
+     * `guardarFotoDoDiario`. Só que ela, ao receber caminho, relê o arquivo com
+     * `fetch(uri)` seguido de `.blob()` — e o próprio Expo avisa, na tela, que
+     * o Blob do React Native "copia a resposta e lê de volta ATRAVÉS DE
+     * BASE64". A alocação gigante voltou pela porta dos fundos, no mesmo
+     * instante ruim: logo depois da câmera.
+     *
+     * Agora são dois `manipulateAsync`. O primeiro reduz SEM texto e devolve a
+     * memória do bitmap da câmera — que é o que pesa, dezenas de megabytes. O
+     * segundo monta o texto depois, com a câmera já fechada; uma foto de 900
+     * pontos dá umas trezentas mil letras, e isso não derruba nada.
+     *
+     * O problema nunca foi o texto existir. Foi ele nascer AO LADO do bitmap. */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO_MAIOR } }],
       { compress: 0.8, format: SaveFormat.JPEG },
     )
-    return { tipo: 'ok', uri: reduzida.uri }
+    /* O segundo passo. Com a câmera fechada e o bitmap já liberado. */
+    const comTexto = await manipulateAsync(
+      reduzida.uri,
+      [],
+      { compress: 0.85, format: SaveFormat.JPEG, base64: true },
+    )
+    if (!comTexto.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }
+
+    return { tipo: 'ok', uri: reduzida.uri, base64: comTexto.base64 }
   } catch (e) {
     falha('Não consegui preparar a foto.', e)
     return { tipo: 'erro', mensagem: 'Não consegui preparar a foto. Tente outra.' }

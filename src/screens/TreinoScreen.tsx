@@ -656,7 +656,7 @@ function FotoDoTreino({
     }
 
     setSubindo(true)
-    const novo = await guardarFotoDoDiario(contaId, escolha.uri)
+    const novo = await guardarFotoDoDiario(contaId, escolha.base64)
     setSubindo(false)
 
     if (!novo) {
@@ -1532,7 +1532,7 @@ const estilos = estilosDe(t =>
   },
   textoConvite: { flex: 1, gap: 4 },
   tituloConvite: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
-  subConvite: { fontSize: 13, color: t.inkMedio, lineHeight: 18 },
+  subConvite: { fontSize: 13, color: t.inkMedio, lineHeight: 18 },
   linhaFeito: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   selo: {
     width: 28,
