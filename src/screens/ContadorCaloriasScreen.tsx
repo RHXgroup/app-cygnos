@@ -1641,7 +1641,7 @@ function ConfirmarFoto({
   return (
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={styles.fundoFolha} onPress={onDescartar} />
-      <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
+      <View style={[styles.folha, styles.folhaAlta, { paddingBottom: Math.max(bottom, 16) }]}>
         {/* ── O PRATO ABRE A FOLHA ──────────────────────────────────────
          *
          * A foto sumia no instante em que a leitura terminava, e a pessoa
@@ -3025,6 +3025,28 @@ const estilos = estilosDe(t =>
    * me fez reescrever cinco arquivos por uma teoria errada.
    *
    * Fica escrito porque a próxima pessoa vai tropeçar na mesma semelhança. */
+  /* A folha da CONFIRMAÇÃO DA FOTO, e por que ela é a única com altura fixa.
+   *
+   * Fotografado no aparelho: acima da capa aparecia uma faixa do cabeçalho
+   * verde do contador, colada na imagem do prato. Duas superfícies fortes
+   * disputando o mesmo olhar, e a de baixo era a que importava.
+   *
+   * Tentei escurecer o véu, de 0,62 para 0,78, e não resolveu. Depois subi o
+   * TETO de 88 para 95, e isso não fez absolutamente nada — a folha parava bem
+   * antes do teto, porque o conteúdo acabava ali. Duas tentativas gastas
+   * porque eu mexia no que dava para mexer em vez de olhar o que definia a
+   * altura.
+   *
+   * `height`, e não `maxHeight`: é o que garante que a folha SEMPRE chegue lá
+   * em cima, cheia ou vazia. A lista tem `flexGrow`/`flexShrink`, então ela é
+   * quem estica e encolhe dentro da altura fixa, e os botões continuam
+   * parados embaixo.
+   *
+   * Os 6% que sobram não são descuido: são onde se toca para fechar, e o único
+   * sinal de que existe tela atrás. Tela cheia perderia esse sinal. */
+  folhaAlta: {
+    height: '94%',
+  },
   fundoFolha: {
     position: 'absolute',
     top: 0,
@@ -3038,20 +3060,14 @@ const estilos = estilosDe(t =>
     left: 0,
     right: 0,
     bottom: 0,
-    /* 95%, e a razão mudou.
-     *
-     * Era 88 para "deixar ver que existe tela por trás". Fotografado no
-     * aparelho, o que se via por trás era uma faixa do cabeçalho VERDE do
-     * contador, colada em cima da foto do prato — duas superfícies fortes
-     * disputando o mesmo olhar, e a de baixo era a que importava.
-     *
-     * Escurecer o véu de 0,62 para 0,78 atenuou e não resolveu: verde vivo
-     * atravessa qualquer véu que ainda deixe ver.
-     *
-     * Os 5% que sobram continuam dizendo que há tela atrás — é o bastante para
-     * o gesto de arrastar fazer sentido, e pouco o bastante para não sobrar
-     * cor competindo com a imagem. */
-    maxHeight: '95%',
+    /* TETO, e não altura — e a diferença já custou uma rodada.
+       Uma folha curta para onde o conteúdo dela acaba; o teto só a impede de
+       passar disso. Subir o teto de uma folha que nem o alcança não move um
+       pixel. Quem precisa de altura garantida usa `folhaAlta`, abaixo.
+
+       88 deixa ver que existe tela por trás, que é o que diz que dá para
+       fechar arrastando. */
+    maxHeight: '88%',
     backgroundColor: t.cores.fundo,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
