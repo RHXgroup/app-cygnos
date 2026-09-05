@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   RefreshControl,
   AppState,
   Pressable,
@@ -250,6 +251,37 @@ export function HomeScreen({
      sobre o que já foi dito — nunca para criar cobrança nova. */
   const [intencoes, setIntencoes] = useState<Intencao[]>([])
   const [detalheDoDia, setDetalheDoDia] = useState(false)
+
+  /* ── O VOLTAR DO ANDROID, e por que ele mora aqui ───────────────────────
+   *
+   * A folha do dia é sobreposição absoluta DENTRO desta tela — não é `Modal`,
+   * então não há `onRequestClose` para o sistema chamar. E o voltar central do
+   * `App.tsx` não a conhece: a lista `deCimaParaBaixo` só enxerga o estado que
+   * mora lá em cima.
+   *
+   * Resultado: com a folha aberta, o botão do aparelho não achava nada para
+   * fechar e o Android fazia a única coisa que sabe — encerrava o app.
+   * Armadilha 1 do AGENTS.md, no formato exato que ela descreve.
+   *
+   * SEM LISTA DE DEPENDÊNCIAS, de propósito. O React roda os efeitos do FILHO
+   * antes dos do PAI, então com lista este ficaria registrado ANTES do central
+   * e perderia para ele. Re-registrar a cada renderização é o que o põe na
+   * frente a partir da primeira re-renderização — que sempre acontece, nem que
+   * seja na carga dos dados. Não é código morto nem descuido: é o que faz o
+   * descascar funcionar.
+   *
+   * `false` quando não há nada aberto, para o nível de cima assumir. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (detalheDoDia) {
+        setDetalheDoDia(false)
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
+
   /* O anel do gesto, e nada mais.
    *
    * Ele NÃO espera as leituras terminarem — os efeitos são vários, cada um com

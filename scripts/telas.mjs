@@ -37,9 +37,27 @@ for (const caminho of arquivos) {
      sinal de que há camada é uma sobreposição absoluta ou um Modal. */
   const temCamada =
     /absoluteFill|position: 'absolute'[\s\S]{0,400}(zIndex|Sobreposta)|<Modal/.test(fonte)
-  const temVoltar = /BackHandler/.test(fonte)
-  if (temCamada && !temVoltar) {
-    nota(1, nome, null, 'tem camada por cima e nenhum BackHandler')
+
+  /* Duas formas de atender o botao do aparelho, e a regra so conhecia uma.
+   *
+   * `<Modal onRequestClose>` E o tratador do voltar no Android -- o sistema
+   * chama aquilo antes de qualquer BackHandler. Os oito Modal deste app ja o
+   * passam, e mesmo assim a regra acusava todos: doze achados, dos quais a
+   * maioria estava CERTA.
+   *
+   * Isso e pior do que nao ter regra. Uma lista que grita a toa ensina a passar
+   * o olho e seguir, e no dia em que ela apontar o defeito de verdade ele vai
+   * junto no meio do ruido. */
+  const temVoltar = /BackHandler|onRequestClose/.test(fonte)
+
+  /* E DESENHO nao e camada. `AnelCalorias`, `AnelProgresso`, `CalendarioMes`,
+     `BarrasPeriodo` e `DiaDoCiclo` usam posicao absoluta para empilhar arco
+     sobre trilho -- nao ha nada para o voltar fechar. O sinal de camada de
+     verdade e ter algo que a FECHE. */
+  const podeFechar = /onFechar|onCancelar|onDescartar|setAbert|setVisivel/.test(fonte)
+
+  if (temCamada && podeFechar && !temVoltar) {
+    nota(1, nome, null, 'tem camada por cima e nada trata o voltar')
   }
 
   /* ── 2. Teclado (armadilha 2) ────────────────────────────────────────────
