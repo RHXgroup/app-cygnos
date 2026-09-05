@@ -105,13 +105,35 @@ export async function trocarAvatar(
   if (escolha.canceled || !escolha.assets?.[0]) return { tipo: 'cancelado' }
 
   try {
+    /* ── DOIS PASSOS, o texto só no segundo ─────────────────────────────
+     *
+     * Era um passo só, com `base64: true` junto do redimensionamento. Ali o
+     * bitmap da câmera — dezenas de megabytes — está vivo ao lado do JPEG e da
+     * string, e é essa soma que faz o Android matar o app ao voltar da foto.
+     *
+     * Este foi o ÚLTIMO dos quatro caminhos de foto do app a ser corrigido, e
+     * ficou por último porque eu o julguei "de risco menor": 512 pontos contra
+     * 1280 da ficha de treino. O julgamento estava certo sobre o tamanho e
+     * errado sobre a decisão — quatro cópias do mesmo defeito, consertadas uma
+     * por vez conforme cada uma era relatada, custaram uma semana. Corrigir as
+     * quatro juntas custaria a mesma tarde.
+     *
+     * A regra que fica: ao achar este defeito, procure os irmãos ANTES de
+     * consertar o que foi relatado.  grep -rn "base64: true" src/lib */
     const reduzida = await manipulateAsync(
       escolha.assets[0].uri,
       [{ resize: { width: LADO, height: LADO } }],
-      { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+      { compress: 0.8, format: SaveFormat.JPEG },
     )
 
-    if (!reduzida.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a imagem.' }
+    /* O segundo passo, com a câmera fechada e o bitmap já liberado. */
+    const comTexto = await manipulateAsync(
+      reduzida.uri,
+      [],
+      { compress: 0.85, format: SaveFormat.JPEG, base64: true },
+    )
+
+    if (!comTexto.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a imagem.' }
 
     /* Dentro da pasta `avatares/`, e não na raiz do bucket.
      *
@@ -131,7 +153,7 @@ export async function trocarAvatar(
 
     const { error: erroUpload } = await supabase.storage
       .from(BUCKET)
-      .upload(path, decode(reduzida.base64), { contentType: 'image/jpeg' })
+      .upload(path, decode(comTexto.base64), { contentType: 'image/jpeg' })
 
     if (erroUpload)
       return {

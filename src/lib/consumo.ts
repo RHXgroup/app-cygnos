@@ -832,9 +832,23 @@ export async function analisarFoto(
      * Quem quiser tentar bytes de novo precisa primeiro de um jeito de ler o
      * arquivo SEM passar por base64 (o pacote `expo-blob`, que o proprio aviso
      * sugere) e de uma medida de memoria no aparelho. Sem as duas, nao. */
+    /* A partir de `reduzida.uri`, e NAO da foto original da camera.
+     *
+     * Estava lendo `escolha.assets[0].uri` -- o arquivo cru, de 4000 por 3000 --
+     * e isso recarrega o BITMAP GIGANTE inteiro so para gerar o texto. Ou seja:
+     * o segundo passo, que existe justamente para NAO ter o bitmap vivo,
+     * trazia o bitmap de volta.
+     *
+     * Achado varrendo os quatro caminhos de foto lado a lado, depois de a
+     * quarta copia do mesmo defeito ser relatada. Dois deles ja liam do
+     * reduzido e dois nao -- e os dois que nao liam eram justamente os
+     * consertados por ultimo, as pressas.
+     *
+     * `reduzida.uri` ja e o arquivo de 900 pontos. Sem `resize`, porque ele ja
+     * esta no tamanho certo. */
     const comTexto = await manipulateAsync(
-      escolha.assets[0].uri,
-      [{ resize: { width: LADO_MAIOR } }],
+      reduzida.uri,
+      [],
       { compress: 0.8, format: SaveFormat.JPEG, base64: true },
     )
     if (!comTexto.base64) return { tipo: 'erro', mensagem: 'Não consegui preparar a foto.' }

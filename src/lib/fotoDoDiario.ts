@@ -211,29 +211,22 @@ export async function guardarFotoDoDiario(
 ): Promise<string | null> {
   if (!contaId || !uriOuBase64) return null
 
-  /* Aceita os dois enquanto houver chamador antigo: caminho começa com file://
-     ou content://, base64 não. */
-  const ehCaminho = /^(file|content|assets-library|ph):/i.test(uriOuBase64)
-  let base64 = uriOuBase64
-  if (ehCaminho) {
-    try {
-      const blob = await (await fetch(uriOuBase64)).blob()
-      base64 = await new Promise<string>((resolve, reject) => {
-        const leitor = new FileReader()
-        leitor.onerror = () => reject(leitor.error ?? new Error('FileReader falhou'))
-        leitor.onload = () => {
-          const texto = String(leitor.result ?? '')
-          const virgula = texto.indexOf(',')
-          resolve(virgula === -1 ? '' : texto.slice(virgula + 1))
-        }
-        leitor.readAsDataURL(blob)
-      })
-    } catch (e) {
-      falha('Não consegui ler a foto do aparelho.', e)
-      return null
-    }
-    if (!base64) return null
-  }
+  /* ── SÓ TEXTO. O caminho de arquivo SAIU daqui, e não volta ───────────
+   *
+   * Ela aceitava os dois formatos, e para caminho relia o arquivo com
+   * `fetch(uri)` seguido de `.blob()`. O próprio Expo avisa, na tela, que o
+   * Blob do React Native copia a resposta e lê de volta ATRAVÉS DE BASE64 — a
+   * alocação gigante voltando pela porta dos fundos, e no pior instante: logo
+   * depois da câmera, com o bitmap dela ainda na memória.
+   *
+   * Foi isso que reiniciava o app ao tirar foto na conversa, DEPOIS de eu ter
+   * "corrigido" o problema mandando o caminho para cá. Consertei um lado e
+   * abri o outro.
+   *
+   * Agora quem chama já traz o texto pronto, feito num segundo
+   * `manipulateAsync` com a câmera fechada. Aceitar caminho de novo seria
+   * reabrir esta porta — e ela levou uma semana para ser achada. */
+  const base64 = uriOuBase64
 
   const agora = new Date()
   const anoMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`

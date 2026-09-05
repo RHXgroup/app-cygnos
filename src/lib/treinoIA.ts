@@ -265,9 +265,18 @@ export async function lerFichaDaFoto(
       const status = (error as { context?: Response }).context?.status
       if (status === undefined || status >= 400) {
         falha('Ficha: os bytes não foram aceitos (HTTP ' + String(status) + '), indo por texto', error)
+      /* A partir do arquivo JA REDUZIDO, e NAO da foto original da camera.
+       *
+       * Estava lendo `escolha.assets[0].uri` -- o arquivo cru, de 4000 por 3000
+       * -- e isso recarrega o BITMAP GIGANTE inteiro so para gerar o texto.
+       * Ou seja: o segundo passo, que existe justamente para nao ter o bitmap
+       * vivo, trazia o bitmap de volta.
+       *
+       * `caminho` ja e o arquivo reduzido pontos, e reler ele custa pouco.
+       * Sem `resize`, porque ele ja esta no tamanho certo. */
         const comTexto = await manipulateAsync(
-          escolha.assets[0].uri,
-          [{ resize: { width: LADO_MAIOR_FICHA } }],
+          caminho,
+          [],
           { compress: 0.8, format: SaveFormat.JPEG, base64: true },
         )
         if (comTexto.base64) {
