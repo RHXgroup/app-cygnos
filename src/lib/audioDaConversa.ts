@@ -1,4 +1,4 @@
-import { decode } from 'base64-arraybuffer'
+import { File } from 'expo-file-system'
 import { falha } from './erros'
 import { supabase } from './supabase'
 
@@ -93,46 +93,51 @@ export async function guardarAudioDaConversa(
   const caminho = `${contaId}/${anoMes}/${nomeUnico(aac ? 'aac' : 'm4a')}`
 
   try {
-    /* ── O caminho de leitura, que erra se for o óbvio ────────────────────
+    /* ── Por que NAO e fetch, e por que a versao anterior parecia certa ──
      *
-     * `fetch(uri).arrayBuffer()` é o que se escreveria em qualquer navegador,
-     * e no React Native ele NÃO serve: o `fetch` daqui é polyfill, e sobre um
-     * `file://` ou devolve vazio ou rejeita. O sintoma no aparelho foi "não
-     * consegui preparar o áudio" logo depois de gravar, sem erro nenhum antes.
+     * Estava assim: `fetch(uri).blob()`, depois `FileReader` para base64,
+     * depois `decode` para bytes. Tres travessias para ler um arquivo que ja
+     * esta no aparelho, e um comentario meu explicando que `arrayBuffer()` do
+     * fetch nao servia -- o que era verdade quando foi escrito.
      *
-     * O caminho que funciona é o mesmo da foto do prato, que já roda há meses:
-     * base64 → `decode` → bytes. `FileReader` é a única leitura de arquivo
-     * disponível sem trazer pacote nativo, e o `blob()` do `fetch` ele lê. */
-    const blob = await (await fetch(uri)).blob()
+     * O projeto esta no SDK 57, e o SDK 57 troca o `fetch` global pelo fetch da
+     * Expo. Ele segue o padrao da web, e o padrao da web nao diz nada sobre
+     * `file://`. Sobre um arquivo local ele nao levanta erro: devolve algo
+     * vazio. E vazio, aqui, atravessava tudo -- `FileReader` lia zero, o
+     * base64 saia vazio, e a pessoa recebia "a gravacao saiu sem som" logo
+     * depois de falar. O microfone estava certo; a leitura e que nao era.
+     *
+     * `new File(uri).arrayBuffer()` e a leitura nativa do proprio Expo, e o
+     * supabase-js aceita `ArrayBuffer` direto. Some o fetch, some o Blob, some
+     * o FileReader e some o base64 -- que ainda por cima era 33% maior que o
+     * arquivo, sem nenhuma razao para existir no meio do caminho. */
+    const arquivo = new File(uri)
 
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const leitor = new FileReader()
-      leitor.onerror = () => reject(leitor.error ?? new Error('FileReader falhou'))
-      leitor.onload = () => {
-        /* Vem como `data:audio/m4a;base64,AAAA…` — só o que está depois da
-           vírgula é o conteúdo. */
-        const texto = String(leitor.result ?? '')
-        const virgula = texto.indexOf(',')
-        resolve(virgula === -1 ? '' : texto.slice(virgula + 1))
-      }
-      leitor.readAsDataURL(blob)
-    })
-
-    /* Gravação que não pegou. Subir isso produz um balão que ninguém consegue
-       tocar — pior que a falha, porque parece sucesso.
-       O tamanho vai para o terminal do Metro com o prefixo [cygnos], como no
-       ditado: sem o número, "não deu" pode ser microfone mudo, arquivo vazio
-       ou upload recusado, e os três têm a mesma cara na tela. */
-    console.log('[cygnos] áudio da conversa:', blob.size, 'bytes,', base64.length, 'em base64')
-    if (!base64) {
-      falha('A gravação saiu vazia.', new Error('0 byte em ' + uri))
+    if (!arquivo.exists) {
+      falha('A gravacao nao existe no aparelho.', new Error(uri))
       return {
         tipo: 'erro',
-        mensagem: 'A gravação saiu sem som. Verifique se algum outro aplicativo está usando o microfone.',
+        mensagem: 'Nao consegui achar a gravacao no aparelho. Tente gravar de novo.',
       }
     }
 
-    const dados = decode(base64)
+    const dados = await arquivo.arrayBuffer()
+
+    /* O tamanho vai para o terminal do Metro com o prefixo [cygnos]. Sem o
+       numero, "nao deu" pode ser microfone mudo, arquivo vazio ou upload
+       recusado, e os tres tem a mesma cara na tela. Foi a AUSENCIA deste
+       numero que deixou o defeito do fetch passar por gravacao muda. */
+    console.log('[cygnos] audio da conversa:', dados.byteLength, 'bytes')
+
+    /* Gravacao que nao pegou. Subir isso produz um balao que ninguem consegue
+       tocar -- pior que a falha, porque parece sucesso. */
+    if (dados.byteLength === 0) {
+      falha('A gravacao saiu vazia.', new Error('0 byte em ' + uri))
+      return {
+        tipo: 'erro',
+        mensagem: 'A gravacao saiu sem som. Verifique se algum outro aplicativo esta usando o microfone.',
+      }
+    }
 
     const { error } = await supabase.storage
       .from(BUCKET)
