@@ -1,5 +1,6 @@
 import {
   ESTADO_INICIAL,
+  PISO_MINIMO,
   MAXIMO_DO_TRECHO_MS,
   MINIMO_DE_FALA_MS,
   SILENCIO_QUE_FECHA_MS,
@@ -204,6 +205,49 @@ function correr(leituras: [number | null, number][], inicial: Estado = ESTADO_IN
     morreu = true
   }
   ok('não derruba', !morreu)
+}
+
+// -- 9. A SEQUENCIA REAL DO APARELHO ---------------------------------------
+//
+// Estes numeros sao do log do treino, copiados como sairam. Antes do piso
+// minimo, a leitura de -160 derrubava o limiar de -89 para -124 num passo, e a
+// escuta nunca mais via silencio -- nada era enviado, e a tela ficava
+// eternamente "gravando".
+{
+  console.log('\n9. a sequencia do aparelho')
+
+  const doLog = [-38.8, -13.6, -26.5, -28.5, -33.2, -160.0, -8.7, -30.4, -13.7]
+  let e = ESTADO_INICIAL
+  let viuSilencio = false
+  doLog.forEach((n, i) => {
+    const r = ouvir(e, n, i * 100)
+    e = r.estado
+    // O -160 e silencio de verdade, e tem de ser lido como tal.
+    if (n === -160 && !r.estado.falando) viuSilencio = true
+    if (n === -160 && limiarDe(e.ambiente) > n) viuSilencio = true
+  })
+
+  ok('o piso nao desce abaixo de -65', e.ambiente >= PISO_MINIMO, String(e.ambiente.toFixed(1)))
+  ok(
+    'o limiar fica acima do silencio de -160',
+    limiarDe(e.ambiente) > -160,
+    String(limiarDe(e.ambiente).toFixed(1)),
+  )
+  ok('e abaixo da fala de -30', limiarDe(e.ambiente) < -30, String(limiarDe(e.ambiente).toFixed(1)))
+  ok('o -160 conta como silencio', viuSilencio)
+}
+
+/* -- 10. SILENCIO DE VERDADE FECHA O TRECHO ------------------------------- */
+{
+  console.log('\n10. o silencio fecha')
+  // Fala por 1,5 s e depois o medidor devolve o sentinela de silencio. O trecho
+  // tem de FECHAR -- e e o fechamento que manda o comando para o servidor.
+  const leituras: [number, number][] = []
+  for (let i = 0; i < 15; i++) leituras.push([-20, 100])
+  for (let i = 0; i < 12; i++) leituras.push([-160, 100])
+  const { decisoes } = correr(leituras)
+  ok('fecha por silencio, e nao pelo teto', decisoes.includes('terminou'), decisoes.join(','))
+  ok('nao chegou a bater no teto', !decisoes.includes('cortar_no_teto'))
 }
 
 console.log(`\n${passou} passaram, ${falhou} falharam`)

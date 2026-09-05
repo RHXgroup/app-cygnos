@@ -29,6 +29,37 @@
    se ouviu antes, e não um número fixo. Ver `limiarDe`. */
 export const MARGEM_ACIMA_DO_AMBIENTE = 12
 
+/* O piso do PISO. Abaixo disto o ambiente não desce, por mais silêncio que o
+ * medidor relate.
+ *
+ * ── O que este número impede ─────────────────────────────────────────────
+ * Lido no log do aparelho, com o treino aberto:
+ *
+ *     -33.2 dB · limiar  -89.6      (o piso vinha subindo, certo)
+ *     fala ACABOU com 6.0 s
+ *     fala COMEÇOU
+ *   -160.0 dB · limiar -124.4      (despencou 35 dB de uma vez)
+ *
+ * `-160` não é medição: é o valor que o Android devolve quando não há sinal
+ * nenhum. E a adaptação desce RÁPIDO de propósito — 30% num passo —, então uma
+ * única leitura dessas arrastava o piso para o fundo. Ele nunca convergia: subia
+ * devagar durante a fala, e o primeiro silêncio o jogava de volta.
+ *
+ * Com o piso em -124, o limiar fica em -112 e TUDO conta como fala. A escuta
+ * nunca vê silêncio, nunca fecha trecho, e a única saída é o teto — que é
+ * descartado. Nada nunca é enviado.
+ *
+ * ── Por que -65, e não -160 ──────────────────────────────────────────────
+ * Nenhum cômodo do mundo tem ruído de fundo de -160 dBFS. Sala silenciosa dá
+ * -60 a -40 no microfone de um celular; fala perto do aparelho, -30 a -5. Um
+ * piso em -65 põe o limiar em -53: acima do silêncio de qualquer lugar real, e
+ * abaixo de qualquer fala.
+ *
+ * E o -160 continua sendo ÓTIMA informação — só não como piso. Ele fica bem
+ * abaixo do limiar, então conta como silêncio, que é exatamente o que ele é. É
+ * o silêncio que FECHA o trecho e faz o comando ser enviado. */
+export const PISO_MINIMO = -65
+
 /* Menos que isto não é frase, é batida de peso no chão ou tosse. */
 export const MINIMO_DE_FALA_MS = 350
 
@@ -113,10 +144,15 @@ export function ouvir(
    * dela de virar o novo normal: uma frase de dois segundos são ~20 leituras e
    * move o ambiente em menos de 1 dB, enquanto barulho constante de um minuto
    * move o suficiente. */
-  const ambiente =
+  const aprendido =
     nivel < estado.ambiente
       ? estado.ambiente * 0.7 + nivel * 0.3
       : estado.ambiente * 0.995 + nivel * 0.005
+
+  /* O piso não desce abaixo do que existe no mundo — ver `PISO_MINIMO`. Sem
+     esta linha, uma leitura de "sem sinal" derruba o limiar e a escuta passa a
+     achar que tudo é fala. */
+  const ambiente = Math.max(aprendido, PISO_MINIMO)
 
   if (!estado.falando) {
     if (!temSom) return { estado: { ...estado, ambiente }, decisao: 'nada' }
