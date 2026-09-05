@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +15,7 @@ import { carregarLimitacoes, salvarLimitacoes } from '../lib/limitacoes'
 import { adaptarExercicio, type Alternativa } from '../lib/treinoIA'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from './Botao'
+import { TelaComTeclado } from './TelaComTeclado'
 
 /* Trocar um exercício por outro que a limitação da pessoa permite.
  *
@@ -137,9 +136,8 @@ export function AdaptarExercicio({
 
   return (
     <Modal visible={visivel} animationType="slide" transparent={false} onRequestClose={onFechar}>
-      <KeyboardAvoidingView
+      <TelaComTeclado
         style={[styles.tela, { paddingTop: top + 8 }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.cabecalho}>
           <Pressable
@@ -246,7 +244,7 @@ export function AdaptarExercicio({
             </>
           )}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </TelaComTeclado>
     </Modal>
   )
 }

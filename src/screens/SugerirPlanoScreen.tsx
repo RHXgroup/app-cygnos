@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   BackHandler,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +19,7 @@ import { sugerirPlano, type PlanoSugerido } from '../lib/planoIA'
 import { milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 import type { RefeicaoEscolhida } from './RefeicoesDoDiaScreen'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* O que a IA precisa saber antes de montar.
  *
@@ -250,9 +249,8 @@ export function SugerirPlanoScreen({
   }
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={styles.tela}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {cabecalho}
 
@@ -331,7 +329,7 @@ export function SugerirPlanoScreen({
           saúde, converse com uma nutricionista.
         </Text>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

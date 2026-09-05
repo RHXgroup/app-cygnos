@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -38,6 +36,7 @@ import {
 import { salvarMetaAgua } from '../lib/metas'
 import { DIAS_CURTOS, horaCurta, milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Água: registrar, desfazer, ver o dia e a semana.
  *
@@ -187,9 +186,8 @@ export function AguaScreen({
      * ligar edge-to-edge por padrão. A documentação do SDK avisa disso e aponta
      * o KeyboardAvoidingView como o caminho; sem os dois, o campo ficava
      * escondido atrás do teclado. */
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -285,7 +283,7 @@ export function AguaScreen({
           />
         </ScrollView>
       )}
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

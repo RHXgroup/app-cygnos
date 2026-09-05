@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   BackHandler,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -52,6 +50,7 @@ import type { DiaSemana } from '../lib/plano'
 import { dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Treino.
  *
@@ -278,9 +277,8 @@ export function TreinoScreen({
   const seguidos = sequencia(sessoes)
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -598,7 +596,7 @@ export function TreinoScreen({
         onCancelar={() => setApagandoSessao(null)}
         onConfirmar={() => apagandoSessao && apagar(apagandoSessao)}
       />
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

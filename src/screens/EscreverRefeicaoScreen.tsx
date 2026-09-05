@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   BackHandler,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,6 +20,7 @@ import { Ditado } from '../components/Ditado'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Escrever a refeição inteira de uma vez.
  *
@@ -295,9 +294,8 @@ export function EscreverRefeicaoScreen({
   }
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -565,7 +563,7 @@ export function EscreverRefeicaoScreen({
           </>
         )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

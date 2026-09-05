@@ -2,9 +2,7 @@ import { useEffect, useCallback, useRef, useState } from 'react'
 import {
   Animated,
   BackHandler,
-  KeyboardAvoidingView,
   PanResponder,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +18,7 @@ import { SugerirPlanoScreen } from './SugerirPlanoScreen'
 import type { ItemAlimento } from '../lib/plano'
 import { mascaraHora, validarHora } from '../lib/formulario'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 type Item = {
   id: string
@@ -375,9 +374,8 @@ export function RefeicoesDoDiaScreen({
   }
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -462,7 +460,7 @@ export function RefeicoesDoDiaScreen({
           <Text style={styles.textoBotao}>Continuar</Text>
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

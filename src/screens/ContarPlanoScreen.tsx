@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +17,7 @@ import { carregarIntencoes, lerIntencao, marcarCumprida, salvarIntencoes, apagar
 import type { Convertida, Intencao, TipoIntencao } from '../lib/intencaoDaIA'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Contar um plano: o que vai acontecer, e não o que aconteceu.
  *
@@ -201,9 +200,8 @@ export function ContarPlanoScreen({
   const voltar = () => (lida ? setLida(null) : onFechar())
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -407,7 +405,7 @@ export function ContarPlanoScreen({
           </>
         )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

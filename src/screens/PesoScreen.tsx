@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -50,6 +48,7 @@ import {
 import { dataISO, dataNumerica } from '../lib/formatar'
 import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 const MARGEM = 20
 /* Vem do tema. Estava escrito à mão aqui e em mais duas telas — ver o
@@ -276,9 +275,8 @@ export function PesoScreen({
   const larguraGrafico = larguraTela - MARGEM * 2 - PADDING_CARTAO * 2
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -578,7 +576,7 @@ export function PesoScreen({
           bottom={bottom + 16}
         />
       )}
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

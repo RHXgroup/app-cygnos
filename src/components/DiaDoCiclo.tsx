@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +26,7 @@ import {
   resumoDoDia,
   temAlgoAnotado,
 } from '../lib/resumoDoDiaDoCiclo'
+import { TelaComTeclado } from './TelaComTeclado'
 
 /* Um dia do calendário do ciclo.
  *
@@ -251,9 +250,8 @@ export function DiaDoCiclo({
 
   return (
     <Modal visible={visivel} animationType="slide" onRequestClose={onFechar}>
-      <KeyboardAvoidingView
+      <TelaComTeclado
         style={[styles.tela, { paddingTop: top + 8 }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.cabecalho}>
           <Pressable
@@ -581,7 +579,7 @@ export function DiaDoCiclo({
             )}
           </ScrollView>
         )}
-      </KeyboardAvoidingView>
+      </TelaComTeclado>
     </Modal>
   )
 }

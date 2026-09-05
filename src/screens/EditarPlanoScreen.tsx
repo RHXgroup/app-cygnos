@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,6 +33,7 @@ import {
   type RefeicaoMontada,
 } from '../lib/plano'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 const LIMITE_NOME = 80
 
@@ -234,9 +233,8 @@ export function EditarPlanoScreen({
   const totais = totaisDe(itensDoPlano(refeicoes))
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={styles.tela}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.cabecalho, { paddingTop: top + 8 }]}>
         <Pressable
@@ -437,7 +435,7 @@ export function EditarPlanoScreen({
         }}
       />
 
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

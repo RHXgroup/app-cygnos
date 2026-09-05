@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   BackHandler,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,6 +30,7 @@ import {
   type Secao,
 } from '../lib/questionarioDaNutri'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Responder o questionário que a nutricionista mandou, sem sair do app.
  *
@@ -247,9 +246,8 @@ export function QuestionarioScreen({
   if (!secao) return moldura(<View style={styles.centro} />)
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -322,7 +320,7 @@ export function QuestionarioScreen({
           Pode pular o que não souber ou não quiser responder — nada aqui é obrigatório.
         </Text>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

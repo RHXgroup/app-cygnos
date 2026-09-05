@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -45,6 +43,7 @@ import {
 import { carregarPeso } from '../lib/peso'
 import { decimal, milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Cálculo energético para quem não sabe o que é cálculo energético.
  *
@@ -263,9 +262,8 @@ export function CalculoEnergeticoScreen({
   const podeAvancar = etapa === 1 ? dadosOk : etapa === 2 ? atividade !== null : true
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -385,7 +383,7 @@ export function CalculoEnergeticoScreen({
           </View>
         </>
       )}
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

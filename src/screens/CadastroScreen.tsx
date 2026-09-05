@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +26,7 @@ import {
 } from '../lib/formulario'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 type Campo = 'nome' | 'email' | 'username' | 'cpf' | 'telefone' | 'nascimento' | 'senha' | 'genero'
 type Erros = Partial<Record<Campo, string>>
@@ -180,9 +179,8 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
   }
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -370,7 +368,7 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
           </Pressable>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

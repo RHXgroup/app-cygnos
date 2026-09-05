@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,6 +39,7 @@ import { mascaraHora, validarHora } from '../lib/formulario'
 import { DIAS_CURTOS, dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* O sono, uma noite por vez.
  *
@@ -271,9 +270,8 @@ export function SonoScreen({
   const varia = regularidade(noites)
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -628,7 +626,7 @@ export function SonoScreen({
           bottom={bottom + 16}
         />
       )}
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

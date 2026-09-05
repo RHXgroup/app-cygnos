@@ -3,9 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   BackHandler,
-  KeyboardAvoidingView,
   Linking,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -53,6 +51,7 @@ import { ConteudoNutriScreen, type ChaveConteudo } from './ConteudoNutriScreen'
 import { AgendarConsultaScreen } from './AgendarConsultaScreen'
 import { dataCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* O catálogo de nutricionistas Cygnos, em tela cheia.
  *
@@ -470,9 +469,8 @@ function PainelDePedido({
   return (
     /* behavior declarado, senão no Android o teclado cobre o campo — a caixa de
        texto fica na metade de baixo do painel. Ver a armadilha 2. */
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.painel, { paddingTop: top + 8, paddingBottom: bottom + 16 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -561,7 +559,7 @@ function PainelDePedido({
           <Text style={styles.textoPedir}>Enviar pedido</Text>
         )}
       </Pressable>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

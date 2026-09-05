@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,6 +31,7 @@ import {
 import { milhar } from '../lib/formatar'
 import { comoFoiCalculado, metasSugeridas, type Sugestao } from '../lib/metasSugeridas'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Onde a pessoa escreve o que ela está perseguindo.
  *
@@ -346,9 +345,8 @@ export function MetasScreen({
   }
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={[styles.tela, { paddingTop: top + 8 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cabecalho}>
         <Pressable
@@ -614,7 +612,7 @@ export function MetasScreen({
           </View>
         </>
       )}
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

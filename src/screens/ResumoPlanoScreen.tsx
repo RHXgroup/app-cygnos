@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +22,7 @@ import {
   type RefeicaoMontada,
 } from '../lib/plano'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 const LIMITE_NOME = 80
 
@@ -91,11 +90,10 @@ export function ResumoPlanoScreen({
   }
 
   return (
-    <KeyboardAvoidingView
+    <TelaComTeclado
       style={styles.tela}
       /* No Android o sistema já encolhe a janela; no iOS não, e sem isto o
          teclado do nome cobre o botão de salvar. */
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.cabecalho, { paddingTop: top + 8 }]}>
         <Pressable
@@ -194,7 +192,7 @@ export function ResumoPlanoScreen({
           )}
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </TelaComTeclado>
   )
 }
 

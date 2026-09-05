@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PALAVRA_CONFIRMACAO, excluirConta } from '../lib/conta'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
+import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Exclusão da conta, exigida pela Play Store para todo app que deixa criar uma.
  *
@@ -82,9 +81,8 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
         <View style={styles.botaoVoltar} />
       </View>
 
-      <KeyboardAvoidingView
+      <TelaComTeclado
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           contentContainerStyle={[styles.conteudo, { paddingBottom: 40 + bottom }]}
@@ -176,7 +174,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
             <Text style={styles.textoBotaoCancelar}>Cancelar</Text>
           </Pressable>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </TelaComTeclado>
     </View>
   )
 }
