@@ -353,6 +353,23 @@ export function MensagensScreen({
     setAnexo({ path: r.caminho, tipo: 'audio' })
   }
 
+  /* ── O DIAGNOSTICO DO ENVIO, so em __DEV__ ─────────────────────────────
+   *
+   * Relatado tres vezes: "foto e audio nao enviam sem texto junto". Conferi o
+   * portao do app (aceita anexo sem texto), a funcao do banco (texto vazio so
+   * e erro quando NAO ha anexo) e a assinatura no banco de producao (o
+   * `npm run contrato` chama com os argumentos exatos, e trata PGRST202 como
+   * ausencia -- ela passou). Nenhum dos tres e o culpado, e dai em diante eu
+   * estaria adivinhando.
+   *
+   * Entao o app passa a dizer o que aconteceu. Armadilha 2 do AGENTS.md: pare
+   * de trocar de mecanismo e imprima o numero na tela -- la foi uma foto que
+   * encerrou o que seis deducoes nao encerraram.
+   *
+   * Guarda o CAMINHO do anexo porque o servidor recusa caminho que nao comece
+   * na pasta de quem envia, e essa e a unica hipotese que sobra em pe. */
+  const [diagnostico, setDiagnostico] = useState('')
+
   async function enviar() {
     const limpo = texto.trim()
     /* Foto sem legenda é mensagem inteira: exigir texto obrigaria a pessoa a
@@ -361,13 +378,20 @@ export function MensagensScreen({
 
     setEnviando(true)
     setErro('')
+    if (__DEV__) {
+      setDiagnostico(
+        `texto:${limpo.length} · anexo:${anexo ? anexo.tipo : 'nenhum'} · ${anexo ? anexo.path : '-'}`,
+      )
+    }
     const r = await enviarMensagem(limpo, anexo)
     setEnviando(false)
 
     if (r.tipo === 'erro') {
       setErro(r.mensagem)
+      if (__DEV__) setDiagnostico(d => d + ` >> RECUSADO: ${r.mensagem}`)
       return
     }
+    if (__DEV__) setDiagnostico(d => d + ' >> aceito')
 
     /* Limpa o campo e relê. Reler em vez de montar a linha aqui: o id e o
        horário vêm do banco, e uma linha montada na mão apareceria com hora do
@@ -592,6 +616,13 @@ export function MensagensScreen({
           )}
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
+
+          {/* Some sozinho no build: `__DEV__` e falso la. */}
+          {__DEV__ && !!diagnostico && (
+            <Text style={styles.diagnostico} selectable>
+              {diagnostico}
+            </Text>
+          )}
 
           {/* A PRÉVIA do que vai junto.
               Sem ela, a pessoa escolhe a foto, vê a tela voltar igual, e não
@@ -965,6 +996,18 @@ const estilos = estilosDe(t =>
     },
     horaMinha: { color: 'rgba(255,255,255,0.75)' },
 
+    /* Miudo, e para ser lido numa FOTO da tela -- por isso o fundo proprio e o
+       `selectable`, que deixa copiar o caminho inteiro se a foto nao bastar. */
+    diagnostico: {
+      marginHorizontal: 20,
+      marginBottom: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 10,
+      fontSize: 10,
+      color: '#B45309',
+      backgroundColor: 'rgba(180,83,9,0.10)',
+    },
     erro: { paddingHorizontal: 20, paddingBottom: 6, fontSize: 12.5, color: t.cores.erroTexto },
 
     /* No FLUXO da coluna, sem posicionamento nenhum. A janela encolhe com o
