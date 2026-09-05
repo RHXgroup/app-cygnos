@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -14,7 +15,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { removerAvatar, trocarAvatar, urlDoAvatar } from '../lib/avatar'
-import { mascaraCPF, mascaraTelefone } from '../lib/formulario'
+import {
+  mascaraCPF,
+  mascaraTelefone,
+  soDigitos,
+  validarNome,
+  validarTelefone,
+} from '../lib/formulario'
 import {
   NOME_DO_OBJETIVO,
   carregarObjetivoPeso,
@@ -22,6 +29,8 @@ import {
   type ObjetivoPeso,
 } from '../lib/metas'
 import { estilosDe, paleta } from '../lib/tema'
+import { falha } from '../lib/erros'
+import { useDesvioDoTeclado } from '../lib/teclado'
 
 type Conta = {
   nome_completo: string
@@ -83,6 +92,76 @@ export function PerfilScreen({
   const [objetivo, setObjetivo] = useState<ObjetivoPeso>(null)
   const [erroObjetivo, setErroObjetivo] = useState('')
 
+  /* ── A EDIÇÃO DO CADASTRO ────────────────────────────────────────────────
+   *
+   * A tela tinha cara de perfil editável e não era: nome, telefone, CPF,
+   * nascimento e gênero eram TEXTO. Relatado assim — "tem a opção de editar o
+   * perfil, não consigo mudar" —, e quem lê a tela chega à mesma conclusão.
+   *
+   * Editáveis: nome e telefone. Os dois mudam na vida real (casamento, erro de
+   * digitação, troca de número) e nenhum entra em conta nenhuma.
+   *
+   * NÃO editáveis, de propósito:
+   *   · CPF e usuário são identidade — mudar aqui é outro assunto, com outra
+   *     conferência;
+   *   · nascimento e gênero entram no CÁLCULO ENERGÉTICO. Trocá-los em silêncio
+   *     mudaria o gasto basal e as metas que a nutricionista prescreveu, sem
+   *     ninguém do outro lado saber. Quem corrige isso é ela;
+   *   · altura já é editada no Cálculo Energético. Um segundo lugar para o mesmo
+   *     campo é a armadilha 5 do AGENTS.md esperando acontecer.
+   *
+   * O `desvio` existe porque no Expo Go a janela NÃO encolhe com o teclado
+   * aberto, e o telefone é o último campo — ver a armadilha 2. */
+  const [editando, setEditando] = useState(false)
+  const [nomeEditado, setNomeEditado] = useState('')
+  const [telefoneEditado, setTelefoneEditado] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [erroEdicao, setErroEdicao] = useState('')
+  const desvio = useDesvioDoTeclado(bottom)
+
+  function comecarAEditar() {
+    if (!conta) return
+    setNomeEditado(conta.nome_completo)
+    setTelefoneEditado(mascaraTelefone(conta.telefone))
+    setErroEdicao('')
+    setEditando(true)
+  }
+
+  async function salvarCadastro() {
+    if (salvando) return
+
+    /* Valida antes de ir ao servidor: o banco aceitaria nome vazio, e um perfil
+       sem nome quebra as iniciais do avatar e a saudação da tela inicial. */
+    const nome = nomeEditado.trim()
+    const erroNome = validarNome(nome)
+    if (erroNome) return setErroEdicao(erroNome)
+
+    const telefone = soDigitos(telefoneEditado)
+    const erroTelefone = validarTelefone(telefone)
+    if (erroTelefone) return setErroEdicao(erroTelefone)
+
+    setSalvando(true)
+    setErroEdicao('')
+    const { error } = await supabase
+      .from('app_contas')
+      .update({ nome_completo: nome, telefone })
+      .eq('id', sessao.user.id)
+    setSalvando(false)
+
+    if (error) {
+      setErroEdicao(
+        falha('Não consegui salvar as suas alterações agora. Verifique a conexão.', error),
+      )
+      return
+    }
+
+    /* Escreve no estado local em vez de reler: a linha é a mesma que acabou de
+       ser gravada, e uma segunda ida ao servidor só adicionaria uma espera e
+       uma chance de falhar depois do sucesso. */
+    setConta(c => (c ? { ...c, nome_completo: nome, telefone } : c))
+    setEditando(false)
+  }
+
   useEffect(() => {
     let ativo = true
 
@@ -130,11 +209,18 @@ export function PerfilScreen({
         setOpcoesAbertas(false)
         return true
       }
+      /* A edição é um degrau, e o voltar descasca ele antes de fechar a tela.
+         Sem isto, quem estivesse editando perdia o que digitou e ainda saía do
+         perfil de uma vez — dois passos num toque só. */
+      if (editando) {
+        setEditando(false)
+        return true
+      }
       return false
     })
 
     return () => sub.remove()
-  }, [opcoesAbertas])
+  }, [opcoesAbertas, editando])
 
   /* O endereço da foto agora é assinado, e assinar é ida ao servidor — então ele
      vira estado em vez de ser calculado no meio do render. Refaz sempre que o
@@ -232,8 +318,17 @@ export function PerfilScreen({
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.conteudo}
+          /* O respiro do teclado vai no CONTEÚDO, e não como deslocamento da
+             tela inteira: aqui a caixa de escrever não é fixa embaixo, é a
+             última linha de uma lista que rola. Sobrando altura equivalente ao
+             teclado, a rolagem alcança o campo — que é o que resolve.
+
+             `teclado + área segura`, e as duas SOMAM: `endCoordinates.height`
+             não inclui a barra de navegação que fica por baixo. Ver a armadilha
+             2 do AGENTS.md, que custou seis tentativas noutra tela. */
+          contentContainerStyle={[styles.conteudo, desvio > 0 && { paddingBottom: desvio + 24 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           bounces={false}
           overScrollMode="never"
         >
@@ -276,11 +371,94 @@ export function PerfilScreen({
 
           {conta ? (
             <View style={styles.cartao}>
+              {/* O cabeçalho do cartão existe para o botão ter onde morar. Sem
+                  ele, "Editar" viraria mais uma linha da lista e se leria como
+                  um dado, e não como uma ação. */}
+              <View style={styles.cabecalhoCartao}>
+                <Text style={styles.tituloCartao}>Meus dados</Text>
+                {!editando && (
+                  <Pressable
+                    onPress={comecarAEditar}
+                    style={({ pressed }) => [styles.botaoEditar, pressed && styles.botaoEditarPress]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Editar os meus dados"
+                  >
+                    <Ionicons name="pencil" size={13} color={paleta().cores.verde} />
+                    <Text style={styles.textoEditar}>Editar</Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {editando ? (
+                <>
+                  <Campo
+                    rotulo="Nome completo"
+                    valor={nomeEditado}
+                    aoMudar={setNomeEditado}
+                    styles={styles}
+                    autoCapitalize="words"
+                  />
+                  <Campo
+                    rotulo="Telefone"
+                    valor={telefoneEditado}
+                    /* A máscara na digitação, e `soDigitos` na hora de salvar:
+                       o banco guarda só número, e a pessoa lê com parênteses. */
+                    aoMudar={t => setTelefoneEditado(mascaraTelefone(soDigitos(t)))}
+                    styles={styles}
+                    teclado="phone-pad"
+                  />
+                </>
+              ) : (
+                <>
+                  <Linha rotulo="Nome" valor={conta.nome_completo} />
+                  <Linha rotulo="Telefone" valor={mascaraTelefone(conta.telefone)} />
+                </>
+              )}
+
               <Linha rotulo="E-mail" valor={sessao.user.email ?? '—'} />
-              <Linha rotulo="Telefone" valor={mascaraTelefone(conta.telefone)} />
               <Linha rotulo="CPF" valor={mascaraCPF(conta.cpf)} />
               <Linha rotulo="Nascimento" valor={dataBR(conta.data_nascimento)} />
               <Linha rotulo="Gênero" valor={GENEROS[conta.genero] ?? conta.genero} ultima />
+
+              {editando && (
+                <View style={styles.acoesEdicao}>
+                  {/* Diz POR QUE os outros não mudam, em vez de deixar a pessoa
+                      procurar o campo que não existe. Sem esta linha, "não
+                      consigo mudar o CPF" vira o próximo relato. */}
+                  <Text style={styles.avisoEdicao}>
+                    CPF, nascimento e gênero entram no cálculo das suas metas — quem corrige esses é
+                    a sua nutricionista.
+                  </Text>
+
+                  {!!erroEdicao && <Text style={styles.erroEdicao}>{erroEdicao}</Text>}
+
+                  <View style={styles.botoesEdicao}>
+                    <Pressable
+                      onPress={() => setEditando(false)}
+                      disabled={salvando}
+                      style={({ pressed }) => [styles.botaoCancelar, pressed && { opacity: 0.7 }]}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.textoCancelar}>Cancelar</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={salvarCadastro}
+                      disabled={salvando}
+                      style={({ pressed }) => [
+                        styles.botaoSalvar,
+                        (pressed || salvando) && { opacity: 0.7 },
+                      ]}
+                      accessibilityRole="button"
+                    >
+                      {salvando ? (
+                        <ActivityIndicator color={paleta().cores.branco} size="small" />
+                      ) : (
+                        <Text style={styles.textoSalvar}>Salvar</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              )}
             </View>
           ) : (
             /* Conta criada direto no painel do Supabase não tem linha em
@@ -432,6 +610,41 @@ function Linha({ rotulo, valor, ultima }: { rotulo: string; valor: string; ultim
   )
 }
 
+/* O irmão editável do `Linha`, e com a MESMA moldura de propósito.
+ *
+ * Entrar em edição não pode reorganizar o cartão: se o campo tivesse altura ou
+ * recuo diferentes, a lista saltaria ao trocar de modo e a pessoa perderia de
+ * vista a linha que estava olhando. O que muda é a borda e o cursor. */
+function Campo({
+  rotulo,
+  valor,
+  aoMudar,
+  styles,
+  teclado,
+  autoCapitalize,
+}: {
+  rotulo: string
+  valor: string
+  aoMudar: (v: string) => void
+  styles: ReturnType<typeof estilos>
+  teclado?: 'phone-pad'
+  autoCapitalize?: 'words'
+}) {
+  return (
+    <View style={[styles.linha, styles.linhaComDivisor]}>
+      <Text style={styles.rotuloLinha}>{rotulo}</Text>
+      <TextInput
+        value={valor}
+        onChangeText={aoMudar}
+        style={styles.campoLinha}
+        keyboardType={teclado}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+      />
+    </View>
+  )
+}
+
 const TAMANHO_AVATAR = 96
 
 const estilos = estilosDe(t =>
@@ -504,6 +717,68 @@ const estilos = estilosDe(t =>
     paddingVertical: 14,
   },
   linhaComDivisor: { borderBottomWidth: 1, borderBottomColor: t.cores.borda },
+  /* ── A EDIÇÃO ────────────────────────────────────────────────────────────
+     O campo herda a tipografia do `valorLinha` para o cartão não saltar ao
+     entrar em edição -- ver o comentário do componente `Campo`. */
+  campoLinha: {
+    flexShrink: 1,
+    minWidth: 150,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: '600',
+    color: t.inkMedio,
+    paddingVertical: 0,
+  },
+  cabecalhoCartao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  tituloCartao: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
+  botaoEditar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: t.cores.verdeClaro,
+  },
+  botaoEditarPress: { opacity: 0.7 },
+  textoEditar: { fontSize: 12.5, fontWeight: '700', color: t.cores.verde },
+  acoesEdicao: { paddingTop: 12, paddingBottom: 14, gap: 10 },
+  avisoEdicao: { fontSize: 12, lineHeight: 16, color: t.inkSuave },
+  erroEdicao: {
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: t.cores.erroTexto,
+    backgroundColor: t.cores.erroFundo,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  botoesEdicao: { flexDirection: 'row', gap: 10 },
+  botaoCancelar: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textoCancelar: { fontSize: 14, fontWeight: '700', color: t.inkMedio },
+  botaoSalvar: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: t.cores.verde,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textoSalvar: { fontSize: 14, fontWeight: '800', color: t.cores.branco },
   rotuloLinha: { fontSize: 13.5, color: t.inkSuave },
   valorLinha: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: t.inkMedio },
 
