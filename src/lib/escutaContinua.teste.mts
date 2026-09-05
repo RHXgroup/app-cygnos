@@ -95,8 +95,8 @@ function correr(leituras: [number | null, number][], inicial: Estado = ESTADO_IN
      trecho aproveitavel -- o que ele produz e a recalibragem do piso. Doze
      segundos so dobravam a espera ate a escuta voltar a funcionar. */
   ok(
-    'o teto e de 6 segundos',
-    MAXIMO_DO_TRECHO_MS === 6_000 && SILENCIO_QUE_FECHA_MS === 700 && MINIMO_DE_FALA_MS === 350,
+    'o teto e de 4 segundos',
+    MAXIMO_DO_TRECHO_MS === 4_000 && SILENCIO_QUE_FECHA_MS === 700 && MINIMO_DE_FALA_MS === 350,
     String(MAXIMO_DO_TRECHO_MS),
   )
 }

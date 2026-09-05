@@ -49,6 +49,32 @@ import { supabase } from './supabase'
 export const OPCOES_DITADO: RecordingOptions = {
   ...RecordingPresets.HIGH_QUALITY,
 
+  /* ── 16 kHz, MONO, 32 kbps: o que o Whisper realmente usa ───────────────
+   *
+   * O preset HIGH_QUALITY grava em 44,1 kHz estéreo a 128 kbps — qualidade de
+   * música. O Whisper reamostra tudo para 16 kHz MONO antes de processar: tudo
+   * acima disso morre na porta de entrada dele.
+   *
+   * Ou seja, pagávamos upload e tempo de servidor por dados que ele descarta.
+   * Medido no aparelho: 106.643 bytes para 6 segundos de comando. Com estes
+   * números o mesmo trecho fica perto de 24 KB — quatro vezes menos para subir,
+   * e menos para o servidor ler.
+   *
+   * ── E por que isto NÃO é o LOW_QUALITY ─────────────────────────────────
+   * O preset pronto de baixa qualidade cai em 3gp/AMR a 8 kHz no Android, que é
+   * qualidade de telefone antigo e faz o modelo errar palavra. O problema dele
+   * nunca foi o tamanho: era a TAXA DE AMOSTRAGEM abaixo do que a fala precisa,
+   * e o codec.
+   *
+   * Aqui o codec continua AAC e a taxa é exatamente a que o modelo usa — não se
+   * perde nada que ele fosse ouvir.
+   *
+   * Vale para os dois usos: o comando do treino fica mais rápido, e o ditado da
+   * refeição também, que é onde alguém fala o almoço inteiro. */
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 32000,
+
   /* No Android, AAC cru (ADTS) — e não o .m4a do preset.
    *
    * Este é o defeito que custou a noite, e ele não estava no áudio: estava no
@@ -77,6 +103,29 @@ export const OPCOES_DITADO: RecordingOptions = {
     extension: '.aac',
     outputFormat: 'aac_adts',
     audioEncoder: 'aac',
+
+    /* ── 16 kHz, MONO, 32 kbps: o que o Whisper realmente usa ─────────────
+     *
+     * O preset HIGH_QUALITY grava em 44,1 kHz estéreo a 128 kbps — qualidade
+     * de música. O Whisper reamostra tudo para 16 kHz MONO antes de processar:
+     * tudo acima disso é jogado fora na entrada dele.
+     *
+     * Ou seja, a gente pagava upload e tempo de servidor por dados que morrem
+     * na porta. Medido no aparelho: 106.643 bytes para 6 segundos de comando.
+     * Com estes números, o mesmo trecho fica perto de 24 KB — quatro vezes
+     * menos para subir, e menos para o servidor ler.
+     *
+     * ── E por que isto NÃO é o LOW_QUALITY ───────────────────────────────
+     * O preset pronto de baixa qualidade cai em 3gp/AMR a 8 kHz no Android, que
+     * é qualidade de telefone antigo e faz o modelo errar palavra. O problema
+     * dele nunca foi o tamanho: era a TAXA DE AMOSTRAGEM abaixo do que a fala
+     * precisa, e o codec.
+     *
+     * Aqui o codec continua AAC e a taxa é exatamente a que o modelo usa. Não
+     * se perde nada que ele fosse ouvir.
+     *
+     * O ditado da refeição usa as mesmas opções e ganha igual: menos espera
+     * para quem fala o almoço inteiro. */
   },
   /* Liga a medição do nível de entrada.
    *

@@ -86,7 +86,21 @@ export const SILENCIO_QUE_FECHA_MS = 700
    comando de duas palavras, e mandá-los gastaria chamada para receber lixo. O
    que o teto faz agora é RECALIBRAR (ver `ouvir`), e seis em vez de doze é
    metade do tempo até a escuta voltar a funcionar. */
-export const MAXIMO_DO_TRECHO_MS = 6_000
+
+/* ── E depois virou 4, por causa da ESPERA ────────────────────────────────
+   Relatado com o recurso ja funcionando: "ele funcionou, porem ele ta lento".
+
+   Lido no log, no ambiente de quem usa: TODO trecho fecha no teto -- o nivel
+   nunca fica abaixo do limiar por 700 ms seguidos. Entao o teto nao e o caso
+   raro que ele foi desenhado para ser: e o caminho NORMAL, e cada comando
+   custava seis segundos de espera antes mesmo de o audio sair do aparelho.
+
+   Um comando de duas palavras dura um segundo e meio. Quatro segundos cobrem
+   "Cygnos, iniciar a serie" dito devagar, com folga, e cortam um terco da
+   espera. Menos que isso comecaria a partir frase no meio, que e o erro caro do
+   outro lado -- e o caso "nao corta no meio" continua no teste para provar que
+   nao. */
+export const MAXIMO_DO_TRECHO_MS = 4_000
 
 export type Estado = {
   /* Se estamos dentro de um trecho de fala. */
