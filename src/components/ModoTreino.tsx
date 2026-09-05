@@ -722,15 +722,41 @@ export function ModoTreino({
     /* 100 ms é o passo do medidor. Mais lento perde o começo da fala; mais
        rápido não acrescenta, porque o próprio medidor não atualiza mais que
        isso. */
+    /* O app estava falando na leitura anterior? É a transição que interessa,
+       não o estado — ver o comentário logo abaixo. */
+    let estavaFalando = false
+
     const id = setInterval(() => {
       if (!vivo || !ouvindoAgora.current) return
 
-      /* Enquanto o app fala, a escuta para e ZERA.
-         Zerar importa tanto quanto parar: sem isso, o trecho que começou antes
-         da fala continuaria aberto e o silêncio depois dela o fecharia — com a
-         voz do próprio app dentro. */
+      /* ── ENQUANTO O APP FALA, A ESCUTA PARA, ZERA E JOGA FORA ──────────
+       *
+       * Parar e zerar a DECISÃO já estava aqui, e estava certo. Faltava a outra
+       * metade: o gravador continuava gravando o tempo todo, então a voz do
+       * próprio app ficava DENTRO do arquivo enviado depois.
+       *
+       * Medido no aparelho, na linha do que voltou do servidor:
+       *
+       *   ouvi: "Série 1 de 4. Descanse 30 segundos. Prepare-se. Signos.
+       *          Terminei. Terminei."
+       *
+       * A primeira metade daquilo é o app se ouvindo. E não é só sujeira: é o
+       * que mantinha o nível acima do limiar por seis segundos seguidos, sem
+       * nunca ficar em silêncio — a razão de todo trecho fechar no teto.
+       *
+       * Ao TERMINAR de falar, o buffer é descartado e a gravação recomeça
+       * limpa. Na transição, e não a cada leitura: chamar isto dez vezes por
+       * segundo pararia o gravador antes de ele gravar qualquer coisa. */
       if (appEstaFalando()) {
         escuta = ESTADO_INICIAL
+        estavaFalando = true
+        return
+      }
+
+      if (estavaFalando) {
+        estavaFalando = false
+        console.log('[cygnos] escuta: joguei fora o que gravei enquanto o app falava')
+        void jogarForaEVoltarAOuvir()
         return
       }
 
