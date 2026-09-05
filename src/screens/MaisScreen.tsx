@@ -171,6 +171,34 @@ export function MaisScreen({
     setTemQuestionario(await existeQuestionarioPendente())
   }, [])
 
+  /* O NOME de quem está logado.
+   *
+   * Lido aqui, e não recebido do App: o App não tem o nome — a tela inicial
+   * também vai buscá-lo em `app_contas`. Duas leituras da mesma coluna em telas
+   * que vivem ao mesmo tempo é desperdício pequeno e conhecido; passá-lo pelo
+   * App exigiria um estado novo lá em cima só para isto, e o App já carrega
+   * versão demais.
+   *
+   * Cai para o e-mail sem o domínio quando não há cadastro — conta criada pelo
+   * painel do Supabase não tem linha em `app_contas`, e um espaço em branco no
+   * lugar do nome se lê como tela quebrada. */
+  const [nome, setNome] = useState('')
+
+  useEffect(() => {
+    let ativo = true
+    supabase
+      .from('app_contas')
+      .select('nome_completo')
+      .eq('id', contaId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (ativo) setNome(data?.nome_completo?.trim() || email.split('@')[0] || '')
+      })
+    return () => {
+      ativo = false
+    }
+  }, [contaId, email])
+
   useEffect(() => {
     let vivo = true
 
@@ -458,7 +486,21 @@ export function MaisScreen({
        * O e-mail embaixo nao e enfeite: e a unica tela do app que diz QUEM
        * esta logado, e essa informacao estava enterrada no fim, dentro do
        * cartao de Conta, junto do botao de sair. */}
+      {/* O NOME primeiro, e o e-mail miúdo embaixo.
+       *
+       * Estava só o e-mail cru sob o título, e a primeira coisa que a pessoa
+       * lia ao abrir a aba dela era um endereço de máquina. O e-mail responde
+       * "em qual conta eu estou", que importa para quem tem duas — mas quem
+       * abre "Você" quer ser reconhecido antes de ser identificado.
+       *
+       * Por isso os dois, nessa ordem e nesses tamanhos: o nome fala, o e-mail
+       * confirma. */}
       <Text style={styles.titulo}>Você</Text>
+      {!!nome && (
+        <Text style={styles.nomeDeQuem} numberOfLines={1}>
+          {nome}
+        </Text>
+      )}
       <Text style={styles.subtitulo} numberOfLines={1}>
         {email}
       </Text>
@@ -1072,7 +1114,15 @@ const estilos = estilosDe(t =>
   tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: MARGEM, paddingBottom: 28, gap: 14 },
 
-  subtitulo: { marginTop: 2, marginBottom: 2, fontSize: 13, color: t.inkSuave },
+  nomeDeQuem: {
+    marginTop: 3,
+    fontSize: 16,
+    fontWeight: '700',
+    color: t.inkMedio,
+    letterSpacing: -0.2,
+  },
+  /* Miúdo e fraco: ele confirma a conta, não apresenta a pessoa. */
+  subtitulo: { marginTop: 1, marginBottom: 2, fontSize: 12, color: t.inkFraco },
   titulo: { fontSize: 27, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.6 },
 
   linhaMensagens: {
