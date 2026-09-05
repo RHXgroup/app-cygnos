@@ -98,11 +98,24 @@ for (const caminho of arquivos) {
   /* ── 8. Dado do sistema sem releitura ao voltar (armadilha 8) ────────────
      Vínculo, consulta e plano mudam do lado da nutricionista e nada avisa o
      aparelho. Sem AppState, só fechando e abrindo o app. */
-  const leDoSistema = /app_meu_vinculo|carregarMensagens|app_recado|consultas|solicitacao/i.test(
-    fonte,
-  )
+  /* CHAMADA, e nao palavra.
+   *
+   * A regra procurava /consultas|solicitacao/ no arquivo inteiro, e casava com
+   * PROSA: "Entre para acompanhar seu plano, suas medidas e suas consultas" numa
+   * tela de login, e "sao duas consultas que a maioria das visitas nao usa" num
+   * comentario sobre banco de dados. Cinco achados, cinco falsos.
+   *
+   * Uma regra que casa com portugues corrente nao esta procurando dado do
+   * sistema -- esta procurando uma palavra que por acaso nomeia os dois. O que
+   * distingue e a FORMA: leitura de dado e chamada de funcao ou consulta ao
+   * PostgREST, e as duas tem parentese ou aspas em volta. */
+  const leDoSistema =
+    /\.from\('(consultas|app_recado|app_vinculos|solicitacoes)'/.test(fonte) ||
+    /rpc\('(app_meu_vinculo|app_minhas_consultas|app_minhas_solicitacoes|app_paciente_da_conta)'/.test(fonte) ||
+    /(carregarMensagens|carregarMeuVinculo|carregarConsultas|carregarSolicitacoes|carregarRecado|carregarConteudo|carregarPlanoDaNutri)\s*\(/.test(fonte)
+
   if (leDoSistema && !/AppState/.test(fonte)) {
-    nota(8, nome, null, 'mostra dado do sistema e não relê ao voltar do segundo plano')
+    nota(8, nome, null, 'lê dado do sistema e não relê ao voltar do segundo plano')
   }
 
   /* ── 9. Erro que não se limpa no sucesso (armadilha 9) ───────────────────
