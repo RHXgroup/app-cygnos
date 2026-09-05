@@ -74,6 +74,7 @@ export function MaisScreen({
   onAbrirRede,
   onAbrirPlanoTerapeutico,
   onAbrirCodigo,
+  onAbrirPerfil,
   onAbrirExcluirConta,
   onAbrirMensagens,
   onAbrirQuestionario,
@@ -96,6 +97,7 @@ export function MaisScreen({
   onAbrirRede: () => void
   onAbrirPlanoTerapeutico: () => void
   onAbrirCodigo: () => void
+  onAbrirPerfil: () => void
   onAbrirExcluirConta: () => void
   /* Mensagens deixou de ser aba e virou linha aqui. O contador vem junto:
      era o ponto sobre o ícone da aba, e sem ele a mensagem dela só seria
@@ -504,6 +506,31 @@ export function MaisScreen({
       <Text style={styles.subtitulo} numberOfLines={1}>
         {email}
       </Text>
+
+      {/* ── O PERFIL MORAVA SÓ NO MENU DA TELA INICIAL ────────────────────
+       *
+       * Uma aba chamada "Você" sem o seu perfil dentro é a definição de
+       * perdido — e não é hipótese: eu mesmo mandei procurá-lo aqui duas vezes,
+       * e quem foi encontrou a tela antiga porque era outra tela.
+       *
+       * Continua também no menu ☰ da inicial. Duas portas para a mesma tela não
+       * é bagunça: é o atalho de quem já sabe, mais o lugar onde quem não sabe
+       * procura. Bagunça era só a primeira existir. */}
+      <Pressable
+        onPress={onAbrirPerfil}
+        style={({ pressed }) => [styles.linhaPerfil, pressed && styles.linhaPressionada]}
+        accessibilityRole="button"
+        accessibilityLabel="Meu perfil"
+      >
+        <View style={styles.iconePerfil}>
+          <Ionicons name="person-circle-outline" size={19} color={paleta().cores.verde} />
+        </View>
+        <View style={styles.textosPerfil}>
+          <Text style={styles.rotuloPerfil}>Meu perfil</Text>
+          <Text style={styles.subPerfil}>Seus dados e o seu objetivo</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+      </Pressable>
 
       <CartaoNutricionista
         catalogo={catalogo}
@@ -1113,6 +1140,29 @@ const estilos = estilosDe(t =>
   StyleSheet.create({
   tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: MARGEM, paddingBottom: 28, gap: 14 },
+
+  /* Cartão de uma linha, e não um item dentro de "Conta": é o primeiro assunto
+     da aba, e o único que fala da PESSOA e não de configuração. */
+  linhaPerfil: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginTop: 12,
+    padding: PADDING_CARTAO - 4,
+    borderRadius: RAIO_CARTAO,
+    backgroundColor: t.cores.cartao,
+  },
+  iconePerfil: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.cores.verdeMenta,
+  },
+  textosPerfil: { flex: 1, gap: 1 },
+  rotuloPerfil: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+  subPerfil: { fontSize: 11.5, color: t.inkSuave },
 
   nomeDeQuem: {
     marginTop: 3,

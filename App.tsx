@@ -1140,6 +1140,9 @@ function TelaDaAba({
           contaId={sessao.user.id}
           email={sessao.user.email ?? ''}
           onAbrirNutricionistas={onAbrirNutricionistas}
+          /* O perfil morava SÓ no menu ☰ da inicial. Uma aba chamada "Você" sem
+             o seu perfil dentro é a definição de perdido. */
+          onAbrirPerfil={onAbrirPerfil}
           onAbrirCodigo={onAbrirCodigo}
           onAbrirExcluirConta={onAbrirExcluirConta}
           onAbrirMensagens={onAbrirMensagens}
