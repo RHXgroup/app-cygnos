@@ -1676,7 +1676,11 @@ function ConfirmarFoto({
             />
             <View style={styles.capaTextos}>
               <View style={styles.capaEsquerda}>
-                <Text style={styles.capaTitulo} numberOfLines={1}>
+                {/* DUAS linhas. A descrição vem da leitura e é uma frase
+                    inteira — "Ovos mexidos servidos direto na frigideira" —,
+                    e numa linha só ela chegava cortada no meio da palavra, o
+                    que se lê como app quebrado e não como texto longo. */}
+                <Text style={styles.capaTitulo} numberOfLines={2}>
                   {estimativa.descricao}
                 </Text>
                 <Text style={styles.capaSub} numberOfLines={1}>
@@ -2669,7 +2673,13 @@ const estilos = estilosDe(t =>
     gap: 12,
   },
   capaEsquerda: { flex: 1, minWidth: 0 },
-  capaTitulo: { fontSize: 19, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
+  capaTitulo: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+    lineHeight: 22,
+  },
   capaSub: { marginTop: 2, fontSize: 11.5, color: 'rgba(255,255,255,0.75)' },
   capaKcal: {
     fontSize: 32,
@@ -2995,7 +3005,34 @@ const estilos = estilosDe(t =>
   textoAnalise: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
 
   /* ── Folhas ── */
-  fundoFolha: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
+  /* ── O VÉU, mais escuro ─────────────────────────────────────────────────
+   *
+   * 0,78 em vez de 0,62. Fotografado no aparelho: a faixa verde do cabeçalho
+   * de trás atravessava o véu e ficava colada na foto do prato, brigando com
+   * ela pela atenção. Capa é imagem, e imagem precisa de fundo quieto — 0,62
+   * deixa verde vivo passar, e verde vivo é a única cor que compete com comida.
+   *
+   * ── Uma coisa que eu quase escrevi aqui, e era MENTIRA ─────────────────
+   * Cheguei a trocar o `...StyleSheet.absoluteFill` por posição escrita à mão,
+   * afirmando que ele é um id registrado e que espalhar não copia nada. Fui
+   * conferir no pacote antes de mexer nos outros cinco lugares que usam isso:
+   *
+   *     node_modules/react-native/Libraries/StyleSheet/StyleSheetExports.js
+   *     const absoluteFill = { ... }        // objeto congelado
+   *
+   * É objeto. Espalhar funciona. Quem foi REMOVIDO no 0.86 é o
+   * `absoluteFillObject`, que é outro nome — e foi confundir os dois que quase
+   * me fez reescrever cinco arquivos por uma teoria errada.
+   *
+   * Fica escrito porque a próxima pessoa vai tropeçar na mesma semelhança. */
+  fundoFolha: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.78)',
+  },
   folha: {
     position: 'absolute',
     left: 0,
