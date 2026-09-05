@@ -124,7 +124,21 @@ const NEGACOES = ['nao ', 'ainda nao', 'nem ', 'para de', 'deixa pra la', 'esque
  * "Cygnos" não é palavra do dicionário, e transcrição devolve o que soa: signos,
  * cisnes, cignus, sygnos. Exigir a grafia certa faria a palavra-chave falhar
  * mais do que a conversa alheia acertar. A lista aceita o que SOA parecido. */
-const CHAMADOS = ['cygnos', 'cignos', 'signos', 'cisnos', 'cisnes', 'cygnus', 'cignus', 'sygnos', 'signus']
+const CHAMADOS = [
+  'cygnos', 'cignos', 'signos', 'cisnos', 'cisnes', 'cygnus', 'cignus', 'sygnos', 'signus',
+  /* Acrescentados depois do relato de que a voz "não funciona": a lista tinha
+     nove grafias e o Whisper produz mais. Estas saem do mesmo som em português
+     falado depressa, no meio de uma academia -- inclusive as duas ultimas, que
+     e o que sai quando ele ouve duas palavras onde ha uma.
+
+     Custa nada errar para MAIS aqui: o chamado sozinho nao faz nada; ele so
+     libera a frase para o `comandoDoTexto`, que exige um comando conhecido e
+     recusa negacao. Um falso positivo em "seguinos" nao dispara serie nenhuma
+     se ninguem tiver dito um comando junto. */
+  'ciguinos', 'siguinos', 'seguinos', 'sequinos', 'zignos', 'zignus',
+  'cygno', 'cigno', 'signo', 'sygno',
+  'six nos', 'seis nos', 'si nos', 'ci nos',
+]
 
 export const temChamado = (bruto: string): boolean => {
   const t = semAcento(bruto)

@@ -820,7 +820,23 @@ export function ModoTreino({
   function responder(texto: string) {
     console.log('[cygnos] ouvi:', JSON.stringify(texto))
     if (!temChamado(texto)) {
+      /* ── O SILÊNCIO AQUI ERA INDISTINGUÍVEL DE ESTAR QUEBRADO ──────────
+       *
+       * Não agir continua certo: responder ao que se ouviu da academia é pior
+       * do que ignorar. Mas não DIZER nada era outra coisa — de fora, "ouvi e
+       * não era comigo" tem exatamente a mesma cara de "o áudio nunca chegou ao
+       * servidor". Relatado como "mesmo assim ele não funciona o comando de
+       * voz", sem nada na tela para separar as duas.
+       *
+       * Agora aparece o que foi ouvido, e só na tela — sem falar, para não
+       * responder a conversa alheia. Quem falou e viu "Ouvi ..." sabe que o
+       * caminho inteiro funciona e que faltou o chamado; quem falou e não viu
+       * nada sabe que o problema é antes, no microfone ou no envio.
+       *
+       * `Cygnos` não é palavra de dicionário, e a transcrição devolve o que
+       * soa. Ver `CHAMADOS`, em comandoDeVoz. */
       console.log('[cygnos] sem a palavra Cygnos — ignorado')
+      setRespostaDaVoz(`Ouvi "${texto.trim()}". Comece com "Cygnos".`)
       return
     }
 
@@ -837,8 +853,27 @@ export function ModoTreino({
     obedecer(c)
   }
 
+  /* ── O COMANDO FAZ O QUE O BOTÃO FAZ ───────────────────────────────────
+   *
+   * Relatado: "se tem que fazer o comando entender o iniciei e terminei, e ele
+   * clicar no botão, fazer a função de clicar".
+   *
+   * E ele não fazia. `comecar()` abre o TREINO — `setInicio` mais
+   * `setFase('treinando')`. Quem diz "Cygnos, iniciar" com o treino já aberto
+   * na tela quer o que o botão grande faz ali na frente dele, que é
+   * `prepararSerie()`. O comando era ouvido, entendido, obedecido — e não
+   * acontecia nada visível, porque a única coisa que ele mudava já estava do
+   * jeito que ele deixava.
+   *
+   * Agora os dois verbos de abertura olham o estado, do mesmo jeito que
+   * `continuar` já olhava: com o treino fechado abrem o treino, com o treino
+   * aberto preparam a série. Não é a mesma frase fazendo coisas diferentes por
+   * capricho — é a ÚNICA coisa possível em cada um dos dois estados. */
   function obedecer(c: Comando) {
-    if (c === 'comecar') comecar()
+    if (c === 'comecar') {
+      if (inicio === null) comecar()
+      else prepararSerie()
+    }
     else if (c === 'fiz') fizASerie()
     else if (c === 'pausar') setFase('parado')
     /* "continuar" com o treino nunca aberto só pode querer dizer começar.
@@ -1317,7 +1352,17 @@ export function ModoTreino({
                       <BotaoDeVoz
                         estado="ouvindo"
                         rotulo="Ouvindo"
-                        rotuloOuvindo={'Diga "Cygnos, terminei"'}
+                        /* Acompanha o botão grande logo acima. Estava fixo em
+                           "terminei", e dizia isso até com a série parada — ou
+                           seja, ensinava a frase ERRADA justamente no momento
+                           em que a pessoa procura o que falar. Relatado assim:
+                           "abre e continua 'diga cygnos, terminei' e nem o
+                           iniciei". */
+                        rotuloOuvindo={
+                          inicioDaSerie === null
+                            ? 'Diga "Cygnos, iniciar"'
+                            : 'Diga "Cygnos, terminei"'
+                        }
                         onPress={() => setModo('manual')}
                       />
                     </View>

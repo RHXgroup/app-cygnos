@@ -228,5 +228,30 @@ function ok(nome: string, cond: boolean, extra = '') {
   ok('nao inicia a serie nao faz nada', comandoDoTexto('nao inicia a serie') === null)
 }
 
+/* == O CHAMADO, e a lista que cresceu ================================== */
+{
+  // "Cygnos" nao existe no dicionario, e a transcricao devolve o que SOA.
+  // Exigir a grafia certa faz o chamado falhar mais do que a conversa alheia
+  // acertar -- e o sintoma disso e "o comando de voz nao funciona", sem nada na
+  // tela dizendo por que.
+  for (const g of ['cygnos', 'signos', 'cignos', 'seguinos', 'zignus', 'six nos', 'cygno']) {
+    ok('reconhece "' + g + '"', temChamado(g + ' terminei'))
+  }
+
+  // Com acento e maiuscula, que e como o Whisper costuma devolver.
+  ok('reconhece "Cygnos," com pontuacao', temChamado('Cygnos, terminei!'))
+  ok('reconhece no meio da frase', temChamado('ok cygnos pula o descanso'))
+
+  // E o chamado sozinho NAO faz nada: ele so libera a frase para o
+  // comandoDoTexto, que exige um comando conhecido. E por isso que errar para
+  // mais na lista custa pouco.
+  ok('chamado sem comando nao vira comando', comandoDoTexto(semChamado('cygnos')) === null)
+  ok('palavra qualquer nao e chamado', !temChamado('bora la galera'))
+
+  // O chamado sai do texto antes de procurar o comando -- senao "cygnos
+  // iniciar" nao casaria com "iniciar".
+  ok('semChamado limpa', semChamado('cygnos iniciar serie').trim() === 'iniciar serie')
+}
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) process.exit(1)
