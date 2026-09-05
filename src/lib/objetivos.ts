@@ -1,20 +1,37 @@
 /* Os objetivos que o PACIENTE escolhe sozinho.
  *
- * ── Por que sete, e não os vinte e três ───────────────────────────────────
+ * ── Por que onze, e não os vinte e três ───────────────────────────────────
  * O sistema tem 23 objetivos em `objetivos_nutricionais`, cada um com ajuste
  * calórico, proteína por quilo e divisão de macros. A tentação é espelhar os 23
  * aqui — e seria errado.
  *
- * Boa parte deles é PRESCRIÇÃO, não preferência: gestação, doença renal
- * crônica, pré e pós bariátrica, SOP, tireoide, esteatose. Se o paciente marca
- * "Doença renal crônica" e o app recalcula as metas em cima disso, o app está
- * prescrevendo — e o `doenca_renal` chega a restringir proteína para 0,80 g/kg.
- * Um toque numa lista não pode fazer isso.
+ * O corte não é "clínico ou não". É outra pergunta, e ela dá uma linha muito
+ * mais limpa: **a pessoa já sabe isso sobre si?**
  *
- * Os sete daqui são os que alguém escolhe para si sem ninguém examinar: uma
- * direção de vida, não um diagnóstico. Os outros dezesseis continuam existindo
- * e continuam vindo de quem pode prescrevê-los — a nutricionista —, e o app os
- * MOSTRA quando ela define, sem deixar escolher.
+ * Sete são direção de vida — emagrecer, ganhar músculo, render no esporte.
+ * Ninguém precisa examinar ninguém.
+ *
+ * Quatro são condição que ela JÁ TEM e já sabe que tem: diabetes, colesterol
+ * alto, menopausa, intestino que não vai bem. Marcar não é se diagnosticar, é
+ * dizer o que já foi dito por um médico ou o que o corpo diz todo dia. E os
+ * ajustes dos quatro são brandos — de 0 a −10%.
+ *
+ * Doze ficam de fora, e não é excesso de zelo:
+ *
+ *   · `doenca_renal` restringe proteína para 0,80 g/kg — marcar por engano
+ *     causa dano real, e a conduta depende de exame;
+ *   · gestação, lactação e bariátrica mudam por trimestre ou por fase, com
+ *     suplementação e laboratório;
+ *   · tireoide, esteatose e SOP se calibram por exame de sangue;
+ *   · compulsão alimentar — o próprio texto do sistema diz que "peso não é o
+ *     alvo primário" e que a conduta é articulada com psicologia. Uma lista de
+ *     objetivos de app é o lugar errado para isso;
+ *   · seletividade, neurodesenvolvimento e pediátrico são sobre um FILHO, e não
+ *     sobre quem tem a conta;
+ *   · sarcopenia é achado clínico, não escolha.
+ *
+ * Os doze continuam existindo e continuam vindo de quem pode prescrevê-los — a
+ * nutricionista —, e o app os MOSTRA quando ela define, sem deixar escolher.
  *
  * ── Os slugs são os do sistema, de propósito ──────────────────────────────
  * `emagrecimento`, `hipertrofia`, `manutencao`… são as mesmas palavras de
@@ -69,6 +86,16 @@ export type Objetivo = {
   ajustePct: number
   proteinaGkg: number
   carboPct: number
+
+  /* É uma condição de saúde, e não uma direção de vida.
+   *
+   * Não muda cálculo nenhum: muda o que a TELA diz. Quem marca "controlar a
+   * glicemia" merece ler que vale contar isso à nutricionista — o app ajusta as
+   * calorias, e quem acompanha diabetes é gente, não uma lista.
+   *
+   * Um booleano e não um grupo separado na lista: separar em duas seções
+   * ("normais" e "de saúde") carimbaria a pessoa antes de ela escolher. */
+  pedeAcompanhamento?: true
 }
 
 export const OBJETIVOS: Objetivo[] = [
@@ -141,6 +168,54 @@ export const OBJETIVOS: Objetivo[] = [
     ajustePct: 5,
     proteinaGkg: 1.8,
     carboPct: 55,
+  },
+
+  /* ── OS QUATRO QUE A PESSOA JÁ SABE TER ────────────────────────────────
+     Vêm por último de propósito: quem abre a lista procurando emagrecer não
+     precisa passar por quatro condições de saúde antes de achar o seu. */
+  {
+    chave: 'controle_glicemico',
+    nome: 'Controlar a glicemia',
+    resumo: 'Segurar o açúcar do sangue ao longo do dia.',
+    sentido: 'perder',
+    icone: 'pulse-outline',
+    ajustePct: -10,
+    proteinaGkg: 1.5,
+    carboPct: 40,
+    pedeAcompanhamento: true,
+  },
+  {
+    chave: 'cardiovascular',
+    nome: 'Cuidar do coração',
+    resumo: 'Melhorar colesterol e pressão pela comida.',
+    sentido: 'manter',
+    icone: 'heart-outline',
+    ajustePct: 0,
+    proteinaGkg: 1.3,
+    carboPct: 50,
+    pedeAcompanhamento: true,
+  },
+  {
+    chave: 'menopausa',
+    nome: 'Menopausa e climatério',
+    resumo: 'Peso, osso e disposição nessa fase.',
+    sentido: 'perder',
+    icone: 'flower-outline',
+    ajustePct: -10,
+    proteinaGkg: 1.6,
+    carboPct: 45,
+    pedeAcompanhamento: true,
+  },
+  {
+    chave: 'saude_intestinal',
+    nome: 'Saúde intestinal',
+    resumo: 'Regular o intestino e reduzir o inchaço.',
+    sentido: 'manter',
+    icone: 'leaf-outline',
+    ajustePct: 0,
+    proteinaGkg: 1.4,
+    carboPct: 50,
+    pedeAcompanhamento: true,
   },
 ]
 

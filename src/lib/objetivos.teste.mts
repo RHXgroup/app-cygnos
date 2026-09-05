@@ -25,21 +25,64 @@ function ok(nome: string, condicao: boolean, extra = '') {
   }
 }
 
-/* == SAO SETE, E SAO OS NAO-CLINICOS ==================================== */
+/* == SAO ONZE, E OS DOZE PERIGOSOS FICAM FORA ========================== */
 {
-  ok('sao sete', OBJETIVOS.length === 7, String(OBJETIVOS.length))
+  ok('sao onze', OBJETIVOS.length === 11, String(OBJETIVOS.length))
 
-  // Os dezesseis clinicos NAO podem estar aqui: marcar "doenca renal" numa
-  // lista e o app recalcular metas em cima disso e o app prescrevendo.
-  const clinicos = [
+  /* Estes doze NAO podem entrar, e cada um por um motivo proprio:
+     - doenca_renal restringe proteina para 0,80 g/kg, e marcar por engano
+       causa dano real;
+     - gestacao, lactacao e bariatrica mudam por trimestre ou fase, com
+       suplementacao e laboratorio;
+     - tireoide, esteatose e sop se calibram por exame de sangue;
+     - compulsao_alimentar tem conduta articulada com psicologia, e o proprio
+       texto do sistema diz que peso nao e o alvo primario;
+     - seletividade, neurodesenvolvimento e pediatrico sao sobre um FILHO;
+     - sarcopenia e achado clinico, nao escolha.
+
+     Este caso e a unica defesa automatica contra alguem acrescentar um deles
+     "porque o sistema tem". */
+  const proibidos = [
     'gestacao', 'lactacao', 'doenca_renal', 'bariatrica', 'sop', 'tireoide',
-    'esteatose_hepatica', 'menopausa', 'controle_glicemico', 'cardiovascular',
-    'sarcopenia', 'ganho_peso_pediatrico', 'saude_intestinal',
+    'esteatose_hepatica', 'sarcopenia', 'ganho_peso_pediatrico',
     'seletividade_alimentar', 'compulsao_alimentar',
     'transtornos_neurodesenvolvimento',
   ]
-  const invadiu = OBJETIVOS.filter(o => clinicos.includes(o.chave)).map(o => o.chave)
-  ok('nenhum clinico entrou na lista', invadiu.length === 0, invadiu.join(', '))
+  const invadiu = OBJETIVOS.filter(o => proibidos.includes(o.chave)).map(o => o.chave)
+  ok('nenhum dos doze perigosos entrou', invadiu.length === 0, invadiu.join(', '))
+}
+
+/* == OS QUATRO DE CONDICAO ============================================== */
+{
+  // A pessoa JA SABE que tem: marcar nao e se diagnosticar.
+  const daSaude = ['controle_glicemico', 'cardiovascular', 'menopausa', 'saude_intestinal']
+  for (const chave of daSaude) {
+    const o = OBJETIVOS.find(x => x.chave === chave)
+    ok(chave + ' esta na lista', !!o)
+    ok(chave + ' pede acompanhamento', o?.pedeAcompanhamento === true)
+  }
+
+  ok(
+    'sao exatamente quatro que pedem acompanhamento',
+    OBJETIVOS.filter(o => o.pedeAcompanhamento).length === 4,
+  )
+
+  // Os sete de direcao de vida NAO podem pedir acompanhamento -- a frase
+  // apareceria para quem so quer emagrecer, e viraria ruido.
+  ok(
+    'emagrecimento nao pede acompanhamento',
+    OBJETIVOS.find(o => o.chave === 'emagrecimento')?.pedeAcompanhamento === undefined,
+  )
+
+  // O ajuste dos quatro e BRANDO. Foi o argumento para deixa-los entrar; se um
+  // dia alguem apertar um deles, este caso reprova.
+  const bruscos = OBJETIVOS.filter(o => o.pedeAcompanhamento && Math.abs(o.ajustePct) > 10)
+  ok('nenhum deles ajusta mais que 10%', bruscos.length === 0, bruscos.map(o => o.chave).join(', '))
+
+  // E nenhum deles restringe proteina: e o que separa estes quatro do
+  // doenca_renal, que ficou de fora justamente por causa disso.
+  const restritivos = OBJETIVOS.filter(o => o.pedeAcompanhamento && o.proteinaGkg < 1.2)
+  ok('nenhum deles restringe proteina', restritivos.length === 0, restritivos.map(o => o.chave).join(', '))
 }
 
 /* == CADA UM ESTA COMPLETO ============================================== */
@@ -77,14 +120,14 @@ function ok(nome: string, condicao: boolean, extra = '') {
 {
   // Armadilha 10: a nutricionista define `gestacao` do lado dela, e isso chega
   // aqui como uma palavra que o app nunca viu.
-  ok('chave desconhecida devolve null', objetivoDe('gestacao') === null)
-  ok('e nao chuta um dos sete', nomeDoObjetivo('gestacao') !== 'Perder gordura')
+  ok('chave desconhecida devolve null', objetivoDe('doenca_renal') === null)
+  ok('e nao chuta um dos onze', nomeDoObjetivo('doenca_renal') !== 'Perder gordura')
   ok(
     'o texto admite que o app nao sabe',
-    nomeDoObjetivo('gestacao').includes('nutricionista'),
-    nomeDoObjetivo('gestacao'),
+    nomeDoObjetivo('doenca_renal').includes('nutricionista'),
+    nomeDoObjetivo('doenca_renal'),
   )
-  ok('sem sentido para o desconhecido', sentidoDoObjetivo('gestacao') === null)
+  ok('sem sentido para o desconhecido', sentidoDoObjetivo('doenca_renal') === null)
 
   ok('null nao quebra', objetivoDe(null) === null)
   ok('undefined nao quebra', objetivoDe(undefined) === null)

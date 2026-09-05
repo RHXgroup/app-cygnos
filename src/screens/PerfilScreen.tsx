@@ -542,6 +542,34 @@ export function PerfilScreen({
               })}
             </View>
 
+            {/* ── QUANDO O FOCO É UMA CONDIÇÃO DE SAÚDE ────────────────────
+             *
+             * Quatro dos onze são coisas que a pessoa JÁ TEM: glicemia,
+             * coração, menopausa, intestino. Elas entraram na lista porque
+             * marcar não é se diagnosticar — é dizer o que já foi dito por um
+             * médico. Mas o app passa a ajustar as calorias por causa disso, e
+             * quem acompanha essas condições é gente, não uma lista.
+             *
+             * Só aparece com uma das quatro marcada. Fixa embaixo da lista, ela
+             * viraria paisagem — e a frase que se lê sempre é a frase que não se
+             * lê nunca.
+             *
+             * O tom é de aviso e não de alarme: quem tem diabetes não precisa
+             * de susto ao dizer que tem diabetes. */}
+            {objetivoDe(objetivo)?.pedeAcompanhamento && (
+              <View style={styles.avisoAcompanhamento}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={15}
+                  color={paleta().cores.verde}
+                />
+                <Text style={styles.textoAcompanhamento}>
+                  O app ajusta as suas metas por causa desse foco. Vale contar à sua nutricionista —
+                  quem acompanha isso de perto é ela.
+                </Text>
+              </View>
+            )}
+
             {erroObjetivo ? (
               <Text style={styles.erroObjetivo}>{erroObjetivo}</Text>
             ) : (
@@ -847,6 +875,18 @@ const estilos = estilosDe(t =>
   textosObjetivo: { flex: 1, gap: 1 },
   nomeObjetivo: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
   resumoObjetivo: { fontSize: 11.5, lineHeight: 15, color: t.inkSuave },
+
+  /* Tingido de verde, e não de amarelo: é informação, não alerta. Quem tem
+     diabetes não precisa de susto ao dizer que tem diabetes. */
+  avisoAcompanhamento: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: t.cores.verdeMenta,
+  },
+  textoAcompanhamento: { flex: 1, fontSize: 11.5, lineHeight: 16, color: t.inkMedio },
 
   opcoesObjetivo: { flexDirection: 'row', gap: 8 },
   opcaoObjetivo: {
