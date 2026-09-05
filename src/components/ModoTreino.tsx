@@ -746,7 +746,26 @@ export function ModoTreino({
       /* Longo demais não é comando. Cortar aqui, ANTES de mandar, é o que
          segura o custo numa academia com gente conversando perto. */
       if (duracao < COMANDO_CURTO_DEMAIS_S || duracao > COMANDO_LONGO_DEMAIS_S) {
+        /* ── DESCARTAR TAMBÉM PRECISA REINICIAR O GRAVADOR ────────────────
+         *
+         * Aqui só havia `return`. O trecho era descartado da CONTA, e o
+         * gravador continuava gravando por cima — ninguém o parava.
+         *
+         * O efeito não é desperdício, é defeito: o arquivo que fosse enviado
+         * depois continha TUDO desde a última vez que se enviou alguma coisa.
+         * Medido no aparelho: `ditado: 2 s, 1078680 bytes`. Um megabyte para
+         * dois segundos é impossível em AAC 128 kbps, que dá uns 32 KB — o
+         * arquivo tinha um minuto inteiro dentro, com os quatro ciclos de teto
+         * descartados e a recalibragem do piso.
+         *
+         * E o Whisper transcreve o que recebe. O comando de duas palavras
+         * estava no FIM de um minuto de ruído de academia, e o que voltava era
+         * a mistura — por isso "não entendi" mesmo com o áudio chegando.
+         *
+         * Esta é a causa que as três tentativas anteriores não acharam, porque
+         * todas olhavam para o texto e nenhuma para o TAMANHO do arquivo. */
         console.log('[cygnos] escuta: descartado por duração')
+        void jogarForaEVoltarAOuvir()
         return
       }
 
@@ -770,6 +789,34 @@ export function ModoTreino({
    * `expo-audio`: ele não entrega pedaço de gravação em andamento. O intervalo
    * entre parar e voltar é de milissegundos, e por isso o que se perde ali é
    * menor do que a pausa que a pessoa faz depois de falar. */
+  /* Para, JOGA FORA o que gravou, e volta a ouvir.
+   *
+   * Irmão de `recortarEEntender`, e existe pelo mesmo motivo dele: o
+   * `expo-audio` não entrega pedaço de gravação em andamento, então a única
+   * forma de esvaziar o buffer é parar e recomeçar. A diferença é que aqui o
+   * arquivo não é enviado a lugar nenhum.
+   *
+   * Sem isto, todo trecho descartado ficava DENTRO do próximo envio. */
+  async function jogarForaEVoltarAOuvir() {
+    if (entendendoVivo.current) return
+    try {
+      await gravadorDeComando.stop()
+      ouvindoAgora.current = false
+    } catch {
+      /* Parar um gravador que já parou não é erro que interesse a ninguém. */
+    }
+
+    if (!vozLigadaVivo.current) return
+    try {
+      await gravadorDeComando.prepareToRecordAsync()
+      gravadorDeComando.record()
+      ouvindoAgora.current = true
+    } catch {
+      /* Se não voltar a ouvir, a tela continua dizendo "Ouvindo" e o medidor
+         para — que é o sinal que o número na tela existe para dar. */
+    }
+  }
+
   async function recortarEEntender(duracao: number) {
     /* Pela REFERÊNCIA, e não pelo estado: quem chama é o intervalo, e lá o
        estado está congelado no valor de quando ele foi criado. */
