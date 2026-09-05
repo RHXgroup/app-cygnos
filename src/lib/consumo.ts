@@ -894,11 +894,31 @@ export async function analisarFoto(
 
     /* Vazia é foto sem alimento. Não há o que confirmar, e uma folha vazia com
        botão "Registrar" seria pior do que a frase. */
-    if (itens.length === 0)
+    if (itens.length === 0) {
+      /* ── O MOTIVO VEM DE LÁ, quando ele sabe ────────────────────────────
+       *
+       * A frase fixa era "Tente de mais perto, com luz" — e ela é conselho
+       * ERRADO na maioria dos casos em que a leitura não acha nada. Testado
+       * com uma foto de buffet: o problema não é distância nem luz, é que não
+       * existe um prato servido ali. A pessoa repete o mesmo gesto e falha
+       * igual.
+       *
+       * O servidor agora devolve, na `descricao`, uma frase dizendo o que
+       * fazer naquele caso: fotografar o prato depois de servido, escolher
+       * qual prato é o dela, apontar para o prato e não para a panela.
+       *
+       * Só aceita se PARECER frase: o campo normalmente traz o rótulo do
+       * conjunto ("Prato feito"), e mostrar isso como explicação seria pior do
+       * que a frase genérica. Duas palavras não explicam nada. */
+      const motivo = typeof data?.descricao === 'string' ? data.descricao.trim() : ''
+      const ehFrase = motivo.length > 24 && motivo.includes(' ') && /[.!?]$/.test(motivo)
       return {
         tipo: 'erro',
-        mensagem: 'Não consegui identificar alimento nesta foto. Tente de mais perto, com luz.',
+        mensagem: ehFrase
+          ? motivo
+          : 'Não consegui identificar alimento nesta foto. Tente de mais perto, com luz.',
       }
+    }
 
     return {
       tipo: 'ok',
