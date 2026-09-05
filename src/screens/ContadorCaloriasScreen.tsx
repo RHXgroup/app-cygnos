@@ -140,6 +140,20 @@ export function ContadorCaloriasScreen({
     rolagem.current?.scrollTo({ y: Math.max(yDasFormas.current - 12, 0), animated: true })
   }
 
+  /* Aparecer nao basta: a tela precisa SUBIR ate o erro.
+   *
+   * Mudar o bloco de lugar resolve quem estava no topo. Quem tirou a foto
+   * depois de rolar continua olhando para outro pedaco da tela, e a explicacao
+   * aparece fora da vista -- que e o mesmo defeito com outra altura.
+   *
+   * Vai para o topo, e nao para a posicao medida do bloco: `onLayout` do bloco
+   * novo so roda DEPOIS deste efeito, entao medir aqui leria zero na primeira
+   * vez -- justamente a vez que importa. O topo nao precisa de medida nenhuma
+   * e mostra o erro junto com as portas, que e o par que interessa. */
+  useEffect(() => {
+    if (erro) rolagem.current?.scrollTo({ y: 0, animated: true })
+  }, [erro])
+
   /* null = a tela principal. As portas abrem por cima dela. */
   const [porta, setPorta] = useState<Exclude<PortaDoDiario, 'foto'> | null>(
     portaInicial && portaInicial !== 'foto' ? portaInicial : null,
@@ -877,6 +891,26 @@ export function ContadorCaloriasScreen({
               O que muda entre os dois lugares é só a refeição de destino: o "+"
               usa a do relógio, e aqui é a que a pessoa escolheu logo acima. É
               por isso que este não pode simplesmente sumir. */}
+          {/* ── O ERRO FICA ANTES DAS PORTAS, e nao depois de tudo ──────────
+           *
+           * Estava la embaixo, entre "Outras formas de registrar" e a lista do
+           * dia. Fotografado: a pessoa tirou a foto, a leitura falhou, e a
+           * explicacao do que houve ficou abaixo da dobra. Relatado como "nem
+           * da pra ver que tinha a mensagem la".
+           *
+           * O lugar certo e colado na porta que falhou. Quem acabou de tocar em
+           * "Foto" esta olhando exatamente para ca, e e aqui que vai tocar de
+           * novo -- entao e aqui que precisa saber por que nao deu. */}
+          {!!erro && (
+            <View style={styles.blocoErro}>
+              <Text style={styles.tituloErro}>Não deu certo</Text>
+              {/* A mensagem crua junto. Depois da correção da edge function ela
+                  distingue foto ruim de chave errada — antes as duas chegavam
+                  aqui como "não identifiquei o alimento". */}
+              <Text style={styles.detalheErro}>{erro}</Text>
+            </View>
+          )}
+
           <View
             style={styles.portas}
             onLayout={e => {
@@ -980,16 +1014,6 @@ export function ContadorCaloriasScreen({
                   : `${pendentes} registros guardados esperando internet. Toque para tentar agora.`}
               </Text>
             </Pressable>
-          )}
-
-          {!!erro && (
-            <View style={styles.blocoErro}>
-              <Text style={styles.tituloErro}>Não deu certo</Text>
-              {/* A mensagem crua junto. Depois da correção da edge function ela
-                  distingue foto ruim de chave errada — antes as duas chegavam
-                  aqui como "não identifiquei o alimento". */}
-              <Text style={styles.detalheErro}>{erro}</Text>
-            </View>
           )}
 
           {/* ── O dia ── */}

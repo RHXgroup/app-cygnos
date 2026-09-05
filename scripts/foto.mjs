@@ -109,12 +109,64 @@ for (const caminho of arquivos) {
   }
 }
 
+/* -- REGRA 4 -- o fetch do SDK 57 nao le arquivo do aparelho ---------------
+ *
+ * Mais larga que as tres de cima de proposito, e a largura foi comprada com
+ * uma semana.
+ *
+ * O SDK 57 troca o fetch global pelo da Expo, que segue o padrao da web. O
+ * padrao da web nao diz nada sobre file://, e nao conhece o { uri, name, type }
+ * que o React Native usa em FormData. Nos dois casos ele NAO levanta erro:
+ * devolve vazio, ou anexa o objeto virado texto.
+ *
+ * Vazio atravessa tudo. Foi relatado como quatro coisas diferentes -- o audio
+ * sozinho nao envia, o comando de voz e ignorado, a gravacao saiu sem som, a
+ * foto nao le -- e era uma linha, copiada em tres arquivos.
+ *
+ * As regras 1 a 3 olham so caminho de FOTO, porque nasceram de um problema de
+ * MEMORIA. Esta olha src/lib inteiro, incluindo audio, que aquelas isentam de
+ * proposito -- e foi por essa isencao que o defeito ficou escondido.
+ *
+ * O jeito certo e new File(uri) de expo-file-system: .arrayBuffer() para os
+ * bytes, ou o proprio objeto no FormData, que ele implementa Blob. */
+const LE_LOCAL = /\bfetch\(\s*(uri|caminho|arquivo|`?file:\/\/)/
+const FORMA_RN = /as unknown as Blob|\{\s*uri\s*,\s*name\s*,\s*type\s*\}/
+
+for (const caminho of arquivos) {
+  const fonte = readFileSync(caminho, 'utf8')
+  const nome = caminho.split(String.fromCharCode(92)).join('/').replace('src/lib/', '')
+
+  let dentroDeComentario = false
+  fonte.split(/\r?\n/).forEach((l, i) => {
+    const cru = l.trim()
+    if (cru.includes('/*')) dentroDeComentario = true
+    const eraComentario = dentroDeComentario || cru.startsWith('*') || cru.startsWith('//')
+    if (cru.includes('*/')) dentroDeComentario = false
+    if (eraComentario) return
+
+    /* fetch() sobre caminho local. A rede continua liberada: o que acusa e a
+       variavel se chamar uri/caminho/arquivo, ou a string comecar em file://.
+       Endereco http fica de fora, e e por isso que codigoBarras.ts passa. */
+    if (LE_LOCAL.test(l)) {
+      problemas.push({ arquivo: nome, linha: i + 1, regra: 'le arquivo do aparelho com fetch' })
+    }
+
+    /* A forma do React Native em FormData. O fetch novo anexa o objeto virado
+       texto, e o servidor recebe um campo com "[object Object]" dentro. */
+    if (FORMA_RN.test(l)) {
+      problemas.push({ arquivo: nome, linha: i + 1, regra: 'FormData na forma do React Native' })
+    }
+  })
+}
+
 console.log('')
 if (problemas.length === 0) {
   console.log('  Os caminhos de foto estão certos:')
   console.log('    · nenhum monta o texto junto do redimensionamento')
   console.log('    · o passo do texto sempre lê o arquivo já reduzido')
   console.log('    · nenhum lê foto com fetch/blob')
+  console.log('    · nenhum lê arquivo do aparelho com fetch, nem áudio')
+  console.log('    · nenhum monta FormData na forma do React Native')
   console.log('')
   process.exit(0)
 }

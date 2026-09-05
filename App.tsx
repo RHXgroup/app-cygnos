@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   useWindowDimensions,
+  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -20,6 +21,7 @@ import {
 } from 'react-native-safe-area-context'
 import type { Session } from '@supabase/supabase-js'
 import { BarraAbas, ORDEM_ABAS, type Aba } from './src/components/BarraAbas'
+import { MARCA_DO_PACOTE } from './src/lib/marcaDoPacote'
 import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from './src/lib/conta'
 import { supabase } from './src/lib/supabase'
 import { AguaScreen } from './src/screens/AguaScreen'
@@ -955,6 +957,31 @@ function AreaLogada({ sessao }: { sessao: Session }) {
             de abas e rolam: o diário, o peso, o sono. Nelas o conteúdo passava
             por trás dos três botões do sistema. */}
         <View style={[styles.faixaSistema, { height: insets.bottom }]} pointerEvents="none" />
+
+        {/* ── O CARIMBO DO PACOTE, so em desenvolvimento ────────────────────
+         *
+         * Rodadas inteiras foram gastas na mesma duvida: "nao mudou nada" quer
+         * dizer que o conserto nao funcionou, ou que o aparelho esta rodando o
+         * pacote guardado? As duas dao exatamente a mesma frase e exatamente a
+         * mesma foto de tela.
+         *
+         * E nao e hipotese: quando o Expo Go nao alcanca o servidor, ele NAO
+         * avisa que desistiu -- abre o pacote guardado, e o app funciona
+         * normalmente ignorando tudo o que foi consertado. O aviso "Cannot
+         * connect to Expo CLI" aparece e some.
+         *
+         * Perguntar nao resolve, porque a pergunta e sobre uma coisa que nao
+         * esta na tela. Entao ela passa a estar. Armadilha 2 do AGENTS.md com
+         * outra roupa: pare de trocar de mecanismo e imprima o numero na tela.
+         *
+         * Fica por ULTIMO no JSX para aparecer por cima das sobreposicoes --
+         * inclusive da folha da foto, que e onde mais precisamos saber. E
+         * `pointerEvents="none"` porque e pintura, nao alvo. */}
+        {__DEV__ && (
+          <View style={[styles.marca, { top: insets.top + 2 }]} pointerEvents="none">
+            <Text style={styles.marcaTexto}>{MARCA_DO_PACOTE}</Text>
+          </View>
+        )}
       </View>
     </>
   )
@@ -1154,6 +1181,18 @@ const estilos = estilosDe(t =>
     right: 0,
     backgroundColor: t.cores.fundo,
   },
+  /* O carimbo: pequeno, canto direito, e legivel numa foto de tela reduzida --
+     que e o unico formato em que ele e lido. Fundo proprio porque ele passa por
+     cima de foto, de verde e de branco, e tem de continuar legivel nos tres. */
+  marca: {
+    position: 'absolute',
+    right: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  marcaTexto: { fontSize: 10, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
   telaApp: { flex: 1, backgroundColor: t.cores.fundo },
   carrossel: { flex: 1 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.cores.fundo },

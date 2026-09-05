@@ -38,6 +38,19 @@ export type Comando =
  * "já fiz" podem aparecer na mesma frase, e quem diz "pula o descanso" não
  * está pedindo para contar outra série. */
 const FRASES: [Comando, string[]][] = [
+  /* A SERIE vem antes de tudo, e a ordem aqui e o conserto.
+   *
+   * "Cygnos, iniciar serie" -- pedido palavra por palavra -- casava com o
+   * `iniciar` solto la embaixo, em `comecar`, e `comecar()` faz
+   * `setInicio(Date.now())`. Ou seja: quem pedisse para iniciar a serie no meio
+   * do treino ZERAVA a hora de inicio do treino, e a duracao contava de novo do
+   * comeco. Nao dava erro nenhum, e o numero errado so aparece no fim.
+   *
+   * Vai para `continuar` e nao para um comando novo porque `continuar` ja
+   * resolve os dois estados certo: sem treino aberto ele comeca, com treino
+   * aberto ele prepara a serie. Um comando novo teria de repetir essa decisao,
+   * e duas copias da mesma decisao divergem. */
+  ['continuar', ['iniciar serie', 'inicia a serie', 'iniciar a serie', 'comecar serie', 'comeca a serie', 'comecar a serie', 'bora pra serie', 'vamos pra serie']],
   /* COMECAR vem primeiro, e não é ordem arbitrária.
      "vamos treinar" e "bora comecar" carregam palavras que `continuar` tambem
      reivindica ('vamos', 'bora'), e quem diz isso com o treino ainda parado

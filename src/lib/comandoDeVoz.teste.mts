@@ -205,5 +205,28 @@ function ok(nome: string, cond: boolean, extra = '') {
   }
 }
 
+/* == INICIAR SERIE, e o zeramento que ele causava ======================== */
+{
+  // Pedido palavra por palavra. Casava com o `iniciar` solto de `comecar`, e
+  // `comecar()` faz setInicio(Date.now()) -- zerava a hora do treino no meio
+  // dele, sem erro nenhum, e a duracao so aparecia errada no fim.
+  ok('cygnos iniciar serie NAO comeca o treino', comandoDoTexto('cygnos iniciar serie') === 'continuar')
+  ok('inicia a serie', comandoDoTexto('inicia a serie') === 'continuar')
+  ok('comecar a serie', comandoDoTexto('comecar a serie') === 'continuar')
+  ok('bora pra serie', comandoDoTexto('bora pra serie') === 'continuar')
+
+  // E o treino inteiro continua indo para comecar -- a linha nova nao pode ter
+  // roubado as frases que ja funcionavam.
+  ok('iniciar treino continua comecando', comandoDoTexto('cygnos iniciar treino') === 'comecar')
+  ok('iniciar sozinho continua comecando', comandoDoTexto('cygnos iniciar') === 'comecar')
+
+  // "proxima serie" carrega a palavra `serie` e NAO e este caso: quem diz isso
+  // no descanso quer pular o descanso, que e o que ele sempre fez.
+  ok('proxima serie continua pulando o descanso', comandoDoTexto('proxima serie') === 'pular_descanso')
+
+  // A negacao continua ganhando de tudo.
+  ok('nao inicia a serie nao faz nada', comandoDoTexto('nao inicia a serie') === null)
+}
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) process.exit(1)

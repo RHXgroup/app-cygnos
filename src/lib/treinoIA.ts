@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker'
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator'
+import { File } from 'expo-file-system'
 import { rotinaDaIA, type RotinaConvertida, type RotinaDaIA } from './rotinaDaIA'
 import { supabase } from './supabase'
 import { semImagem } from './permissoes'
@@ -246,15 +247,25 @@ export async function lerFichaDaFoto(
 
   let bruto: RotinaDaIA
   try {
-    /* A forma do arquivo é a mesma de `voz.ts`, que sobe áudio para uma função
-       Deno todo dia. Jeito já provado no mesmo projeto vale mais do que um
-       segundo escrito do zero. */
+    /* O arquivo vai como Blob de verdade, e antes nao ia.
+     *
+     * Estava `{ uri, name, type }` -- a forma do React Native, copiada de
+     * `voz.ts` com um comentario meu dizendo que era jeito ja provado. Era, ate
+     * o SDK 57 trocar o `fetch` global pelo da Expo: o fetch novo segue o padrao
+     * da web, nao conhece esse objeto, e anexa ele VIRADO TEXTO. O servidor
+     * recebia um campo `imagem` contendo "[object Object]".
+     *
+     * Aqui isso nao aparecia como defeito porque existe a reserva por base64 --
+     * a primeira tentativa falhava, a segunda salvava, e a unica marca era uma
+     * linha no console. Ou seja: o caminho principal estava morto ha uma semana
+     * e a ficha continuava sendo lida, pelo caminho que gasta mais memoria.
+     *
+     * Achado pela regra 4 de `scripts/foto.mjs`, que eu escrevi depois de
+     * consertar os outros tres. Foi o primeiro achado dela.
+     *
+     * `File` de expo-file-system implementa `Blob`, entao entra direto. */
     const forma = new FormData()
-    forma.append('imagem', {
-      uri: caminho,
-      name: 'ficha.jpg',
-      type: 'image/jpeg',
-    } as unknown as Blob)
+    forma.append('imagem', new File(caminho), 'ficha.jpg')
 
     let { data, error } = await supabase.functions.invoke('app-ler-treino-foto', { body: forma })
 

@@ -45,7 +45,8 @@
     "orfaos": "node scripts/orfaos.mjs",
     "telas": "node scripts/telas.mjs",
     "raios": "node scripts/raios.mjs",
-    "foto": "node scripts/foto.mjs"
+    "foto": "node scripts/foto.mjs",
+    "marca": "node scripts/marca.mjs"
   },
   "private": true
 }

@@ -2,10 +2,16 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
-> O projeto está no **SDK 54** (`expo@54.0.37`), não no 57. Ao consultar a
-> documentação, use a versão que o projeto realmente usa — corrigir contra a
-> documentação de outra versão introduz problema novo. Se a intenção for migrar
-> para o 57, isso é uma decisão à parte, não um detalhe de implementação.
+> **O projeto está no SDK 57** (`expo@^57.0.0`, `react-native@0.86.3`).
+>
+> Este parágrafo dizia "SDK 54, não 57" e estava **errado** — provavelmente certo
+> quando foi escrito, e nunca atualizado na migração. Custou caro: eu li a linha
+> do teclado logo abaixo sobre documento errado que "não fica parado, ele
+> argumenta", e ainda assim passei uma semana sem procurar a causa certa de
+> quatro defeitos, porque o `fetch` do 57 não é o do 54 (ver a armadilha 17).
+>
+> **Confira no `package.json` antes de acreditar nesta linha.** Uma versão
+> escrita à mão num documento envelhece; a do `package.json` não.
 
 **Instalar pacote é `npx expo install`, nunca `npm install`.** Ele consulta o que
 a SDK do projeto usa; o npm sozinho pega o mais novo do registro. Já aconteceu:
@@ -509,12 +515,70 @@ linha antes de consertar.
 Rodado nos dois repositórios em 31/08/2026: **nenhum dano**, só aquele falso
 positivo em `lib/interpretador.ts`.
 
+## 17. O `fetch` do SDK 57 não lê arquivo do aparelho, e não avisa
+
+Esta é a armadilha que custou **uma semana**, e ela apareceu como **quatro
+defeitos diferentes**: "o áudio sozinho não envia na conversa", "o comando de voz
+é ignorado", "a gravação saiu sem som", "a ficha por foto não lê". Uma linha,
+copiada em quatro arquivos.
+
+O SDK 57 troca o `fetch` global pelo da Expo. Ele segue o padrão da web, e o
+padrão da web:
+
+- **não diz nada sobre `file://`** — sobre arquivo local ele não levanta erro,
+  devolve vazio;
+- **não conhece `{ uri, name, type }`**, que é a forma do React Native em
+  `FormData` — em vez de anexar o arquivo, ele anexa o objeto **virado texto**,
+  e o servidor recebe um campo com `[object Object]` dentro.
+
+**Nos dois casos não há erro.** Vazio atravessa tudo e sai do outro lado como
+uma frase que culpa a pessoa: "a gravação saiu sem som" acusa o microfone dela
+por um defeito de leitura. E onde havia reserva — a ficha de treino tem — o
+caminho principal ficou morto por uma semana sem sintoma nenhum, só uma linha no
+console.
+
+O que funciona é `expo-file-system`:
+
+```ts
+import { File } from 'expo-file-system'
+
+const arquivo = new File(uri)
+if (!arquivo.exists) return  /* ... */
+const bytes = await arquivo.arrayBuffer()          // o supabase-js aceita direto
+forma.append('audio', arquivo, 'ditado.m4a')       // `File` IMPLEMENTA `Blob`
+```
+
+E some junto o `base64`, que inflava o corpo em 33% sem razão nenhuma.
+
+`npm run foto` tem a regra 4 para isto, e ela varre `src/lib` **inteiro** — as
+regras 1 a 3 isentam áudio de propósito, porque nasceram de um problema de
+memória, e foi por essa isenção que o defeito ficou escondido. O primeiro achado
+da regra 4 foi uma quarta cópia que nenhum relato tinha apontado.
+
+**A lição que vale mais que a regra**: eu diagnostiquei esse `fetch` na foto do
+prato e **escrevi o diagnóstico num comentário** em `consumo.ts` — e não procurei
+os irmãos. É a armadilha 5 outra vez, pelo lado do defeito em vez do lado do
+nome. Ao descobrir a causa de alguma coisa, varra por ela antes de dar por
+resolvida:
+
+```bash
+node scripts/foto.mjs
+```
+
+---
+
 ## 16. Antes de dar por pronto
 
 - `npx tsc --noEmit` — o principal, e por muito tempo o único.
 - `npm run contrato` — confere que toda RPC que o app chama existe no banco com
   a assinatura exata, e lista as que executam sem sessão. Precisa de rede, e por
   isso fica fora do `npm test`.
+- `npm run foto` — os quatro caminhos de foto e de áudio, contra as armadilhas
+  1-3 (memória) e 4 (o `fetch` do SDK 57). Não precisa de rede.
+- `npm run marca` — carimba o pacote com o commit e a hora. **Rode antes de
+  pedir para alguém recarregar**: o carimbo aparece no canto de qualquer tela
+  em desenvolvimento, e é o que diferencia "o conserto não funcionou" de "o
+  Expo Go abriu o pacote guardado" — que dão exatamente a mesma foto de tela.
 - `npm run orfaos` — lista o que `src/lib` exporta e ninguém chama. **Órfão não
   é erro**: exportar só para o teste é legítimo, e função nova esperando a tela
   também. A saída é lista para olhar, não reprovação.

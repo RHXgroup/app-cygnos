@@ -6,6 +6,7 @@ import {
   setAudioModeAsync,
 } from 'expo-audio'
 import type { RecordingOptions } from 'expo-audio'
+import { File } from 'expo-file-system'
 import { supabase } from './supabase'
 
 /* Ditar a refeição em vez de digitar.
@@ -203,29 +204,53 @@ export async function transcrever(
 ): Promise<ResultadoTranscricao> {
   if (duracaoSegundos < MINIMO_SEGUNDOS) return { tipo: 'curto_demais' }
 
-  /* Quanto o arquivo realmente tem. Custa uma leitura local e vale a pena: sem
-     este número, "não ouvi nada" pode ser gravação muda, arquivo vazio ou
-     upload que não anexou — três defeitos diferentes com a mesma cara na tela.
-     Aparece no terminal do Metro com o prefixo [cygnos]. */
-  try {
-    const arquivo = await fetch(uri)
-    const bytes = (await arquivo.blob()).size
-    console.log('[cygnos] ditado:', Math.round(duracaoSegundos), 's,', bytes, 'bytes,', uri)
-  } catch {
-    console.log('[cygnos] ditado: não consegui medir o arquivo', uri)
+  /* ── O ARQUIVO VAI COMO Blob DE VERDADE, e antes nao ia ────────────────
+   *
+   * Estava assim: `forma.append('audio', { uri, name, type })`. Essa e a forma
+   * do React Native, e ela depende de o `fetch` reconhecer o objeto e ir ler o
+   * arquivo sozinho.
+   *
+   * O SDK 57 troca o `fetch` global pelo da Expo, que segue o padrao da web. E
+   * o padrao da web nao conhece `{ uri, name, type }`: em vez de anexar o
+   * arquivo, ele anexa o OBJETO virado texto. Sai um multipart bem formado,
+   * com o campo `audio` contendo a string "[object Object]".
+   *
+   * E o servidor nao erra por isso -- ele recebe um campo, transcreve o que
+   * pode, e devolve nada. O app entao dizia "nao ouvi nada", que e a frase de
+   * quem apertou e nao falou. Uma semana relatado como "o comando de voz nao
+   * funciona": os comandos estavam certos, a lista estava certa, e nada nunca
+   * chegou a ser transcrito.
+   *
+   * `File` do expo-file-system IMPLEMENTA `Blob` (`class File ... implements
+   * Blob`), entao ele entra direto no `FormData` e o fetch novo sabe monta-lo.
+   * O nome com extensao continua importando: e por ele que o Whisper escolhe o
+   * leitor, e um nome mentindo sobre o conteudo chega ao mesmo silencio por
+   * outro caminho.
+   *
+   * O mesmo `fetch` derrubou o audio da conversa, e la eu diagnostiquei e nao
+   * procurei os irmaos -- armadilha 5 do AGENTS.md. Este era o irmao. */
+  const aac = uri.toLowerCase().endsWith('.aac')
+  const arquivo = new File(uri)
+
+  if (!arquivo.exists) {
+    console.log('[cygnos] ditado: o arquivo nao existe', uri)
+    return { tipo: 'erro', mensagem: 'Nao consegui achar a gravacao no aparelho. Tente de novo.' }
   }
 
-  /* O nome e o tipo saem da extensão de verdade do arquivo, e não de uma
-     constante: quem decide o formato é o preset, por plataforma, e um nome
-     mentindo sobre o conteúdo faz o ffmpeg escolher o leitor errado — que é
-     outra forma de chegar ao mesmo silêncio. */
-  const aac = uri.toLowerCase().endsWith('.aac')
+  /* Quanto o arquivo realmente tem. Sem este numero, "nao ouvi nada" pode ser
+     gravacao muda, arquivo vazio ou anexo que nao foi -- tres defeitos com a
+     mesma cara na tela. E foi exatamente a falta dele que deixou o defeito de
+     cima passar por gravacao muda durante uma semana.
+     Aparece no terminal do Metro com o prefixo [cygnos]. */
+  console.log('[cygnos] ditado:', Math.round(duracaoSegundos), 's,', arquivo.size, 'bytes')
+
+  if (arquivo.size === 0) {
+    console.log('[cygnos] ditado: arquivo vazio', uri)
+    return { tipo: 'nada_ouvido' }
+  }
+
   const forma = new FormData()
-  forma.append('audio', {
-    uri,
-    name: aac ? 'ditado.aac' : 'ditado.m4a',
-    type: aac ? 'audio/aac' : 'audio/m4a',
-  } as unknown as Blob)
+  forma.append('audio', arquivo, aac ? 'ditado.aac' : 'ditado.m4a')
 
   try {
     const { data, error } = await supabase.functions.invoke('app-transcrever', { body: forma })
