@@ -139,9 +139,15 @@ const estilos = estilosDe(t =>
       marginHorizontal: 20,
       marginBottom: 14,
       backgroundColor: t.cores.cartao,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: t.cores.verde,
+      /* Sem contorno, e raio 20 como os outros cartões da tela inicial.
+         Ele tinha borda verde e raio 16, e ficava empilhado sobre cartões
+         preenchidos e arredondados — dois desenhos diferentes na mesma coluna.
+         Fotografado, e descrito por quem usa como "tudo fora de padrão, o do
+         meio parece remendado".
+         O destaque que a borda dava não se perde: este cartão aparece uma vez
+         por semana e some quando fechado, e o que chama atenção nele é ser
+         raro, não ser delineado. */
+      borderRadius: 20,
       padding: 16,
       gap: 10,
     },

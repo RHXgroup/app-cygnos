@@ -1292,6 +1292,9 @@ function CartaoCalorias({
 }) {
   const styles = estilos()
   const comido: TotaisConsumo = totaisConsumidos(consumo)
+  /* Dia sem NENHUM registro. Ver `LinhaMacro`: aqui o zero é a verdade, e o
+     traço mentiria dizendo "não sei". */
+  const vazio = consumo.length === 0
   const meta = metas.calorias
   const doPlano = plano ? totaisDe(itensDoPlano(plano.refeicoes)).calorias : null
   const rotuloDoDia = ehHoje(dia) ? 'Hoje' : dataNumerica(dia)
@@ -1370,18 +1373,21 @@ function CartaoCalorias({
         <View style={styles.colunaMacros}>
           <LinhaMacro
             rotulo="Carboidratos"
+            diaVazio={vazio}
             comido={comido.carboidratos}
             meta={metas.carboidratos}
             cor={paleta().coresMacro.carboidratos}
           />
           <LinhaMacro
             rotulo="Proteínas"
+            diaVazio={vazio}
             comido={comido.proteinas}
             meta={metas.proteinas}
             cor={paleta().coresMacro.proteinas}
           />
           <LinhaMacro
             rotulo="Gorduras"
+            diaVazio={vazio}
             comido={comido.gorduras}
             meta={metas.gorduras}
             cor={paleta().coresMacro.gorduras}
@@ -2203,11 +2209,18 @@ function LinhaMacro({
   comido,
   meta,
   cor,
+  diaVazio,
 }: {
   rotulo: string
   comido: number | null
   meta: number | null
   cor: string
+  /* Se o dia está VAZIO — nenhum item registrado.
+     Sem isto o traço aparecia no dia em branco, e ali ele mente: "não sei
+     quanta proteína" é diferente de "não comeu nada ainda", e a segunda é a
+     verdade quando não há um único registro. Fotografado na tela inicial de um
+     dia que começou: três linhas de "—/300g", que se leem como app sem dados. */
+  diaVazio: boolean
 }) {
   const styles = estilos()
   const fracao = meta !== null && meta > 0 && comido !== null ? Math.min(comido / meta, 1) : 0
@@ -2234,7 +2247,7 @@ function LinhaMacro({
         <Text style={styles.valorMacro} numberOfLines={1}>
           {/* Traço, e não zero, quando nada informou o macro: nenhum item trouxe
               proteína é diferente de comeu zero de proteína. */}
-          {comido === null ? '—' : Math.round(comido)}
+          {comido === null ? (diaVazio ? 0 : '—') : Math.round(comido)}
           {meta !== null && <Text style={styles.metaMacro}>/{meta}g</Text>}
         </Text>
         <Text style={[styles.rotuloMacro, { color: cor }]} numberOfLines={1}>
