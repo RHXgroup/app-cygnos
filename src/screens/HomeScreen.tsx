@@ -27,7 +27,7 @@ import { MenuTopo } from '../components/MenuTopo'
 import { MiniGrafico } from '../components/MiniGrafico'
 import { TotaisPlano } from '../components/TotaisPlano'
 import { supabase } from '../lib/supabase'
-import { dataISO, dataNumerica, milhar } from '../lib/formatar'
+import { dataISO, dataNumerica, milhar, rotuloDoDia } from '../lib/formatar'
 import {
   carregarAgua,
   coposDaMeta,
@@ -883,7 +883,32 @@ export function HomeScreen({
        * vista. */}
       <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
 
-      {/* ── Dias da semana ── */}
+      {/* ── AS SEÇÕES, e por que a tela precisava delas ─────────────────
+       *
+       * Eram dez blocos empilhados sem um título sequer. Quem abria não sabia
+       * para onde olhar, e nenhum era claramente o primeiro — descrito por
+       * quem usa como "não é acolhedor".
+       *
+       * Três títulos resolvem, e não quatro: cada um agrupa um ASSUNTO que a
+       * pessoa procura inteiro. "Como estou hoje", "o que ela me disse", "como
+       * está o meu corpo". Abaixo disso viraria etiqueta em cima de cartão.
+       *
+       * A regra que não pode ser quebrada: título só existe com conteúdo
+       * embaixo. Por isso os três escolhidos são justamente aqueles cujo vazio
+       * a tela consegue enxergar daqui — o do recado olha `recado`, e os
+       * outros dois cobrem cartões que nunca somem. `CartaoDaSequencia` e
+       * `CartaoDaSemana` ficaram DE FORA de propósito: os dois decidem sozinhos
+       * se aparecem, com estado interno que este arquivo não vê, e um título
+       * sobrando sobre o nada é pior do que título nenhum. */}
+      <Secao
+        /* Diz o dia que está sendo olhado, e não "Hoje" fixo. A faixa de dias
+           logo acima muda o conteúdo desta seção inteira; um título mentindo
+           sobre qual dia é seria a primeira coisa a confundir. */
+        titulo={rotuloDoDia(diaSelecionado, new Date())}
+        icone="today-outline"
+        styles={styles}
+      />
+
       {/* ── Calorias ── */}
       <CartaoCalorias
         consumo={consumo}
@@ -899,8 +924,14 @@ export function HomeScreen({
           conta. Some sozinho quando não há recado — nada de moldura dizendo
           "sua nutricionista ainda não escreveu", que é cobrança do profissional
           na cara da paciente. */}
-      {ehHoje(diaSelecionado) && (
-        <CartaoDoRecado recado={recado} onAbrirMensagens={onAbrirMensagens} />
+      {/* O título só nasce com recado. `CartaoDoRecado` devolve null quando
+          não há, e um "Da sua nutricionista" sobre o vazio pareceria falha do
+          app — ou, pior, cobrança dela. */}
+      {ehHoje(diaSelecionado) && recado !== null && (
+        <>
+          <Secao titulo="Da sua nutricionista" icone="chatbubble-ellipses-outline" styles={styles} />
+          <CartaoDoRecado recado={recado} onAbrirMensagens={onAbrirMensagens} />
+        </>
       )}
 
       {/* A SEQUÊNCIA, antes de tudo.
@@ -1023,6 +1054,8 @@ export function HomeScreen({
       </View>
 
       {/* ── Progresso ── */}
+      <Secao titulo="O seu corpo" icone="body-outline" styles={styles} />
+
       <CartaoProgresso
         pesos={pesos}
         objetivo={objetivo}
@@ -1274,6 +1307,34 @@ function BlocoPlano({
  * O plano continua no cartão, numa linha discreta: é a referência do dia — o que
  * a pessoa combinou consigo mesma — e comparar o combinado com o comido é
  * exatamente o que uma nutricionista quer ver. */
+/* O título de uma seção da tela inicial.
+ *
+ * Pequeno, em caixa alta discreta e com o ícone antes — a mesma forma que os
+ * apps de nutrição bem resolvidos usam, e por uma razão que não é estética: um
+ * título assim se lê como PLACA, não como conteúdo, então o olho pula de placa
+ * em placa e para no assunto que quer. Um título grande e escuro competiria com
+ * os números dos cartões, que é o que a pessoa veio ver.
+ *
+ * Recebe `styles` em vez de chamar `estilos()` porque ele mora no mesmo arquivo
+ * da tela e o cache é por paleta — pedir de novo aqui seria trabalho repetido
+ * a cada quadro, sem ganho nenhum. */
+function Secao({
+  titulo,
+  icone,
+  styles,
+}: {
+  titulo: string
+  icone: keyof typeof Ionicons.glyphMap
+  styles: ReturnType<typeof estilos>
+}) {
+  return (
+    <View style={styles.secao}>
+      <Ionicons name={icone} size={13} color={paleta().inkSuave} />
+      <Text style={styles.tituloSecao}>{titulo}</Text>
+    </View>
+  )
+}
+
 function CartaoCalorias({
   consumo,
   plano,
@@ -2365,6 +2426,25 @@ const estilos = estilosDe(t =>
      ele só precisa reconhecer quem chegou. */
   ola: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.4 },
 
+  /* ── AS PLACAS DE SEÇÃO ──────────────────────────────────────────────
+     O recuo em cima é maior que embaixo de propósito: o título pertence ao que
+     vem DEPOIS dele, e um espaçamento igual dos dois lados o deixaria boiando
+     entre dois cartões, pertencendo aos dois e a nenhum. */
+  secao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 20,
+    marginBottom: 2,
+    paddingHorizontal: 4,
+  },
+  tituloSecao: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: t.inkSuave,
+  },
   cartao: {
     borderRadius: 20,
     backgroundColor: t.cores.cartao,
