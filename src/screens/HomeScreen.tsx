@@ -1361,12 +1361,38 @@ function CartaoCalorias({
   const doPlano = plano ? totaisDe(itensDoPlano(plano.refeicoes)).calorias : null
   const rotuloDoDia = ehHoje(dia) ? 'Hoje' : dataNumerica(dia)
 
+  /* ── O CARTÃO HERÓI, e por que a faixa e não o cartão inteiro ──────────
+   *
+   * A tela não tinha PRIMEIRO LUGAR: onze blocos, todos com a mesma casca
+   * branca, e nenhum dizendo "olhe aqui". Quem abre tem uma pergunta só — como
+   * estou hoje — e a resposta estava disfarçada de item de lista.
+   *
+   * O caminho óbvio seria pintar o cartão inteiro de verde, que é o que o
+   * Dietbox e o Nutrifit fazem no cabeçalho deles. Aqui isso quebraria: o anel
+   * e as barras de macro têm cores escolhidas para fundo claro, e as três
+   * precisam continuar distinguíveis ENTRE SI — inclusive para quem enxerga
+   * pouco contraste. Mudá-las para caber num fundo verde seria trocar
+   * hierarquia por legibilidade, e legibilidade não se troca.
+   *
+   * A faixa dá a mesma hierarquia sem tocar em nada que precise ser lido: ela
+   * ocupa só o título, o miolo continua claro, e o cartão passa a ser o único
+   * da tela com cor de marca no topo. Um por tela — o resto fica quieto, que é
+   * o que faz este falar.
+   *
+   * `degrades.destaque` e não uma cor fixa: ele acompanha o acento que a pessoa
+   * escolheu, e `cores.branco` sobre esse preenchimento é a garantia já
+   * verificada nos 360 matizes (ver comAcento, em lib/tema). */
   const cabecalho = (
-    <View style={styles.linhaTituloPlano}>
-      <Ionicons name="flame-outline" size={16} color={paleta().cores.verde} />
-      <Text style={[styles.tituloCartao, styles.tituloPlano]}>Calorias</Text>
-      <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
-    </View>
+    <LinearGradient
+      colors={paleta().degrades.destaque}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.faixaHeroi}
+    >
+      <Ionicons name="flame" size={16} color={paleta().cores.branco} />
+      <Text style={styles.tituloHeroi}>Calorias</Text>
+      <Ionicons name="chevron-forward" size={17} color={paleta().cores.branco} />
+    </LinearGradient>
   )
 
   /* Sem meta, o número do dia não tem contra o que ser lido: 1.500 kcal não é
@@ -1375,7 +1401,11 @@ function CartaoCalorias({
     return (
       <Pressable
         onPress={onAbrirMetas}
-        style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
+        style={({ pressed }) => [
+          styles.cartao,
+          styles.cartaoHeroi,
+          pressed && styles.cartaoPressionado,
+        ]}
         accessibilityRole="button"
         accessibilityLabel="Definir suas metas"
       >
@@ -1403,7 +1433,11 @@ function CartaoCalorias({
        sempre a caminho de registrar mais uma coisa. */
     <Pressable
       onPress={onAbrirContador}
-      style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
+      style={({ pressed }) => [
+        styles.cartao,
+        styles.cartaoHeroi,
+        pressed && styles.cartaoPressionado,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={`${milhar(kcal)} de ${milhar(meta)} calorias em ${rotuloDoDia}. Abrir o contador.`}
     >
@@ -2451,6 +2485,33 @@ const estilos = estilosDe(t =>
     padding: PADDING_CARTAO,
   },
   tituloCartao: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
+  /* ── A FAIXA DO CARTÃO HERÓI ─────────────────────────────────────────────
+     Sangra até a borda: as margens negativas desfazem o padding do cartão, e o
+     `overflow: hidden` do próprio cartão é que arredonda os cantos de cima.
+     Sem sangrar, ela viraria um retângulo colorido flutuando dentro de uma
+     moldura branca — que se lê como aviso, e não como identidade. */
+  /* `overflow: hidden` SÓ aqui, e não em `cartao`.
+     É ele que recorta a faixa nos cantos de cima. Posto na casca comum, ele
+     cortaria o que outros cartões deixam transbordar de propósito — e um
+     `overflow` global é a mudança que quebra três telas longe daqui. */
+  cartaoHeroi: { overflow: 'hidden' },
+  faixaHeroi: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: -PADDING_CARTAO,
+    marginHorizontal: -PADDING_CARTAO,
+    marginBottom: 2,
+    paddingHorizontal: PADDING_CARTAO,
+    paddingVertical: 11,
+  },
+  tituloHeroi: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '800',
+    color: t.cores.branco,
+    letterSpacing: -0.2,
+  },
   /* flex só aqui, e não no tituloCartao: nos outros cartões ele está dentro de
      uma coluna, e ali flex faria o texto esticar na vertical. */
   tituloPlano: { flex: 1 },
@@ -2479,7 +2540,9 @@ const estilos = estilosDe(t =>
      quase toda a largura interna. */
   rotuloAnelDia: { fontSize: 11.5, fontWeight: '700', color: t.inkSuave },
   linhaValorAnel: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  valorAnel: { fontSize: 34, fontWeight: '800', color: t.cores.ink, letterSpacing: -1.2 },
+  /* 38 e não 34: é a resposta da única pergunta que a pessoa tem ao abrir a
+     tela, e estava do mesmo tamanho dos títulos dos outros cartões. */
+  valorAnel: { fontSize: 38, fontWeight: '800', color: t.cores.ink, letterSpacing: -1.4 },
   metaAnel: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
   restantesAnel: { marginTop: 3, fontSize: 11.5, fontWeight: '700', color: t.cores.limao },
 
