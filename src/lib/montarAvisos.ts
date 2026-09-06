@@ -30,6 +30,8 @@
  * Mensagem é a exceção, e a única que não depende do truque: `lida_em` é do
  * banco, então ali o app não adivinha o que a pessoa viu — ele sabe. */
 
+import { ASuaNutri, aSuaNutri, elaPronome, uma } from './tratamentoDaNutri.ts'
+
 export type Aviso = {
   /* Estável entre aberturas, e é o que impede o mesmo aviso de contar duas
      vezes: ele é montado a partir do assunto e do estado, não de um contador. */
@@ -134,8 +136,8 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
     if (agora.nutricionista && marca.nutricionistaId !== agora.nutricionista.id) {
       lista.push({
         id: `vinculo:${agora.nutricionista.id}`,
-        titulo: 'Você tem uma nutricionista',
-        texto: `${agora.nutricionista.nome} passou a acompanhar você. O que ela registrar aparece aqui no app.`,
+        titulo: `Você tem ${uma()} nutricionista`,
+        texto: `${agora.nutricionista.nome} passou a acompanhar você. O que ${elaPronome()} registrar aparece aqui no app.`,
         icone: 'person-add',
         novo: true,
         destino: 'nutricionista',
@@ -146,7 +148,7 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
       lista.push({
         id: `plano:${agora.planoId}`,
         titulo: 'Plano alimentar novo',
-        texto: 'A sua nutricionista publicou um plano novo. Ele já está valendo na tela inicial.',
+        texto: `${ASuaNutri()} publicou um plano novo. Ele já está valendo na tela inicial.`,
         icone: 'restaurant',
         novo: true,
         /* O plano novo já está valendo na tela inicial: o toque devolve para lá. */
@@ -187,7 +189,7 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
       lista.push({
         id: `consulta:${c.id}:${c.status}`,
         titulo: 'A sua consulta mudou',
-        texto: `Houve uma mudança na consulta de ${c.quando}. Confirme com a sua nutricionista antes de se programar para o dia.`,
+        texto: `Houve uma mudança na consulta de ${c.quando}. Confirme com ${aSuaNutri()} antes de se programar para o dia.`,
         icone: 'calendar',
         novo: true,
         destino: 'nutricionista',
@@ -203,7 +205,7 @@ export function montarAvisos(agora: Retrato, marca: Marca | null): Aviso[] {
       id: `consulta:${c.id}:${c.status}`,
       titulo: dela ? 'Consulta marcada para você' : 'Pedido aceito',
       texto: dela
-        ? `A sua nutricionista agendou ${c.quando}.`
+        ? `${ASuaNutri()} agendou ${c.quando}.`
         : `A sua consulta ficou marcada para ${c.quando}.`,
       icone: 'checkmark-circle',
       novo: true,

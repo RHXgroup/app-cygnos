@@ -14,6 +14,7 @@ import { PALAVRA_CONFIRMACAO, excluirConta } from '../lib/conta'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
 import { TelaComTeclado } from '../components/TelaComTeclado'
+import { aSuaNutri, uma } from '../lib/tratamentoDaNutri'
 
 /* Exclusão da conta, exigida pela Play Store para todo app que deixa criar uma.
  *
@@ -105,7 +106,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
               'Seu cadastro: nome, CPF, telefone, e-mail e foto de perfil',
               'Seus registros de água, peso, sono e refeições',
               'Suas metas, planos alimentares e cálculos energéticos',
-              'O vínculo com a sua nutricionista',
+              `O vínculo com ${aSuaNutri()}`,
             ].map(item => (
               <View key={item} style={styles.linhaItem}>
                 <Ionicons name="close-circle" size={16} color={paleta().cores.erroTexto} />
@@ -119,7 +120,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
             <View style={styles.linhaItem}>
               <Ionicons name="information-circle" size={16} color={paleta().inkFraco} />
               <Text style={styles.textoItem}>
-                Se você já foi atendido por uma nutricionista, o prontuário daquele atendimento
+                Se você já foi atendido por {uma()} nutricionista, o prontuário daquele atendimento
                 continua com ela — consultas, medidas, exames e fotos tiradas no consultório. São
                 registros de saúde que a profissional é obrigada a guardar por prazo legal, e não
                 dependem do app. Para tratar deles, fale diretamente com ela.

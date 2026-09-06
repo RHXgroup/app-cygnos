@@ -2,6 +2,7 @@ import { falha, mensagemDoBanco } from './erros'
 import { supabase } from './supabase'
 import type { ChaveReacao, Registro } from './escadaDaAceitacao'
 import { REACOES } from './escadaDaAceitacao'
+import { aSuaNutri } from './tratamentoDaNutri'
 
 /* A ponte da escada de aceitação.
  *
@@ -76,7 +77,7 @@ export async function carregarPlanoTerapeutico(): Promise<ResultadoDoPlano> {
   if (error)
     return {
       tipo: 'erro',
-      mensagem: falha('Não consegui carregar o plano da sua nutricionista agora.', error),
+      mensagem: falha(`Não consegui carregar o plano d${aSuaNutri()} agora.`, error),
     }
   const objetivos = ((data ?? []) as LinhaDoPlano[])
     .map(doPlano)

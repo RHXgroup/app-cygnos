@@ -23,6 +23,7 @@ import {
 } from '../lib/planoTerapeutico'
 import { estilosDe, paleta } from '../lib/tema'
 import { RegistrarExposicaoScreen } from './RegistrarExposicaoScreen'
+import { ASuaNutri, aSuaNutri } from '../lib/tratamentoDaNutri'
 
 /* O plano terapêutico, do lado de quem oferece a comida.
  *
@@ -167,7 +168,7 @@ export function PlanoTerapeuticoScreen({ onFechar }: { onFechar: () => void }) {
         >
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
-        {/* "Alimentos para oferecer em casa", e NAO "Plano da nutricionista".
+        {/* "Alimentos para oferecer em casa", e NAO `Plano d${a()} nutricionista`.
          *
          * O dono do produto abriu esta tela e perguntou o que era. Ele tinha
          * razao: o app ja chama de "Plano da nutricionista" o PLANO ALIMENTAR,
@@ -206,7 +207,7 @@ export function PlanoTerapeuticoScreen({ onFechar }: { onFechar: () => void }) {
           )}
 
           {objetivos.length === 0 && !erro ? (
-            <Aviso texto="A sua nutricionista ainda não montou um plano de alimentos para oferecer em casa." />
+            <Aviso texto={`${ASuaNutri()} ainda não montou um plano de alimentos para oferecer em casa.`} />
           ) : (
             <>
               <Text style={styles.explicacao}>
@@ -249,7 +250,7 @@ export function PlanoTerapeuticoScreen({ onFechar }: { onFechar: () => void }) {
                       {registros.length === 0
                         ? 'Ainda não registrado'
                         : resumo.pedeAtencao
-                          ? 'Tem sido difícil — vale falar com a sua nutricionista'
+                          ? `Tem sido difícil — vale falar com ${aSuaNutri()}`
                           : resumo.jaDaParaSaber
                             ? `Já dá para saber · ${resumo.atual?.paraMae ?? '—'}`
                             : `${resumo.ofertas} ${resumo.ofertas === 1 ? 'vez' : 'vezes'} · ${resumo.atual?.paraMae ?? '—'}`}

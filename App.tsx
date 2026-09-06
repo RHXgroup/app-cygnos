@@ -56,6 +56,7 @@ import { QuestionarioScreen } from './src/screens/QuestionarioScreen'
 import { SonoScreen } from './src/screens/SonoScreen'
 import type { PlanoCompleto, RefeicaoSalva } from './src/lib/plano'
 import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/tema'
+import { carregarTratamento } from './src/lib/tratamentoGuardado'
 
 /* UM provider só, na raiz, e que nunca desmonta.
  *
@@ -90,6 +91,12 @@ export default function App() {
 
   useEffect(() => {
     carregarTema().finally(() => setLendoTema(false))
+    /* Junto com o tema, e sem ninguém esperar por ele: é a palavra com que
+       o app se refere à profissional ("a sua" ou "o seu" nutricionista).
+       Guardada, a primeira tela já nasce certa; sem ela, sairia no feminino
+       e se corrigiria quando o catálogo respondesse — um pisca-pisca de
+       gênero na cara de quem relatou justamente isso. */
+    void carregarTratamento()
     escutarTema(redesenhar)
     return () => escutarTema(null)
   }, [])

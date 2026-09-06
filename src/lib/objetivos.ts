@@ -46,6 +46,8 @@
  * para o dia. Eles continuam sendo lidos e traduzidos; o que muda é o que se
  * pode ESCOLHER daqui em diante. */
 
+import { aSuaNutri } from './tratamentoDaNutri.ts'
+
 /* Para onde o peso deve ir.
  *
  * É o que a tela de Peso usa para dizer se a variação foi na direção desejada,
@@ -251,7 +253,7 @@ export function objetivoDe(chave: string | null | undefined): Objetivo | null {
 export const nomeDoObjetivo = (chave: string | null | undefined): string =>
   chave === null || chave === undefined
     ? 'sem foco definido'
-    : (objetivoDe(chave)?.nome ?? 'um foco definido pela sua nutricionista')
+    : (objetivoDe(chave)?.nome ?? `um foco definido pel${aSuaNutri()}`)
 
 /* Para onde o peso deve ir, segundo o foco escolhido.
  *

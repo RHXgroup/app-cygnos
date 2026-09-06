@@ -40,6 +40,7 @@ import { DIAS_CURTOS, dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
 import { TelaComTeclado } from '../components/TelaComTeclado'
+import { aSuaNutri } from '../lib/tratamentoDaNutri'
 
 /* O sono, uma noite por vez.
  *
@@ -505,7 +506,7 @@ export function SonoScreen({
               {/* A frase existe porque estes três são o motivo de a seção estar
                   aqui, e não numa lista genérica de hábitos. */}
               <Text style={styles.ajudaCampo}>
-                Cafeína, álcool e jantar pesado são os que a sua nutricionista consegue ajustar.
+                Cafeína, álcool e jantar pesado são os que {aSuaNutri()} consegue ajustar.
               </Text>
 
               <TextInput

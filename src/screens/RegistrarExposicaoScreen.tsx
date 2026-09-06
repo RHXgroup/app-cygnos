@@ -19,7 +19,8 @@ import {
 } from '../lib/escadaDaAceitacao'
 import { coresDaEscada } from '../lib/coresDaEscada'
 import { dataISO } from '../lib/formatar'
-import { acentoEfetivo, estilosDe, paleta } from '../lib/tema'
+import { acentoEfetivo, estilosDe, paleta } from '../lib/tema'
+import { aSuaNutri } from '../lib/tratamentoDaNutri'
 
 /* Como foi com este alimento hoje.
  *
@@ -161,7 +162,7 @@ export function RegistrarExposicaoScreen({
         {passo === 'reacao' && (
           <>
             <Text style={styles.explica}>
-              Isto é opcional — mas é o que a sua nutricionista mais usa.
+              Isto é opcional — mas é o que {aSuaNutri()} mais usa.
             </Text>
             <View style={styles.reacoes}>
               {REACOES.map(r => (

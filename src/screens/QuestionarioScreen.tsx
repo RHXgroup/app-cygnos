@@ -31,6 +31,7 @@ import {
 } from '../lib/questionarioDaNutri'
 import { estilosDe, paleta } from '../lib/tema'
 import { TelaComTeclado } from '../components/TelaComTeclado'
+import { ASuaNutri, aSuaNutri, suaNutri } from '../lib/tratamentoDaNutri'
 
 /* Responder o questionário que a nutricionista mandou, sem sair do app.
  *
@@ -208,7 +209,7 @@ export function QuestionarioScreen({
       <View style={styles.centro}>
         <Text style={styles.titulo}>Nada para responder agora</Text>
         <Text style={styles.explicacao}>
-          Quando a sua nutricionista mandar um questionário, ele aparece aqui.
+          Quando {aSuaNutri()} mandar um questionário, ele aparece aqui.
         </Text>
       </View>,
     )
@@ -221,7 +222,7 @@ export function QuestionarioScreen({
             sempre; isto diz o que fazer, e o link dela continua funcionando. */}
         <Text style={styles.explicacao}>
           Ele foi enviado antes de o app conseguir abrir questionário. Responda pelo link que a
-          sua nutricionista te mandou, que continua valendo.
+          {suaNutri()} te mandou, que continua valendo.
         </Text>
       </View>,
     )
@@ -234,7 +235,7 @@ export function QuestionarioScreen({
         <Text style={styles.explicacao}>
           {q?.nutri?.nome
             ? `${q.nutri.nome} já consegue ver antes da sua consulta.`
-            : 'A sua nutricionista já consegue ver antes da consulta.'}
+            : `${ASuaNutri()} já consegue ver antes da consulta.`}
         </Text>
         <Pressable onPress={sair} style={styles.botao} accessibilityRole="button">
           <Text style={styles.textoBotao}>Pronto</Text>

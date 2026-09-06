@@ -52,6 +52,7 @@ import { hexDeHsl } from '../lib/cor'
 import { ritmoDeAgua } from '../lib/ritmoDeAgua'
 import { Confirmacao } from '../components/Confirmacao'
 import { EXPLICACAO_DA_NOTIFICACAO, SEM_NOTIFICACAO } from '../lib/permissoes'
+import { ASuaNutri, Minha, SuaNutri, elaPronome, uma } from '../lib/tratamentoDaNutri'
 
 const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'sunny-outline' }[] = [
   { chave: 'escuro', rotulo: 'Escuro', icone: 'moon-outline' },
@@ -574,7 +575,7 @@ export function MaisScreen({
        *
        * O cartão dela continua sendo cartão de propósito: ele não é uma ação, é
        * a IDENTIDADE de uma pessoa — foto, nome, CRN e especialidades. */}
-      <Secao titulo="Sua nutricionista" icone="medkit-outline" recuo={0} />
+      <Secao titulo={`${SuaNutri()}`} icone="medkit-outline" recuo={0} />
 
       <CartaoNutricionista
         catalogo={catalogo}
@@ -611,7 +612,7 @@ export function MaisScreen({
         </View>
         <View style={styles.textoQuestionario}>
           <Text style={styles.tituloQuestionario}>Alimentos para oferecer em casa</Text>
-          <Text style={styles.subQuestionario}>O que ela pediu, e como foi cada vez</Text>
+          <Text style={styles.subQuestionario}>{`O que ${elaPronome()} pediu, e como foi cada vez`}</Text>
         </View>
         <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
       </Pressable>
@@ -634,7 +635,7 @@ export function MaisScreen({
           <View style={styles.textoQuestionario}>
             <Text style={styles.tituloQuestionario}>Responder antes da consulta</Text>
             <Text style={styles.subQuestionario}>
-              A sua nutricionista mandou algumas perguntas
+              {ASuaNutri()} mandou algumas perguntas
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
@@ -1128,7 +1129,7 @@ function CartaoNutricionista({
         onPress={onAbrir}
         style={({ pressed }) => [styles.cartao, pressed && styles.cartaoPressionado]}
         accessibilityRole="button"
-        accessibilityLabel={`Meu nutricionista: ${vinculada.nome}`}
+        accessibilityLabel={`${Minha()} nutricionista: ${vinculada.nome}`}
       >
         <View style={styles.cabecalhoCartao}>
           <Text style={styles.tituloCartao}>Meu nutricionista</Text>
@@ -1175,7 +1176,7 @@ function CartaoNutricionista({
       </View>
 
       <Text style={styles.semVinculo}>
-        Você ainda não está vinculada a uma nutricionista. Conheça quem está no Cygnos e informe o
+        Você ainda não está vinculada a {uma()} nutricionista. Conheça quem está no Cygnos e informe o
         seu código a ela.
       </Text>
 

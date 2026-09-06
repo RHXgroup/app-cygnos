@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
 import type { DiaSemana, ItemSalvo, PlanoCompleto, RefeicaoSalva } from './plano'
+import { aSuaNutri } from './tratamentoDaNutri'
 
 /* O plano alimentar da nutricionista, no formato do plano do app.
  *
@@ -113,7 +114,7 @@ export async function carregarPlanoDaNutri(): Promise<PlanoCompleto | null> {
      é como o defeito da RPC de conteúdo passou despercebido: a lista
      simplesmente não aparecia, e nada em lugar nenhum dizia por quê. Ver a
      armadilha 12 do AGENTS.md, que é sobre os DOIS lados. */
-  if (error) throw new Error(falha('Não consegui carregar o plano da sua nutricionista.', error))
+  if (error) throw new Error(falha(`Não consegui carregar o plano d${aSuaNutri()}.`, error))
 
   const linhas = (data ?? []) as Linha[]
   if (linhas.length === 0) return null
@@ -177,7 +178,7 @@ export async function carregarPlanoDaNutri(): Promise<PlanoCompleto | null> {
 
   return {
     id: `nutri-${primeira.plano_id}`,
-    nome: primeira.plano_titulo?.trim() || 'Plano da sua nutricionista',
+    nome: primeira.plano_titulo?.trim() || `Plano d${aSuaNutri()}`,
     observacao: descricaoDeVerdade(primeira.plano_descricao),
     /* O sistema não devolve a data de criação por aqui, e o bloco do plano não
        mostra "criado em" para plano da nutricionista — ver BlocoPlano. */

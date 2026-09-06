@@ -32,6 +32,7 @@ import { milhar } from '../lib/formatar'
 import { comoFoiCalculado, metasSugeridas, type Sugestao } from '../lib/metasSugeridas'
 import { estilosDe, paleta } from '../lib/tema'
 import { TelaComTeclado } from '../components/TelaComTeclado'
+import { SuaNutri, elaPronome, suaNutri } from '../lib/tratamentoDaNutri'
 
 /* Onde a pessoa escreve o que ela está perseguindo.
  *
@@ -405,10 +406,10 @@ export function MetasScreen({
 
                 <Text style={styles.textoDela}>
                   {prescritos.size > 0
-                    ? 'Sua nutricionista prescreveu este plano, e os campos marcados abaixo seguem o que ela definiu. As suas metas continuam guardadas aqui, e valem para tudo que ela não definiu.'
+                    ? `${SuaNutri()} prescreveu este plano, e os campos marcados abaixo seguem o que ${elaPronome()} definiu. As suas metas continuam guardadas aqui, e valem para tudo que ela não definiu.`
                     : prescricao.tipo === 'detalhado'
-                      ? 'Sua nutricionista montou este plano em tarefas por dia, e não em números — então ele não muda as metas daqui. Veja com ela como acompanhar.'
-                      : `Sua nutricionista montou este plano por ${prescricao.periodo === 'mensal' ? 'mês' : 'semana'}, e as metas daqui são por dia. O app não tem como repartir os números dela sem inventar uma divisão que ela não escreveu — então continua valendo o que está abaixo.`}
+                      ? `${SuaNutri()} montou este plano em tarefas por dia, e não em números — então ele não muda as metas daqui. Veja com ${elaPronome()} como acompanhar.`
+                      : `${SuaNutri()} montou este plano por ${prescricao.periodo === 'mensal' ? 'mês' : 'semana'}, e as metas daqui são por dia. O app não tem como repartir os números dela sem inventar uma divisão que ela não escreveu — então continua valendo o que está abaixo.`}
                 </Text>
 
                 {!!prescricao.objetivo && (
@@ -682,7 +683,7 @@ function LinhaCampo({
           {invalido
             ? `de ${milhar(min)} a ${milhar(max)} ${campo.unidade}`
             : dela
-              ? 'sua nutricionista definiu este'
+              ? `${suaNutri()} definiu este`
               : semMedicao
                 ? 'o app ainda não conta isso'
                 : campo.periodo}

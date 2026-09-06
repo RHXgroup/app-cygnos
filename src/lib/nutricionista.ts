@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { falha, mensagemDoBanco } from './erros'
 import { assinados } from './arquivos'
+import { definirTratamento } from './tratamentoDaNutri'
 
 /* O catálogo de nutricionistas do app.
  *
@@ -29,6 +30,10 @@ export type Nutricionista = {
      padrão é o sistema — a conversa acontece dentro do app e o telefone nem
      chega aqui. Só com 'whatsapp' o número vem preenchido. */
   canalDeContato: string
+  /* Como o app fala dela: 'ela', 'ele', ou nulo para "ainda não disse".
+     Quem transforma isso em texto não é quem lê este campo — ver
+     lib/tratamentoDaNutri.ts, que guarda a resposta para o app inteiro. */
+  tratamento: string | null
 }
 
 export type Catalogo = {
@@ -62,6 +67,8 @@ type Linha = {
   cidade: string | null
   uf: string | null
   canal_de_contato: string | null
+  /* 'ela' ou 'ele', ou nulo enquanto ninguém responder. */
+  tratamento: string | null
   vinculada: boolean
 }
 
@@ -81,6 +88,7 @@ const daLinha = (l: Linha): Nutricionista => ({
   cidade: l.cidade,
   uf: l.uf,
   canalDeContato: l.canal_de_contato ?? 'sistema',
+  tratamento: l.tratamento ?? null,
 })
 
 /* ── As fotos ──────────────────────────────────────────────────────────────
@@ -147,6 +155,13 @@ export async function carregarCatalogo(): Promise<ResultadoCatalogo> {
    * Dizer a alguém que ela não tem profissional é a pior coisa que esta tela
    * pode dizer errado, e não custa nada evitar antes. */
   const vinculadas = lista.filter((_, i) => linhas[i]?.vinculada)
+
+  /* A palavra que o app inteiro vai usar sai DAQUI, e da linha vinculada.
+     Nunca de uma do catálogo em geral: o texto fala da profissional DESTA
+     pessoa. Sem vínculo nada muda — a função ignora nulo de
+     propósito. */
+  definirTratamento(vinculadas[0]?.tratamento)
+
 
   return {
     tipo: 'ok',

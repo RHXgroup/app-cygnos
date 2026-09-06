@@ -27,6 +27,8 @@
  *
  * Sem import de runtime, de propósito: é o que permite exercitar no Node. */
 
+import { aSuaNutri } from './tratamentoDaNutri.ts'
+
 export type ChaveDegrau =
   | 'recusou'
   | 'tolerar'
@@ -334,7 +336,7 @@ export function apoioDoRegistro(degrau: Degrau, resumo: ResumoDoAlimento): strin
        cujo texto diz "considere recuar um degrau e reduzir a exigência" —
        depois de uma sequência difícil a conduta é ALIVIAR. "Tenta de novo
        amanhã" aqui seria a tela empurrando o oposto do tratamento. */
-    return 'As últimas vezes foram difíceis pra ele. Vale recuar um degrau, baixar a exigência, e falar com a sua nutricionista.'
+    return `As últimas vezes foram difíceis pra ele. Vale recuar um degrau, baixar a exigência, e falar com ${aSuaNutri()}.`
   }
   if (resumo.jaDaParaSaber) {
     return `Já são ${resumo.ofertas} encontros com este alimento — o bastante para saber como ele responde. Leve isso para a próxima consulta.`

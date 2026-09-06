@@ -52,6 +52,7 @@ import { AgendarConsultaScreen } from './AgendarConsultaScreen'
 import { dataCurta } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 import { TelaComTeclado } from '../components/TelaComTeclado'
+import { ElaPronome, Minha, aSuaNutri, elaPronome, minha, outra, uma } from '../lib/tratamentoDaNutri'
 
 /* O catálogo de nutricionistas Cygnos, em tela cheia.
  *
@@ -268,12 +269,12 @@ export function NutricionistasScreen({
           style={styles.botaoVoltar}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={vendoRede ? 'Voltar para a minha nutricionista' : 'Voltar'}
+          accessibilityLabel={vendoRede ? `Voltar para a ${minha()} nutricionista` : 'Voltar'}
         >
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>
-          {vendoRede || !vinculada ? 'Nutricionistas Cygnos' : 'Minha nutricionista'}
+          {vendoRede || !vinculada ? 'Nutricionistas Cygnos' : `${Minha()} nutricionista`}
         </Text>
         <View style={styles.botaoVoltar} />
       </View>
@@ -403,7 +404,7 @@ export function NutricionistasScreen({
       <Confirmacao
         visivel={!!encerrou}
         titulo="Acompanhamento encerrado"
-        mensagem={`Você não é mais acompanhada por ${encerrou}. O que ela registrou continua aqui, e você pode procurar outra nutricionista quando quiser.`}
+        mensagem={`${encerrou} não acompanha mais você. O que ${elaPronome()} registrou continua aqui, e você pode procurar ${outra()} nutricionista quando quiser.`}
         rotuloConfirmar="Entendi"
         rotuloCancelar="Fechar"
         onCancelar={() => setEncerrou('')}
@@ -715,11 +716,11 @@ function Ficha({
       <Confirmacao
         visivel={perguntando}
         titulo="Encerrar o acompanhamento?"
-        mensagem={`Você deixa de ser acompanhada por ${nutri.nome}. O que ela já registrou continua no seu app, e o seu ciclo deixa de ser compartilhado.
+        mensagem={`${nutri.nome} deixa de acompanhar você. O que ${elaPronome()} já registrou continua no seu app, e o seu ciclo deixa de ser compartilhado.
 
-Você pode procurar outra nutricionista depois.`}
+Você pode procurar {outra()} nutricionista depois.`}
         rotuloConfirmar="Encerrar"
-        rotuloCancelar="Continuar acompanhada"
+        rotuloCancelar="Continuar como está"
         destrutiva
         ocupada={saindo}
         onCancelar={() => {
@@ -745,7 +746,7 @@ Você pode procurar outra nutricionista depois.`}
          *
          * Não há segunda chavinha de "mandar para ela?". Um campo opcional já É
          * a escolha, e um motivo que ninguém lê é desabafo, não retorno. */}
-        <Text style={styles.rotuloMotivo}>Quer dizer o motivo? Ela vai poder ler.</Text>
+        <Text style={styles.rotuloMotivo}>{`Quer dizer o motivo? ${ElaPronome()} vai poder ler.`}</Text>
         <TextInput
           value={motivo}
           onChangeText={setMotivo}
@@ -807,7 +808,7 @@ function Acompanhamento({
         <Text style={styles.apoioItem}>
           {erro
             ? 'Não foi possível carregar agora. Puxe para atualizar mais tarde.'
-            : 'Assim que a sua nutricionista abrir a sua ficha, o que ela registrar aparece aqui.'}
+            : `Assim que ${aSuaNutri()} abrir a sua ficha, o que ${elaPronome()} registrar aparece aqui.`}
         </Text>
       </View>
     )
@@ -844,7 +845,7 @@ function Acompanhamento({
          não conta exames, e inventar "0 exames" para quem tem três seria pior do
          que não dizer número nenhum. A frase convida a abrir, e a tela de dentro
          responde a pergunta. */
-      apoio: 'Os exames que ela importou',
+      apoio: `Os exames que ${elaPronome()} importou`,
       chave: 'exames',
     },
     {
@@ -865,7 +866,7 @@ function Acompanhamento({
       /* Logo abaixo do plano, e é o lugar certo: a pergunta que vem depois de
          "o que eu como" é "como eu faço isso". Sem contagem pelo mesmo motivo
          dos exames — o resumo do banco não conta receitas. */
-      apoio: 'O que ela sugeriu para você cozinhar',
+      apoio: `O que ${elaPronome()} sugeriu para você cozinhar`,
       chave: 'receitas',
     },
   ]
@@ -949,7 +950,7 @@ function Lista({
         <View style={styles.circuloVazio}>
           <Ionicons name="people-outline" size={26} color={paleta().cores.verde} />
         </View>
-        <Text style={styles.tituloVazio}>Nenhuma nutricionista por aqui ainda</Text>
+        <Text style={styles.tituloVazio}>Nenh{uma()} nutricionista por aqui ainda</Text>
         <Text style={styles.textoVazio}>
           Assim que houver profissionais disponíveis, elas aparecem nesta lista.
         </Text>
@@ -966,7 +967,7 @@ function Lista({
       </Text>
       <Text style={styles.explicacaoLista}>
         {podePedir
-          ? 'Toque em quem você quer que acompanhe você e mande um pedido de contato. Se você já está com ela, dê o seu código de vínculo — é com ele que ela puxa a sua conta.'
+          ? 'Toque em quem você quer que acompanhe você e mande um pedido de contato. Se você já está com ${elaPronome()}, dê o seu código de vínculo — é com ele que ela puxa a sua conta.'
           : 'Toque para ver a ficha de cada uma.'}
       </Text>
 

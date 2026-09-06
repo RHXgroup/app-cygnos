@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { carregarAvisos, guardarMarca, type Aviso } from '../lib/avisos'
 import { estilosDe, paleta } from '../lib/tema'
+import { aSuaNutri } from '../lib/tratamentoDaNutri'
 
 /* O que aconteceu do lado da nutricionista.
  *
@@ -195,7 +196,7 @@ function Vazio() {
       </View>
       <Text style={styles.tituloVazio}>Nada de novo por aqui</Text>
       <Text style={styles.textoVazio}>
-        Quando a sua nutricionista marcar uma consulta, responder a um pedido ou publicar um plano,
+        Quando {aSuaNutri()} marcar uma consulta, responder a um pedido ou publicar um plano,
         o aviso aparece nesta tela.
       </Text>
     </View>

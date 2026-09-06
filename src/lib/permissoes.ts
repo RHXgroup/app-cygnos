@@ -13,6 +13,8 @@
  * Android — o app nunca mais pergunta —, e sem o caminho a pessoa conclui que
  * a função está quebrada. */
 
+import { aSuaNutri } from './tratamentoDaNutri.ts'
+
 export const SEM_CAMERA =
   'Preciso de acesso à câmera. Você pode liberar nos ajustes do aparelho.'
 
@@ -44,6 +46,6 @@ export const SEM_NOTIFICACAO =
  * liberar. */
 export const EXPLICACAO_DA_NOTIFICACAO =
   'Os lembretes são avisos deste aparelho, no horário que você escolher. ' +
-  'Nada é enviado para a sua nutricionista e nada aparece para mais ninguém.\n\n' +
+  `Nada é enviado para ${aSuaNutri()} e nada aparece para mais ninguém.\n\n` +
   'O aparelho vai pedir a permissão na tela seguinte. Se você recusar, o ' +
   'Android não pergunta de novo — e aí só dá para liberar pelas configurações.'

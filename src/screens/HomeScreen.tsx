@@ -103,7 +103,8 @@ import {
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
 import { proximoPasso } from '../lib/proximoPasso'
 import { daquiA, janelaAcordada, ritmoDaAgua } from '../lib/ritmoAgua'
-import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
+import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
+import { aSuaNutri, elaPronome } from '../lib/tratamentoDaNutri'
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
 
@@ -1275,7 +1276,7 @@ function BlocoPlano({
       <View style={styles.linhaTituloPlano}>
         <Ionicons name="nutrition-outline" size={16} color={paleta().cores.verde} />
         <Text style={[styles.tituloCartao, styles.tituloPlano]}>
-          {encerrado ? 'Plano encerrado' : daNutri ? 'Plano da sua nutricionista' : 'Plano alimentar'}
+          {encerrado ? 'Plano encerrado' : daNutri ? `Plano d${aSuaNutri()}` : 'Plano alimentar'}
         </Text>
         {!daNutri && <Ionicons name="create-outline" size={17} color={paleta().inkFraco} />}
       </View>
@@ -1302,7 +1303,7 @@ function BlocoPlano({
         /* O plano dela já vem recortado no cardápio de HOJE (ver
            lib/planoDaNutri.ts), então não há "em que dias se repete" para
            mostrar: o que está na tela é o de hoje, e ponto. */
-        <Text style={styles.dataPlano}>O cardápio de hoje, montado por ela</Text>
+        <Text style={styles.dataPlano}>{`O cardápio de hoje, montado por ${elaPronome()}`}</Text>
       ) : (
         <>
           {/* Em que dias este cardápio se repete, e se hoje é um deles. Sem a
@@ -2023,7 +2024,7 @@ function CartaoTreino({
         <Text style={styles.chamadaVazio}>Você treinou hoje?</Text>
         <Text style={styles.planoVazio}>
           Monte a sua rotina da semana e registre o que fez. O app passa a mostrar aqui a sua
-          constância — e a sua nutricionista enxerga o mesmo.
+          constância — e {aSuaNutri()} enxerga o mesmo.
         </Text>
 
         <View style={styles.botaoPlano}>

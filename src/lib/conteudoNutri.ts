@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
-import { dataNumerica, milhar } from './formatar'
+import { dataNumerica, milhar } from './formatar'
+import { aSuaNutri } from './tratamentoDaNutri'
 
 /* ── Por que estas funções LANÇAM, e o que elas lançam ─────────────────────
    Lançar é a forma daqui, e a tela que as consome já trata: ela junta as
@@ -309,7 +310,7 @@ export async function carregarAvaliacoes(): Promise<Avaliacao[]> {
    mostra um dia de cada vez, e para isso precisa deles separados. */
 export async function carregarPlano(): Promise<PlanoDaNutri | null> {
   const { data, error } = await supabase.rpc('app_plano_do_paciente')
-  if (error) throw new Error(falha('Não consegui carregar o plano da sua nutricionista. Verifique a conexão.', error))
+  if (error) throw new Error(falha(`Não consegui carregar o plano d${aSuaNutri()}. Verifique a conexão.`, error))
 
   const linhas = (data ?? []) as any[]
   if (linhas.length === 0) return null

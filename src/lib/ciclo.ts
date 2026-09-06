@@ -2,6 +2,7 @@ import { mostraOCiclo } from './cicloVisivel'
 import { falha } from './erros'
 import { supabase } from './supabase'
 import type { Ciclo, CicloInformado } from './cicloDaPessoa'
+import { aSuaNutri } from './tratamentoDaNutri'
 
 /* O que fala com o banco sobre o ciclo. O que DECIDE mora em `cicloDaPessoa`,
  * que não importa nada de execução e por isso tem teste de verdade — mesmo
@@ -196,7 +197,7 @@ export async function sincronizarCiclo(): Promise<Compartilhamento> {
   try {
     const { data, error } = await supabase.rpc('app_ciclo_sincronizar')
     if (error) {
-      falha('Não consegui atualizar o que a sua nutricionista vê.', error)
+      falha(`Não consegui atualizar o que ${aSuaNutri()} vê.`, error)
       return { compartilhando: false, enviados: 0 }
     }
     return doRetorno(data)

@@ -20,6 +20,7 @@ import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { Botao } from '../components/Botao'
+import { suaNutri } from '../lib/tratamentoDaNutri'
 
 /* Recuperação de senha em três etapas, por código de seis dígitos.
  *
@@ -136,7 +137,7 @@ export function RecuperarSenhaScreen({
          falhado do nosso lado. A mensagem antiga mandava conferir a conexão e,
          quando o problema era nosso, fazia a pessoa procurar defeito no
          aparelho dela. */
-      setErro('Não consegui enviar o código agora. Tente de novo em instantes — se continuar, fale com sua nutricionista.')
+      setErro(`Não consegui enviar o código agora. Tente de novo em instantes — se continuar, fale com ${suaNutri()}.`)
       setCarregando(false)
       return
     }

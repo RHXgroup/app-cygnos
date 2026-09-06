@@ -41,6 +41,7 @@ import { abrirLink } from '../lib/links'
 import { estilosDe, paleta } from '../lib/tema'
 import { SEM_RESPOSTA, linhasDaResposta } from '../lib/respostaDaAnamnese'
 import { Aviso } from '../components/Aviso'
+import { ASuaNutri, aSuaNutri } from '../lib/tratamentoDaNutri'
 
 /* O conteúdo de um item do painel "Meu nutricionista".
  *
@@ -273,7 +274,7 @@ function CartaoExame({ exame }: { exame: Exame }) {
       {exame.temAnalise && (
         <View style={styles.seloAnalise}>
           <Ionicons name="sparkles-outline" size={13} color={paleta().cores.verde} />
-          <Text style={styles.textoSeloAnalise}>Analisado pela sua nutricionista</Text>
+          <Text style={styles.textoSeloAnalise}>Analisado pel{aSuaNutri()}</Text>
         </View>
       )}
     </Pressable>
@@ -352,7 +353,7 @@ function Macro({ rotulo, valor }: { rotulo: string; valor: string }) {
 function Miolo({ dados }: { dados: Dados }) {
   if (dados.chave === 'receitas') {
     if (dados.receitas.length === 0) {
-      return <Aviso texto="A sua nutricionista ainda não publicou nenhuma receita." />
+      return <Aviso texto={`${ASuaNutri()} ainda não publicou nenhuma receita.`} />
     }
     return (
       <>
@@ -364,7 +365,7 @@ function Miolo({ dados }: { dados: Dados }) {
   }
   if (dados.chave === 'exames') {
     if (dados.exames.length === 0) {
-      return <Aviso texto="A sua nutricionista ainda não importou nenhum exame." />
+      return <Aviso texto={`${ASuaNutri()} ainda não importou nenhum exame.`} />
     }
     return (
       <>
@@ -377,7 +378,7 @@ function Miolo({ dados }: { dados: Dados }) {
 
   if (dados.chave === 'anamnese') {
     if (dados.anamneses.length === 0) {
-      return <Aviso texto="A sua nutricionista ainda não preencheu uma anamnese." />
+      return <Aviso texto={`${ASuaNutri()} ainda não preencheu uma anamnese.`} />
     }
     return (
       <>
@@ -403,7 +404,7 @@ function Miolo({ dados }: { dados: Dados }) {
 
   if (dados.chave === 'fotos') {
     if (dados.sessoes.length === 0) {
-      return <Aviso texto="A sua nutricionista ainda não registrou fotos de evolução." />
+      return <Aviso texto={`${ASuaNutri()} ainda não registrou fotos de evolução.`} />
     }
     return <ComparativoFotos sessoes={dados.sessoes} />
   }
@@ -416,7 +417,7 @@ function Miolo({ dados }: { dados: Dados }) {
   }
 
   if (!dados.energetico) {
-    return <Aviso texto="A sua nutricionista ainda não fez esse cálculo." />
+    return <Aviso texto={`${ASuaNutri()} ainda não fez esse cálculo.`} />
   }
   return <CartaoEnergetico energetico={dados.energetico} />
 }

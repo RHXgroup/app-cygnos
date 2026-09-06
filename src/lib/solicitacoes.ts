@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { assinados } from './arquivos'
 import { falha, mensagemDoBanco } from './erros'
+import { ElaPronome, dela, outra, outras } from './tratamentoDaNutri'
 
 /* O primeiro contato, que parte SEMPRE do paciente.
  *
@@ -150,17 +151,17 @@ type Estado = { titulo: string; explicacao: string; icone: 'hourglass-outline' |
 const ESTADOS: Record<StatusSolicitacao, Estado> = {
   enviada: {
     titulo: 'Aguardando resposta',
-    explicacao: 'Ela ainda não respondeu. Enquanto isso, você pode procurar outras.',
+    explicacao: `${ElaPronome()} ainda não respondeu. Enquanto isso, você pode procurar ${outras()}.`,
     icone: 'hourglass-outline',
   },
   aceita: {
     titulo: 'Pedido aceito',
-    explicacao: 'Vocês estão conectados. O acompanhamento dela já aparece no app.',
+    explicacao: `Vocês estão conectados. O acompanhamento ${dela()} já aparece no app.`,
     icone: 'checkmark-circle',
   },
   recusada: {
     titulo: 'Não pôde atender',
-    explicacao: 'Ela não pôde aceitar agora. Você pode procurar outra nutricionista.',
+    explicacao: `${ElaPronome()} não pôde aceitar agora. Você pode procurar ${outra()} nutricionista.`,
     icone: 'close-circle-outline',
   },
   cancelada: {

@@ -38,6 +38,7 @@
  * Roda fora do aparelho, e é exercitado com dados torpes de propósito. */
 
 import { somandoDias } from './datas.ts'
+import { aSuaNutri } from './tratamentoDaNutri.ts'
 
 export type DiaDeSono = { data: string; minutos: number | null }
 export type DiaDeCalorias = { data: string; calorias: number | null; proteinas?: number | null }
@@ -277,7 +278,7 @@ function proteinaNoDeficit(
       `Você perdeu ${kg} kg no período, comendo em média ${Math.round(media(proteinas))} g de ` +
       `proteína por dia — cerca de ${gkg} g por quilo, em ${proteinas.length} dias registrados. ` +
       'Quem emagrece com proteína baixa costuma perder músculo junto com a gordura. ' +
-      'Vale mostrar isso para a sua nutricionista.',
+      `Vale mostrar isso para ${aSuaNutri()}.`,
   }
 }
 

@@ -1,6 +1,7 @@
 import { falha, mensagemDoBanco } from './erros'
 import { supabase } from './supabase'
 import { dataCurta, dataPorExtenso, horaCurta } from './formatar'
+import { ASuaNutri, aSuaNutri, elaPronome } from './tratamentoDaNutri'
 
 /* Pedir consulta à nutricionista.
  *
@@ -225,21 +226,21 @@ const ESTADO_DA_CONSULTA: Record<StatusConsulta, Estado> = {
     curto: 'Pedido',
     icone: 'hourglass-outline',
     explicacao:
-      'A sua nutricionista precisa aceitar o pedido. Enquanto isso não acontece, a consulta ainda não está marcada — vale esperar a confirmação antes de se programar para o dia.',
+      `${ASuaNutri()} precisa aceitar o pedido. Enquanto isso não acontece, a consulta ainda não está marcada — vale esperar a confirmação antes de se programar para o dia.`,
   },
   pendente: {
     titulo: 'Consulta marcada',
     curto: 'Marcada',
     icone: 'checkmark-circle',
     explicacao:
-      'A sua nutricionista agendou esta consulta. Se não puder ir, avise ela com antecedência.',
+      `${ASuaNutri()} agendou esta consulta. Se não puder ir, avise ${elaPronome()} com antecedência.`,
   },
   confirmada: {
     titulo: 'Consulta confirmada',
     curto: 'Confirmada',
     icone: 'checkmark-circle',
     explicacao:
-      'Está tudo certo para este horário. Se não puder ir, avise a sua nutricionista com antecedência.',
+      `Está tudo certo para este horário. Se não puder ir, avise ${aSuaNutri()} com antecedência.`,
   },
 }
 
@@ -259,7 +260,7 @@ const DESCONHECIDO: Estado = {
   curto: 'Consulta',
   icone: 'calendar-outline',
   explicacao:
-    'Não foi possível identificar a situação desta consulta. Confirme com a sua nutricionista antes de se programar para o dia.',
+    `Não foi possível identificar a situação desta consulta. Confirme com ${aSuaNutri()} antes de se programar para o dia.`,
 }
 
 export const estadoDaConsulta = (status: string): Estado =>

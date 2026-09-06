@@ -13,6 +13,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { primeiroNomeDela, type RecadoDaNutri } from '../lib/recadoDaNutri'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
+import { suaNutri } from '../lib/tratamentoDaNutri'
 
 /* O recado da nutricionista, como aviso na tela que abre todo dia.
  *
@@ -189,7 +190,7 @@ export function AvisoDoRecado({
          mesma saída para quem depende dele — sem ela, o aviso seria a única
          coisa da tela que não se consegue dispensar. */
       accessible
-      accessibilityLabel={`Recado de ${primeiroNomeDela(recado.nome)}, sua nutricionista. ${recado.texto}`}
+      accessibilityLabel={`Recado de ${primeiroNomeDela(recado.nome)}, ${suaNutri()}. ${recado.texto}`}
       accessibilityActions={[{ name: 'dispensar', label: 'Dispensar o recado' }]}
       onAccessibilityAction={e => {
         if (e.nativeEvent.actionName === 'dispensar') sair(width)
@@ -204,7 +205,7 @@ export function AvisoDoRecado({
             profissional de saúde é pior do que o aviso ter três linhas. */}
         <Text style={styles.fala}>{recado.texto}</Text>
         <Text style={styles.assinatura}>
-          {primeiroNomeDela(recado.nome)}, sua nutricionista
+          {primeiroNomeDela(recado.nome)}, {suaNutri()}
         </Text>
       </View>
 

@@ -28,6 +28,7 @@ import {
 } from '../lib/agenda'
 import { estilosDe, paleta } from '../lib/tema'
 import { Aviso } from '../components/Aviso'
+import { aSuaNutri, elaPronome } from '../lib/tratamentoDaNutri'
 
 /* Pedir consulta.
  *
@@ -200,7 +201,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
         {destaque ? 'Marcar outro horário' : 'Escolha um horário'}
       </Text>
       <Text style={styles.explicacao}>
-        O horário fica reservado como pedido até a sua nutricionista responder.
+        O horário fica reservado como pedido até {aSuaNutri()} responder.
       </Text>
     </>
   )
@@ -257,7 +258,7 @@ export function AgendarConsultaScreen({ onFechar }: { onFechar: () => void }) {
               um botão que abre a conversa com ela. Dizer o meio sem dizer o
               caminho deixa a pessoa procurando o número sozinha. */}
           {!aguardando && (
-            <Aviso texto="Não há horários livres na agenda da sua nutricionista nas próximas semanas. Você pode falar com ela pela aba Mensagens." />
+            <Aviso texto={`Não há horários livres na agenda d${aSuaNutri()} nas próximas semanas. Você pode falar com ${elaPronome()} pela aba Mensagens.`} />
           )}
         </ScrollView>
       ) : (

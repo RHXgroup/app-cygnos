@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Image,
@@ -55,6 +55,7 @@ import {
   prepararMicrofone,
 } from '../lib/voz'
 import { useDesvioDoTeclado } from '../lib/teclado'
+import { ElaPronome, aSuaNutri, elaPronome, uma } from '../lib/tratamentoDaNutri'
 
 /* A conversa com a nutricionista.
  *
@@ -154,8 +155,30 @@ export function MensagensScreen({
    * descartado assim que a transcrição volta. Aqui o áudio É a mensagem, e
    * quem ouve é a nutricionista. */
   const gravador = useAudioRecorder(OPCOES_DITADO)
-  const estadoDoGravador = useAudioRecorderState(gravador, 200)
   const [gravando, setGravando] = useState(false)
+
+  /* O PISCA-PISCA DA CONVERSA MORAVA NESTA LINHA.
+   *
+   * `useAudioRecorderState` PESQUISA o gravador de tempos em tempos e devolve
+   * estado novo a cada volta — ou seja, re-renderiza a tela inteira nesse
+   * ritmo, gravando ou não. Estava em 200 ms: cinco renderizações por
+   * segundo, para sempre, numa tela que fica aberta em cima de uma conversa.
+   *
+   * Sozinho isso seria só desperdício. O que virou defeito visível foi
+   * o encontro com a foto do balão: `source={{ uri }}` é um objeto NOVO a
+   * cada renderização, e o React Native lê objeto novo como origem
+   * nova — a imagem recarregava cinco vezes por segundo. Relatado assim:
+   * "quando abre a tela de mensagem do app ele tá dando umas piscada toda
+   * hora".
+   *
+   * Dois cortes, e os dois precisam existir: aqui, só pulsa enquanto grava,
+   * que é o único momento em que o cronômetro da tela muda; e o
+   * `Balao` virou memoizado, para a pulsação que sobra não alcançar
+   * as fotos.
+   *
+   * Dois segundos parado, e não zero: o estado ainda precisa acordar quando
+   * a gravação começa. */
+  const estadoDoGravador = useAudioRecorderState(gravador, gravando ? 200 : 2_000)
   const gravandoAgora = useRef(false)
 
   const segundosGravados = Math.floor((estadoDoGravador.durationMillis ?? 0) / 1000)
@@ -273,6 +296,7 @@ export function MensagensScreen({
    * disse na semana passada seria jogado de volta para baixo assim que uma
    * imagem terminasse de carregar. */
   const grudadoNoFim = useRef(true)
+  const ultimaAltura = useRef(0)
 
   /* Para sozinho no limite.
    *
@@ -480,7 +504,7 @@ export function MensagensScreen({
           </View>
           <Text style={styles.tituloVazio}>Ainda não há com quem conversar</Text>
           <Text style={styles.textoVazio}>
-            A conversa começa quando uma nutricionista aceita o seu pedido. Conheça quem está no
+            A conversa começa quando {uma()} nutricionista aceita o seu pedido. Conheça quem está no
             Cygnos e mande o primeiro contato.
           </Text>
 
@@ -545,7 +569,7 @@ export function MensagensScreen({
           <View style={styles.circulo}>
             <Ionicons name="logo-whatsapp" size={26} color={paleta().cores.verde} />
           </View>
-          <Text style={styles.tituloVazio}>Ela prefere conversar pelo WhatsApp</Text>
+          <Text style={styles.tituloVazio}>{`${ElaPronome()} prefere conversar pelo WhatsApp`}</Text>
           <Text style={styles.textoVazio}>
             {nutri.telefone
               ? `Toque no botão acima, ou chame no ${telefoneFormatado(nutri.telefone)}.`
@@ -562,7 +586,22 @@ export function MensagensScreen({
             keyboardShouldPersistTaps="handled"
             /* A cada MEDIDA nova do conteúdo, e não a cada mensagem: é
                isto que alcança a foto que terminou de carregar depois. */
-            onContentSizeChange={() => {
+            /* A JANELA também manda, e não só o conteúdo.
+               `onContentSizeChange` cobre o conteúdo crescendo; este cobre a
+               área visível mudando de tamanho — que é o que
+               acontece quando o teclado abre e quando a tela termina de montar
+               DEPOIS de o conteúdo já ter sido medido. Sem ele, a
+               conversa abria no meio quando a ordem das duas medidas se
+               invertia, e a ordem depende do aparelho. */
+            onLayout={() => {
+              if (grudadoNoFim.current) rolagem.current?.scrollToEnd({ animated: false })
+            }}
+            onContentSizeChange={(_, altura) => {
+              /* Só quando a altura MUDA de verdade. Rolar de dentro deste
+                 tratador provoca outra medida, e sem esta guarda a conversa
+                 entrava num vai-e-vem de saltos — mais pisca-pisca. */
+              if (altura === ultimaAltura.current) return
+              ultimaAltura.current = altura
               if (grudadoNoFim.current) rolagem.current?.scrollToEnd({ animated: false })
             }}
             /* Quem subiu para reler deixa de ser arrastado de volta.
@@ -622,7 +661,7 @@ export function MensagensScreen({
            * sem dado novo. E some assim que ela responde: com a resposta na
            * tela, dizer quanto ela costuma demorar seria ruído. */}
           {esperando && !!ritmo && (
-            <Text style={styles.ritmo}>Ela costuma responder em {ritmo}.</Text>
+            <Text style={styles.ritmo}>{`${ElaPronome()} costuma responder em ${ritmo}.`}</Text>
           )}
 
           {!!erro && <Text style={styles.erro}>{erro}</Text>}
@@ -667,7 +706,7 @@ export function MensagensScreen({
               <Text style={styles.dicaGravando}>
                 {segundosGravados >= LIMITE_DO_RECADO - 10
                   ? `Faltam ${LIMITE_DO_RECADO - segundosGravados}s`
-                  : 'Gravando para a sua nutricionista'}
+                  : `Gravando para ${aSuaNutri()}`}
               </Text>
               <Pressable
                 onPress={pararEAnexar}
@@ -722,7 +761,7 @@ export function MensagensScreen({
                 disabled={subindoAnexo}
                 style={({ pressed }) => [styles.botaoEnviar, pressed && styles.botaoZapPressionado]}
                 accessibilityRole="button"
-                accessibilityLabel="Gravar um áudio para a sua nutricionista"
+                accessibilityLabel={`Gravar um áudio para ${aSuaNutri()}`}
               >
                 {subindoAnexo ? (
                   <ActivityIndicator size="small" color={paleta().cores.branco} />
@@ -811,7 +850,17 @@ function mudouDeDia(anterior: Mensagem | undefined, atual: Mensagem): boolean {
 
 /* Minhas à direita e cheias, as dela à esquerda e claras — o lado diz de quem é
    antes de qualquer palavra ser lida. */
-function Balao({ mensagem }: { mensagem: Mensagem }) {
+/* MEMOIZADO, e o motivo não é desempenho em geral.
+ *
+ * A tela ainda re-renderiza sozinha — o gravador pulsa, o realtime chega,
+ * a aba vira visível. Sem `memo`, cada uma dessas passadas recria o
+ * `source={{ uri }}` da foto, e o React Native recarrega a imagem por causa
+ * disso: era o pisca-pisca relatado.
+ *
+ * A comparação padrão basta porque `mensagem` só troca de
+ * identidade quando a conversa é relida de verdade — e aí recarregar
+ * a foto é o certo. */
+const Balao = memo(function Balao({ mensagem }: { mensagem: Mensagem }) {
   const styles = estilos()
   const minha = ehMinha(mensagem)
 
@@ -865,7 +914,7 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
             source={{ uri: endereco }}
             style={styles.fotoDoBalao}
             onError={() => setFalhou(endereco)}
-            accessibilityLabel={minha ? 'Foto que você mandou' : 'Foto que ela mandou'}
+            accessibilityLabel={minha ? 'Foto que você mandou' : `Foto que ${elaPronome()} mandou`}
           />
         )}
 
@@ -904,7 +953,7 @@ function Balao({ mensagem }: { mensagem: Mensagem }) {
       </View>
     </View>
   )
-}
+})
 
 const estilos = estilosDe(t =>
   StyleSheet.create({

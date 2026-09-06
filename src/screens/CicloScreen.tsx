@@ -50,6 +50,7 @@ import { avisoDaSemana, padraoAntesDaMenstruacao } from '../lib/padraoDoCiclo'
 import { carregarConsumoPeriodo } from '../lib/consumo'
 import { dataISO, milhar } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
+import { ElaPronome, a, aSuaNutri, minha } from '../lib/tratamentoDaNutri'
 
 /* O ciclo menstrual — calendário, e não formulário.
  *
@@ -342,7 +343,7 @@ export function CicloScreen({
           ? 'relação sem proteção'
           : 'relação',
     )
-    if ((d.observacao ?? '').trim()) partes.push('recado para a nutricionista')
+    if ((d.observacao ?? '').trim()) partes.push(`recado para ${a()} nutricionista`)
     if ((d.notaPrivada ?? '').trim()) partes.push('nota sua')
     return partes.join(' · ')
   }
@@ -486,7 +487,7 @@ export function CicloScreen({
             <Text style={styles.textoPromessa}>
               O que você marcar como <Text style={styles.negritoPromessa}>relação</Text> e as{' '}
               <Text style={styles.negritoPromessa}>notas privadas</Text> ficam só neste aparelho.
-              Não vão para a sua nutricionista, e não existe opção para ligar isso.
+              Não vão para {aSuaNutri()}, e não existe opção para ligar isso.
             </Text>
           </View>
 
@@ -676,12 +677,12 @@ export function CicloScreen({
           <View style={styles.cartao}>
             <View style={styles.linhaChave}>
               <View style={styles.textoChave}>
-                <Text style={styles.tituloCartao}>Mostrar para a minha nutricionista</Text>
+                <Text style={styles.tituloCartao}>Mostrar para {a()} {minha()} nutricionista</Text>
                 <Text style={styles.ajuda}>
                   {!temNutricionista
-                    ? 'Você ainda não tem nutricionista vinculada. Quando tiver, esta opção liga.'
+                    ? 'Você ainda não tem nutricionista. Quando tiver, esta opção liga.'
                     : compartilha
-                      ? 'Ela vê as datas, o fluxo, os sintomas, o humor e a vontade de comer. Desligar apaga o que já foi enviado.'
+                      ? `${ElaPronome()} vê as datas, o fluxo, os sintomas, o humor e a vontade de comer. Desligar apaga o que já foi enviado.`
                       : 'Hoje ninguém além de você vê isto.'}
                 </Text>
               </View>
@@ -693,7 +694,7 @@ export function CicloScreen({
                   onValueChange={v => void trocarChave(v)}
                   disabled={!temNutricionista}
                   trackColor={{ false: paleta().cores.trilho, true: paleta().cores.verde }}
-                  accessibilityLabel="Mostrar o meu ciclo para a minha nutricionista"
+                  accessibilityLabel={`Mostrar o meu ciclo para ${a()} ${minha()} nutricionista`}
                 />
               )}
             </View>

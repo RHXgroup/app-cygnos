@@ -5,7 +5,8 @@ import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'
 
 import { enderecoNoDiario } from '../lib/fotoDoDiario'
 import { estilosDe, paleta } from '../lib/tema'
-import { mmss } from '../lib/voz'
+import { mmss } from '../lib/voz'
+import { dela } from '../lib/tratamentoDaNutri'
 
 /* O áudio da conversa, tocado dentro do balão.
  *
@@ -157,7 +158,7 @@ export function AudioDoBalao({ caminho, minha }: { caminho: string; minha: boole
       style={({ pressed }) => [styles.linha, pressed && { opacity: 0.65 }]}
       accessibilityRole="button"
       accessibilityLabel={
-        tocando ? 'Pausar o áudio' : minha ? 'Tocar o áudio que você mandou' : 'Tocar o áudio dela'
+        tocando ? 'Pausar o áudio' : minha ? 'Tocar o áudio que você mandou' : `Tocar o áudio ${dela()}`
       }
     >
       {carregando ? (

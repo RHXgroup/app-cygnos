@@ -51,6 +51,7 @@ import { dataISO } from '../lib/formatar'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
 import { TelaComTeclado } from '../components/TelaComTeclado'
+import { SuaNutri } from '../lib/tratamentoDaNutri'
 
 /* Treino.
  *
@@ -768,7 +769,7 @@ function FotoDoTreino({
           seria explicar um recurso que ninguém pediu. */}
       {caminho && (
         <Text style={styles.ajuda}>
-          Sua nutricionista consegue ver esta foto junto com o treino.
+          {SuaNutri()} consegue ver esta foto junto com o treino.
         </Text>
       )}
     </>

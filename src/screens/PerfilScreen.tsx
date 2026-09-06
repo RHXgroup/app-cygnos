@@ -33,7 +33,8 @@ import {
 import { estilosDe, paleta } from '../lib/tema'
 import { OBJETIVOS, objetivoDe } from '../lib/objetivos'
 import { falha } from '../lib/erros'
-import { useDesvioDoTeclado } from '../lib/teclado'
+import { useDesvioDoTeclado } from '../lib/teclado'
+import { suaNutri } from '../lib/tratamentoDaNutri'
 
 type Conta = {
   nome_completo: string
@@ -654,7 +655,7 @@ export function PerfilScreen({
                   color={paleta().cores.verde}
                 />
                 <Text style={styles.textoAcompanhamento}>
-                  O app ajusta as suas metas por causa desse foco. Vale contar à sua nutricionista —
+                  O app ajusta as suas metas por causa desse foco. Vale contar à {suaNutri()} —
                   quem acompanha isso de perto é ela.
                 </Text>
               </View>

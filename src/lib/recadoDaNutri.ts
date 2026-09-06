@@ -1,5 +1,7 @@
 import { falha } from './erros'
 import { supabase } from './supabase'
+import { definirTratamento } from './tratamentoDaNutri'
+import { SuaNutri, aSuaNutri } from './tratamentoDaNutri'
 
 /* O recado que a nutricionista escreveu para ela.
  *
@@ -42,6 +44,9 @@ export type RecadoDaNutri = {
   /* Caminho da foto no bucket de avatares, ou nulo. Quem transforma em endereço
      assinado é quem desenha — bucket privado, item 7 do AGENTS.md. */
   foto: string | null
+  /* 'ela', 'ele', ou nulo. O aviso assina "Fulano, sua nutricionista" ou "seu
+     nutricionista" a partir daqui. */
+  tratamento: string | null
 }
 
 /* Devolve o recado, ou NULL.
@@ -59,7 +64,7 @@ export async function carregarRecadoDaNutri(): Promise<RecadoDaNutri | null> {
   const { data, error } = await supabase.rpc('app_recado_da_nutri')
 
   if (error) {
-    falha('Não consegui carregar o recado da sua nutricionista.', error)
+    falha(`Não consegui carregar o recado d${aSuaNutri()}.`, error)
     return null
   }
 
@@ -75,12 +80,23 @@ export async function carregarRecadoDaNutri(): Promise<RecadoDaNutri | null> {
   if (__DEV__) console.log('[cygnos] recado cru:', JSON.stringify(data))
 
   const r = data as
-    | { tem?: boolean; texto?: unknown; criado_em?: unknown; de?: { nome?: unknown; foto?: unknown } }
+    | {
+        tem?: boolean
+        texto?: unknown
+        criado_em?: unknown
+        de?: { nome?: unknown; foto?: unknown; tratamento?: unknown }
+      }
     | null
 
   if (!r || r.tem !== true) return null
 
-  const texto = typeof r.texto === 'string' ? r.texto.trim() : ''
+/* O recado também carrega o tratamento, e por isso ele também o
+     ensina: quem abre o app direto na inicial — que é todo mundo —
+     recebe o recado antes de qualquer coisa tocar o catálogo. Sem esta
+     linha, a primeira tela sairia no feminino e se corrigiria depois. */
+  definirTratamento(typeof r.de?.tratamento === 'string' ? r.de.tratamento : null)
+
+    const texto = typeof r.texto === 'string' ? r.texto.trim() : ''
   /* Recado em branco não é recado. Se o outro lado deixar passar um, aqui ele
      morre — um cartão vazio com a foto da nutricionista é pior do que nenhum. */
   if (!texto) return null
@@ -88,8 +104,9 @@ export async function carregarRecadoDaNutri(): Promise<RecadoDaNutri | null> {
   return {
     texto,
     criadoEm: typeof r.criado_em === 'string' ? r.criado_em : '',
-    nome: typeof r.de?.nome === 'string' && r.de.nome.trim() ? r.de.nome.trim() : 'Sua nutricionista',
+    nome: typeof r.de?.nome === 'string' && r.de.nome.trim() ? r.de.nome.trim() : `${SuaNutri()}`,
     foto: typeof r.de?.foto === 'string' && r.de.foto ? r.de.foto : null,
+    tratamento: typeof r.de?.tratamento === 'string' ? r.de.tratamento : null,
   }
 }
 

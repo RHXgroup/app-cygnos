@@ -1,6 +1,7 @@
 import { falha } from './erros'
 import { supabase } from './supabase'
 import { modeloDoBanco, type Modelo, type Respostas } from './questionarioDaNutri'
+import { aSuaNutri } from './tratamentoDaNutri'
 
 /* O questionário pré-consulta, do lado da rede.
  *
@@ -144,7 +145,7 @@ export async function responderQuestionario(
   if (data !== true)
     return {
       erro:
-        'Esse questionário não está mais aceitando respostas. Peça um novo para a sua nutricionista.',
+        `Esse questionário não está mais aceitando respostas. Peça um novo para ${aSuaNutri()}.`,
     }
   return null
 }

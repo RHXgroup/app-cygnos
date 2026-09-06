@@ -68,6 +68,7 @@ import {
   totaisDe as totaisDaTroca,
   type ItemComTrocas,
 } from '../lib/trocaNoPlano'
+import { aSuaNutri } from '../lib/tratamentoDaNutri'
 
 /* O contador de calorias: o que a pessoa comeu hoje, contra a meta dela.
  *
@@ -2153,7 +2154,7 @@ function ConferirDoPlano({
 
         <Text style={styles.tituloFolha}>{rotulo}</Text>
         <Text style={styles.porcaoFolha}>
-          Toque num alimento para ver as trocas que a sua nutricionista deixou.
+          Toque num alimento para ver as trocas que {aSuaNutri()} deixou.
         </Text>
 
         <ScrollView style={styles.listaPlano} bounces={false}>

@@ -27,6 +27,7 @@ import {
   temAlgoAnotado,
 } from '../lib/resumoDoDiaDoCiclo'
 import { TelaComTeclado } from './TelaComTeclado'
+import { aSuaNutri } from '../lib/tratamentoDaNutri'
 
 /* Um dia do calendário do ciclo.
  *
@@ -386,7 +387,7 @@ export function DiaDoCiclo({
                 <View style={styles.textosPrivado}>
                   <Text style={styles.textoTituloPrivado}>Só seu</Text>
                   <Text style={styles.explicacaoPrivado}>
-                    Fica neste aparelho. Não vai para a sua nutricionista, e não existe opção para
+                    Fica neste aparelho. Não vai para {aSuaNutri()}, e não existe opção para
                     ligar isso.
                   </Text>
                 </View>
@@ -498,7 +499,7 @@ export function DiaDoCiclo({
             <View style={styles.nota}>
               <Ionicons name="people-outline" size={14} color={paleta().inkFraco} />
               <Text style={styles.textoNota}>
-                Daqui para baixo vai para a sua nutricionista, se você tiver ligado o
+                Daqui para baixo vai para {aSuaNutri()}, se você tiver ligado o
                 compartilhamento.
               </Text>
             </View>
@@ -563,14 +564,14 @@ export function DiaDoCiclo({
             <TextInput
               value={d.observacao ?? ''}
               onChangeText={t => setD(x => ({ ...x, observacao: t }))}
-              placeholder="Recado para a sua nutricionista"
+              placeholder={`Recado para ${aSuaNutri()}`}
               placeholderTextColor={paleta().inkFraco}
               keyboardAppearance="dark"
               multiline
               textAlignVertical="top"
               maxLength={500}
               style={styles.campo}
-              accessibilityLabel="Recado para a sua nutricionista"
+              accessibilityLabel={`Recado para ${aSuaNutri()}`}
             />
 
 

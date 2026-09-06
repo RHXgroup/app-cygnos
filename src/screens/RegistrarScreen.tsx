@@ -13,6 +13,7 @@ import { TreinoScreen } from './TreinoScreen'
 import { ContarPlanoScreen } from './ContarPlanoScreen'
 import { RefeicoesDoDiaScreen } from './RefeicoesDoDiaScreen'
 import { estilosDe, paleta } from '../lib/tema'
+import { dela } from '../lib/tratamentoDaNutri'
 
 type Opcao = {
   chave: string
@@ -74,7 +75,7 @@ const COMER_MAIS: Opcao[] = [
   { chave: 'buscar', rotulo: 'Buscar na tabela', icone: 'search-outline' },
   { chave: 'repetir', rotulo: 'Repetir', icone: 'repeat-outline', frase: 'O que você já comeu antes' },
   { chave: 'codigo', rotulo: 'Código de barras', icone: 'barcode-outline', frase: 'Produto de mercado' },
-  { chave: 'receitas', rotulo: 'Receitas', icone: 'book-outline', frase: 'As suas e as dela' },
+  { chave: 'receitas', rotulo: 'Receitas', icone: 'book-outline', frase: `As suas e as ${dela()}` },
 ]
 
 /* O que se anota em segundos, quase todo dia. */

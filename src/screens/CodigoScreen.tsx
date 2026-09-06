@@ -15,6 +15,7 @@ import type { Session } from '@supabase/supabase-js'
 import { carregarCatalogo, jaVinculado } from '../lib/nutricionista'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
+import { aCrase, aSuaNutri, dela, elaPronome, suaNutri } from '../lib/tratamentoDaNutri'
 
 /* De quanto em quanto tempo a tela pergunta se o vínculo já aconteceu.
  *
@@ -115,7 +116,7 @@ export function CodigoScreen({
         const r = await carregarCatalogo()
         if (!ativo || minha !== geracao) return
         setVinculada(
-          (r.tipo === 'ok' && r.catalogo.vinculada?.nome) || 'a sua nutricionista',
+          (r.tipo === 'ok' && r.catalogo.vinculada?.nome) || `${aSuaNutri()}`,
         )
         onVinculou()
         return
@@ -194,12 +195,12 @@ export function CodigoScreen({
               certo?". Antes a resposta estava em outra tela, e chegar até ela
               exigia sair desta — que é a que ela foi orientada a abrir. */}
           <Text style={styles.chamada}>
-            {vinculada ? 'Pronto, vocês estão conectadas' : 'Informe este código à sua nutricionista'}
+            {vinculada ? 'Pronto, o vínculo está feito' : `Informe este código ${aCrase()} nutricionista`}
           </Text>
           <Text style={styles.explicacao}>
             {vinculada
-              ? `${vinculada} já pode ver o seu acompanhamento. O plano, as metas e os retornos dela passam a chegar aqui.`
-              : 'É com ele que ela encontra a sua conta e vincula você ao consultório dela. O código é seu e não muda.'}
+              ? `${vinculada} já pode ver o seu acompanhamento. O plano, as metas e os retornos ${dela()} passam a chegar aqui.`
+              : `É com ele que ${elaPronome()} encontra a sua conta e vincula você ao consultório ${dela()}. O código é seu e não muda.`}
           </Text>
 
           {codigo ? (
@@ -229,7 +230,7 @@ export function CodigoScreen({
                   vai exigir ditá-lo de novo. */}
               {!vinculada && (
                 <Text style={styles.aviso}>
-                  Só compartilhe com a sua nutricionista. Com este código ela passa a ver o seu
+                  Só compartilhe com {aSuaNutri()}. Com este código {elaPronome()} passa a ver o seu
                   acompanhamento.
                 </Text>
               )}
