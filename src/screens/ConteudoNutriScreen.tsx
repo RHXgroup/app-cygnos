@@ -39,6 +39,7 @@ import { ComparativoFotos } from '../components/ComparativoFotos'
 import { decimal, milhar } from '../lib/formatar'
 import { abrirLink } from '../lib/links'
 import { estilosDe, paleta } from '../lib/tema'
+import { SEM_RESPOSTA, linhasDaResposta } from '../lib/respostaDaAnamnese'
 import { Aviso } from '../components/Aviso'
 
 /* O conteúdo de um item do painel "Meu nutricionista".
@@ -451,46 +452,47 @@ function CartaoAnamnese({ anamnese }: { anamnese: Anamnese }) {
 
 function CampoLido({ campo }: { campo: CampoAnamnese }) {
   const styles = estilos()
-  /* O valor vem de jsonb preenchido por outro sistema: pode ser texto, booleano
-     ou uma lista de linhas (o "grupo repetível" do web, como a tabela de
-     exercícios praticados). Qualquer outra coisa vira texto — melhor mostrar o
-     bruto do que esconder que existe resposta ali. */
-  if (Array.isArray(campo.valor)) {
-    return (
-      <View style={styles.campo}>
-        <Text style={styles.rotuloCampo}>{campo.label}</Text>
-        {campo.valor.length === 0 ? (
-          <Text style={styles.valorCampo}>—</Text>
-        ) : (
-          campo.valor.map((linha, i) => (
-            <View key={i} style={styles.linhaGrupo}>
-              {Object.entries(linha ?? {}).map(([chave, valor]) => (
-                <Text key={chave} style={styles.valorCampo}>
-                  {chave}: {textoDe(valor)}
-                </Text>
-              ))}
-            </View>
-          ))
-        )}
-      </View>
-    )
-  }
+  /* ── O VALOR VIRA TEXTO, E NUNCA JSON ────────────────────────────────────
+   *
+   * Aqui havia `JSON.stringify` para qualquer objeto, com um comentário
+   * defendendo a escolha: "melhor mostrar o bruto do que esconder que existe
+   * resposta ali". Fazia sentido quando ninguém sabia a forma dos valores.
+   *
+   * Fotografado na tela da paciente:
+   *
+   *   Escala de Bristol
+   *   {"tipo":"Tipo 3 — Como salsicha, com rachaduras na superfície (normal)"}
+   *
+   *   Pele, cabelo, unha, boca e olhos
+   *   {"Boca":["Normal"],"Pele":["Normal"],"Unha":["Quebradiça / fina"]…}
+   *
+   * E o ramo de lista tinha o segundo defeito, que ninguém tinha relatado: ele
+   * fazia `Object.entries(linha)` supondo lista de OBJETOS. A múltipla escolha
+   * guarda lista de TEXTOS, e `Object.entries('Gases')` devolve
+   * `[['0','G'],['1','a']…]` — uma letra por linha.
+   *
+   * As duas decisões saíram daqui para `lib/respostaDaAnamnese`, que é pura e
+   * tem os formatos reais do banco em caso de teste. O sistema tem outros dois
+   * desenhadores dos mesmos dados; este era o terceiro, e o único que mostrava
+   * o bruto. */
+  const linhas = linhasDaResposta(campo.valor)
 
   return (
     <View style={styles.campo}>
       <Text style={styles.rotuloCampo}>{campo.label}</Text>
-      <Text style={styles.valorCampo}>{textoDe(campo.valor)}</Text>
+      {linhas.length === 0 ? (
+        <Text style={styles.valorCampo}>{SEM_RESPOSTA}</Text>
+      ) : (
+        linhas.map((linha, i) => (
+          <Text key={i} style={styles.valorCampo}>
+            {linha}
+          </Text>
+        ))
+      )}
     </View>
   )
 }
 
-const textoDe = (v: unknown): string => {
-  if (v === true) return 'Sim'
-  if (v === false) return 'Não'
-  if (v == null || v === '') return '—'
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
-}
 
 /* ── Antropometria ─────────────────────────────────────────────────────────*/
 
