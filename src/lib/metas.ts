@@ -393,10 +393,51 @@ export async function salvarObjetivoPeso(
     .update({ objetivo_peso: objetivo })
     .eq('id', contaId)
 
-  if (!error) return null
-  return {
-    erro: falha('Não consegui salvar o seu foco de peso agora. Verifique a conexão.', error),
+  if (error) {
+    return {
+      erro: falha('Não consegui salvar o seu foco de peso agora. Verifique a conexão.', error),
+    }
   }
+
+  /* ── A NUTRICIONISTA PRECISA SABER ─────────────────────────────────────
+   *
+   * Levantado por quem usa: "os objetivos, se troca, como comunica a nutri?
+   * senão ela troca aqui para cuidar do coração e a ficha dela ainda está
+   * perder peso — não faz muito sentido".
+   *
+   * Não faz mesmo, e é a classe de defeito mais cara que este projeto tem:
+   * dois lados com planos diferentes, e nenhum dos dois sabendo. Foi assim a
+   * trava do texto da conversa (a função autorizava e a tabela recusava) e as
+   * duas tabelas de ajuste calórico. Aqui a consequência é clínica: ela pode
+   * prescrever déficit para quem passou a cuidar do colesterol.
+   *
+   * O aviso vai como MENSAGEM na conversa, e não como notificação nova: o
+   * caminho já existe, ela já lê aquilo todo dia, e não exige coluna nem tela
+   * do lado dela. E é escrito na primeira pessoa porque é verdade — quem
+   * mudou foi a pessoa, no app dela.
+   *
+   * ── E ele NUNCA derruba o salvamento ─────────────────────────────────
+   * Item 11 do AGENTS.md. O foco já está gravado quando esta linha roda; se o
+   * aviso falhar — sem sinal, sem vínculo, servidor fora —, o que a pessoa
+   * pediu continua feito. Uma marca no console e segue.
+   *
+   * Sem nutricionista vinculada, `app_enviar_mensagem` recusa com a frase dela
+   * ("Você ainda não tem uma nutricionista para conversar."), e isso também não
+   * é erro: é o caso comum de quem usa o app sozinho. */
+  const nome = nomeDoObjetivo(objetivo)
+  const texto =
+    objetivo === null
+      ? 'Tirei o meu objetivo aqui no app.'
+      : `Mudei o meu objetivo aqui no app para: ${nome}.`
+
+  try {
+    const { error: erroAviso } = await supabase.rpc('app_enviar_mensagem', { p_texto: texto })
+    if (erroAviso) console.log('[cygnos] objetivo mudou, aviso não foi:', erroAviso.message)
+  } catch (e) {
+    console.log('[cygnos] objetivo mudou, aviso não foi:', e)
+  }
+
+  return null
 }
 
 /* O movimento do peso vai no sentido que a pessoa pediu?
