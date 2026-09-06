@@ -2,6 +2,11 @@ import { supabase } from './supabase'
 import { falha } from './erros'
 import { dataNumerica, milhar } from './formatar'
 import { aSuaNutri } from './tratamentoDaNutri'
+import type { SecoesVisiveis } from './secoesDoApp'
+
+/* A tela consome tudo de `conteudoNutri`; reexporto a decisão pura pra não
+   precisar aprender que ela mora noutro arquivo. O teste importa de lá direto. */
+export { secaoVisivel, type SecoesVisiveis } from './secoesDoApp'
 
 /* ── Por que estas funções LANÇAM, e o que elas lançam ─────────────────────
    Lançar é a forma daqui, e a tela que as consome já trata: ela junta as
@@ -156,20 +161,10 @@ export async function carregarConteudo(): Promise<ResultadoConteudo> {
  * Falha aqui NÃO esconde nada: mapa vazio quer dizer "mostra tudo", como era
  * antes de existir o interruptor. Sumir com uma seção por causa de um erro de
  * rede seria a nutricionista publicar e o paciente não ver, sem ninguém ter
- * desligado — o oposto do erro seguro. */
-
-/* As chaves do app e as do sistema web nasceram separadas; este é o de-para.
-   `energetico` e `receitas` não têm interruptor no sistema — sempre visíveis. */
-const SECAO_NO_SERVIDOR: Record<string, string> = {
-  anamnese: 'anamnese_geral',
-  antropometria: 'antropometria_geral',
-  fotos: 'evolucao_fotografica',
-  exames: 'exames_laboratoriais',
-  plano: 'planejamento_alimentar',
-}
-
-export type SecoesVisiveis = Record<string, boolean>
-
+ * desligado — o oposto do erro seguro.
+ *
+ * A DECISÃO ("esta chave aparece?") mora em `secoesDoApp.ts`, sem supabase, pra
+ * ser testável. Aqui fica só a BUSCA, que precisa do banco. */
 export async function carregarSecoesVisiveis(): Promise<SecoesVisiveis> {
   const { data, error } = await supabase.rpc('app_secoes_do_paciente')
   if (error || !data || typeof data !== 'object') {
@@ -179,14 +174,6 @@ export async function carregarSecoesVisiveis(): Promise<SecoesVisiveis> {
     return {}
   }
   return data as SecoesVisiveis
-}
-
-/* Uma seção do app aparece A MENOS QUE o sistema a tenha desligado. Chave sem
-   interruptor (energetico, receitas) e mapa vazio (erro/carregando) contam como
-   visível: o default é mostrar, e o silêncio nunca esconde. */
-export function secaoVisivel(chave: string, visiveis: SecoesVisiveis): boolean {
-  const k = SECAO_NO_SERVIDOR[chave]
-  return !k || visiveis[k] !== false
 }
 
 /* ── O conteúdo de cada item ───────────────────────────────────────────────
