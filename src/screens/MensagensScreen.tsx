@@ -191,6 +191,25 @@ export function MensagensScreen({
 
   const rolagem = useRef<ScrollView>(null)
 
+  /* ── FAIXA DE MEDIDA, TEMPORÁRIA ───────────────────
+   *
+   * Duas queixas sobreviveram a duas correções cada: a conversa abre no
+   * meio, e a tela pisca. Armadilha 2 do AGENTS.md, que custou seis rodadas
+   * numa tela só: quando a segunda tentativa falha, PARE de trocar de
+   * mecanismo e imprima os números na tela. Uma foto encerrou o que seis
+   * deduções não encerraram.
+   *
+   * `r` sobe a cada renderização: se ele correr sozinho com o dedo
+   * parado, o pisca-pisca é re-renderização. `fim` é a distância
+   * do fim da conversa: se ficar grande depois de abrir, a rolagem não
+   * chegou lá.
+   *
+   * Sai daqui assim que a causa aparecer. */
+  const renders = useRef(0)
+  renders.current += 1
+  const [medida, setMedida] = useState({ c: 0, l: 0, y: 0 })
+
+
   /* Ele mandou a última e ainda não teve resposta? É o único momento em que a
      frase do ritmo ajuda. */
   const esperando = mensagens.length > 0 && ehMinha(mensagens[mensagens.length - 1])
@@ -530,6 +549,21 @@ export function MensagensScreen({
       style={[styles.tela, { paddingTop: top + 8 }]}
       onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}
     >
+      {__DEV__ && (
+        <Text
+          style={{
+            fontSize: 10,
+            color: paleta().cores.ink,
+            backgroundColor: paleta().cores.verdeMenta,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+          }}
+        >
+          {`r:${renders.current} c:${medida.c} l:${medida.l} y:${medida.y} fim:${
+            medida.c - medida.y - medida.l
+          } g:${grudadoNoFim.current ? 1 : 0} n:${mensagens.length}`}
+        </Text>
+      )}
       <View style={styles.cabecalho}>
         <Pressable
           onPress={onFechar}
@@ -611,6 +645,7 @@ export function MensagensScreen({
             onScroll={e => {
               const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
               const daBase = contentSize.height - contentOffset.y - layoutMeasurement.height
+              if (__DEV__) setMedida({ c: Math.round(contentSize.height), l: Math.round(layoutMeasurement.height), y: Math.round(contentOffset.y) })
               grudadoNoFim.current = daBase < 120
             }}
             /* Puxar para tentar de novo é o gesto óbvio de quem viu a conversa
