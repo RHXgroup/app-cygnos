@@ -100,7 +100,21 @@ export const SILENCIO_QUE_FECHA_MS = 700
    espera. Menos que isso comecaria a partir frase no meio, que e o erro caro do
    outro lado -- e o caso "nao corta no meio" continua no teste para provar que
    nao. */
-export const MAXIMO_DO_TRECHO_MS = 4_000
+/* ── E depois virou 2,8, pela mesma razão de novo ───────────
+   Relatado: "ele ta demorandoooo muitoo muito para iniciar, repeti umas 4
+   vezes". Quatro segundos de teto mais a rede e o Whisper dão seis ou sete
+   por tentativa — e quem espera sete segundos sem resposta repete, o que
+   piora tudo: cada repetição vira outro trecho para transcrever.
+
+   "Cygnos, terminei a série" dito devagar dura menos de dois segundos. 2,8
+   cobre isso com folga e devolve mais de um segundo por comando.
+
+   Este número é CALIBRAÇÃO, e não dedução: se começar a
+   cortar comando no meio — o sintoma é o app entender metade da frase,
+   ou não entender nada de uma frase inteira — ele sobe de volta. O caso
+   "não corta no meio" continua no teste para essa fronteira não ser
+   cruzada sem alguem ver. */
+export const MAXIMO_DO_TRECHO_MS = 2_800
 
 export type Estado = {
   /* Se estamos dentro de um trecho de fala. */

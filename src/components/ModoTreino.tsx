@@ -322,6 +322,8 @@ export function ModoTreino({
      sem uma ida à rede: são exatamente as séries que acabaram de ser gravadas. */
   const [feitasNaSessao, setFeitasNaSessao] = useState<SerieFeita[]>([])
   const [terminando, setTerminando] = useState(false)
+  /* Quando a VOZ pediu para terminar e ainda falta confirmar. Ver `obedecer`. */
+  const [perguntandoSeTermina, setPerguntandoSeTermina] = useState(false)
 
   useEffect(() => {
     if (!visivel) return
@@ -1096,9 +1098,12 @@ export function ModoTreino({
       return
     }
     setRespostaDaVoz(RESPOSTA[c])
-    /* Responde FALANDO antes de agir: quem está de mãos ocupadas precisa saber
-       que foi ouvido, e o "três, dois, um" que vem depois já é a ação. */
-    dizer(RESPOSTA[c])
+    /* Responde FALANDO antes de agir: quem está de mãos ocupadas precisa
+       saber que foi ouvido, e o "três, dois, um" que vem depois já é a
+       ação.
+       `terminar` fica de fora porque ele fala a pergunta dele mesmo, e duas
+       falas em cima uma da outra não se entendem. */
+    if (c !== 'terminar') dizer(RESPOSTA[c])
     obedecer(c)
   }
 
@@ -1138,7 +1143,33 @@ export function ModoTreino({
     else if (c === 'mais_descanso') ajustarDescanso(15)
     else if (c === 'menos_descanso') ajustarDescanso(-15)
     else if (c === 'pular_descanso') setFimDoDescanso(Date.now())
-    else if (c === 'terminar') terminar()
+    /* ── TERMINAR PELA VOZ PERGUNTA ANTES ─────────────────
+     *
+     * É o único comando que ACABA a sessão: apaga o rascunho e pula para
+     * o resumo. Todos os outros custam um toque para desfazer; este custa o
+     * treino.
+     *
+     * E ele já disparou sozinho duas vezes. A primeira: "eu não sei o que
+     * eu falei, ele concluiu meu treino". A segunda, hoje: "do nada ele
+     * concluiu sozinho como treino feito e eu nem falei nada".
+     *
+     * A defesa deste arquivo sempre foi reduzir o que PODE acontecer quando o
+     * reconhecimento erra, e não tentar acertar mais — reconhecimento de
+     * fala erra e vai continuar errando, ainda mais numa academia com gente
+     * conversando ao lado. Filtrar por momento não basta aqui, porque
+     * `terminar` cabe em quase todos eles: é legítimo terminar descansando,
+     * parado, ou entre exercícios.
+     *
+     * Então a voz PEDE, e quem termina é o toque. Um erro passa a custar
+     * uma pergunta na tela em vez da sessão inteira.
+     *
+     * Pelo botão continua direto: ali quem pediu foi um dedo num alvo
+     * rótulado, e não um microfone numa academia. */
+    else if (c === 'terminar') {
+      setPerguntandoSeTermina(true)
+      setRespostaDaVoz('')
+      dizer('Terminar o treino? Confirme na tela.')
+    }
   }
 
   /* COMEÇAR ABRE O TREINO E JÁ VAI PARA A PRIMEIRA SÉRIE.
@@ -1720,6 +1751,35 @@ export function ModoTreino({
                       É o pior formato de falha: parece que o toque não pegou. */}
                   {!!respostaDaVoz && <Text style={styles.respostaVoz}>{respostaDaVoz}</Text>}
 
+                  {/* A PERGUNTA de terminar, e ela só existe para a voz.
+                      Ver `obedecer`: pelo botão termina direto, porque ali
+                      quem pediu foi um dedo num alvo rótulado.
+                      "Continuar" é o primeiro e o maior de propósito: quem
+                      chegou aqui por engano é a maioria, e o gesto barato tem
+                      de ser o de voltar ao treino. */}
+                  {perguntandoSeTermina && (
+                    <View style={styles.perguntaTerminar}>
+                      <Text style={styles.textoPerguntaTerminar}>Terminar o treino?</Text>
+                      <Pressable
+                        onPress={() => setPerguntandoSeTermina(false)}
+                        style={({ pressed }) => [styles.botaoGrande, pressed && styles.pressionado]}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.textoBotaoGrande}>Continuar treinando</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          setPerguntandoSeTermina(false)
+                          terminar()
+                        }}
+                        style={styles.botaoPular}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.textoPular}>Sim, terminar</Text>
+                      </Pressable>
+                    </View>
+                  )}
+
                   {/* ── OS NÚMEROS NA TELA ────────────────────────────────
                       A escuta falha em silêncio: sem medidor, nada acontece e
                       a tela continua dizendo "Ouvindo". Duas rodadas de teste
@@ -1997,6 +2057,13 @@ const estilos = estilosDe(t =>
     pressionado: { opacity: 0.85 },
     textoBotaoGrande: { color: t.cores.branco, fontSize: 20, fontWeight: '800' },
 
+    perguntaTerminar: { gap: 8, marginTop: 12, alignItems: 'stretch' },
+    textoPerguntaTerminar: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: t.cores.ink,
+      textAlign: 'center',
+    },
     botaoPular: { paddingVertical: 12 },
     textoPular: { fontSize: 14, fontWeight: '700', color: t.inkMedio },
 

@@ -90,14 +90,30 @@ function correr(leituras: [number | null, number][], inicial: Estado = ESTADO_IN
   for (let i = 0; i < 200; i++) leituras.push([-20, 100])
   const { decisoes } = correr(leituras)
   ok('corta no teto', decisoes.includes('cortar_no_teto'), decisoes.slice(0, 4).join(','))
-  /* 6 s, e nao 12. Quem recebe o corte descarta acima de 5 s
-     (COMANDO_LONGO_DEMAIS_S, em ModoTreino), entao o teto NUNCA produz um
-     trecho aproveitavel -- o que ele produz e a recalibragem do piso. Doze
-     segundos so dobravam a espera ate a escuta voltar a funcionar. */
+  /* O teto e CALIBRACAO, e este caso existe para ele nao ser mexido de
+     graca -- e nao para provar que 2800 e o numero certo, que nenhum teste
+     sabe.
+
+     Ele foi 12, virou 6, virou 4 e agora e 2,8, sempre pelo mesmo motivo: no
+     ambiente de quem usa TODO trecho fecha no teto, porque o nivel nunca fica
+     abaixo do limiar por 700 ms seguidos. Entao o teto nao e o caso raro que
+     ele foi desenhado para ser -- ele e a espera de cada comando.
+
+     A fronteira de baixo: precisa caber "Cygnos, terminei a serie" dito
+     devagar, que da menos de dois segundos. Se um dia comecar a cortar comando
+     no meio, sobe.
+
+     A fronteira de cima: quem recebe descarta acima de COMANDO_LONGO_DEMAIS_S
+     (7 s, em ModoTreino). Acima disso o teto so produz trecho jogado fora. */
   ok(
-    'o teto e de 4 segundos',
-    MAXIMO_DO_TRECHO_MS === 4_000 && SILENCIO_QUE_FECHA_MS === 700 && MINIMO_DE_FALA_MS === 350,
+    'o teto cabe num comando falado devagar',
+    MAXIMO_DO_TRECHO_MS >= 2_500 && MAXIMO_DO_TRECHO_MS <= 5_000,
     String(MAXIMO_DO_TRECHO_MS),
+  )
+  ok(
+    'e o silencio e o minimo de fala continuam onde estavam',
+    SILENCIO_QUE_FECHA_MS === 700 && MINIMO_DE_FALA_MS === 350,
+    SILENCIO_QUE_FECHA_MS + '/' + MINIMO_DE_FALA_MS,
   )
 }
 
