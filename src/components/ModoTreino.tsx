@@ -871,7 +871,7 @@ export function ModoTreino({
         return
       }
 
-      void recortarEEntender(duracao)
+      void recortarVivo.current(duracao)
     }, 100)
 
     return () => {
@@ -918,6 +918,32 @@ export function ModoTreino({
          para — que é o sinal que o número na tela existe para dar. */
     }
   }
+
+/* ── O ESTADO CONGELADO, e o pior defeito que a voz teve ─────────
+   *
+   * A escuta é montada num efeito com `[vozLigada, visivel]` na lista. Ela
+   * fica de pé enquanto o treino inteiro acontece — e junto com ela ficam
+   * de pé as FUNÇÕES daquela renderização, com o estado daquele
+   * instante dentro.
+   *
+   * O instante é "acabei de ligar a voz": treino não começou, nenhuma
+   * série aberta. E `cabeAgora` conferia o comando contra ESSE momento, para
+   * sempre. "Cygnos, terminei" era ouvido, transcrito certo, reconhecido como
+   * `fiz` — e recusado, porque naquele momento congelado não havia série
+   * para contar. A recusa é silenciosa de propósito, então não sobrava
+   * nem sintoma.
+   *
+   * Relatado assim: "ele não coloca que terminou (…) ele ouviu certo, só
+   * que ele não coloca que terminei a série".
+   *
+   * O ref carrega a versão de AGORA desta função, e com ela toda a
+   * cadeia de baixo — `responder`, `cabeAgora`, `obedecer`, `comecar`,
+   * `fizASerie`. Uma linha, porque o problema nunca foi de uma função só:
+   * era da árvore inteira estar velha.
+   *
+   * O arquivo já usa este padrão em `vozLigadaVivo`, `ouvindoAgora` e
+   * `entendendoVivo`. Faltou justamente no caminho que DECIDE. */
+  const recortarVivo = useRef<(duracao: number) => void>(() => {})
 
   async function recortarEEntender(duracao: number) {
     /* Pela REFERÊNCIA, e não pelo estado: quem chama é o intervalo, e lá o
@@ -973,6 +999,10 @@ export function ModoTreino({
     entendendoVivo.current = false
     setEntendendo(false)
   }
+
+  /* A cada renderização, e não num efeito: tem de estar fresco ANTES do
+     próximo trecho de áudio fechar, e um efeito rodaria depois. */
+  recortarVivo.current = recortarEEntender
 
 
   /* O comando faz o MESMO que o botão faria — chama a mesma função.
