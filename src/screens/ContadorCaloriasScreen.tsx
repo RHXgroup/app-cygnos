@@ -1606,7 +1606,7 @@ function ConfirmarFoto({
   onDescartar: () => void
 }) {
   const styles = estilos()
-  const { bottom } = useSafeAreaInsets()
+  const { bottom, top } = useSafeAreaInsets()
 
   /* A capa é pequena por necessidade — a lista precisa do espaço. Mas quem
      confere "isso aí é frango ou peixe?" precisa VER, e 132 pontos de altura
@@ -1683,7 +1683,17 @@ function ConfirmarFoto({
          * luz de janela. Sem ele o texto some em metade dos pratos. */}
         {temCapa ? (
           <Pressable
-            style={styles.capaFolha}
+            /* A capa cresce o tanto da barra de status e perde o recuo de
+               cima: com a folha ocupando a tela inteira, a foto encosta no
+               pixel zero e o relógio do aparelho fica SOBRE ela, que é o
+               que faz a imagem parecer a tela, e não um cartão dentro
+               dela. A altura soma o inset para o número de kcal, que mora
+               na base da capa, continuar na mesma distância de sempre do
+               conteúdo de baixo. */
+            style={[
+              styles.capaFolha,
+              { height: 132 + top, marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
+            ]}
             onPress={() => setFotoAberta(true)}
             accessibilityRole="imagebutton"
             accessibilityLabel="Ver a foto inteira"
@@ -1721,7 +1731,9 @@ function ConfirmarFoto({
                 <Text style={styles.capaUnidade}>kcal</Text>
               </View>
             </View>
-            <View style={styles.puxadorSobreFoto} />
+            {/* Desce o tanto da barra de status: em cima dela o puxador
+                fica atrás do relógio. */}
+            <View style={[styles.puxadorSobreFoto, { top: 10 + top }]} />
             {/* A lupa diz que dá para tocar. Sem ela a capa parece decoração,
                 e ninguém toca em decoração. */}
             <View style={styles.lupaDaCapa}>
@@ -3069,8 +3081,38 @@ const estilos = estilosDe(t =>
    *
    * Os 6% que sobram não são descuido: são onde se toca para fechar, e o único
    * sinal de que existe tela atrás. Tela cheia perderia esse sinal. */
+  /* A FOLHA DA FOTO OCUPA A TELA INTEIRA.
+   *
+   * Ela já foi 88% de teto (e o teto não fazia nada, porque o
+   * conteúdo parava antes), depois 94% de altura garantida. Os 6% que
+   * sobravam existiam por um motivo bom: mostrar que há tela atrás, que
+   * é o sinal de que dá para fechar arrastando.
+   *
+   * Só que o que aparecia naqueles 6% era a barra do Diário escurecida
+   * — e a foto do prato, que é a coisa mais bonita e mais útil
+   * desta tela, nascia embaixo de uma tira suja de outra tela. Relatado duas
+   * vezes, e as duas com a mesma palavra: o fundo.
+   *
+   * Então vai inteira, e a foto encosta no alto. O sinal de "dá para
+   * fechar" não se perde: o puxador continua lá, agora por cima da
+   * própria imagem, e os botões de Descartar e Registrar estão
+   * embaixo o tempo todo.
+   *
+   * `top: 0` junto com o `bottom: 0` de `folha`, e não `height: 100%`:
+   * assim a folha se estica entre as duas bordas sem depender de a mãe ter
+   * altura conhecida. */
   folhaAlta: {
-    height: '94%',
+    top: 0,
+    /* Nada de cantos arredondados em cima quando ela ocupa tudo: canto
+       redondo contra a borda do aparelho deixa duas frestas escuras nos
+       ombros da tela, que é exatamente o tipo de sujeira que esta
+       mudança veio tirar. */
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    /* O recuo de cima deixa de existir: a foto começa no pixel zero. Quem
+       precisa de folga até a barra de status é o conteúdo, e ele já
+       tem a sua. */
+    paddingTop: 0,
   },
   fundoFolha: {
     position: 'absolute',
