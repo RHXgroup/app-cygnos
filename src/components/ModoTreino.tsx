@@ -635,6 +635,24 @@ export function ModoTreino({
    *
    * `__DEV__` porque é diagnóstico: no build ele não existe. */
   const [ultimoOuvido, setUltimoOuvido] = useState('')
+
+  /* ── ESTA CAPTURANDO A SUA FALA AGORA? ─────────────────────────────────
+   *
+   * Descrito por quem usa: "nao sei quando falar; ele fica contando uns dB, ai
+   * aparece SEM MEDIDOR, e nessa hora ele comeca a ler".
+   *
+   * A tela dizia "Ouvindo" o tempo todo, de proposito -- alternar a cada trecho
+   * fazia o botao piscar sem parar, porque o ciclo de parar-mandar-voltar era
+   * rapido e disparava toda vez que alguem falava perto.
+   *
+   * O que mudou desde entao: o trecho agora dura ate 4 segundos e o buffer e
+   * descartado quando o app fala, entao as transicoes ficaram raras o bastante
+   * para valer a pena mostrar. E o silencio de informacao custava mais que o
+   * pisca-pisca: sem saber se esta capturando, a pessoa fala no vazio.
+   *
+   * So na TRANSICAO, e nao a cada leitura: o intervalo roda dez vezes por
+   * segundo, e chamar setState em todas seria redesenhar a tela a toa. */
+  const [capturando, setCapturando] = useState(false)
   const ouvindoAgora = useRef(false)
 
   /* Solta o microfone ao sair, mesmo no meio. Recurso nativo aberto mantém o
@@ -785,12 +803,14 @@ export function ModoTreino({
 
       if (r.decisao === 'comecou') {
         inicioDoTrecho = agora
+        setCapturando(true)
         console.log('[cygnos] escuta: fala COMEÇOU')
         return
       }
       if (r.decisao !== 'terminou' && r.decisao !== 'cortar_no_teto') return
 
       const duracao = (agora - inicioDoTrecho) / 1000
+      setCapturando(false)
       console.log('[cygnos] escuta: fala ACABOU com', duracao.toFixed(1), 's')
       /* Longo demais não é comando. Cortar aqui, ANTES de mandar, é o que
          segura o custo numa academia com gente conversando perto. */
@@ -1150,37 +1170,58 @@ export function ModoTreino({
               que ele é — e some da área de ação quando está desligado.
               Desligado por padrão: reconhecimento de fala erra, e um treino
               conduzido por engano é pior do que um toque a mais. */}
-          {/* Um toque roda os três. O rótulo diz o modo ATUAL, e não o
-              próximo: interruptor que mostra para onde vai obriga a pessoa a
-              deduzir onde está. */}
-          <Pressable
-            onPress={() => {
-              setModo(m => (m === 'manual' ? 'voz' : m === 'voz' ? 'mudo' : 'manual'))
-              setRespostaDaVoz('')
-            }}
-            style={({ pressed }) => [
-              styles.chaveVoz,
-              modo === 'voz' && styles.chaveVozLigada,
-              pressed && { opacity: 0.7 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={
-              modo === 'voz'
-                ? 'Conduzindo por voz. Tocar para passar a silencioso.'
-                : modo === 'manual'
-                  ? 'Conduzindo na mão, com avisos falados. Tocar para usar a voz.'
-                  : 'Silencioso. Tocar para voltar aos avisos falados.'
-            }
-          >
-            <Ionicons
-              name={modo === 'voz' ? 'mic' : modo === 'manual' ? 'volume-medium' : 'volume-mute'}
-              size={17}
-              color={modo === 'voz' ? paleta().cores.branco : paleta().inkMedio}
-            />
-            <Text style={[styles.textoChaveVoz, modo === 'voz' && styles.textoChaveVozLigada]}>
-              {modo === 'voz' ? 'Voz' : modo === 'manual' ? 'Mão' : 'Mudo'}
-            </Text>
-          </Pressable>
+          {/* ── OS TRÊS MODOS À VISTA, e não um botão que cicla ───────────
+           *
+           * Era um botão só, que rodava manual → voz → mudo a cada toque, com
+           * o rótulo dizendo o modo ATUAL. Isso resolvia "onde estou" e deixava
+           * de fora "o que existe" — descrito por quem usa: "tinha que melhorar
+           * para saber quais opções eu tenho; hoje só vou saber se eu clicar
+           * lá em cima, senão não vou saber".
+           *
+           * Três chips lado a lado custam a mesma largura e respondem as duas
+           * perguntas de uma vez. E cada um vira um toque direto: sair de mudo
+           * para voz não exige mais passar por manual. */}
+          <View style={styles.chavesDeModo}>
+            {([
+              { chave: 'voz', rotulo: 'Voz', icone: 'mic' },
+              { chave: 'manual', rotulo: 'Mão', icone: 'volume-medium' },
+              { chave: 'mudo', rotulo: 'Mudo', icone: 'volume-mute' },
+            ] as const).map(op => {
+              const ativo = modo === op.chave
+              return (
+                <Pressable
+                  key={op.chave}
+                  onPress={() => {
+                    setModo(op.chave)
+                    setRespostaDaVoz('')
+                  }}
+                  style={({ pressed }) => [
+                    styles.chaveModo,
+                    ativo && styles.chaveModoAtiva,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: ativo }}
+                  accessibilityLabel={
+                    op.chave === 'voz'
+                      ? 'Conduzir por voz'
+                      : op.chave === 'manual'
+                        ? 'Conduzir na mão, com avisos falados'
+                        : 'Silencioso, sem avisos falados'
+                  }
+                >
+                  <Ionicons
+                    name={op.icone}
+                    size={15}
+                    color={ativo ? paleta().cores.branco : paleta().inkMedio}
+                  />
+                  <Text style={[styles.textoChaveModo, ativo && styles.textoChaveModoAtiva]}>
+                    {op.rotulo}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
         </View>
 
         {exercicios.length === 0 ? (
@@ -1465,19 +1506,22 @@ export function ModoTreino({
                           lado de fora isso se lê como travamento, e não como
                           trabalho. O que muda de verdade é a resposta falada,
                           e ela chega quando chega. */}
+                      {/* Tres estados, e cada um responde a uma pergunta:
+                          "pode falar?", "estou sendo ouvido?", "e agora?".
+                          Ver o comentario de `capturando`. */}
                       <BotaoDeVoz
-                        estado="ouvindo"
+                        estado={entendendo ? 'pensando' : 'ouvindo'}
                         rotulo="Ouvindo"
-                        /* Acompanha o botão grande logo acima. Estava fixo em
-                           "terminei", e dizia isso até com a série parada — ou
+                        /* Acompanha o botao grande logo acima. Estava fixo em
+                           "terminei", e dizia isso ate com a serie parada -- ou
                            seja, ensinava a frase ERRADA justamente no momento
-                           em que a pessoa procura o que falar. Relatado assim:
-                           "abre e continua 'diga cygnos, terminei' e nem o
-                           iniciei". */
+                           em que a pessoa procura o que falar. */
                         rotuloOuvindo={
-                          inicioDaSerie === null
-                            ? 'Diga "Cygnos, iniciar"'
-                            : 'Diga "Cygnos, terminei"'
+                          capturando
+                            ? 'Estou ouvindo voce…'
+                            : inicioDaSerie === null
+                              ? 'Diga "Cygnos, iniciar"'
+                              : 'Diga "Cygnos, terminei"'
                         }
                         onPress={() => setModo('manual')}
                       />
@@ -1503,7 +1547,17 @@ export function ModoTreino({
                   {vozLigada && (
                     <Text style={styles.medidorVoz}>
                       {estadoDoGravador.metering === undefined
-                        ? 'sem medidor · o aparelho não está entregando o nível'
+                        ? /* "Preparando", e não "o aparelho não está entregando o nível".
+                          
+                             A frase antiga acusava o APARELHO, e ela aparece
+                             justo no instante em que o gravador foi parado para
+                             mandar o trecho e ainda não voltou — ou seja, no
+                             momento em que tudo está indo bem. Relatado como
+                             "aparece SEM MEDIDOR, aparelho não está conectado".
+                          
+                             Dizer que está preparando é verdade nos dois casos,
+                             e não assusta em nenhum. */
+                        'preparando o microfone…'
                         : `${estadoDoGravador.metering.toFixed(0)} dB · limiar ${limiarDe(
                             ambienteVisivel,
                           ).toFixed(0)} · ${estadoDoGravador.isRecording ? 'gravando' : 'PARADO'}`}
@@ -1769,6 +1823,29 @@ const estilos = estilosDe(t =>
      vira um quadradinho com o ícone e NENHUM texto. Foi o que apareceu no
      aparelho — a pessoa via um quadrado verde e nada dizendo "Ouvindo". */
   espacoVoz: { marginTop: 10, alignSelf: 'stretch' },
+  /* Os três modos, lado a lado. Mesma largura total do botão único que havia
+     antes — o que muda é que as opções ficam à vista. */
+  chavesDeModo: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 3,
+    borderRadius: 20,
+    backgroundColor: t.cores.superficie,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  chaveModo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 16,
+  },
+  chaveModoAtiva: { backgroundColor: t.cores.verde },
+  textoChaveModo: { fontSize: 12, fontWeight: '700', color: t.inkMedio },
+  textoChaveModoAtiva: { color: t.cores.branco },
+
   chaveVoz: {
     flexDirection: 'row',
     alignItems: 'center',
