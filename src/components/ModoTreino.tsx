@@ -1576,7 +1576,7 @@ export function ModoTreino({
                            em que a pessoa procura o que falar. */
                         rotuloOuvindo={
                           capturando
-                            ? 'Estou ouvindo voce…'
+                            ? 'Estou ouvindo você…'
                             : inicioDaSerie === null
                               ? 'Diga "Cygnos, iniciar"'
                               : 'Diga "Cygnos, terminei"'

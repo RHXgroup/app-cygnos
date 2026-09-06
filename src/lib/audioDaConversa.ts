@@ -114,10 +114,10 @@ export async function guardarAudioDaConversa(
     const arquivo = new File(uri)
 
     if (!arquivo.exists) {
-      falha('A gravacao nao existe no aparelho.', new Error(uri))
+      falha('A gravação não existe no aparelho.', new Error(uri))
       return {
         tipo: 'erro',
-        mensagem: 'Nao consegui achar a gravacao no aparelho. Tente gravar de novo.',
+        mensagem: 'Não consegui achar a gravação no aparelho. Tente gravar de novo.',
       }
     }
 
@@ -132,10 +132,10 @@ export async function guardarAudioDaConversa(
     /* Gravacao que nao pegou. Subir isso produz um balao que ninguem consegue
        tocar -- pior que a falha, porque parece sucesso. */
     if (dados.byteLength === 0) {
-      falha('A gravacao saiu vazia.', new Error('0 byte em ' + uri))
+      falha('A gravação saiu vazia.', new Error('0 byte em ' + uri))
       return {
         tipo: 'erro',
-        mensagem: 'A gravacao saiu sem som. Verifique se algum outro aplicativo esta usando o microfone.',
+        mensagem: 'A gravação saiu sem som. Verifique se algum outro aplicativo está usando o microfone.',
       }
     }
 
