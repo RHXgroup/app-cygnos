@@ -380,13 +380,7 @@ function Miolo({ dados }: { dados: Dados }) {
     if (dados.anamneses.length === 0) {
       return <Aviso texto={`${ASuaNutri()} ainda não preencheu uma anamnese.`} />
     }
-    return (
-      <>
-        {dados.anamneses.map(a => (
-          <CartaoAnamnese key={a.id} anamnese={a} />
-        ))}
-      </>
-    )
+    return <Anamneses anamneses={dados.anamneses} />
   }
 
   if (dados.chave === 'antropometria') {
@@ -423,6 +417,73 @@ function Miolo({ dados }: { dados: Dados }) {
 }
 
 /* ── Anamnese ──────────────────────────────────────────────────────────────*/
+
+/* UMA anamnese por vez, com as outras a um toque.
+ *
+ * ── O relato ──────────────────────────────
+ * "eu coloquei 2 anamnese e fica ruim a forma de ver no app (…) aqui ficou
+ * lista sabe?"
+ *
+ * Ficou mesmo: a tela desenhava as duas INTEIRAS, uma embaixo da outra. Uma
+ * anamnese tem dezenas de perguntas, então duas viram uma rolagem em que a
+ * pessoa não sabe onde uma acaba e a outra começa — e comparar, que
+ * é a única razão de ter duas na tela, fica impossível.
+ *
+ * ── Por que NÃO é uma pergunta antes ─────────────────
+ * A ideia dele era abrir uma caixa perguntando qual ver. O instinto está
+ * certo — uma por vez —, e a pergunta é que sobra: quem tem UMA
+ * anamnese, que é a maioria, teria de responder "qual?" para uma lista de
+ * um item. Toque cobrado para escolher o que não tem escolha.
+ *
+ * Então a mais RECENTE abre sozinha, e as outras ficam numa fileira em cima.
+ * Com uma só, a fileira nem existe: a tela fica igual ao que era.
+ *
+ * ── A ordem vem do servidor ──────────────────────
+ * `app_anamnese_do_paciente` devolve `order by created_at desc`, então a
+ * primeira é a mais nova. Guardar o ÍNDICE e não o id é de
+ * propósito: quando a nutricionista publicar uma anamnese nova com a tela
+ * aberta, a releitura traz outra lista e o índice 0 continua sendo "a mais
+ * recente" — que é o que a pessoa quer ver. */
+function Anamneses({ anamneses }: { anamneses: Anamnese[] }) {
+  const styles = estilos()
+  const [qual, setQual] = useState(0)
+
+  /* Aparado, e não confiado: a lista pode encolher numa releitura, e um
+     índice sobrando apontaria para nada (armadilha 10, pelo lado do
+     índice). */
+  const escolhida = anamneses[Math.min(qual, anamneses.length - 1)]
+
+  return (
+    <>
+      {anamneses.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.fileiraAnamneses}
+        >
+          {anamneses.map((a, i) => {
+            const marcada = i === Math.min(qual, anamneses.length - 1)
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => setQual(i)}
+                style={[styles.fichaAnamnese, marcada && styles.fichaAnamneseAtiva]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: marcada }}
+              >
+                <Text style={[styles.textoFicha, marcada && styles.textoFichaAtivo]}>
+                  {dataLegivel(a.data) || a.titulo?.trim() || 'Anamnese'}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      )}
+
+      {escolhida && <CartaoAnamnese anamnese={escolhida} />}
+    </>
+  )
+}
 
 function CartaoAnamnese({ anamnese }: { anamnese: Anamnese }) {
   const styles = estilos()
@@ -796,6 +857,25 @@ cartaoPressionado: { backgroundColor: t.cores.superficie },
     backgroundColor: t.cores.cartao,
   },
   fitaAberta: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  /* ── A fileira que escolhe QUAL anamnese ────────────────
+     Horizontal e rolável: quem faz acompanhamento longo acumula anamneses, e
+     uma fileira que quebra em duas linhas empurra o conteúdo para fora da
+     tela justamente quando há mais para ler. */
+  fileiraAnamneses: { gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
+  fichaAnamnese: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+    backgroundColor: t.cores.cartao,
+  },
+  /* Tingida E com o texto mais forte: só a cor de fundo distingue mal numa
+     fileira que se rola, porque a escolhida pode estar fora da vista quando a
+     pessoa volta à tela. */
+  fichaAnamneseAtiva: { backgroundColor: t.cores.verdeMenta, borderColor: t.cores.verdeClaro },
+  textoFicha: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
+  textoFichaAtivo: { fontWeight: '800', color: t.cores.verdeEscuro },
   textoFita: { fontSize: 12.5, fontWeight: '600', color: t.inkSuave },
   textoFitaAberto: { fontWeight: '800', color: t.cores.verdeEscuro },
   /* O nome por extenso embaixo da fita: "Seg" sozinho é abreviação de fita, e

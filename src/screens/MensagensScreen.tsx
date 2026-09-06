@@ -58,6 +58,12 @@ import {
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { ElaPronome, aSuaNutri, elaPronome, uma } from '../lib/tratamentoDaNutri'
 
+
+/* Quanto tempo a conversa tem para se assentar antes de a rolagem parar de
+   persegui-la. Cada medida nova dentro da janela ESTICA a janela, então o
+   número não precisa cobrir o pior caso — ele só precisa ser maior
+   que o intervalo entre duas medidas. */
+const ESPERA_DO_ASSENTAMENTO = 900
 /* A conversa com a nutricionista.
  *
  * Existe só com vínculo. Antes dele não há conversa — há pedido, que mora no
@@ -258,7 +264,7 @@ export function MensagensScreen({
     prazo.current = setTimeout(() => {
       querOFim.current = false
       prazo.current = null
-    }, 600)
+    }, ESPERA_DO_ASSENTAMENTO)
     aoFim()
   }, [aoFim])
 
@@ -698,7 +704,13 @@ export function MensagensScreen({
             /* Só dentro da janela de assentamento — ver `querOFim`. Fora
                dela, uma medida nova não mexe na tela de ninguém. */
             onContentSizeChange={() => {
-              if (querOFim.current && grudadoNoFim.current) aoFim()
+              /* Dentro da janela, cada medida nova rola E ESTICA a janela.
+                 Sem esticar, a janela fechava antes de a conversa terminar de
+                 se assentar e o fim escapava: "abriu certo e depois carregou,
+                 foi subindo". Esticar não pode ficar preso, porque rolar
+                 não muda o tamanho do conteúdo — só conteúdo
+                 novo muda, e conteúdo novo acaba. */
+              if (querOFim.current && grudadoNoFim.current) pedirOFim()
             }}
             /* QUEM DESGRUDA A CONVERSA DO FIM É O DEDO, e mais ninguém.
              *
