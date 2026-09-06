@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
-import { dataNumerica, milhar } from './formatar'
+import { dataNumerica, milhar } from './formatar'
 import { aSuaNutri } from './tratamentoDaNutri'
 
 /* ── Por que estas funções LANÇAM, e o que elas lançam ─────────────────────
@@ -139,6 +139,54 @@ export async function carregarConteudo(): Promise<ResultadoConteudo> {
         : null,
     },
   }
+}
+
+/* ── O que o app deve MOSTRAR ao paciente ───────────────────────────────────
+ *
+ * A nutricionista liga e desliga seções no sistema web (a grade "o que o
+ * paciente vê no app"). O banco guarda o que ficou desligado em
+ * `pacientes.app_permissoes`, e `app_secoes_do_paciente()` devolve as 11 seções
+ * com true/false — default tudo-ligado, e `privacidade_lgpd` sempre true
+ * (direito da LGPD, o servidor não deixa escondê-la).
+ *
+ * Sem esta leitura o app mostrava tudo: desligar a anamnese no sistema não
+ * sumia com ela aqui. Era o buraco — a nutricionista desmarcava e o paciente
+ * continuava vendo.
+ *
+ * Falha aqui NÃO esconde nada: mapa vazio quer dizer "mostra tudo", como era
+ * antes de existir o interruptor. Sumir com uma seção por causa de um erro de
+ * rede seria a nutricionista publicar e o paciente não ver, sem ninguém ter
+ * desligado — o oposto do erro seguro. */
+
+/* As chaves do app e as do sistema web nasceram separadas; este é o de-para.
+   `energetico` e `receitas` não têm interruptor no sistema — sempre visíveis. */
+const SECAO_NO_SERVIDOR: Record<string, string> = {
+  anamnese: 'anamnese_geral',
+  antropometria: 'antropometria_geral',
+  fotos: 'evolucao_fotografica',
+  exames: 'exames_laboratoriais',
+  plano: 'planejamento_alimentar',
+}
+
+export type SecoesVisiveis = Record<string, boolean>
+
+export async function carregarSecoesVisiveis(): Promise<SecoesVisiveis> {
+  const { data, error } = await supabase.rpc('app_secoes_do_paciente')
+  if (error || !data || typeof data !== 'object') {
+    /* Motivo cru no console para quem for depurar; a tela não muda de cara por
+       causa disto — mapa vazio abaixo significa "mostra tudo". */
+    if (error) console.warn('[nutricionistas] falha ao ler as seções visíveis:', error.message)
+    return {}
+  }
+  return data as SecoesVisiveis
+}
+
+/* Uma seção do app aparece A MENOS QUE o sistema a tenha desligado. Chave sem
+   interruptor (energetico, receitas) e mapa vazio (erro/carregando) contam como
+   visível: o default é mostrar, e o silêncio nunca esconde. */
+export function secaoVisivel(chave: string, visiveis: SecoesVisiveis): boolean {
+  const k = SECAO_NO_SERVIDOR[chave]
+  return !k || visiveis[k] !== false
 }
 
 /* ── O conteúdo de cada item ───────────────────────────────────────────────

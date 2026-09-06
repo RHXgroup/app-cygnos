@@ -27,10 +27,13 @@ import {
 } from '../lib/nutricionista'
 import {
   carregarConteudo,
+  carregarSecoesVisiveis,
+  secaoVisivel,
   descricaoDeContagem,
   descricaoDoEnergetico,
   descricaoDoPlano,
   type ConteudoNutri,
+  type SecoesVisiveis,
 } from '../lib/conteudoNutri'
 import {
   carregarMinhasConsultas,
@@ -78,6 +81,9 @@ export function NutricionistasScreen({
   const { top, bottom } = useSafeAreaInsets()
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
   const [conteudo, setConteudo] = useState<ConteudoNutri | null>(null)
+  /* O que a nutricionista deixou visível no app (default vazio = mostra tudo).
+     Some da lista as seções que ela desligou no sistema. */
+  const [secoesVisiveis, setSecoesVisiveis] = useState<SecoesVisiveis>({})
   const [erroConteudo, setErroConteudo] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -186,7 +192,11 @@ export function NutricionistasScreen({
          cima dela. Falha aqui vira lista vazia — sem pedido a tela continua
          inteira, e um erro no lugar do catálogo custaria mais do que o bloco. */
       carregarMinhasSolicitacoes().catch(() => ({ tipo: 'erro' as const, mensagem: '' })),
-    ]).then(([cat, cont, minhas, pedidos]) => {
+      /* No mesmo lote pra não piscar: se chegasse depois, a lista apareceria
+         inteira e só então uma seção sumiria na frente da pessoa. Falha vira
+         mapa vazio = mostra tudo, como era antes do interruptor existir. */
+      carregarSecoesVisiveis().catch(() => ({}) as SecoesVisiveis),
+    ]).then(([cat, cont, minhas, pedidos, secoes]) => {
       if (!vivo) return
 
       /* O erro é limpo no sucesso, e não só escrito na falha: agora que a tela
@@ -206,6 +216,7 @@ export function NutricionistasScreen({
 
       setConsultas(minhas)
       if (pedidos.tipo === 'ok') setSolicitacoes(pedidos.solicitacoes)
+      setSecoesVisiveis(secoes)
 
       /* Falha aqui NÃO derruba a tela: sem o resumo, a ficha da nutricionista
          continua inteira e útil, e trocá-la por uma mensagem de erro tiraria da
@@ -307,6 +318,7 @@ export function NutricionistasScreen({
               nutri={vinculada}
               conteudo={conteudo}
               erroConteudo={erroConteudo}
+              secoesVisiveis={secoesVisiveis}
               consultas={consultas}
               onAbrir={setAberto}
               onAgendar={() => setAgendando(true)}
@@ -570,6 +582,7 @@ function Ficha({
   nutri,
   conteudo,
   erroConteudo,
+  secoesVisiveis,
   consultas,
   onAbrir,
   onAgendar,
@@ -579,6 +592,7 @@ function Ficha({
   nutri: Nutricionista
   conteudo: ConteudoNutri | null
   erroConteudo: string | null
+  secoesVisiveis: SecoesVisiveis
   consultas: MinhaConsulta[]
   onAbrir: (chave: ChaveConteudo) => void
   onAgendar: () => void
@@ -670,7 +684,7 @@ function Ficha({
         <Text style={styles.textoConversar}>Conversar</Text>
       </Pressable>
 
-      <Acompanhamento conteudo={conteudo} erro={erroConteudo} onAbrir={onAbrir} />
+      <Acompanhamento conteudo={conteudo} erro={erroConteudo} secoesVisiveis={secoesVisiveis} onAbrir={onAbrir} />
 
       {nutri.especialidades.length > 0 && (
         <View style={styles.cartao}>
@@ -788,10 +802,12 @@ Você pode procurar {outra()} nutricionista depois.`}
 function Acompanhamento({
   conteudo,
   erro,
+  secoesVisiveis,
   onAbrir,
 }: {
   conteudo: ConteudoNutri | null
   erro: string | null
+  secoesVisiveis: SecoesVisiveis
   onAbrir: (chave: ChaveConteudo) => void
 }) {
   const styles = estilos()
@@ -871,12 +887,18 @@ function Acompanhamento({
     },
   ]
 
+  /* Fora as que a nutricionista desligou no sistema. `energetico` e `receitas`
+     não têm interruptor lá — `secaoVisivel` os deixa passar. Se ela desligar
+     tudo, o cartão inteiro some (abaixo), em vez de virar um título vazio. */
+  const visiveis = itens.filter(item => !item.chave || secaoVisivel(item.chave, secoesVisiveis))
+  if (visiveis.length === 0) return null
+
   return (
     <View style={styles.cartao}>
       <Text style={styles.tituloCartao}>Meu acompanhamento</Text>
 
       <View style={styles.listaItens}>
-        {itens.map(item => {
+        {visiveis.map(item => {
           const miolo = (
             <>
               <View style={styles.iconeItem}>

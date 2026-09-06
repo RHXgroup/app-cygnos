@@ -27,6 +27,7 @@ import {
 import {
   NOME_DO_OBJETIVO,
   carregarObjetivoPeso,
+  avisarObjetivoMudou,
   salvarObjetivoPeso,
   type ObjetivoPeso,
 } from '../lib/metas'
@@ -34,7 +35,7 @@ import { estilosDe, paleta } from '../lib/tema'
 import { OBJETIVOS, objetivoDe } from '../lib/objetivos'
 import { falha } from '../lib/erros'
 import { useDesvioDoTeclado } from '../lib/teclado'
-import { suaNutri } from '../lib/tratamentoDaNutri'
+import { ASuaNutri, a, suaNutri } from '../lib/tratamentoDaNutri'
 
 type Conta = {
   nome_completo: string
@@ -136,6 +137,21 @@ export function PerfilScreen({
    * Fluxo proprio, alteracao a parte. */
   const [nascimentoEditado, setNascimentoEditado] = useState('')
   const [generoEditado, setGeneroEditado] = useState('')
+  /* O objetivo agora entra no FORMULÁRIO, e não mais no toque.
+   *
+   * Ele gravava a cada toque, e junto com o salvamento ia uma mensagem para a
+   * nutricionista. Quem descia a lista dos onze experimentando mandava onze
+   * mensagens para uma profissional de saúde. Relatado assim: "toda hora que
+   * clico em um objetivo diferente ele manda mensagem pra minha nutri".
+   *
+   * O que estava errado não era avisar — ela precisa mesmo saber, senão
+   * prescreve déficit para quem passou a cuidar do colesterol. Era avisar
+   * por um gesto de ESCOLHA em vez de um gesto de DECISÃO.
+   *
+   * `undefined` quer dizer "não mexi": é o que separa "escolhi o mesmo de
+   * novo" de "nem toquei", e é por isso que não dá para usar `null`, que
+   * aqui já significa "sem objetivo". */
+  const [objetivoEditado, setObjetivoEditado] = useState<ObjetivoPeso | undefined>(undefined)
   const [salvando, setSalvando] = useState(false)
   const [erroEdicao, setErroEdicao] = useState('')
   const desvio = useDesvioDoTeclado(bottom)
@@ -147,6 +163,7 @@ export function PerfilScreen({
     /* ISO no banco, dd/mm/aaaa na tela. */
     setNascimentoEditado(dataBR(conta.data_nascimento))
     setGeneroEditado(conta.genero)
+    setObjetivoEditado(objetivo)
     setErroEdicao('')
     setEditando(true)
   }
@@ -198,9 +215,31 @@ export function PerfilScreen({
         ? { ...c, nome_completo: nome, telefone, data_nascimento: nasc.iso, genero: generoEditado }
         : c,
     )
-    /* As metas partem da idade e do genero. Sem avisar, a tela inicial ficaria
-       com o gasto basal antigo ate alguem fechar o app. */
+/* ── O OBJETIVO, uma vez só, e só se mudou ──────────────
+     *
+     * Depois do cadastro ter ido, e não junto: são duas gravações
+     * diferentes, e falhar a segunda não pode desfazer a primeira.
+     *
+     * `!== objetivo` é o que impede a mensagem de sair quando ela abriu a
+     * edição, mexeu no telefone e nem tocou na lista — e também
+     * quando experimentou três e voltou para o que já estava. Neste caso o
+     * app não tem o que contar: nada mudou. */
+    if (objetivoEditado !== undefined && objetivoEditado !== objetivo) {
+      const falhouObjetivo = await salvarObjetivoPeso(sessao.user.id, objetivoEditado)
+      if (falhouObjetivo) {
+        setErroObjetivo(falhouObjetivo.erro)
+      } else {
+        setObjetivo(objetivoEditado)
+        /* Sem `await`: a nutricionista saber é importante, e mesmo assim não
+           é motivo para segurar a tela. A função nunca rejeita. */
+        void avisarObjetivoMudou(objetivoEditado)
+      }
+    }
+
+    /* As metas partem da idade, do genero e do objetivo. Sem avisar, a tela
+       inicial ficaria com o gasto basal antigo ate alguem fechar o app. */
     onObjetivoMudou()
+    setObjetivoEditado(undefined)
     setEditando(false)
   }
 
@@ -255,7 +294,7 @@ export function PerfilScreen({
          Sem isto, quem estivesse editando perdia o que digitou e ainda saía do
          perfil de uma vez — dois passos num toque só. */
       if (editando) {
-        setEditando(false)
+        sairDaEdicao()
         return true
       }
       return false
@@ -286,29 +325,33 @@ export function PerfilScreen({
     }
   }, [conta?.avatar_path])
 
-  /* Sem botão de salvar: o toque É a gravação.
+/* Enquanto edita, o toque só RISCA no rascunho.
    *
-   * Otimista, como a água e o peso — três opções numa fileira não comportam um
-   * "salvar" embaixo sem virar formulário. Falhou, a marca volta para onde
-   * estava e o erro aparece. */
-  async function escolherObjetivo(novo: ObjetivoPeso) {
-    const anterior = objetivo
-
+   * O comentário antigo aqui dizia "sem botão de salvar: o toque É a
+   * gravação", e defendia isso comparando com a água e o peso. A
+   * comparação não valia: copo de água não avisa ninguém, e este
+   * toque mandava mensagem para uma profissional de saúde.
+   *
+   * Fora do modo de edição a lista é só leitura — ver o `disabled`
+   * lá embaixo. */
+/* Sair da edição joga o rascunho fora, o do objetivo junto.
+   *
+   * Sem isto, quem experimentasse um objetivo, desistisse pelo Cancelar, e
+   * mais tarde abrisse a edição de novo para trocar o telefone salvaria
+   * junto a escolha abandonada — e mandaria a mensagem dela. */
+  function sairDaEdicao() {
+    setObjetivoEditado(undefined)
     setErroObjetivo('')
-    setObjetivo(novo)
-
-    const falha = await salvarObjetivoPeso(sessao.user.id, novo)
-
-    if (falha) {
-      setObjetivo(anterior)
-      setErroObjetivo(falha.erro)
-      return
-    }
-
-    onObjetivoMudou()
+    setErroEdicao('')
+    setEditando(false)
   }
 
-  const nome = conta?.nome_completo ?? sessao.user.email?.split('@')[0] ?? ''
+  function riscarObjetivo(novo: ObjetivoPeso) {
+    setErroObjetivo('')
+    setObjetivoEditado(novo)
+  }
+
+    const nome = conta?.nome_completo ?? sessao.user.email?.split('@')[0] ?? ''
 
   async function escolherFoto(origem: 'galeria' | 'camera') {
     setOpcoesAbertas(false)
@@ -526,7 +569,7 @@ export function PerfilScreen({
 
                   <View style={styles.botoesEdicao}>
                     <Pressable
-                      onPress={() => setEditando(false)}
+                      onPress={sairDaEdicao}
                       disabled={salvando}
                       style={({ pressed }) => [styles.botaoCancelar, pressed && { opacity: 0.7 }]}
                       accessibilityRole="button"
@@ -588,16 +631,35 @@ export function PerfilScreen({
               deixa o app dizer se a sua evolução está indo no sentido que você quer.
             </Text>
 
+            {/* Uma lista que não responde ao toque e não explica por quê
+                se lê como app quebrado. Esta linha é o que separa
+                "desligado" de "travado", e ela só existe fora da edição
+                — dentro dela a lista funciona e a frase seria ruído. */}
+            {!editando && (
+              <Text style={styles.ajudaObjetivo}>
+                Para trocar, toque em <Text style={styles.negrito}>Editar</Text> lá em cima.
+                {' '}{ASuaNutri()} é avisad{a()} quando você salvar.
+              </Text>
+            )}
+
             <View style={styles.listaObjetivos}>
               {OBJETIVOS.map(o => {
-                const marcado = objetivoDe(objetivo)?.chave === o.chave
+                /* O rascunho manda enquanto ele existe: é o que a pessoa
+                   acabou de tocar, e ainda não foi salvo. */
+                const escolhido = objetivoEditado !== undefined ? objetivoEditado : objetivo
+                const marcado = objetivoDe(escolhido)?.chave === o.chave
                 return (
                   <Pressable
                     key={o.chave}
                     /* Tocar no que já está marcado desmarca. A dica embaixo diz
                        isso por escrito — sem ela seria um gesto escondido, e
                        quem marcou sem querer ficaria preso à escolha. */
-                    onPress={() => escolherObjetivo(marcado ? null : o.chave)}
+                    onPress={() => riscarObjetivo(marcado ? null : o.chave)}
+                    /* Só mexe dentro da edição. Fora dela a lista continua
+                       visível — ela diz o que está valendo — mas não
+                       responde ao toque, que é o que impedia uma escolha de
+                       virar mensagem sem ninguém confirmar nada. */
+                    disabled={!editando}
                     style={({ pressed }) => [
                       styles.linhaObjetivo,
                       marcado && styles.linhaObjetivoAtiva,
@@ -647,7 +709,7 @@ export function PerfilScreen({
              *
              * O tom é de aviso e não de alarme: quem tem diabetes não precisa
              * de susto ao dizer que tem diabetes. */}
-            {objetivoDe(objetivo)?.pedeAcompanhamento && (
+            {objetivoDe(objetivoEditado !== undefined ? objetivoEditado : objetivo)?.pedeAcompanhamento && (
               <View style={styles.avisoAcompanhamento}>
                 <Ionicons
                   name="information-circle-outline"
@@ -976,6 +1038,7 @@ const estilos = estilosDe(t =>
   },
   tituloObjetivo: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
   ajudaObjetivo: { fontSize: 12.5, lineHeight: 18, color: t.inkSuave },
+  negrito: { fontWeight: '800', color: t.cores.ink },
   /* ── OS SETE OBJETIVOS ────────────────────────────────────────────────
      Uma forma repetida: quadrado tingido com ícone · nome · resumo · marca.
      Muda o texto, nunca o formato — que é o que faz uma lista de sete ser
