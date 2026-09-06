@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
-import Ionicons from '@expo/vector-icons/Ionicons'
+import { Image, StyleSheet, Text, View } from 'react-native'
 import { urlDoAvatar } from '../lib/avatar'
 import { primeiroNomeDela, type RecadoDaNutri } from '../lib/recadoDaNutri'
 import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
@@ -25,16 +24,7 @@ import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
  * pedir confirmação de leitura de um recado de três linhas seria transformar
  * carinho em tarefa. */
 
-export function CartaoDoRecado({
-  recado,
-  onAbrirMensagens,
-}: {
-  recado: RecadoDaNutri | null
-  /* O recado anterior vira mensagem na conversa quando ela escreve outro — o
-     gatilho é do lado do servidor. Então tocar aqui leva ao lugar onde o
-     histórico está, e não a uma tela própria que duplicaria a conversa. */
-  onAbrirMensagens: () => void
-}) {
+export function CartaoDoRecado({ recado }: { recado: RecadoDaNutri | null }) {
   const styles = estilos()
   const [foto, setFoto] = useState<string | null>(null)
   /* QUAL endereço falhou, e não um booleano — item 7 do AGENTS.md: assinatura
@@ -64,13 +54,24 @@ export function CartaoDoRecado({
   const nome = primeiroNomeDela(recado.nome)
   const temFoto = foto !== null && foto !== falhou
 
+  /* ── UMA SAUDACAO, E NAO UMA LINHA DE CAIXA DE ENTRADA ──────────────────
+   *
+   * Ele era foto pequena, "Recado de Renan", uma seta, e o toque abria a
+   * conversa. Isso e uma linha de inbox: competia com a aba Mensagens e nao
+   * parecia saudacao nenhuma.
+   *
+   * Pedido assim: "so quero que apareca um card de saudacao mesmo, como se
+   * fosse um aviso... ai se ela quiser falar com a nutri, vai na mensagem".
+   *
+   * Entao as PALAVRAS DELA vem em primeiro plano, entre aspas, no tamanho de
+   * quem fala -- e a assinatura embaixo, pequena. A foto cresce porque numa
+   * saudacao o rosto e metade do recado.
+   *
+   * E ele deixou de ser tocavel. Um cartao que abre a conversa duplica o que a
+   * aba Mensagens ja faz, e um toque sem seta seria gesto escondido -- pior que
+   * nao ter. Quem quiser responder tem a aba, que esta sempre ali embaixo. */
   return (
-    <Pressable
-      onPress={onAbrirMensagens}
-      style={({ pressed }) => [styles.cartao, pressed && styles.pressionado]}
-      accessibilityRole="button"
-      accessibilityLabel={`Recado de ${nome}: ${recado.texto}. Abrir a conversa.`}
-    >
+    <View style={styles.cartao}>
       <View style={styles.topo}>
         {temFoto ? (
           <Image
@@ -80,28 +81,22 @@ export function CartaoDoRecado({
             accessibilityIgnoresInvertColors
           />
         ) : (
-          /* Iniciais quando não há foto ou ela falhou. Um buraco do tamanho da
-             foto se lê como app quebrado — pior do que nunca ter tido foto. */
+          /* Iniciais quando nao ha foto ou ela falhou. Um buraco do tamanho da
+             foto se le como app quebrado -- pior do que nunca ter tido foto. */
           <View style={styles.semFoto}>
             <Text style={styles.iniciais}>{nome.slice(0, 1).toUpperCase()}</Text>
           </View>
         )}
 
-        <View style={styles.deQuem}>
-          <Text style={styles.rotulo}>Recado de</Text>
-          <Text style={styles.nome} numberOfLines={1}>
-            {nome}
-          </Text>
+        <View style={styles.textos}>
+          {/* Sem `numberOfLines`: o recado e curto por limite do outro lado, e
+              cortar a frase de uma profissional de saude com reticencias e pior
+              do que o cartao crescer tres linhas. */}
+          <Text style={styles.fala}>{recado.texto}</Text>
+          <Text style={styles.assinatura}>{nome}, sua nutricionista</Text>
         </View>
-
-        <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
       </View>
-
-      {/* Sem `numberOfLines`: o recado é curto por limite do outro lado, e
-          cortar a frase de uma profissional de saúde com reticências é pior do
-          que o cartão crescer três linhas. */}
-      <Text style={styles.texto}>{recado.texto}</Text>
-    </Pressable>
+    </View>
   )
 }
 
@@ -119,24 +114,29 @@ const estilos = estilosDe(t =>
       borderRadius: RAIO_CARTAO,
       padding: PADDING_CARTAO,
     },
-    pressionado: { opacity: 0.85 },
+    /* Alinhado ao TOPO, e não ao centro: com duas ou três linhas de fala, o
+       centro deixaria a foto boiando no meio do parágrafo. */
+    topo: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
 
-    topo: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-    foto: { width: 38, height: 38, borderRadius: 20, backgroundColor: t.cores.cartao },
+    /* 46, e não 38. Numa saudação o rosto é metade do recado — era tamanho de
+       item de lista, e este cartão deixou de ser um. */
+    foto: { width: 46, height: 46, borderRadius: 23, backgroundColor: t.cores.cartao },
     semFoto: {
-      width: 38,
-      height: 38,
-      borderRadius: 20,
+      width: 46,
+      height: 46,
+      borderRadius: 23,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: t.cores.verde,
     },
-    iniciais: { fontSize: 16, fontWeight: '800', color: t.cores.branco },
+    iniciais: { fontSize: 18, fontWeight: '800', color: t.cores.branco },
 
-    deQuem: { flex: 1 },
-    rotulo: { fontSize: 11, fontWeight: '700', color: t.inkFraco, letterSpacing: 0.3 },
-    nome: { fontSize: 15, fontWeight: '800', color: t.cores.ink },
-
-    texto: { fontSize: 14.5, color: t.cores.ink, lineHeight: 21 },
+    textos: { flex: 1, gap: 4 },
+    /* As palavras DELA, no tamanho de quem fala. Era 14,5 embaixo de um rótulo
+       "Recado de"; agora é a primeira coisa que se lê no cartão. */
+    fala: { fontSize: 15.5, color: t.cores.ink, lineHeight: 22 },
+    /* A assinatura fecha a saudação, e por isso vem DEPOIS: quem lê termina
+       sabendo de quem é, como numa nota deixada na porta da geladeira. */
+    assinatura: { fontSize: 12, fontWeight: '700', color: t.inkSuave },
   }),
 )

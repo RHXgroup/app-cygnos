@@ -959,7 +959,7 @@ export function HomeScreen({
        * ele não muda com o dia escolhido, então não pertence ao que vem depois
        * dela. */}
       {recado !== null && (
-        <CartaoDoRecado recado={recado} onAbrirMensagens={onAbrirMensagens} />
+        <CartaoDoRecado recado={recado} />
       )}
 
       <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
