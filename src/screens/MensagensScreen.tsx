@@ -251,13 +251,28 @@ export function MensagensScreen({
     return desligar
   }, [nutri])
 
-  /* Sempre no fim: uma conversa que abre no começo obriga a rolar para ler o que
-     acabou de chegar. */
-  useEffect(() => {
-    if (mensagens.length > 0) {
-      requestAnimationFrame(() => rolagem.current?.scrollToEnd({ animated: false }))
-    }
-  }, [mensagens.length])
+/* SEMPRE NO FIM, e agora de verdade.
+   *
+   * Era um efeito na quantidade de mensagens, com um `requestAnimationFrame`
+   * antes de rolar. Ele acertava numa conversa de texto puro e errava em toda
+   * a outra: a conversa abria NO MEIO, e a pessoa tinha de rolar para ler o
+   * que acabou de chegar.
+   *
+   * O motivo e que um quadro nao basta. Balão de foto e de áudio nascem
+   * com a altura errada e só crescem quando a imagem carrega ou a duração
+   * do áudio é lida; a rolagem ia até o fim do que existia NAQUELE
+   * instante, o conteúdo crescia embaixo dela, e o fim ficava mais para
+   * baixo do que ela tinha ido.
+   *
+   * Quem sabe a hora certa é a própria rolagem: `onContentSizeChange`
+   * dispara a cada vez que o conteúdo muda de tamanho, inclusive nessas
+   * medidas tardias. Ver o uso lá embaixo.
+   *
+   * O ref diz se ela está GRUDADA no fim. Rolar para o fim sempre seria
+   * pior do que abrir no meio: quem sobe para reler o que a nutricionista
+   * disse na semana passada seria jogado de volta para baixo assim que uma
+   * imagem terminasse de carregar. */
+  const grudadoNoFim = useRef(true)
 
   /* Para sozinho no limite.
    *
@@ -360,6 +375,10 @@ export function MensagensScreen({
        escrever "olha" para poder mandar o prato. */
     if ((!limpo && !anexo) || enviando) return
 
+    /* Mandar é dizer "quero ver o que eu mandei". Mesmo tendo subido para
+       reler algo antigo, a própria mensagem traz a conversa de volta para o
+       fim. */
+    grudadoNoFim.current = true
     setEnviando(true)
     setErro('')
     const r = await enviarMensagem(limpo, anexo)
@@ -541,6 +560,20 @@ export function MensagensScreen({
             contentContainerStyle={styles.conteudoConversa}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            /* A cada MEDIDA nova do conteúdo, e não a cada mensagem: é
+               isto que alcança a foto que terminou de carregar depois. */
+            onContentSizeChange={() => {
+              if (grudadoNoFim.current) rolagem.current?.scrollToEnd({ animated: false })
+            }}
+            /* Quem subiu para reler deixa de ser arrastado de volta.
+               120 de folga: o fim "quase exato" da conta -- exigir zero faria
+               qualquer sobra de meio pixel desgrudar a conversa. */
+            scrollEventThrottle={64}
+            onScroll={e => {
+              const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
+              const daBase = contentSize.height - contentOffset.y - layoutMeasurement.height
+              grudadoNoFim.current = daBase < 120
+            }}
             /* Puxar para tentar de novo é o gesto óbvio de quem viu a conversa
                não descer, e a tela precisa atender ao gesto que ela sugere. */
             refreshControl={

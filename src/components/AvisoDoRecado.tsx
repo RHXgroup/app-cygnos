@@ -2,144 +2,180 @@ import { useEffect, useRef } from 'react'
 import {
   Animated,
   Easing,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
-  type StyleProp,
-  type ViewStyle,
+  useWindowDimensions,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { primeiroNomeDela, type RecadoDaNutri } from '../lib/recadoDaNutri'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 
-/* O recado da nutricionista, como AVISO: aparece, ela lê, some sozinho.
+/* O recado da nutricionista, como aviso na tela que abre todo dia.
  *
- * ── Como ele chegou aqui ──────────────────────────────────────────────────
- * Ele já foi três coisas: linha de caixa de entrada com seta, cartão de
- * saudação com foto, e faixa fixa no topo da tela. O pedido que encerrou a
- * discussão foi "quero um aviso que aparece na tela e depois some, e pronto".
+ * ── Ele já foi quatro coisas, e o que cada troca ensinou ──────────────────
+ * Linha de caixa de entrada com seta; cartão de saudação com foto grande;
+ * faixa fixa; e um aviso que sumia sozinho depois de alguns segundos.
  *
- * A diferença não é de tamanho, é de NATUREZA. Cartão é conteúdo: ocupa lugar
- * na tela para sempre, empurra o resto para baixo e obriga a pessoa a decidir o
- * que fazer com ele. Aviso é um instante — ele usa o momento em que a tela
- * abre, que é o único em que se tem atenção de graça, entrega a frase e devolve
- * a tela inteira.
+ * O que ficou de cada uma: o DESENHO do aviso é o que agradou ("ficou legal, a
+ * forma que apareceu"), e o TEMPORIZADOR é o que caiu — "ele não sumiria
+ * sozinho, ele aparece igual apareceu (…) caso ela não consiga ler".
  *
- * ── Por que sumir sozinho é seguro ────────────────────────────────────────
- * Porque o recado NÃO SOME: ele continua em Mensagens, que é onde ela procura
- * quando lembrar que "a nutri falou alguma coisa". O aviso é a batida na porta,
- * e não a carta.
+ * E o argumento é bom. Um aviso que evapora aposta que a pessoa estava olhando
+ * na hora em que o app abriu; quem abriu o app com o celular na mão indo para o
+ * trabalho perde a frase e não sabe que perdeu. Isso é aceitável para "salvo
+ * com sucesso"; não é para a única frase que uma profissional de saúde escreveu
+ * para ela esta semana.
  *
- * Sem essa rede eu não teria feito assim, e vale ficar escrito: um aviso que
- * evapora sendo a única cópia de um recado de profissional de saúde seria a
- * pior combinação possível deste app.
+ * ── Então quem tira é ela ─────────────────────────────────────────────────
+ * Arrastando para o lado, como se joga fora uma notificação, ou pelo ×. Os dois
+ * fazem a mesma coisa: só quem leu decide que já leu.
  *
- * ── E a assinatura fica ───────────────────────────────────────────────────
- * É a única parte que eu não tiraria. Sem ela, "Bom dia, continue assim!" se lê
- * como o APP falando — mensagem de sistema, dessas que todo aplicativo escreve
- * e ninguém lê. O valor está em ter vindo de uma pessoa que ela consulta de
- * verdade, e essa é justamente a parte que nenhum concorrente pode copiar. */
+ * O × existe porque arrastar não se descobre sozinho — quem nunca tentou não
+ * sabe que dá. E o arrastar existe porque quem já sabe não quer procurar um
+ * alvo de 30 pixels.
+ *
+ * ── Está DENTRO da rolagem, e isso mudou junto ────────────────────────────
+ * Enquanto ele sumia sozinho, flutuava por cima: assim o desaparecimento não
+ * fazia a tela saltar. Agora que ele fica até ser dispensado, flutuar
+ * significaria tapar um pedaço da tela inicial por tempo indeterminado — então
+ * ele volta a ocupar o lugar dele, empurrando o resto para baixo enquanto
+ * existir. O salto de volta agora acontece só depois de um gesto DELA, e
+ * conteúdo que sai quando se joga fora não é susto: é a resposta.
+ *
+ * ── E o recado não depende disto para existir ─────────────────────────────
+ * Ele também está em Mensagens, que é onde ela procura quando lembrar que "a
+ * nutri falou alguma coisa". Este aviso é a batida na porta, e não a carta.
+ *
+ * ── A assinatura fica ─────────────────────────────────────────────────────
+ * É a única parte que eu não tiraria. Sem ela, "Boa noite, continue assim!" se
+ * lê como o APP falando — mensagem de sistema, dessas que todo aplicativo
+ * escreve e ninguém lê. O valor está em ter vindo de uma pessoa que ela
+ * consulta de verdade, e essa é justamente a parte que nenhum concorrente pode
+ * copiar. */
 
-const ENTRADA_MS = 260
-const SAIDA_MS = 220
+const ENTRADA_MS = 300
+const SAIDA_MS = 200
 
-/* Quanto tempo o aviso fica parado na tela.
+/* Quanto o dedo precisa andar para valer como "joguei fora".
  *
- * Proporcional ao TEXTO, e não fixo: três segundos servem para "Bom dia!" e
- * cortam pela metade um recado de três linhas — e cortar a frase de uma
- * profissional de saúde no meio é o defeito que este número existe para evitar.
- *
- * A conta é leitura calma (~180 palavras por minuto, perto de 16 letras por
- * segundo) mais um segundo e meio para o olho encontrar o aviso, que apareceu
- * sozinho e não estava sendo procurado. O teto de 11 segundos existe porque
- * acima disso ele deixa de ser aviso e vira coisa parada na tela. */
-export function tempoDeLeituraMs(texto: string): number {
-  const conta = 1_500 + (texto.trim().length / 16) * 1_000
-  return Math.min(11_000, Math.max(4_500, Math.round(conta)))
-}
+ * Fração da largura, e não pixels: 90 px são um terço da tela num aparelho
+ * pequeno e um oitavo num grande, e o mesmo gesto teria significados
+ * diferentes. */
+const FRACAO_PARA_SUMIR = 0.3
+/* Um gesto RÁPIDO conta mesmo sem chegar lá. É como se joga fora de verdade —
+   um peteleco curto —, e exigir a distância inteira faria o aviso voltar para o
+   lugar depois de um gesto que qualquer pessoa leria como descarte. */
+const VELOCIDADE_PARA_SUMIR = 0.5
 
 export function AvisoDoRecado({
   recado,
-  /* Chamado quando ele terminou de sair, e não quando começa: quem chama usa
-     isto para DESMONTAR o componente, e desmontar no começo cortaria a
-     animação de saída pela metade — o aviso sumiria com um corte seco, que é
-     exatamente o susto que uma saída animada existe para evitar.
-     Marcar como visto acontece no mesmo momento, e pelo mesmo motivo é o
-     momento certo: app fechado no meio da exibição volta a mostrar o aviso, e
-     isso está certo — ela não chegou a ler. */
+  /* Chamado quando ele terminou de sair. Quem chama usa isto para DESMONTAR e
+     para marcar o recado como visto — e as duas coisas acontecem só depois de
+     um gesto dela, que é o que garante que ninguém marca por ela. */
   onSumir,
-  /* Só a posição vertical vem de fora: quem monta é quem sabe onde acaba a
-     barra de cima daquela tela. O resto do desenho é deste arquivo. */
-  style,
 }: {
   recado: RecadoDaNutri
   onSumir: () => void
-  style?: StyleProp<ViewStyle>
 }) {
   const styles = estilos()
+  const { width } = useWindowDimensions()
+
+  /* Entrada e saída: opacidade e deslocamento vertical. */
   const anima = useRef(new Animated.Value(0)).current
+  /* O arraste horizontal, separado porque ele é conduzido pelo dedo e não por
+     uma animação com tempo. */
+  const arraste = useRef(new Animated.Value(0)).current
 
-  /* O toque antecipa a saída, e para isso precisa alcançar a função que mora
-     dentro do efeito. Um ref é o que liga os dois sem duplicar a lógica. */
-  const antecipar = useRef<() => void>(() => {})
-
-  /* Ref, e não estado: quem tocar no aviso enquanto o relógio corre não pode
-     disparar a saída duas vezes — a segunda animação começaria do meio e daria
-     um tranco. */
+  /* Ref, e não estado: o × e o arraste podem chegar quase juntos, e a segunda
+     saída começaria do meio da primeira e daria um tranco. */
   const saindo = useRef(false)
 
-  useEffect(() => {
-    let relogio: ReturnType<typeof setTimeout> | undefined
-
-    const sair = () => {
-      if (saindo.current) return
-      saindo.current = true
+  /* A saída mora num ref para o gesto, o botão e o efeito chamarem a MESMA
+     função — três caminhos para o mesmo fim, e um só lugar que sabe como. */
+  const sair = useRef((paraOnde: number) => {
+    if (saindo.current) return
+    saindo.current = true
+    Animated.parallel([
+      Animated.timing(arraste, {
+        toValue: paraOnde,
+        duration: SAIDA_MS,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
       Animated.timing(anima, {
         toValue: 0,
         duration: SAIDA_MS,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
-      }).start(() => onSumir())
-    }
-    antecipar.current = sair
+      }),
+    ]).start(() => onSumir())
+  }).current
 
+  useEffect(() => {
     Animated.timing(anima, {
       toValue: 1,
       duration: ENTRADA_MS,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start(({ finished }) => {
-      /* Só conta o tempo DEPOIS de o aviso estar inteiro na tela. Começar a
-         contagem junto com a entrada roubaria os primeiros instantes de
-         leitura, que são justamente os que a pessoa gasta percebendo que
-         apareceu alguma coisa. */
-      if (finished) relogio = setTimeout(sair, tempoDeLeituraMs(recado.texto))
-    })
-
-    return () => {
-      if (relogio) clearTimeout(relogio)
-    }
-    /* Uma vez por montagem, de propósito: o aviso nasce e morre com um recado
-       só. Quem troca o recado troca a `key` de quem monta este componente, e
-       aí ele nasce de novo — que é o comportamento certo para uma mensagem
-       nova. */
+    }).start()
+    /* Uma vez por montagem: o aviso nasce e morre com um recado só, e quem
+       troca o recado troca a `key` de quem o monta. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const dedo = useRef(
+    PanResponder.create({
+      /* NÃO pega o toque no início: pegar de saída roubaria o toque do × e
+         mataria a rolagem da tela inteira, que passa por baixo deste
+         componente. */
+      onStartShouldSetPanResponder: () => false,
+      /* Só quando o dedo anda claramente na HORIZONTAL. A tela por fora é uma
+         rolagem vertical; sem esta comparação, tentar rolar a página com o dedo
+         em cima do aviso arrastaria o aviso em vez de rolar. */
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderMove: (_, g) => arraste.setValue(g.dx),
+      onPanResponderRelease: (_, g) => {
+        const longe = Math.abs(g.dx) > width * FRACAO_PARA_SUMIR
+        const rapido = Math.abs(g.vx) > VELOCIDADE_PARA_SUMIR
+        if (longe || rapido) {
+          /* Sai para o lado para onde ela empurrou: sair para o outro seria o
+             aviso discordando do gesto. `Math.sign` do próprio deslocamento, e
+             não da velocidade, porque um peteleco pode terminar com o dedo
+             voltando um pouco. */
+          sair((g.dx < 0 ? -1 : 1) * width)
+          return
+        }
+        /* Não foi longe nem rápido: volta ao lugar. Mola, e não tempo — é o que
+           faz parecer que o aviso resistiu, em vez de ter escorregado de
+           volta. */
+        Animated.spring(arraste, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 6,
+        }).start()
+      },
+      /* Uma interrupção do sistema (ligação, notificação) deixaria o aviso preso
+         torto no meio da tela. */
+      onPanResponderTerminate: () => {
+        Animated.spring(arraste, { toValue: 0, useNativeDriver: true }).start()
+      },
+    }),
+  ).current
+
   return (
     <Animated.View
-      /* `box-none` na moldura: ela é uma faixa da largura da tela, e sem isto
-         engoliria o toque no que estiver por baixo durante os instantes em que
-         já está transparente mas ainda montada. */
-      pointerEvents="box-none"
+      {...dedo.panHandlers}
       style={[
         styles.moldura,
-        style,
         {
           opacity: anima,
           transform: [
+            { translateX: arraste },
             {
               /* Desce de cima, como notificação do sistema. Doze pixels: o
                  bastante para o olho registrar movimento, pouco o bastante para
@@ -149,32 +185,40 @@ export function AvisoDoRecado({
           ],
         },
       ]}
+      /* O leitor de tela não arrasta. A ação de acessibilidade é o que dá a
+         mesma saída para quem depende dele — sem ela, o aviso seria a única
+         coisa da tela que não se consegue dispensar. */
+      accessible
+      accessibilityLabel={`Recado de ${primeiroNomeDela(recado.nome)}, sua nutricionista. ${recado.texto}`}
+      accessibilityActions={[{ name: 'dispensar', label: 'Dispensar o recado' }]}
+      onAccessibilityAction={e => {
+        if (e.nativeEvent.actionName === 'dispensar') sair(width)
+      }}
     >
+      <View style={styles.selo}>
+        <Ionicons name="chatbubble-ellipses" size={14} color={paleta().cores.verde} />
+      </View>
+
+      <View style={styles.textos}>
+        {/* Sem `numberOfLines`: cortar com reticências a frase de uma
+            profissional de saúde é pior do que o aviso ter três linhas. */}
+        <Text style={styles.fala}>{recado.texto}</Text>
+        <Text style={styles.assinatura}>
+          {primeiroNomeDela(recado.nome)}, sua nutricionista
+        </Text>
+      </View>
+
+      {/* `hitSlop` porque o × desenhado é pequeno de propósito — ele não pode
+          competir com a frase —, e área de toque pequena não é o mesmo que
+          desenho pequeno. */}
       <Pressable
-        onPress={() => antecipar.current()}
-        style={styles.aviso}
+        onPress={() => sair(width)}
+        hitSlop={12}
+        style={styles.fechar}
         accessibilityRole="button"
-        /* O rótulo diz QUEM falou antes do que foi dito: quem usa leitor de tela
-           não vê o ícone, e "sua nutricionista" é o que faz a frase merecer
-           atenção. */
-        accessibilityLabel={`Recado de ${primeiroNomeDela(recado.nome)}, sua nutricionista. ${recado.texto}. Toque para dispensar.`}
-        /* Ele some sozinho, então o leitor de tela precisa anunciá-lo na hora em
-           que aparece — do contrário ele passa inteiro sem nunca ter existido
-           para quem depende do leitor. */
-        accessibilityLiveRegion="polite"
+        accessibilityLabel="Dispensar o recado"
       >
-        <View style={styles.selo}>
-          <Ionicons name="chatbubble-ellipses" size={14} color={paleta().cores.verde} />
-        </View>
-        <View style={styles.textos}>
-          {/* Sem `numberOfLines`: o tempo lá em cima já é calculado pelo tamanho
-              do texto, então recado longo ganha tempo em vez de perder
-              palavras. */}
-          <Text style={styles.fala}>{recado.texto}</Text>
-          <Text style={styles.assinatura}>
-            {primeiroNomeDela(recado.nome)}, sua nutricionista
-          </Text>
-        </View>
+        <Ionicons name="close" size={15} color={paleta().inkFraco} />
       </Pressable>
     </Animated.View>
   )
@@ -182,37 +226,28 @@ export function AvisoDoRecado({
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
-    /* Flutua SOBRE a tela, e não dentro da rolagem. Dentro, o desaparecimento
-       faria todo o conteúdo saltar para cima no meio da leitura — que é
-       exatamente o susto que um aviso não pode dar. */
     moldura: {
-      position: 'absolute',
-      left: 12,
-      right: 12,
-      zIndex: 20,
-    },
-    aviso: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 10,
       paddingVertical: 12,
-      paddingHorizontal: 13,
+      paddingLeft: 13,
+      /* Menos à direita: o × já traz a própria folga. */
+      paddingRight: 8,
       borderRadius: RAIO_CARTAO,
-      /* Opaco de propósito: ele passa por cima de texto, e um fundo translúcido
-         deixaria as duas camadas se lendo ao mesmo tempo. */
       backgroundColor: t.cores.cartao,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: t.cores.verdeClaro,
-      /* A sombra é o que diz "isto está por cima". Sem ela o aviso se lê como
-         mais um cartão da tela, e aí sumir vira defeito. */
+      /* A sombra é o que diz "isto chegou agora", e separa o aviso dos cartões
+         de conteúdo que vêm logo abaixo. */
       ...Platform.select({
         ios: {
           shadowColor: '#000',
-          shadowOpacity: 0.16,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.12,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
         },
-        android: { elevation: 6 },
+        android: { elevation: 4 },
         default: {},
       }),
     },
@@ -226,9 +261,10 @@ const estilos = estilosDe(t =>
       justifyContent: 'center',
       backgroundColor: t.cores.verdeMenta,
     },
-    textos: { flex: 1, gap: 3 },
+    textos: { flex: 1, gap: 3, paddingTop: 2 },
     fala: { fontSize: 14, lineHeight: 20, color: t.cores.ink },
     /* Miúda: diz de quem é, sem disputar com o que foi dito. */
     assinatura: { fontSize: 11.5, fontWeight: '700', color: t.inkSuave },
+    fechar: { padding: 4 },
   }),
 )

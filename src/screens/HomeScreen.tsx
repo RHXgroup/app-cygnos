@@ -962,16 +962,32 @@ export function HomeScreen({
        * A faixa de dias veio junto porque ela SELECIONA o que este cartão
        * mostra: separadas, a pessoa mudava o dia e o número mudava fora da
        * vista. */}
-      {/* O recado dela NÃO mora mais aqui.
+      {/* ── O AVISO DELA, e por que ele fica AQUI ──────────────
        *
-       * Ele já foi cartão exatamente neste ponto, e o pedido depois foi
-       * outro: "quero um aviso que aparece na tela e depois some, e pronto".
-       * Conteúdo fixo empurra o dia para baixo todo santo dia; aviso usa o
-       * instante em que a tela abre e devolve a tela inteira.
+       * Primeira coisa depois do próprio nome, e antes da faixa de dias: ele
+       * não muda com o dia escolhido, então não pertence ao que vem
+       * depois dela.
        *
-       * Ele virou <AvisoDoRecado />, logo depois do fim desta rolagem — fora
-       * dela de propósito, para o desaparecimento não fazer o conteúdo saltar
-       * no meio da leitura. */}
+       * Ele já flutuou por cima da tela, enquanto sumia sozinho. Agora que
+       * ele fica até ser dispensado, flutuar significaria tapar um pedaço
+       * da inicial por tempo indeterminado — então volta a ocupar
+       * lugar, empurrando o resto para baixo enquanto existir.
+       *
+       * A `key` é o recado: se ela escrever outro com o app aberto, o
+       * componente NASCE DE NOVO em vez de trocar o texto por baixo. */}
+      {aviso !== null && (
+        <AvisoDoRecado
+          key={aviso.criadoEm}
+          recado={aviso}
+          onSumir={() => {
+            /* Só depois de ela ter dispensado. É o que garante que
+               ninguém marca por ela: app fechado com o aviso na tela o traz
+               de volta na próxima abertura, e isso está certo. */
+            marcarRecadoVisto(aviso.criadoEm)
+            setAviso(null)
+          }}
+        />
+      )}
 
       <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
 
@@ -1156,36 +1172,6 @@ export function HomeScreen({
           rotina que se esquece. */}
       <CartaoTreino sessoes={sessoes} metaSemana={metas.treinosSemana} onAbrir={onAbrirTreino} />
     </ScrollView>
-
-    {/* —— O AVISO DELA ——————————————————
-      *
-      * Fora da rolagem, e depois dela: é uma camada por cima, e não um
-      * item da tela. Dentro, o instante em que ele some faria todo o
-      * conteúdo saltar para cima no meio da leitura.
-      *
-      * A `key` é o recado: se ela escrever outro com o app aberto, o
-      * componente NASCE DE NOVO em vez de trocar o texto por baixo — o
-      * que daria uma frase nova com o relógio da antiga já correndo.
-      *
-      * Ancorado ABAIXO da barra de cima, e não colado no alto: por cima do
-      * botão de menu ele bloquearia o menu justamente nos segundos em que
-      * alguém pode querer usá-lo. */}
-    {aviso !== null && (
-      <AvisoDoRecado
-        key={aviso.criadoEm}
-        recado={aviso}
-        style={{ top: top + 58 }}
-        onSumir={() => {
-          /* Chamado quando a saída TERMINOU, e não quando ela começa:
-             desmontar no começo cortaria a animação pela metade.
-             Marcar aqui também é o momento certo. App fechado no meio da
-             exibição volta a mostrar o aviso na próxima abertura, e
-             isso está certo — ela não chegou a ler. */
-          marcarRecadoVisto(aviso.criadoEm)
-          setAviso(null)
-        }}
-      />
-    )}
 
     {detalheDoDia && <FolhaDoDia doDia={doDia} onFechar={() => setDetalheDoDia(false)} />}
 
