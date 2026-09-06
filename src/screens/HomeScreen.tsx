@@ -21,7 +21,7 @@ import { valemPara, type Intencao } from '../lib/intencaoDaIA'
 import { AnelCalorias } from '../components/AnelCalorias'
 import { CartaoDaSemana } from '../components/CartaoDaSemana'
 import { CartaoDaSequencia } from '../components/CartaoDaSequencia'
-import { CartaoDoRecado } from '../components/CartaoDoRecado'
+import { AvisoDoRecado } from '../components/AvisoDoRecado'
 import { Secao } from '../components/Secao'
 import { AnelProgresso } from '../components/AnelProgresso'
 import { FaixaDeDias } from '../components/FaixaDeDias'
@@ -58,6 +58,7 @@ import { passoInicial } from '../lib/primeirosDias'
 import { metasSugeridas } from '../lib/metasSugeridas'
 import { carregarCorpoDaConta } from '../lib/metas'
 import { carregarRecadoDaNutri, type RecadoDaNutri } from '../lib/recadoDaNutri'
+import { marcarRecadoVisto, recadoJaVisto } from '../lib/recadoVisto'
 import { tendenciaDoPeso } from '../lib/tendenciaDoPeso' 
 import { reagendarSequencia } from '../lib/lembretes' 
 import { sequenciaDaPessoa } from '../lib/sequenciaDaPessoa' 
@@ -241,9 +242,18 @@ export function HomeScreen({
      `carregando` da tela não serve, porque ele é da consulta do nome, que
      termina antes desta. Item 8: releitura não pode piscar. */
   const [diasCarregados, setDiasCarregados] = useState(false)
-  /* O recado da nutricionista. Só é buscado quando esta aba está NA FRENTE —
-     ver o efeito abaixo, e `naFrente` em App.tsx. */
-  const [recado, setRecado] = useState<RecadoDaNutri | null>(null)
+  /* O recado da nutricionista, enquanto ele está APARECENDO.
+   *
+   * Só é buscado com esta aba NA FRENTE — ver o efeito abaixo, e
+   * `naFrente` em App.tsx. Buscar marca como LIDO, e marcar de uma aba
+   * escondida faria o retorno mentir para ela.
+   *
+   * Nulo quer dizer "não há aviso na tela", e isso cobre três casos
+   * que a tela não precisa distinguir: não há recado, ele já
+   * apareceu numa abertura anterior, ou ele acabou de sair sozinho. Um estado
+   * para o recado e outro para o aviso seriam duas verdades sobre a mesma
+   * coisa. */
+  const [aviso, setAviso] = useState<RecadoDaNutri | null>(null)
   /* Só o anel usa: é a rotina que diz se hoje é dia de treino ou de descanso.
      Sem ela não há como cobrar treino de ninguém — ver lib/metaDoDia. */
   const [rotina, setRotina] = useState<Exercicio[]>([])
@@ -451,7 +461,17 @@ export function HomeScreen({
     carregarRecadoDaNutri().then(r => {
       if (!vivo) return
       if (__DEV__) console.log('[cygnos] recado:', r === null ? 'NULL' : JSON.stringify(r))
-      setRecado(r)
+      if (r === null) return
+/* O MESMO recado não aparece duas vezes.
+       *
+       * Ele fica no banco até ela escrever outro — às vezes uma
+       * semana. Sem esta pergunta, o mesmo "Bom dia!" voltaria em toda
+       * abertura do app durante sete dias, e aviso que se repete é o banner
+       * que a pessoa aprende a fechar sem ler. Ver lib/recadoVisto. */
+      recadoJaVisto(r.criadoEm).then(visto => {
+        if (!vivo || visto) return
+        setAviso(r)
+      })
     })
     return () => {
       vivo = false
@@ -942,25 +962,16 @@ export function HomeScreen({
        * A faixa de dias veio junto porque ela SELECIONA o que este cartão
        * mostra: separadas, a pessoa mudava o dia e o número mudava fora da
        * vista. */}
-      {/* ── O RECADO DELA ABRE A TELA ────────────────────────────────────
+      {/* O recado dela NÃO mora mais aqui.
        *
-       * Ele estava depois do cartão de calorias, sob a placa da nutricionista.
-       * Ali ele é mais um item; aqui ele é a primeira coisa que a pessoa lê
-       * depois do próprio nome — e é o único conteúdo desta tela que veio de
-       * uma PESSOA, e não de uma conta.
+       * Ele já foi cartão exatamente neste ponto, e o pedido depois foi
+       * outro: "quero um aviso que aparece na tela e depois some, e pronto".
+       * Conteúdo fixo empurra o dia para baixo todo santo dia; aviso usa o
+       * instante em que a tela abre e devolve a tela inteira.
        *
-       * Pedido assim: "não seria melhor se aparecesse um card na tela inicial
-       * assim que abre o app, dando uma saudação?". É isso, e o texto é dela,
-       * o que vale mais do que qualquer frase que o app inventasse.
-       *
-       * Some sozinho quando não há recado — nada de moldura dizendo "sua
-       * nutricionista ainda não escreveu", que é cobrança do profissional na
-       * cara de quem abriu o app. E fica antes da faixa de dias de propósito:
-       * ele não muda com o dia escolhido, então não pertence ao que vem depois
-       * dela. */}
-      {recado !== null && (
-        <CartaoDoRecado recado={recado} />
-      )}
+       * Ele virou <AvisoDoRecado />, logo depois do fim desta rolagem — fora
+       * dela de propósito, para o desaparecimento não fazer o conteúdo saltar
+       * no meio da leitura. */}
 
       <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
 
@@ -1000,14 +1011,6 @@ export function HomeScreen({
         onAbrirContador={onAbrirContador}
       />
 
-      {/* O RECADO DELA, acima de tudo.
-          É o único conteúdo desta tela que veio de uma PESSOA, e não de uma
-          conta. Some sozinho quando não há recado — nada de moldura dizendo
-          "sua nutricionista ainda não escreveu", que é cobrança do profissional
-          na cara da paciente. */}
-      {/* O título só nasce com recado. `CartaoDoRecado` devolve null quando
-          não há, e um "Da sua nutricionista" sobre o vazio pareceria falha do
-          app — ou, pior, cobrança dela. */}
       {/* A SEQUÊNCIA, antes de tudo.
           Acima do próximo passo de propósito: ela é o MOTIVO de fazer, e o
           passo é a tarefa. Motivo vem antes de tarefa — a ordem contrária
@@ -1153,6 +1156,36 @@ export function HomeScreen({
           rotina que se esquece. */}
       <CartaoTreino sessoes={sessoes} metaSemana={metas.treinosSemana} onAbrir={onAbrirTreino} />
     </ScrollView>
+
+    {/* —— O AVISO DELA ——————————————————
+      *
+      * Fora da rolagem, e depois dela: é uma camada por cima, e não um
+      * item da tela. Dentro, o instante em que ele some faria todo o
+      * conteúdo saltar para cima no meio da leitura.
+      *
+      * A `key` é o recado: se ela escrever outro com o app aberto, o
+      * componente NASCE DE NOVO em vez de trocar o texto por baixo — o
+      * que daria uma frase nova com o relógio da antiga já correndo.
+      *
+      * Ancorado ABAIXO da barra de cima, e não colado no alto: por cima do
+      * botão de menu ele bloquearia o menu justamente nos segundos em que
+      * alguém pode querer usá-lo. */}
+    {aviso !== null && (
+      <AvisoDoRecado
+        key={aviso.criadoEm}
+        recado={aviso}
+        style={{ top: top + 58 }}
+        onSumir={() => {
+          /* Chamado quando a saída TERMINOU, e não quando ela começa:
+             desmontar no começo cortaria a animação pela metade.
+             Marcar aqui também é o momento certo. App fechado no meio da
+             exibição volta a mostrar o aviso na próxima abertura, e
+             isso está certo — ela não chegou a ler. */
+          marcarRecadoVisto(aviso.criadoEm)
+          setAviso(null)
+        }}
+      />
+    )}
 
     {detalheDoDia && <FolhaDoDia doDia={doDia} onFechar={() => setDetalheDoDia(false)} />}
 
