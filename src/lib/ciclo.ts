@@ -1,3 +1,4 @@
+import { mostraOCiclo } from './cicloVisivel'
 import { falha } from './erros'
 import { supabase } from './supabase'
 import type { Ciclo, CicloInformado } from './cicloDaPessoa'
@@ -53,6 +54,48 @@ export async function carregarCiclos(contaId: string): Promise<ResultadoCiclos> 
       mensagem: falha('Não consegui carregar os seus registros agora. Verifique a conexão.', error),
     }
   return { tipo: 'ok', registros: ((data ?? []) as Linha[]).map(doRegistro) }
+}
+
+/* Se a linha do ciclo deve aparecer na aba Corpo.
+ *
+ * A REGRA mora em lib/cicloVisivel.ts, separada e testada; aqui fica só a
+ * ida ao banco. É o corte de sempre neste projeto: quem decide não fala
+ * com a rede, e quem fala com a rede não decide.
+ *
+ * Devolve VERDADEIRO quando a consulta falha, e isso é de propósito
+ * (armadilha 11): sem sinal, a resposta certa é deixar a tela como ela
+ * sempre foi. Esconder por falta de rede faria uma funcionalidade sumir do
+ * aparelho de quem a usa todo mês, sem erro nenhum na tela. */
+export async function mostraALinhaDoCiclo(contaId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('app_contas')
+    .select('genero')
+    .eq('id', contaId)
+    .maybeSingle()
+
+  if (error) {
+    falha('Não consegui ler o seu cadastro agora.', error)
+    return true
+  }
+
+  const genero = (data as { genero?: string | null } | null)?.genero ?? null
+
+  /* A segunda consulta só acontece para quem a primeira esconderia. Para
+     todo o resto a resposta já está decidida, e perguntar por registros
+     seria uma ida à rede por linha de lista que ninguém pediu. */
+  if (mostraOCiclo({ genero, temRegistro: false })) return true
+
+  const { count, error: erroCount } = await supabase
+    .from('app_ciclo_registros')
+    .select('id', { count: 'exact', head: true })
+    .eq('conta_id', contaId)
+
+  if (erroCount) {
+    falha('Não consegui conferir os seus registros de ciclo.', erroCount)
+    return true
+  }
+
+  return mostraOCiclo({ genero, temRegistro: (count ?? 0) > 0 })
 }
 
 export type ResultadoRegistro =

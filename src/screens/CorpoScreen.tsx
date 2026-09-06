@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { RelatoriosScreen } from './RelatoriosScreen'
+import { mostraALinhaDoCiclo } from '../lib/ciclo'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* A aba Corpo: como o corpo respondeu.
@@ -47,6 +49,28 @@ export function CorpoScreen({
   const styles = estilos()
   const { top } = useSafeAreaInsets()
 
+  /* A linha do ciclo não é para todo mundo.
+   *
+   * Começa VERDADEIRA e só pode virar falsa: a tela nasce como sempre
+   * foi, e se a resposta demorar ou não vier, ela continua como sempre foi.
+   * Começar escondida faria a linha PISCAR na tela de quem usa o ciclo todo
+   * mês, a cada abertura da aba — e piscar é justamente o que a
+   * armadilha 8 proíbe numa releitura.
+   *
+   * Sem `versao` na lista: gênero não muda por registro nenhum, e o
+   * único lugar que o altera é o perfil, que fica noutra tela. */
+  const [comCiclo, setComCiclo] = useState(true)
+  useEffect(() => {
+    let vivo = true
+    mostraALinhaDoCiclo(contaId).then(r => {
+      if (vivo) setComCiclo(r)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [contaId])
+
+
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -77,16 +101,23 @@ export function CorpoScreen({
             onPress={onAbrirTreino}
             styles={styles}
           />
-          {/* Por último dos quatro, e sem enfeite nenhum na linha: quem não
-              menstrua passa por ela todo dia, e um destaque a transformaria em
-              ruído permanente. Quem usa acha na segunda vez. */}
-          <Linha
-            icone="ellipse-outline"
-            titulo="Ciclo"
-            sub="Menstruação, e o que ela mostra no seu diário"
-            onPress={onAbrirCiclo}
-            styles={styles}
-          />
+          {/* O CICLO, e para quem.
+              Por último dos quatro, e sem enfeite nenhum: para quem usa,
+              achar na segunda vez basta; um destaque a transformaria em
+              ruído permanente para quem não usa.
+              E agora ela nem aparece para quem se cadastrou como homem —
+              relatado assim: "eu sou homem no meu app e aparece o ciclo
+              menstrual rs, não deveria né". A regra, com as duas
+              exceções que ela precisa ter, mora em lib/cicloVisivel. */}
+          {comCiclo && (
+            <Linha
+              icone="ellipse-outline"
+              titulo="Ciclo"
+              sub="Menstruação, e o que ela mostra no seu diário"
+              onPress={onAbrirCiclo}
+              styles={styles}
+            />
+          )}
         </View>
 
         {/* O relatório inteiro, e não um resumo com "ver mais". Ele já era uma
