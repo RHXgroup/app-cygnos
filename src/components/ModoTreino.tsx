@@ -1183,9 +1183,20 @@ export function ModoTreino({
            * para voz não exige mais passar por manual. */}
           <View style={styles.chavesDeModo}>
             {([
-              { chave: 'voz', rotulo: 'Voz', icone: 'mic' },
-              { chave: 'manual', rotulo: 'Mão', icone: 'volume-medium' },
-              { chave: 'mudo', rotulo: 'Mudo', icone: 'volume-mute' },
+              /* EMOJI, e não Ionicons — pedido de quem usa, olhando a tela.
+               *
+               * Os três desenhos vetoriais estavam certos e discretos demais:
+               * num chip de doze pontos de altura, um microfone cinza ao lado
+               * da palavra "Voz" some. O emoji tem cor própria e peso, e por
+               * isso é lido de relance no meio de uma série — que é o momento
+               * em que esta tela é usada.
+               *
+               * O custo conhecido: emoji não muda de cor com o chip. No verde
+               * do modo ativo ele continua colorido, e é por isso que o texto
+               * ao lado é que vira branco. */
+              { chave: 'voz', rotulo: 'Voz', emoji: '🎤' },
+              { chave: 'manual', rotulo: 'Mão', emoji: '🔊' },
+              { chave: 'mudo', rotulo: 'Mudo', emoji: '🔇' },
             ] as const).map(op => {
               const ativo = modo === op.chave
               return (
@@ -1210,11 +1221,7 @@ export function ModoTreino({
                         : 'Silencioso, sem avisos falados'
                   }
                 >
-                  <Ionicons
-                    name={op.icone}
-                    size={15}
-                    color={ativo ? paleta().cores.branco : paleta().inkMedio}
-                  />
+                  <Text style={styles.emojiModo}>{op.emoji}</Text>
                   <Text style={[styles.textoChaveModo, ativo && styles.textoChaveModoAtiva]}>
                     {op.rotulo}
                   </Text>
@@ -1843,6 +1850,8 @@ const estilos = estilosDe(t =>
     borderRadius: 16,
   },
   chaveModoAtiva: { backgroundColor: t.cores.verde },
+  /* Sem cor: emoji traz a própria. Só o tamanho, alinhado com o texto ao lado. */
+  emojiModo: { fontSize: 13 },
   textoChaveModo: { fontSize: 12, fontWeight: '700', color: t.inkMedio },
   textoChaveModoAtiva: { color: t.cores.branco },
 
