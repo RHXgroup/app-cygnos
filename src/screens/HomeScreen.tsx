@@ -428,13 +428,30 @@ export function HomeScreen({
    * os dois momentos em que a pessoa está presente e olhando para esta tela.
    * Trocar de aba não mexe nele, então a proteção do parágrafo acima continua
    * inteira, que é o motivo de a guarda existir. */
-  const recadoNaVersao = useRef(-1)
+  /* ── RELÊ SEMPRE QUE ESTA ABA VOLTA À FRENTE ───────────────────────────
+   *
+   * Havia uma guarda por `versaoPlano`, que só sobe ao voltar do segundo plano
+   * ou ao puxar para atualizar. Com o app ABERTO, o recado era buscado uma vez
+   * e nunca mais: a nutricionista escrevia, e a pessoa do outro lado não via
+   * nada até fechar o app.
+   *
+   * Relatado assim: "mandei mensagem no sistema e não aparece no app… não foi,
+   * porque tô com ele aberto e não apareceu nada aqui".
+   *
+   * O motivo da guarda continua válido e continua atendido: o recado é marcado
+   * como LIDO ao ser buscado, então buscar de uma aba escondida faria o retorno
+   * mentir para a nutricionista. Por isso a condição de `naFrente` fica — o que
+   * sai é o travamento por versão. Trocar para esta aba é a pessoa olhando, e é
+   * exatamente aí que ler é honesto.
+   *
+   * `versaoPlano` continua na lista: puxar para atualizar deve reler também. */
   useEffect(() => {
-    if (!naFrente || recadoNaVersao.current === versaoPlano) return
-    recadoNaVersao.current = versaoPlano
+    if (!naFrente) return
     let vivo = true
     carregarRecadoDaNutri().then(r => {
-      if (vivo) setRecado(r)
+      if (!vivo) return
+      if (__DEV__) console.log('[cygnos] recado:', r === null ? 'NULL' : JSON.stringify(r))
+      setRecado(r)
     })
     return () => {
       vivo = false

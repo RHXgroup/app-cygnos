@@ -66,6 +66,14 @@ export async function carregarRecadoDaNutri(): Promise<RecadoDaNutri | null> {
   /* O retorno é jsonb, e chega como `unknown`. Um `as` cru deixaria passar o
      dia em que o contrato mudar, e aí o cartão desenharia "undefined" no lugar
      do recado — que é pior do que não desenhar. */
+  /* O retorno CRU no terminal, só em desenvolvimento.
+   *
+   * A função do banco marca o recado como LIDO antes de devolver — então
+   * `lido_em` preenchido prova que ela foi chamada, e NÃO que o cartão
+   * apareceu. As duas coisas se pareciam de fora, e foi o que travou o
+   * diagnóstico: o banco dizia "entregue" enquanto a tela não mostrava nada. */
+  if (__DEV__) console.log('[cygnos] recado cru:', JSON.stringify(data))
+
   const r = data as
     | { tem?: boolean; texto?: unknown; criado_em?: unknown; de?: { nome?: unknown; foto?: unknown } }
     | null
