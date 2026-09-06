@@ -1,6 +1,7 @@
 import {
   cabeAgora,
   comandoDoTexto,
+  frasesDoMomento,
   naoEntendi,
   RESPOSTA,
   semChamado,
@@ -370,6 +371,44 @@ function ok(nome: string, cond: boolean, extra = '') {
       cabeAgora('terminar', descanso) &&
       cabeAgora('terminar', entre),
   )
+}
+
+/* == A LEGENDA SAI DA MESMA REGRA ====================================== */
+{
+  const fechado = { aberto: false, descansando: false, naSerie: false }
+  const naSerie = { aberto: true, descansando: false, naSerie: true }
+  const descanso = { aberto: true, descansando: true, naSerie: false }
+
+  // A propriedade que importa: a tela NAO pode ensinar frase que o app recusa.
+  // Uma legenda escrita a mao seria uma segunda copia da regra, e a pessoa que
+  // tenta a frase errada conclui que a voz quebrou.
+  for (const m of [fechado, naSerie, descanso]) {
+    const frases = frasesDoMomento(m)
+    ok('a legenda nao fica vazia', frases.length > 0, JSON.stringify(m))
+    for (const f of frases) {
+      const c = temChamado(f) ? comandoDoTexto(semChamado(f)) : null
+      ok('"' + f + '" e entendida', c !== null, String(c))
+      ok('"' + f + '" cabe no momento', c !== null && cabeAgora(c, m), JSON.stringify(m))
+    }
+  }
+
+  // No meio da serie e UMA frase so -- e a regra que impedia encerrar o treino
+  // por engano. Se alguem alargar cabeAgora, este caso reprova.
+  ok('na serie a legenda tem uma frase', frasesDoMomento(naSerie).length === 1,
+     frasesDoMomento(naSerie).join(' | '))
+  ok('e ela e terminei', frasesDoMomento(naSerie)[0] === 'Cygnos, terminei',
+     frasesDoMomento(naSerie)[0])
+
+  // Com o treino fechado, so abrir -- e as DUAS formas de abrir, que foi como
+  // ele ditou: "enquanto eu nao falar signos iniciar ou signos vamos".
+  ok('fechado oferece as duas de abrir',
+     frasesDoMomento(fechado).join(' | ') === 'Cygnos, iniciar | Cygnos, vamos',
+     frasesDoMomento(fechado).join(' | '))
+  ok('e nada mais', frasesDoMomento(fechado).length === 2, String(frasesDoMomento(fechado).length))
+
+  // Toda frase comeca com o chamado -- senao a legenda ensina a falar sem ele.
+  const todas = [...frasesDoMomento(fechado), ...frasesDoMomento(naSerie), ...frasesDoMomento(descanso)]
+  ok('toda frase comeca com Cygnos', todas.every(f => f.startsWith('Cygnos,')), todas.join(' | '))
 }
 
 console.log(`\n${passou} passaram, ${falhou} falharam`)

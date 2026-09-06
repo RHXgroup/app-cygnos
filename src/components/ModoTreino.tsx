@@ -35,6 +35,7 @@ import {
   RESPOSTA,
   cabeAgora,
   comandoDoTexto,
+  frasesDoMomento,
   naoEntendi,
   semChamado,
   temChamado,
@@ -659,6 +660,18 @@ export function ModoTreino({
    * So na TRANSICAO, e nao a cada leitura: o intervalo roda dez vezes por
    * segundo, e chamar setState em todas seria redesenhar a tela a toa. */
   const [capturando, setCapturando] = useState(false)
+
+  /* O momento do treino, montado UMA vez.
+   *
+   * Duas coisas leem isto — o filtro que decide se um comando cabe, e a legenda
+   * que diz o que falar — e as duas precisam ver o mesmo. Montado solto em cada
+   * lugar, o TypeScript ainda estreita `fase` dentro dos ramos do JSX e a
+   * segunda leitura sai diferente da primeira sem ninguem notar. */
+  const momento = {
+    aberto: inicio !== null,
+    descansando: fase === 'descansando',
+    naSerie: inicioDaSerie !== null,
+  }
   const ouvindoAgora = useRef(false)
 
   /* Solta o microfone ao sair, mesmo no meio. Recurso nativo aberto mantém o
@@ -1024,11 +1037,7 @@ export function ModoTreino({
      * dito — foi ouvido de outra pessoa. A decisão mora em `cabeAgora`, que é
      * pura e tem caso de teste. */
     if (
-      !cabeAgora(c, {
-        aberto: inicio !== null,
-        descansando: fase === 'descansando',
-        naSerie: inicioDaSerie !== null,
-      })
+      !cabeAgora(c, momento)
     ) {
       console.log('[cygnos] comando', c, 'nao cabe agora — ignorado')
       return
@@ -1564,6 +1573,33 @@ export function ModoTreino({
                           lado de fora isso se lê como travamento, e não como
                           trabalho. O que muda de verdade é a resposta falada,
                           e ela chega quando chega. */}
+                      {/* ── A LEGENDA DO QUE DIZER AGORA ──────────────────
+                       *
+                       * Pedida junto com a regra dos momentos: "precisa inserir
+                       * uma legenda em algum lugar com essas informações, de
+                       * como tem que falar".
+                       *
+                       * Sai da MESMA fonte que decide o que o app aceita
+                       * (`frasesDoMomento`, sobre `cabeAgora`). Escrever as
+                       * frases à mão aqui criaria uma segunda cópia da regra, e
+                       * no dia em que uma mudasse a tela ensinaria uma frase que
+                       * o app já não aceita — pior do que legenda nenhuma,
+                       * porque a pessoa tenta, não funciona, e conclui que a voz
+                       * quebrou.
+                       *
+                       * Some enquanto ele está capturando: ali a resposta é
+                       * "estou ouvindo você", e a lista viraria ruído em cima da
+                       * única informação que importa naquele segundo. */}
+                      {!capturando && !entendendo && (
+                        <View style={styles.legendaVoz}>
+                          {frasesDoMomento(momento).map(f => (
+                            <Text key={f} style={styles.fraseLegenda}>
+                              {f}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
                       {/* Tres estados, e cada um responde a uma pergunta:
                           "pode falar?", "estou sendo ouvido?", "e agora?".
                           Ver o comentario de `capturando`. */}
@@ -1921,6 +1957,13 @@ const estilos = estilosDe(t =>
   textoChaveVoz: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
   textoChaveVozLigada: { color: t.cores.branco },
   respostaVoz: { marginTop: 8, fontSize: 13, color: t.inkMedio, textAlign: 'center' },
+  /* A legenda fica ACIMA do botão, e não abaixo: quem procura o que falar olha
+     para cima a partir do botão que diz "Ouvindo". Embaixo ela competiria com a
+     resposta do que foi ouvido, que aparece no mesmo lugar. */
+  legendaVoz: { gap: 2, marginBottom: 8, alignItems: 'center' },
+  /* Miúdo e fraco: é lembrete, não instrução. Quem já sabe a frase não precisa
+     ler, e quem não sabe acha em um olhar. */
+  fraseLegenda: { fontSize: 11.5, fontWeight: '600', color: t.inkSuave },
   medidorVoz: {
     marginTop: 4,
     fontSize: 11,

@@ -193,6 +193,62 @@ export function cabeAgora(comando: Comando, m: MomentoDoTreino): boolean {
   return comando === 'comecar' || comando === 'continuar' || comando === 'terminar'
 }
 
+/* O que dizer AGORA, para a tela mostrar.
+ *
+ * Pedido junto com a regra: "depois a gente precisa inserir uma legenda em
+ * algum lugar com essas informações, de como tem que falar".
+ *
+ * Sai da MESMA fonte que `cabeAgora` — e é esse o ponto. Uma legenda escrita à
+ * mão na tela seria uma segunda cópia da regra, e as duas divergiriam no dia em
+ * que alguém mexesse numa só: a tela ensinando uma frase que o app já não
+ * aceita é pior do que legenda nenhuma, porque a pessoa tenta, não funciona, e
+ * conclui que a voz está quebrada.
+ *
+ * Uma frase por comando, e a mais curta de cada lista: quem lê isso está com o
+ * peso na mão. */
+const EXEMPLO: Record<Comando, string> = {
+  comecar: 'Cygnos, iniciar',
+  continuar: 'Cygnos, vamos',
+  fiz: 'Cygnos, terminei',
+  pausar: 'Cygnos, pausa',
+  mais_descanso: 'Cygnos, mais tempo',
+  menos_descanso: 'Cygnos, menos tempo',
+  pular_descanso: 'Cygnos, pula o descanso',
+  terminar: 'Cygnos, terminar o treino',
+}
+
+/* A ordem em que as frases aparecem, e não a ordem do `Comando`.
+ *
+ * A primeira é a que a pessoa vai usar em 90% das vezes naquele momento; as
+ * outras são saída. Ordenar por dentro do tipo daria "mais tempo" antes de
+ * "terminei" no meio de uma série, e a primeira linha é a única que muitos
+ * leem. */
+const ORDEM: Comando[] = [
+  'fiz',
+  'comecar',
+  'continuar',
+  'mais_descanso',
+  'menos_descanso',
+  'pular_descanso',
+  'pausar',
+  'terminar',
+]
+
+export function frasesDoMomento(m: MomentoDoTreino): string[] {
+  const vistas = new Set<string>()
+  const frases: string[] = []
+  for (const c of ORDEM) {
+    if (!cabeAgora(c, m)) continue
+    const f = EXEMPLO[c]
+    /* `comecar` e `continuar` levam à mesma coisa em quase todo momento, e
+       mostrar as duas faria a legenda parecer maior do que a decisão é. */
+    if (vistas.has(f)) continue
+    vistas.add(f)
+    frases.push(f)
+  }
+  return frases
+}
+
 /* Palavras que INVERTEM o pedido.
  *
  * "não pausa" e "ainda não terminei" carregam a palavra do comando e querem o
