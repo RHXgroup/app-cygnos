@@ -206,17 +206,31 @@ export function MensagensScreen({
    * Dois `rAF` porque um só ainda cai dentro do mesmo ciclo de layout em
    * parte dos aparelhos. Isso é mais barato do que a terceira teoria. */
   const aoFim = useCallback(() => {
-    /* Uma RAJADA de avisos vira UMA rolagem.
+    /* ── A ROLAGEM VIROU UM EVENTO, e deixou de ser uma REAÇÃO ────
      *
-     * `onContentSizeChange` e `onLayout` disparam várias vezes seguidas
-     * enquanto a conversa se assenta, e cada um agendava a sua própria
-     * rolagem. Três rolagens em três quadros seguidos, cada uma mirando
-     * uma medida um pouco diferente, é o que se vê como a tela TREMENDO
-     * — e foi exatamente o que apareceu quando ela finalmente passou a
-     * abrir no fim.
+     * Quatro tentativas moram na história deste arquivo, e as quatro
+     * penduravam a rolagem nos avisos de medida: `onContentSizeChange` e
+     * `onLayout`. A conversa passou a abrir no fim e começou a TREMER, e eu
+     * tratei o tremor como defeito separado três vezes — limitando
+     * rajada, exigindo crescimento, exigindo mudança de janela. A cada
+     * aperto ele voltava.
      *
-     * Cancelar o agendamento anterior deixa só o último valer, e o
-     * último é o certo: é o que tem a medida mais nova. */
+     * O erro era o ACOPLAMENTO, e não o ajuste: rolar provoca medida, a
+     * medida chega no tratador, o tratador rola. Enquanto a rolagem for
+     * resposta a uma medida existe um caminho da rolagem para ela mesma, e o
+     * único jeito de fechar é acertar um limiar — que é adivinhar.
+     *
+     * Agora ela responde a FATO, e não a medida: a conversa terminou de
+     * carregar, ou chegou mensagem. Os dois são contáveis, acontecem uma
+     * vez, e nenhum deles é causado por rolar. O ciclo deixa de existir em
+     * vez de ficar apertado.
+     *
+     * Isto só é possível porque a foto passou a RESERVAR o lugar dela
+     * antes de o endereço chegar (ver o `Balao`): a altura da conversa já
+     * nasce certa, então não há crescimento tardio para perseguir.
+     *
+     * Os dois `rAF` ficam: são eles que esperam o desenho terminar antes de
+     * mirar o fim, e foram eles que fizeram a conversa abrir no lugar certo. */
     if (agendado.current !== null) cancelAnimationFrame(agendado.current)
     agendado.current = requestAnimationFrame(() => {
       agendado.current = requestAnimationFrame(() => {
@@ -236,7 +250,17 @@ export function MensagensScreen({
     [],
   )
 
-  const medir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+/* Ao terminar de carregar, e a cada mensagem nova. Mais nada.
+   *
+   * `mensagens.length`, e não `mensagens`: a lista ganha identidade nova a
+   * cada releitura, e reagir ao objeto faria a conversa saltar toda vez que
+   * ela voltasse do segundo plano sem nada ter mudado. */
+  useEffect(() => {
+    if (carregando || mensagens.length === 0) return
+    if (grudadoNoFim.current) aoFim()
+  }, [carregando, mensagens.length, aoFim])
+
+    const medir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
     grudadoNoFim.current =
       contentSize.height - contentOffset.y - layoutMeasurement.height < 120
@@ -642,38 +666,6 @@ export function MensagensScreen({
             contentContainerStyle={styles.conteudoConversa}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-/* ── POR QUE ESTES DOIS SÓ TAO CHATOS ────────────────
-             *
-             * A conversa passou por três estados, nesta ordem: abria no
-             * meio; passou a abrir no fim; e aí começou a TREMER. O tremor
-             * não foi um defeito novo — foi a rolagem, que agora
-             * funciona, se realimentando.
-             *
-             * Rolar provoca uma nova medida. A nova medida chega aqui. Se a
-             * resposta for rolar de novo, o ciclo não fecha — e como
-             * cada volta muda a altura por uma fração de pixel, ele nunca
-             * bate na guarda de igualdade que existia antes.
-             *
-             * Então os dois só reagem a mudança de VERDADE:
-             *
-             * - o conteúdo, só quando CRESCEU mais de um pixel. Crescer é
-             *   mensagem nova ou foto que chegou, que é quando se quer o fim.
-             *   Encolher e oscilar não são motivo para mexer na tela de
-             *   ninguém;
-             * - a janela, só quando a ALTURA DELA mudou. É o caso do
-             *   teclado abrindo. Reagir a todo `onLayout` é reagir também
-             *   ao que a própria rolagem provocou. */
-            onLayout={e => {
-              const altura = e.nativeEvent.layout.height
-              if (Math.abs(altura - ultimaJanela.current) < 1) return
-              ultimaJanela.current = altura
-              if (grudadoNoFim.current) aoFim()
-            }}
-            onContentSizeChange={(_, altura) => {
-              const cresceu = altura > ultimaAltura.current + 1
-              ultimaAltura.current = altura
-              if (cresceu && grudadoNoFim.current) aoFim()
-            }}
             /* QUEM DESGRUDA A CONVERSA DO FIM É O DEDO, e mais ninguém.
              *
              * Isto estava em `onScroll`, e era a segunda causa das duas
