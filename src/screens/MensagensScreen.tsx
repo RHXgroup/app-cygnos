@@ -207,6 +207,13 @@ export function MensagensScreen({
    *
    * Sai daqui assim que a causa aparecer. */
   const renders = useRef(0)
+  /* `cs` conta as vezes que o CONTEÚDO mudou de tamanho, e `se` as vezes que
+     a rolagem correu até o fim. Se os dois correrem sozinhos com o dedo
+     parado, a conversa ainda está crescendo por baixo e saltando — e o
+     conserto da foto que reserva o lugar não pegou tudo. Se estiverem
+     parados e mesmo assim piscar, o que pisca não é esta tela. */
+  const mudancasDeTamanho = useRef(0)
+  const rolagensAoFim = useRef(0)
   renders.current += 1
   const [medida, setMedida] = useState({ c: 0, l: 0, y: 0 })
 
@@ -574,7 +581,7 @@ export function MensagensScreen({
             paddingVertical: 2,
           }}
         >
-          {`r:${renders.current} c:${medida.c} l:${medida.l} y:${medida.y} fim:${
+          {`r:${renders.current} cs:${mudancasDeTamanho.current} se:${rolagensAoFim.current} c:${medida.c} l:${medida.l} y:${medida.y} fim:${
             medida.c - medida.y - medida.l
           } g:${grudadoNoFim.current ? 1 : 0} n:${mensagens.length}`}
         </Text>
@@ -649,9 +656,13 @@ export function MensagensScreen({
               /* Só quando a altura MUDA de verdade. Rolar de dentro deste
                  tratador provoca outra medida, e sem esta guarda a conversa
                  entrava num vai-e-vem de saltos — mais pisca-pisca. */
+              mudancasDeTamanho.current += 1
               if (altura === ultimaAltura.current) return
               ultimaAltura.current = altura
-              if (grudadoNoFim.current) rolagem.current?.scrollToEnd({ animated: false })
+              if (grudadoNoFim.current) {
+                rolagensAoFim.current += 1
+                rolagem.current?.scrollToEnd({ animated: false })
+              }
             }}
             /* QUEM DESGRUDA A CONVERSA DO FIM É O DEDO, e mais ninguém.
              *
