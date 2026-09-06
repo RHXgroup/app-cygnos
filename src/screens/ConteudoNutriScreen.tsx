@@ -444,6 +444,15 @@ function Miolo({ dados }: { dados: Dados }) {
  * propósito: quando a nutricionista publicar uma anamnese nova com a tela
  * aberta, a releitura traz outra lista e o índice 0 continua sendo "a mais
  * recente" — que é o que a pessoa quer ver. */
+/* O nome da anamnese, como ela batizou.
+ *
+ * Pedido assim: "ao invés da data poderia ser o nome dela né?". Faz
+ * sentido — "Anamnese inicial" e "Retorno 3 meses" dizem o que a ficha é;
+ * "14/02" obriga a lembrar o que aconteceu naquele dia. */
+function nomeDaAnamnese(a: Anamnese): string {
+  return a.titulo?.trim() || a.templateNome?.trim() || 'Anamnese'
+}
+
 function Anamneses({ anamneses }: { anamneses: Anamnese[] }) {
   const styles = estilos()
   const [qual, setQual] = useState(0)
@@ -452,6 +461,19 @@ function Anamneses({ anamneses }: { anamneses: Anamnese[] }) {
      índice sobrando apontaria para nada (armadilha 10, pelo lado do
      índice). */
   const escolhida = anamneses[Math.min(qual, anamneses.length - 1)]
+
+  /* O rótulo de cada ficha: o NOME, e a data só quando ela é o que
+     diferencia.
+     Duas anamneses do mesmo modelo têm o mesmo nome — e aí a fileira
+     ficaria com duas fichas idênticas, sem como escolher entre elas. Este é
+     o caso comum de quem faz retorno com o mesmo questionário, e não um
+     caso de borda. */
+  const rotulos = anamneses.map(a => {
+    const nome = nomeDaAnamnese(a)
+    const repetido = anamneses.filter(o => nomeDaAnamnese(o) === nome).length > 1
+    const quando = dataLegivel(a.data)
+    return repetido && quando ? `${nome} ${String.fromCharCode(0xb7)} ${quando}` : nome
+  })
 
   return (
     <>
@@ -472,7 +494,7 @@ function Anamneses({ anamneses }: { anamneses: Anamnese[] }) {
                 accessibilityState={{ selected: marcada }}
               >
                 <Text style={[styles.textoFicha, marcada && styles.textoFichaAtivo]}>
-                  {dataLegivel(a.data) || a.titulo?.trim() || 'Anamnese'}
+                  {rotulos[i]}
                 </Text>
               </Pressable>
             )

@@ -64,6 +64,9 @@ import { ElaPronome, aSuaNutri, elaPronome, uma } from '../lib/tratamentoDaNutri
    número não precisa cobrir o pior caso — ele só precisa ser maior
    que o intervalo entre duas medidas. */
 const ESPERA_DO_ASSENTAMENTO = 900
+
+/* O teto para a conversa aparecer, aconteça o que acontecer. */
+const LIMITE_PARA_APARECER = 2_000
 /* A conversa com a nutricionista.
  *
  * Existe só com vínculo. Antes dele não há conversa — há pedido, que mora no
@@ -253,6 +256,7 @@ export function MensagensScreen({
     () => () => {
       if (agendado.current !== null) cancelAnimationFrame(agendado.current)
       if (prazo.current) clearTimeout(prazo.current)
+      if (revelacaoForcada.current) clearTimeout(revelacaoForcada.current)
     },
     [],
   )
@@ -264,7 +268,17 @@ export function MensagensScreen({
     prazo.current = setTimeout(() => {
       querOFim.current = false
       prazo.current = null
+      setAssentado(true)
     }, ESPERA_DO_ASSENTAMENTO)
+
+    /* A rede de segurança: se as medidas nunca pararem de chegar, a janela
+       nunca fecha e a conversa ficaria invisível para sempre. Depois deste
+       limite ela aparece do jeito que estiver — conversa no lugar errado é
+       ruim; conversa que não aparece é inaceitável. */
+    if (revelacaoForcada.current === null) {
+      revelacaoForcada.current = setTimeout(() => setAssentado(true), LIMITE_PARA_APARECER)
+    }
+
     aoFim()
   }, [aoFim])
 
@@ -413,6 +427,20 @@ export function MensagensScreen({
    * ciclo não pode se sustentar porque ele tem prazo, e o prazo não
    * depende de acertar limiar nenhum. */
   const querOFim = useRef(false)
+  /* A conversa fica INVISÍVEL até estar posicionada.
+   *
+   * Perseguir o fim enquanto a conversa se assenta funciona, e cada ajuste é
+   * um pulo que se vê: "apareceu no final e piscou umas 3 ou 4 vezes".
+   *
+   * Não dá para ter as duas coisas — ou a rolagem persegue e os pulos
+   * aparecem, ou ela não persegue e o fim escapa. O que dá é perseguir
+   * SEM PLATEIA: a conversa desenha, se ajusta, e só então aparece, já
+   * no lugar certo.
+   *
+   * Vale só para a primeira vez. Depois de assentada ela não some mais —
+   * apagar a tela a cada mensagem nova seria trocar um pulo por um susto. */
+  const [assentado, setAssentado] = useState(false)
+  const revelacaoForcada = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prazo = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* Para sozinho no limite.
@@ -697,7 +725,7 @@ export function MensagensScreen({
         <>
           <ScrollView
             ref={rolagem}
-            style={styles.conversa}
+            style={[styles.conversa, !assentado && styles.aindaSeAjustando]}
             contentContainerStyle={styles.conteudoConversa}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -1131,7 +1159,10 @@ const estilos = estilosDe(t =>
     },
     botaoZapPressionado: { backgroundColor: t.cores.verdeEscuro },
 
-    conversa: { flex: 1 },
+    /* Invisível, e não desmontada: ~e9~ desenhada que ela se mede e se ajusta.
+     Ver `assentado`. */
+  aindaSeAjustando: { opacity: 0 },
+  conversa: { flex: 1 },
     conteudoConversa: {
       paddingHorizontal: 16,
       paddingTop: 14,
