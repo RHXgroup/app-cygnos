@@ -120,6 +120,79 @@ const FRASES: [Comando, string[]][] = [
   ['fiz', ['fiz', 'feito', 'termin', 'acabei', 'pronto', 'completei', 'ok']],
 ]
 
+/* ── O QUE CABE EM CADA MOMENTO DO TREINO ─────────────────────────────────
+ *
+ * Relatado, e é o pior defeito possível aqui: "eu não sei o que eu falei, ele
+ * concluiu meu treino". Um comando mal ouvido encerrou a sessão inteira — e
+ * isso entra no histórico sem ninguém conferir depois.
+ *
+ * A causa não é o reconhecimento: é o app aceitar os oito comandos em qualquer
+ * estado. Reconhecimento de fala ERRA, sempre vai errar, e a defesa contra isso
+ * não é acertar mais — é reduzir o que pode acontecer quando ele errar.
+ *
+ * Com o treino ainda fechado, a única coisa possível é começar; qualquer outra
+ * palavra é ruído por definição. No descanso, "contei a série" não tem o que
+ * contar. E encerrar o treino, que é o único irreversível, só faz sentido com
+ * ele aberto.
+ *
+ * ── Mora aqui, e não na tela ────────────────────────────────────────────
+ * Porque é decisão, e decisão é o que erra. A tela não dá para exercitar; esta
+ * função dá — e é exatamente o tipo de coisa em que uma linha trocada não
+ * aparece até alguém perder um treino. */
+export type MomentoDoTreino = {
+  /* O treino foi aberto? Enquanto não, só cabe começar. */
+  aberto: boolean
+  /* Está descansando entre séries? */
+  descansando: boolean
+  /* Há uma série CORRENDO agora? */
+  naSerie: boolean
+}
+
+/* Os comandos que fazem sentido em cada momento.
+ *
+ * A lista é do que PODE, e não do que não pode: assim, comando novo nasce
+ * bloqueado até alguém decidir onde ele cabe, que é o lado seguro do erro. */
+export function cabeAgora(comando: Comando, m: MomentoDoTreino): boolean {
+  /* Treino fechado: só abrir. Nada mais existe para ser feito, e qualquer
+     outra palavra ali é, por definição, ruído de outra pessoa. */
+  if (!m.aberto) return comando === 'comecar' || comando === 'continuar'
+
+  /* ── NO MEIO DE UMA SÉRIE: SÓ "TERMINEI" ──────────────────────────────
+   *
+   * Ditado por quem usa, e é a regra mais importante da lista: "eu estou
+   * iniciando, a única coisa que ele tem que interpretar é 'Cygnos, terminei'".
+   *
+   * É aqui que encerrar o treino por engano acontecia. Quem está com o peso na
+   * mão não está pedindo para acabar a sessão, nem para pausar, nem para
+   * esticar um descanso que não começou. Uma porta só, e ela é a que a pessoa
+   * vai usar. */
+  if (m.naSerie) return comando === 'fiz'
+
+  /* ── DESCANSANDO ──────────────────────────────────────────────────────
+   * "A única coisa que ele pode ouvir é 'Cygnos, iniciar' ou 'Cygnos, vamos'.
+   *  Ou 'Cygnos, encerrar o treino'."
+   *
+   * Mais e menos tempo ficam porque são frases de duas palavras, valem só aqui
+   * e desfazem-se sozinhas — errar nelas custa quinze segundos.
+   *
+   * `pular_descanso` NÃO fica: "pula" é palavra curta, das mais fáceis de ouvir
+   * por engano, e ela faz exatamente o mesmo que "iniciar" faz aqui. Duas
+   * portas para a mesma sala, e uma delas frágil. */
+  if (m.descansando) {
+    return (
+      comando === 'comecar' ||
+      comando === 'continuar' ||
+      comando === 'mais_descanso' ||
+      comando === 'menos_descanso' ||
+      comando === 'terminar'
+    )
+  }
+
+  /* Aberto, sem série e sem descanso: entre exercícios, ou depois de pausar.
+     Começar a próxima, ou encerrar. */
+  return comando === 'comecar' || comando === 'continuar' || comando === 'terminar'
+}
+
 /* Palavras que INVERTEM o pedido.
  *
  * "não pausa" e "ainda não terminei" carregam a palavra do comando e querem o
@@ -155,17 +228,24 @@ const CHAMADOS = [
      recusa negacao. Um falso positivo em "seguinos" nao dispara serie nenhuma
      se ninguem tiver dito um comando junto. */
   'ciguinos', 'siguinos', 'seguinos', 'sequinos', 'zignos', 'zignus',
-  /* Estas saíram do aparelho, e não da minha cabeça. Lidas no log:
-       "Signos terminais. Signos terminais."
-       "Seguem nos iniciar."
-       "seguindo inicia"
-     `seguindo` é palavra do dicionário, e por isso o Whisper a prefere ao nome
-     que ele não conhece. Custa pouco aceitá-la: o chamado sozinho não faz nada
-     -- ele só libera a frase para o `comandoDoTexto`, que ainda exige um comando
-     conhecido e recusa negação. */
-  'seguindo', 'seguind', 'sequindo', 'seguem nos', 'segue nos', 'sigo nos',
-  'cygno', 'cigno', 'signo', 'sygno',
-  'six nos', 'seis nos', 'si nos', 'ci nos',
+  /* ── O QUE SAIU DAQUI, E POR QUE ─────────────────────────────────────
+     Eu tinha acrescentado `seguindo`, `seguem nos`, `segue nos`, `sigo nos`,
+     `si nos`, `ci nos`, `seis nos` e `six nos`, argumentando que "custa pouco
+     errar para mais, porque o chamado sozinho não faz nada".
+
+     Custa. Relatado da academia: "ele fica toda hora falando não entendi e eu
+     não tô falando nada, tô na academia e todo mundo falando".
+
+     São PALAVRAS COMUNS e fragmentos de palavras comuns. Numa academia com
+     gente conversando perto, "seguindo" aparece o tempo todo — e cada vez que
+     aparece o app se acha chamado, não encontra comando, e responde "não
+     entendi" EM VOZ ALTA. O barulho que o chamado existe para evitar passou a
+     ser feito pelo próprio chamado.
+
+     O que fica são só as grafias que soam como o NOME e não são palavra de uso
+     corrente. `signos` fica porque é o erro mais comum do Whisper para
+     "Cygnos" e ninguém diz "signos" levantando peso. */
+  'cygno', 'cigno', 'sygno',
 ]
 
 export const temChamado = (bruto: string): boolean => {

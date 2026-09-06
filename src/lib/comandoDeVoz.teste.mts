@@ -1,4 +1,5 @@
 import {
+  cabeAgora,
   comandoDoTexto,
   naoEntendi,
   RESPOSTA,
@@ -234,8 +235,21 @@ function ok(nome: string, cond: boolean, extra = '') {
   // Exigir a grafia certa faz o chamado falhar mais do que a conversa alheia
   // acertar -- e o sintoma disso e "o comando de voz nao funciona", sem nada na
   // tela dizendo por que.
-  for (const g of ['cygnos', 'signos', 'cignos', 'seguinos', 'zignus', 'six nos', 'cygno']) {
+  for (const g of ['cygnos', 'signos', 'cignos', 'seguinos', 'zignus', 'cygno']) {
     ok('reconhece "' + g + '"', temChamado(g + ' terminei'))
+  }
+
+  /* E o que NAO pode ser chamado, que e a metade que faltava.
+   *
+   * Eu tinha posto `seguindo`, `seguem nos`, `six nos` e companhia na lista,
+   * argumentando que "custa pouco errar para mais". Custa: relatado da
+   * academia, "ele fica toda hora falando nao entendi e eu nao to falando
+   * nada". Sao palavras comuns, e cada vez que alguem perto dizia uma delas o
+   * app se achava chamado.
+   *
+   * Estes casos existem para a lista nao voltar a crescer por conveniencia. */
+  for (const comum of ['seguindo o plano', 'seis nos exercicios', 'segue nos treinos']) {
+    ok('NAO e chamado: "' + comum + '"', !temChamado(comum))
   }
 
   // Com acento e maiuscula, que e como o Whisper costuma devolver.
@@ -283,7 +297,9 @@ function ok(nome: string, cond: boolean, extra = '') {
   // devolve o que SOA, e prefere palavra de dicionario ao nome que nao conhece.
   const doLog: [string, string | null][] = [
     ['Signos terminais. Signos terminais.', 'fiz'],
-    ['seguindo inicia', 'comecar'],
+    /* `seguindo` saiu da lista de chamados de proposito -- palavra comum demais
+       para uma academia. Este caso deixou de ser "vira comando" e passou a ser
+       "NAO vira", que e a correcao. */
     ['Signos, iniciar', 'comecar'],
     ['cygnos terminei', 'fiz'],
   ]
@@ -302,6 +318,58 @@ function ok(nome: string, cond: boolean, extra = '') {
     const c = temChamado(r) ? comandoDoTexto(semChamado(r)) : null
     ok('ruido nao vira comando: "' + r.slice(0, 30) + '"', c === null, String(c))
   }
+}
+
+/* == O QUE CABE EM CADA MOMENTO ======================================== */
+{
+  const fechado = { aberto: false, descansando: false, naSerie: false }
+  const naSerie = { aberto: true, descansando: false, naSerie: true }
+  const descanso = { aberto: true, descansando: true, naSerie: false }
+  const entre = { aberto: true, descansando: false, naSerie: false }
+
+  // -- Treino fechado: so abrir --------------------------------------------
+  ok('fechado aceita comecar', cabeAgora('comecar', fechado))
+  ok('fechado aceita continuar', cabeAgora('continuar', fechado))
+  for (const c of ['fiz', 'pausar', 'terminar', 'pular_descanso', 'mais_descanso'] as const) {
+    ok('fechado recusa ' + c, !cabeAgora(c, fechado))
+  }
+
+  // -- Na serie: SO terminei -----------------------------------------------
+  //
+  // A regra mais importante da lista, e a que impedia o defeito relatado: "eu
+  // nao sei o que eu falei, ele concluiu meu treino". Quem esta com o peso na
+  // mao nao esta pedindo para acabar a sessao.
+  ok('na serie aceita fiz', cabeAgora('fiz', naSerie))
+  for (const c of ['terminar', 'pausar', 'comecar', 'continuar', 'pular_descanso',
+                   'mais_descanso', 'menos_descanso'] as const) {
+    ok('na serie recusa ' + c, !cabeAgora(c, naSerie))
+  }
+
+  // -- Descansando ---------------------------------------------------------
+  ok('descanso aceita comecar', cabeAgora('comecar', descanso))
+  ok('descanso aceita continuar', cabeAgora('continuar', descanso))
+  ok('descanso aceita terminar', cabeAgora('terminar', descanso))
+  ok('descanso aceita mais tempo', cabeAgora('mais_descanso', descanso))
+  ok('descanso aceita menos tempo', cabeAgora('menos_descanso', descanso))
+  // "pula" e palavra curta e faz o mesmo que "iniciar" aqui: duas portas para a
+  // mesma sala, e uma delas fragil.
+  ok('descanso recusa pular', !cabeAgora('pular_descanso', descanso))
+  ok('descanso recusa fiz', !cabeAgora('fiz', descanso))
+
+  // -- Entre exercicios ----------------------------------------------------
+  ok('entre aceita comecar', cabeAgora('comecar', entre))
+  ok('entre aceita terminar', cabeAgora('terminar', entre))
+  ok('entre recusa fiz', !cabeAgora('fiz', entre))
+  ok('entre recusa pular', !cabeAgora('pular_descanso', entre))
+
+  // -- ENCERRAR o treino so em dois momentos, e nunca no meio da serie ------
+  ok(
+    'encerrar so cabe fora da serie e com o treino aberto',
+    !cabeAgora('terminar', fechado) &&
+      !cabeAgora('terminar', naSerie) &&
+      cabeAgora('terminar', descanso) &&
+      cabeAgora('terminar', entre),
+  )
 }
 
 console.log(`\n${passou} passaram, ${falhou} falharam`)

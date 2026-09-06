@@ -33,6 +33,7 @@ import { FimDoTreino } from './FimDoTreino'
 import { dataISO } from '../lib/formatar'
 import {
   RESPOSTA,
+  cabeAgora,
   comandoDoTexto,
   naoEntendi,
   semChamado,
@@ -329,6 +330,11 @@ export function ModoTreino({
 
   useEffect(() => {
     if (visivel) return
+    /* Cala o que estiver sendo falado.
+       O laço da escuta já para pelo `visivel` na condição dele, mas uma frase
+       longa que começou antes de sair continuaria até o fim — falando sozinha
+       para uma tela que não está mais na frente de ninguém. */
+    Speech.stop()
     setFase('parado')
     /* Os prazos e o cronômetro da série saem JUNTO.
        Sem isto, fechar o modo treino no meio de uma série e reabrir amanhã
@@ -711,7 +717,21 @@ export function ModoTreino({
   const COMANDO_LONGO_DEMAIS_S = 7
 
   useEffect(() => {
-    if (!vozLigada) return
+    /* ── `visivel` TAMBÉM, e não só `vozLigada` ──────────────────────────
+     *
+     * Relatado: "estou no treino e cliquei em voltar no celular; ele continua
+     * gravando sem parar e falando".
+     *
+     * O `<Modal visible={...}>` ESCONDE a tela e NÃO desmonta o componente.
+     * Então, sem `visivel` aqui, o laço continuava rodando, o gravador
+     * continuava gravando e o app continuava anunciando série com a tela
+     * fechada — gastando bateria, microfone e a paciência de quem já tinha
+     * saído.
+     *
+     * Com ele na condição e na lista de dependências, sair da tela dispara a
+     * limpeza abaixo, que é a mesma de desligar a voz: para o intervalo, para o
+     * gravador, e apaga o "Ouvindo". */
+    if (!vozLigada || !visivel) return
 
     let vivo = true
     let escuta = ESTADO_INICIAL
@@ -850,7 +870,7 @@ export function ModoTreino({
       }
       setOuvindo(false)
     }
-  }, [vozLigada])
+  }, [vozLigada, visivel])
 
   /* Para, manda o pedaço, e VOLTA A OUVIR.
    *
@@ -978,8 +998,39 @@ export function ModoTreino({
 
     const c = comandoDoTexto(semChamado(texto))
     if (!c) {
+      /* Mostra, e NÃO fala.
+       *
+       * Relatado da academia: "ele fica toda hora falando 'não entendi' e eu
+       * não tô falando nada; tô na academia e todo mundo falando".
+       *
+       * Falar de volta a cada trecho mal ouvido transforma o app na fonte do
+       * barulho que o chamado existe para evitar. A frase continua na tela para
+       * quem estiver olhando; quem está com o peso na mão não precisa ouvir que
+       * o app não entendeu uma coisa que ele nem disse. */
       setRespostaDaVoz(naoEntendi(texto))
-      dizer('Não entendi.')
+      return
+    }
+
+    /* ── O COMANDO PRECISA CABER NO MOMENTO ────────────────────────────────
+     *
+     * Relatado, e é o pior erro possível aqui: "eu não sei o que eu falei, ele
+     * concluiu meu treino".
+     *
+     * Reconhecimento de fala erra e vai continuar errando. A defesa não é
+     * acertar mais — é reduzir o que pode acontecer quando ele errar.
+     *
+     * Silencioso de propósito: dizer "esse comando não cabe agora" no meio de
+     * uma série é conversa que ninguém pediu, e quase sempre o comando nem foi
+     * dito — foi ouvido de outra pessoa. A decisão mora em `cabeAgora`, que é
+     * pura e tem caso de teste. */
+    if (
+      !cabeAgora(c, {
+        aberto: inicio !== null,
+        descansando: fase === 'descansando',
+        naSerie: inicioDaSerie !== null,
+      })
+    ) {
+      console.log('[cygnos] comando', c, 'nao cabe agora — ignorado')
       return
     }
     setRespostaDaVoz(RESPOSTA[c])
