@@ -17,8 +17,10 @@ import { supabase } from '../lib/supabase'
 import { removerAvatar, trocarAvatar, urlDoAvatar } from '../lib/avatar'
 import {
   mascaraCPF,
+  mascaraData,
   mascaraTelefone,
   soDigitos,
+  validarNascimento,
   validarNome,
   validarTelefone,
 } from '../lib/formulario'
@@ -116,6 +118,23 @@ export function PerfilScreen({
   const [editando, setEditando] = useState(false)
   const [nomeEditado, setNomeEditado] = useState('')
   const [telefoneEditado, setTelefoneEditado] = useState('')
+  /* ── NASCIMENTO E GENERO DESTRAVARAM ────────────────────────────────────
+   *
+   * Eu os tinha travado, com o motivo escrito na tela: "entram no calculo das
+   * suas metas; quem corrige esses e a sua nutricionista". Ele discordou, e tem
+   * razao: "acho errado nao deixar trocar o sexo".
+   *
+   * O motivo era bom e a conclusao era errada. Entrar num calculo pede AVISO,
+   * nao cadeado -- e nascimento e genero sao dados da PESSOA, nao da
+   * nutricionista. Quem digitou errado no cadastro ficava preso a um erro
+   * proprio, com o app dizendo que a culpa era de outra pessoa.
+   *
+   * O que continua travado, e agora e a lista inteira: CPF e e-mail. CPF e
+   * identidade; e-mail e CREDENCIAL DE ENTRADA -- troca-lo exige confirmacao
+   * nos dois enderecos, senao quem pegar o telefone destravado toma a conta.
+   * Fluxo proprio, alteracao a parte. */
+  const [nascimentoEditado, setNascimentoEditado] = useState('')
+  const [generoEditado, setGeneroEditado] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erroEdicao, setErroEdicao] = useState('')
   const desvio = useDesvioDoTeclado(bottom)
@@ -124,6 +143,9 @@ export function PerfilScreen({
     if (!conta) return
     setNomeEditado(conta.nome_completo)
     setTelefoneEditado(mascaraTelefone(conta.telefone))
+    /* ISO no banco, dd/mm/aaaa na tela. */
+    setNascimentoEditado(dataBR(conta.data_nascimento))
+    setGeneroEditado(conta.genero)
     setErroEdicao('')
     setEditando(true)
   }
@@ -141,11 +163,22 @@ export function PerfilScreen({
     const erroTelefone = validarTelefone(telefone)
     if (erroTelefone) return setErroEdicao(erroTelefone)
 
+    /* `validarNascimento` devolve o ISO ou o erro -- ela pega 31/02 e afins,
+       que o `Date` corrige em silencio para 03/03. */
+    const nasc = validarNascimento(nascimentoEditado)
+    if ('erro' in nasc) return setErroEdicao(nasc.erro)
+    if (!GENEROS[generoEditado]) return setErroEdicao('Escolha o gênero.')
+
     setSalvando(true)
     setErroEdicao('')
     const { error } = await supabase
       .from('app_contas')
-      .update({ nome_completo: nome, telefone })
+      .update({
+        nome_completo: nome,
+        telefone,
+        data_nascimento: nasc.iso,
+        genero: generoEditado,
+      })
       .eq('id', sessao.user.id)
     setSalvando(false)
 
@@ -159,7 +192,14 @@ export function PerfilScreen({
     /* Escreve no estado local em vez de reler: a linha é a mesma que acabou de
        ser gravada, e uma segunda ida ao servidor só adicionaria uma espera e
        uma chance de falhar depois do sucesso. */
-    setConta(c => (c ? { ...c, nome_completo: nome, telefone } : c))
+    setConta(c =>
+      c
+        ? { ...c, nome_completo: nome, telefone, data_nascimento: nasc.iso, genero: generoEditado }
+        : c,
+    )
+    /* As metas partem da idade e do genero. Sem avisar, a tela inicial ficaria
+       com o gasto basal antigo ate alguem fechar o app. */
+    onObjetivoMudou()
     setEditando(false)
   }
 
@@ -408,27 +448,77 @@ export function PerfilScreen({
                     styles={styles}
                     teclado="phone-pad"
                   />
+                  <Campo
+                    rotulo="Nascimento"
+                    valor={nascimentoEditado}
+                    /* Máscara na digitação e teclado sem separador: campo de
+                       data com vírgula à mão convida a digitar o que ele
+                       descarta (armadilha 3). */
+                    aoMudar={t => setNascimentoEditado(mascaraData(t))}
+                    styles={styles}
+                    teclado="phone-pad"
+                  />
+
+                  {/* Três opções cabem numa fileira. Lista vertical para três
+                      gastaria meia tela dentro de um cartão de seis linhas. */}
+                  <View style={[styles.linha, styles.linhaComDivisor]}>
+                    <Text style={styles.rotuloLinha}>Gênero</Text>
+                    <View style={styles.opcoesGenero}>
+                      {Object.entries(GENEROS).map(([chave, rotulo]) => (
+                        <Pressable
+                          key={chave}
+                          onPress={() => setGeneroEditado(chave)}
+                          style={({ pressed }) => [
+                            styles.opcaoGenero,
+                            generoEditado === chave && styles.opcaoGeneroAtiva,
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: generoEditado === chave }}
+                          accessibilityLabel={rotulo}
+                        >
+                          <Text
+                            style={[
+                              styles.textoOpcaoGenero,
+                              generoEditado === chave && styles.textoOpcaoGeneroAtiva,
+                            ]}
+                          >
+                            {rotulo}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
                 </>
               ) : (
                 <>
                   <Linha rotulo="Nome" valor={conta.nome_completo} />
                   <Linha rotulo="Telefone" valor={mascaraTelefone(conta.telefone)} />
+                  <Linha rotulo="Nascimento" valor={dataBR(conta.data_nascimento)} />
+                  <Linha rotulo="Gênero" valor={GENEROS[conta.genero] ?? conta.genero} />
                 </>
               )}
 
+              {/* Os dois que NÃO mudam por esta tela, e agora são só dois.
+                  CPF é identidade; e-mail é credencial de entrada — trocá-lo
+                  exige confirmação nos dois endereços, senão quem pegar o
+                  telefone destravado toma a conta. */}
               <Linha rotulo="E-mail" valor={sessao.user.email ?? '—'} travada={editando} />
-              <Linha rotulo="CPF" valor={mascaraCPF(conta.cpf)} travada={editando} />
-              <Linha rotulo="Nascimento" valor={dataBR(conta.data_nascimento)} travada={editando} />
-              <Linha rotulo="Gênero" valor={GENEROS[conta.genero] ?? conta.genero} travada={editando} ultima />
+              <Linha rotulo="CPF" valor={mascaraCPF(conta.cpf)} travada={editando} ultima />
 
               {editando && (
                 <View style={styles.acoesEdicao}>
                   {/* Diz POR QUE os outros não mudam, em vez de deixar a pessoa
                       procurar o campo que não existe. Sem esta linha, "não
                       consigo mudar o CPF" vira o próximo relato. */}
+                  {/* Diz o que ACONTECE ao salvar, e não o que é proibido.
+                      A versão anterior travava nascimento e gênero dizendo que
+                      quem os corrige é a nutricionista — motivo bom, conclusão
+                      errada: são dados da pessoa, e entrar num cálculo pede
+                      aviso, não cadeado. */}
                   <Text style={styles.avisoEdicao}>
-                    CPF, nascimento e gênero entram no cálculo das suas metas — quem corrige esses é
-                    a sua nutricionista.
+                    Nascimento e gênero entram no cálculo das suas metas: mudar aqui muda o seu gasto
+                    calórico. CPF e e-mail não mudam por esta tela.
                   </Text>
 
                   {!!erroEdicao && <Text style={styles.erroEdicao}>{erroEdicao}</Text>}
@@ -799,6 +889,19 @@ const estilos = estilosDe(t =>
   /* Apagado E com cadeado. Apagar sozinho se leria como "carregando"; o
      cadeado sozinho se perde. Os dois juntos dizem a mesma coisa duas vezes,
      que e o certo quando a conclusao errada custa uma reclamacao. */
+  opcoesGenero: { flexDirection: 'row', gap: 6, flexShrink: 1 },
+  opcaoGenero: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: t.cores.superficie,
+    borderWidth: 1,
+    borderColor: t.cores.borda,
+  },
+  opcaoGeneroAtiva: { backgroundColor: t.cores.verde, borderColor: t.cores.verde },
+  textoOpcaoGenero: { fontSize: 12.5, fontWeight: '700', color: t.inkMedio },
+  textoOpcaoGeneroAtiva: { color: t.cores.branco },
+
   rotuloTravado: { opacity: 0.55 },
   valorTravado: { opacity: 0.55 },
   campoLinha: {
