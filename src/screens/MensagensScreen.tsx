@@ -352,6 +352,9 @@ export function MensagensScreen({
   /* O quadro já agendado para rolar, para uma rajada não virar três.
      Ver `aoFim`. */
   const agendado = useRef<number | null>(null)
+  /* A altura da JANELA da conversa, para separar "o teclado abriu" de "a
+     rolagem mexeu em alguma coisa". Ver os tratadores lá embaixo. */
+  const ultimaJanela = useRef(0)
 
   /* Para sozinho no limite.
    *
@@ -639,25 +642,37 @@ export function MensagensScreen({
             contentContainerStyle={styles.conteudoConversa}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            /* A cada MEDIDA nova do conteúdo, e não a cada mensagem: é
-               isto que alcança a foto que terminou de carregar depois. */
-            /* A JANELA também manda, e não só o conteúdo.
-               `onContentSizeChange` cobre o conteúdo crescendo; este cobre a
-               área visível mudando de tamanho — que é o que
-               acontece quando o teclado abre e quando a tela termina de montar
-               DEPOIS de o conteúdo já ter sido medido. Sem ele, a
-               conversa abria no meio quando a ordem das duas medidas se
-               invertia, e a ordem depende do aparelho. */
-            onLayout={() => {
+/* ── POR QUE ESTES DOIS SÓ TAO CHATOS ────────────────
+             *
+             * A conversa passou por três estados, nesta ordem: abria no
+             * meio; passou a abrir no fim; e aí começou a TREMER. O tremor
+             * não foi um defeito novo — foi a rolagem, que agora
+             * funciona, se realimentando.
+             *
+             * Rolar provoca uma nova medida. A nova medida chega aqui. Se a
+             * resposta for rolar de novo, o ciclo não fecha — e como
+             * cada volta muda a altura por uma fração de pixel, ele nunca
+             * bate na guarda de igualdade que existia antes.
+             *
+             * Então os dois só reagem a mudança de VERDADE:
+             *
+             * - o conteúdo, só quando CRESCEU mais de um pixel. Crescer é
+             *   mensagem nova ou foto que chegou, que é quando se quer o fim.
+             *   Encolher e oscilar não são motivo para mexer na tela de
+             *   ninguém;
+             * - a janela, só quando a ALTURA DELA mudou. É o caso do
+             *   teclado abrindo. Reagir a todo `onLayout` é reagir também
+             *   ao que a própria rolagem provocou. */
+            onLayout={e => {
+              const altura = e.nativeEvent.layout.height
+              if (Math.abs(altura - ultimaJanela.current) < 1) return
+              ultimaJanela.current = altura
               if (grudadoNoFim.current) aoFim()
             }}
             onContentSizeChange={(_, altura) => {
-              /* Só quando a altura MUDA de verdade. Rolar de dentro deste
-                 tratador provoca outra medida, e sem esta guarda a conversa
-                 entrava num vai-e-vem de saltos — mais pisca-pisca. */
-              if (altura === ultimaAltura.current) return
+              const cresceu = altura > ultimaAltura.current + 1
               ultimaAltura.current = altura
-              if (grudadoNoFim.current) aoFim()
+              if (cresceu && grudadoNoFim.current) aoFim()
             }}
             /* QUEM DESGRUDA A CONVERSA DO FIM É O DEDO, e mais ninguém.
              *
