@@ -951,10 +951,45 @@ export function ModoTreino({
     if (entendendoVivo.current) return
     entendendoVivo.current = true
     setEntendendo(true)
+    let uri: string | null = null
     try {
       await gravadorDeComando.stop()
-      const uri = gravadorDeComando.uri
-      ouvindoAgora.current = false
+      uri = gravadorDeComando.uri
+
+      /* ── VOLTA A OUVIR ANTES DE MANDAR ──────────────────
+       *
+       * Aqui ficava o contrário: parava, MANDAVA, esperava o Whisper
+       * responder, e só então voltava a gravar. Entre o "mandava" e o
+       * "voltava" cabem vários segundos de rede — e nesse tempo o
+       * microfone estava DESLIGADO. Quem falasse ali não era ouvido, e nada
+       * na tela dizia isso.
+       *
+       * Relatado assim: "ele para, parece que entendeu o que eu falei antes, e
+       * se nesse meio tempo eu falo ele não presta atenção no que eu
+       * falo. Fica meio perdido".
+       *
+       * Voltando a gravar agora, a surdez cai de segundos para milissegundos —
+       * o tempo de o gravador reabrir.
+       *
+       * Isto só é seguro porque o `expo-audio` grava em ARQUIVO NOVO a cada
+       * vez (`recording-<uuid>`, em AudioRecorder.kt): o áudio anterior
+       * continua no disco enquanto sobe, e reabrir o gravador não escreve por
+       * cima dele. Conferido no código do pacote, e não suposto — se um
+       * dia ele passar a reaproveitar o caminho, o que sobe aqui vira um
+       * arquivo cortado pela metade. */
+      if (vozLigadaVivo.current) {
+        try {
+          await gravadorDeComando.prepareToRecordAsync()
+          gravadorDeComando.record()
+          ouvindoAgora.current = true
+        } catch {
+          ouvindoAgora.current = false
+          setRespostaDaVoz('O microfone parou. Toque em Voz para ligar de novo.')
+          setModo('manual')
+        }
+      } else {
+        ouvindoAgora.current = false
+      }
 
       if (uri) {
         /* 'treino' e nao o padrao: o servidor troca o contexto que manda ao
@@ -984,18 +1019,6 @@ export function ModoTreino({
       console.log('[cygnos] recorte da escuta falhou:', e)
     }
 
-    /* Volta a ouvir, se a voz continua ligada. Pela referência, pelo mesmo
-       motivo. */
-    if (vozLigadaVivo.current) {
-      try {
-        await gravadorDeComando.prepareToRecordAsync()
-        gravadorDeComando.record()
-        ouvindoAgora.current = true
-      } catch {
-        setRespostaDaVoz('O microfone parou. Toque em Voz para ligar de novo.')
-        setModo('manual')
-      }
-    }
     entendendoVivo.current = false
     setEntendendo(false)
   }
@@ -1641,10 +1664,16 @@ export function ModoTreino({
                        * porque a pessoa tenta, não funciona, e conclui que a voz
                        * quebrou.
                        *
-                       * Some enquanto ele está capturando: ali a resposta é
-                       * "estou ouvindo você", e a lista viraria ruído em cima da
-                       * única informação que importa naquele segundo. */}
-                      {!capturando && !entendendo && (
+                       * Some só enquanto ele CAPTURA a sua fala — ali a resposta é
+                       * "estou ouvindo você", e a lista viraria ruído em
+                       * cima da única informação que importa naquele
+                       * segundo.
+                       *
+                       * Enquanto ele ENTENDE a fala anterior a lista FICA: o
+                       * microfone continua aberto, então esconder o que dizer
+                       * seria esconder justamente quando ainda dá para
+                       * falar. */}
+                      {!capturando && (
                         <View style={styles.legendaVoz}>
                           {frasesDoMomento(momento).map(f => (
                             <Text key={f} style={styles.fraseLegenda}>
@@ -1658,7 +1687,11 @@ export function ModoTreino({
                           "pode falar?", "estou sendo ouvido?", "e agora?".
                           Ver o comentario de `capturando`. */}
                       <BotaoDeVoz
-                        estado={entendendo ? 'pensando' : 'ouvindo'}
+                        /* Sempre 'ouvindo', porque agora é verdade sempre: o
+                            gravador volta a gravar ANTES de mandar o áudio,
+                            então entender a fala anterior deixou de significar
+                            estar surdo para a próxima. */
+                        estado="ouvindo"
                         rotulo="Ouvindo"
                         /* Acompanha o botao grande logo acima. Estava fixo em
                            "terminei", e dizia isso ate com a serie parada -- ou
@@ -1667,6 +1700,8 @@ export function ModoTreino({
                         rotuloOuvindo={
                           capturando
                             ? 'Estou ouvindo você…'
+                            : entendendo
+                              ? 'Entendendo — pode falar'
                             : inicioDaSerie === null
                               ? 'Diga "Cygnos, iniciar"'
                               : 'Diga "Cygnos, terminei"'
