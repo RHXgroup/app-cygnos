@@ -1088,9 +1088,33 @@ export function ModoTreino({
     else if (c === 'terminar') terminar()
   }
 
+  /* COMEÇAR ABRE O TREINO E JÁ VAI PARA A PRIMEIRA SÉRIE.
+   *
+   * Antes ele só abria: `setInicio` e `fase = 'treinando'`, com
+   * `inicioDaSerie` continuando NULO. E aí o treino ficava num estado que
+   * não é nem série nem descanso — e nesse estado `cabeAgora`
+   * recusa `fiz`, de propósito, porque não há série para contar.
+   *
+   * Pela tela isso é óbvio: aparece o botão "Iniciar a série", e quem
+   * vê o botão toca nele. Pela VOZ é uma armadilha, porque as duas
+   * etapas têm a mesma palavra: era preciso dizer "Cygnos, iniciar" DUAS
+   * vezes, e a segunda não parece existir.
+   *
+   * Relatado assim: "ele iniciou porém falei várias vezes, Cygnos termine a
+   * série, e nadaaaaaa". O comando estava sendo ouvido e entendido — eu
+   * conferi o interpretador com a frase exata dele, e ela vira `fiz` — e
+   * era recusado por não haver série aberta. Recusa silenciosa, que é o
+   * certo no meio de uma série e é o pior possível aqui.
+   *
+   * Agora "começar" quer dizer começar: abre o treino e entra na primeira
+   * série, passando pelo "prepare-se" — que é o mesmo caminho do
+   * botão. Uma frase, uma ação.
+   *
+   * Só a VOZ chama esta função; o botão tem o caminho dele e continua
+   * com os dois passos, que ali são visíveis e rótulados. */
   function comecar() {
     setInicio(Date.now())
-    setFase('treinando')
+    prepararSerie('Vamos começar')
   }
 
   /* Terminar MOSTRA o que aquele treino valeu, e só depois fecha.
