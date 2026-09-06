@@ -246,21 +246,33 @@ export function MensagensScreen({
   useEffect(
     () => () => {
       if (agendado.current !== null) cancelAnimationFrame(agendado.current)
+      if (prazo.current) clearTimeout(prazo.current)
     },
     [],
   )
 
-/* Ao terminar de carregar, e a cada mensagem nova. Mais nada.
+/* Pede o fim e ABRE A JANELA de assentamento. Ver `querOFim`. */
+  const pedirOFim = useCallback(() => {
+    querOFim.current = true
+    if (prazo.current) clearTimeout(prazo.current)
+    prazo.current = setTimeout(() => {
+      querOFim.current = false
+      prazo.current = null
+    }, 600)
+    aoFim()
+  }, [aoFim])
+
+  /* Ao terminar de carregar, e a cada mensagem nova. Mais nada.
    *
    * `mensagens.length`, e não `mensagens`: a lista ganha identidade nova a
    * cada releitura, e reagir ao objeto faria a conversa saltar toda vez que
    * ela voltasse do segundo plano sem nada ter mudado. */
   useEffect(() => {
     if (carregando || mensagens.length === 0) return
-    if (grudadoNoFim.current) aoFim()
-  }, [carregando, mensagens.length, aoFim])
+    if (grudadoNoFim.current) pedirOFim()
+  }, [carregando, mensagens.length, pedirOFim])
 
-    const medir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const medir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
     grudadoNoFim.current =
       contentSize.height - contentOffset.y - layoutMeasurement.height < 120
@@ -379,6 +391,23 @@ export function MensagensScreen({
   /* A altura da JANELA da conversa, para separar "o teclado abriu" de "a
      rolagem mexeu em alguma coisa". Ver os tratadores lá embaixo. */
   const ultimaJanela = useRef(0)
+  /* A JANELA DE ASSENTAMENTO.
+   *
+   * Dois `rAF` bastam para esperar o JavaScript, e não bastam para esperar o
+   * ANDROID: o layout roda noutra linha de execução, então quando a
+   * rolagem acontece a conversa ainda pode não ter a altura final. É por
+   * isso que ela "dá uma piscada e não vai para o fim".
+   *
+   * Quem sabe a hora certa continua sendo `onContentSizeChange` — ele
+   * dispara quando a medida fica pronta de verdade. O problema de usá-lo era
+   * que rolar provoca medida, e aí o ciclo não fechava.
+   *
+   * A janela resolve os dois: por meio segundo depois de "carregou" ou "chegou
+   * mensagem", a medida nova manda; passado isso, ela não manda mais nada. O
+   * ciclo não pode se sustentar porque ele tem prazo, e o prazo não
+   * depende de acertar limiar nenhum. */
+  const querOFim = useRef(false)
+  const prazo = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* Para sozinho no limite.
    *
@@ -666,6 +695,11 @@ export function MensagensScreen({
             contentContainerStyle={styles.conteudoConversa}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            /* Só dentro da janela de assentamento — ver `querOFim`. Fora
+               dela, uma medida nova não mexe na tela de ninguém. */
+            onContentSizeChange={() => {
+              if (querOFim.current && grudadoNoFim.current) aoFim()
+            }}
             /* QUEM DESGRUDA A CONVERSA DO FIM É O DEDO, e mais ninguém.
              *
              * Isto estava em `onScroll`, e era a segunda causa das duas
