@@ -1,4 +1,5 @@
 import { Fragment, memo, useCallback, useEffect, useRef, useState } from 'react'
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import {
   ActivityIndicator,
   Image,
@@ -208,6 +209,20 @@ export function MensagensScreen({
   const renders = useRef(0)
   renders.current += 1
   const [medida, setMedida] = useState({ c: 0, l: 0, y: 0 })
+
+  /* Mede e decide se a conversa continua grudada no fim. Chamado SÓ pelos
+     eventos de arraste — ver o comentário na rolagem. */
+  const medir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
+    if (__DEV__)
+      setMedida({
+        c: Math.round(contentSize.height),
+        l: Math.round(layoutMeasurement.height),
+        y: Math.round(contentOffset.y),
+      })
+    grudadoNoFim.current =
+      contentSize.height - contentOffset.y - layoutMeasurement.height < 120
+  }, [])
 
 
   /* Ele mandou a última e ainda não teve resposta? É o único momento em que a
@@ -638,16 +653,22 @@ export function MensagensScreen({
               ultimaAltura.current = altura
               if (grudadoNoFim.current) rolagem.current?.scrollToEnd({ animated: false })
             }}
-            /* Quem subiu para reler deixa de ser arrastado de volta.
-               120 de folga: o fim "quase exato" da conta -- exigir zero faria
-               qualquer sobra de meio pixel desgrudar a conversa. */
-            scrollEventThrottle={64}
-            onScroll={e => {
-              const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
-              const daBase = contentSize.height - contentOffset.y - layoutMeasurement.height
-              if (__DEV__) setMedida({ c: Math.round(contentSize.height), l: Math.round(layoutMeasurement.height), y: Math.round(contentOffset.y) })
-              grudadoNoFim.current = daBase < 120
-            }}
+            /* QUEM DESGRUDA A CONVERSA DO FIM É O DEDO, e mais ninguém.
+             *
+             * Isto estava em `onScroll`, e era a segunda causa das duas
+             * queixas. `onScroll` dispara também quando o CONTEÚDO cresce por
+             * baixo do pano — e nesse instante a distância até o fim é enorme,
+             * porque o conteúdo cresceu e a posição ainda não. O app lia isso
+             * como "ela subiu para reler", desgrudava, e parava de acompanhar
+             * o fim: a conversa ficava ancorada no meio, para sempre.
+             *
+             * Nos eventos de ARRASTE isso não acontece: eles só existem depois
+             * de alguém encostar o dedo na tela.
+             *
+             * 120 de folga porque o fim "quase exato" tem de contar — exigir
+             * zero faria meio pixel de sobra desgrudar a conversa. */
+            onScrollEndDrag={medir}
+            onMomentumScrollEnd={medir}
             /* Puxar para tentar de novo é o gesto óbvio de quem viu a conversa
                não descer, e a tela precisa atender ao gesto que ela sugere. */
             refreshControl={
@@ -940,18 +961,41 @@ const Balao = memo(function Balao({ mensagem }: { mensagem: Mensagem }) {
           mensagem.anexoTipo === 'foto' && styles.balaoComFoto,
         ]}
       >
-        {/* A FOTO vem antes do texto, porque é a legenda que explica a imagem e
-            não o contrário. Sem endereço — ainda assinando, ou falhou — o balão
-            desenha só o texto: uma imagem que não carrega deixa um buraco do
-            tamanho dela, e isso se lê como app quebrado. */}
-        {mensagem.anexoTipo === 'foto' && endereco && endereco !== falhou && (
-          <Image
-            source={{ uri: endereco }}
-            style={styles.fotoDoBalao}
-            onError={() => setFalhou(endereco)}
-            accessibilityLabel={minha ? 'Foto que você mandou' : `Foto que ${elaPronome()} mandou`}
-          />
-        )}
+        {/* A FOTO VEM ANTES DO TEXTO, e o LUGAR dela vem antes da foto.
+         *
+         * A legenda explica a imagem, e não o contrário — por isso
+         * ela é a primeira.
+         *
+         * E o quadro cinza aparece ANTES do endereço chegar. Isto não é
+         * enfeite: era a causa das duas queixas da conversa.
+         *
+         * O balde é privado, então cada foto precisa de um endereço
+         * assinado, que é `async` (item 7). Enquanto ele não chegava, o
+         * balão desenhava só o texto — e aí, uma a uma, as fotos
+         * iam ENTRANDO e empurrando tudo para baixo. Cada entrada mudava a
+         * altura da conversa; a rolagem corria atrás do fim a cada uma; e o
+         * que se via era a tela saltando sozinha: "ele tá dando umas piscada
+         * toda hora".
+         *
+         * Reservado o lugar, a altura já nasce certa: nada cresce depois,
+         * nada salta, e a primeira rolagem para o fim cai no fim de verdade.
+         *
+         * O buraco só some quando a foto FALHA — aí ele seria um vazio
+         * permanente, que se lê como app quebrado. Enquanto ela está a
+         * caminho, o quadro é a promessa certa. */}
+        {mensagem.anexoTipo === 'foto' &&
+          (endereco !== falhou ? (
+            <View style={styles.fotoDoBalao}>
+              {!!endereco && (
+                <Image
+                  source={{ uri: endereco }}
+                  style={styles.fotoDentroDoQuadro}
+                  onError={() => setFalhou(endereco)}
+                  accessibilityLabel={minha ? 'Foto que você mandou' : `Foto que ${elaPronome()} mandou`}
+                />
+              )}
+            </View>
+          ) : null)}
 
         {/* ── Áudio ────────────────────────────────────────────────────────
          *
@@ -1092,6 +1136,9 @@ const estilos = estilosDe(t =>
     /* Largura cheia do balão e altura fixa: proporção livre faria cada foto
      mudar a altura da conversa enquanto ela carrega, e a lista pularia sob o
      dedo de quem está rolando. */
+  /* A foto DENTRO do quadro reservado: ela só preenche o que já estava
+     guardado, e por isso a chegada dela não mexe na altura de nada. */
+  fotoDentroDoQuadro: { width: '100%', height: '100%', borderRadius: 12 },
   fotoDoBalao: {
     width: '100%',
     /* Proporção, e não altura fixa: 170 de altura numa foto em pé corta cabeça
