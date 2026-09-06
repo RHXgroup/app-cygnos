@@ -34,3 +34,47 @@ export function secaoVisivel(chave: string, visiveis: SecoesVisiveis): boolean {
   const k = SECAO_NO_SERVIDOR[chave]
   return !k || visiveis[k] !== false
 }
+
+/* ── E A SEÇÃO DESLIGADA QUE TEM HISTÓRICO ───────────────
+ *
+ * Desligar deixou de esconder tudo. A regra, decidida por quem usa:
+ *
+ *   "o problema disso é histórico do paciente né, não podemos fazer
+ *    ele perder esse acesso né"
+ *   "só que se ele desliga, as próxima que ele fizer não pode aparecer"
+ *
+ * Então: o que ela registrou ANTES de desligar continua visível — é o
+ * histórico dele, e um profissional pode deixar de usar uma ferramenta sem
+ * poder tirar de alguém o acesso ao que já foi registrado sobre ele. O que
+ * vier DEPOIS não aparece.
+ *
+ * ── Por que aqui basta a CONTAGEM ────────────────────
+ * O corte por data mora no SERVIDOR: `app_conteudo_da_nutricionista` já
+ * devolve as contagens filtradas pelo instante em que a seção foi
+ * desligada. Então o app não precisa saber de datas nem do instante —
+ * ele só pergunta se sobrou alguma coisa para mostrar.
+ *
+ * Isso é de propósito e vale além desta função: com a regra no
+ * servidor, uma tela nova que alguém escrever amanhã já nasce
+ * obedecendo, e um aplicativo JÁ INSTALADO obedece sem atualizar. Foi
+ * "consertar numa tela e esquecer as irmãs" que criou este defeito —
+ * cinco telas mostravam conteúdo dela e só uma consultava o interruptor.
+ *
+ * ── As três combinações ────────────────────────
+ *   ligada, vazia        -> APARECE (ela ainda vai preencher)
+ *   desligada, com hist. -> APARECE (o histórico é dele)
+ *   desligada, vazia     -> some  (é para isso que o interruptor serve)
+ *
+ * A contagem manda mesmo com o mapa vazio: sem resposta do servidor,
+ * `secaoVisivel` já devolve true, e o `||` só pode confirmar. */
+export function secaoNaLista(
+  chave: string,
+  visiveis: SecoesVisiveis,
+  /* Quantos registros sobraram para mostrar. Indefinido = a tela não sabe
+     contar esta seção (energético, receitas), e aí quem decide é só
+     o interruptor. */
+  total?: number,
+): boolean {
+  if (secaoVisivel(chave, visiveis)) return true
+  return (total ?? 0) > 0
+}

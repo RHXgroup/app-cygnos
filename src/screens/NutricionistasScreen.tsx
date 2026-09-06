@@ -28,7 +28,7 @@ import {
 import {
   carregarConteudo,
   carregarSecoesVisiveis,
-  secaoVisivel,
+  secaoNaLista,
   descricaoDeContagem,
   descricaoDoEnergetico,
   descricaoDoPlano,
@@ -887,10 +887,35 @@ function Acompanhamento({
     },
   ]
 
-  /* Fora as que a nutricionista desligou no sistema. `energetico` e `receitas`
-     não têm interruptor lá — `secaoVisivel` os deixa passar. Se ela desligar
-     tudo, o cartão inteiro some (abaixo), em vez de virar um título vazio. */
-  const visiveis = itens.filter(item => !item.chave || secaoVisivel(item.chave, secoesVisiveis))
+  /* ── QUEM APARECE NESTA LISTA ──────────────────────
+   *
+   * Desligar uma seção no sistema dela deixou de esconder tudo. A regra,
+   * de quem usa: o que ela registrou ANTES de desligar continua visível —
+   * é o histórico do paciente — e o que vier DEPOIS não aparece.
+   *
+   * O corte por data é do servidor: `app_conteudo_da_nutricionista` devolve
+   * as contagens já filtradas pelo instante em que ela desligou. Por isso
+   * aqui basta perguntar se sobrou alguma coisa, e por isso as OUTRAS quatro
+   * telas do app que mostram conteúdo dela não precisaram de conserto
+   * nenhum: elas obedecem pelo dado que recebem.
+   *
+   * As contagens só existem para as três de REGISTRO. Plano, exames e
+   * receitas são de ENTREGA e vão por outro caminho — um "enviar ao
+   * app" por item, ainda por vir —, então continuam decididas só pelo
+   * interruptor. Passar `undefined` como contagem é o que diz isso: "esta
+   * tela não sabe contar esta seção".
+   *
+   * Se ela desligar tudo e não houver histórico, o cartão inteiro some
+   * (abaixo), em vez de virar um título vazio. */
+  const totalDaSecao: Partial<Record<ChaveConteudo, number>> = {
+    anamnese: conteudo.anamnese.total,
+    antropometria: conteudo.antropometria.total,
+    fotos: conteudo.fotos.total,
+  }
+
+  const visiveis = itens.filter(
+    item => !item.chave || secaoNaLista(item.chave, secoesVisiveis, totalDaSecao[item.chave]),
+  )
   if (visiveis.length === 0) return null
 
   return (

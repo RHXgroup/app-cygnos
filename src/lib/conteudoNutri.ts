@@ -6,7 +6,7 @@ import type { SecoesVisiveis } from './secoesDoApp'
 
 /* A tela consome tudo de `conteudoNutri`; reexporto a decisão pura pra não
    precisar aprender que ela mora noutro arquivo. O teste importa de lá direto. */
-export { secaoVisivel, type SecoesVisiveis } from './secoesDoApp'
+export { secaoNaLista, secaoVisivel, type SecoesVisiveis } from './secoesDoApp'
 
 /* ── Por que estas funções LANÇAM, e o que elas lançam ─────────────────────
    Lançar é a forma daqui, e a tela que as consome já trata: ela junta as
