@@ -192,30 +192,6 @@ export function MensagensScreen({
 
   const rolagem = useRef<ScrollView>(null)
 
-  /* ── FAIXA DE MEDIDA, TEMPORÁRIA ───────────────────
-   *
-   * Duas queixas sobreviveram a duas correções cada: a conversa abre no
-   * meio, e a tela pisca. Armadilha 2 do AGENTS.md, que custou seis rodadas
-   * numa tela só: quando a segunda tentativa falha, PARE de trocar de
-   * mecanismo e imprima os números na tela. Uma foto encerrou o que seis
-   * deduções não encerraram.
-   *
-   * `r` sobe a cada renderização: se ele correr sozinho com o dedo
-   * parado, o pisca-pisca é re-renderização. `fim` é a distância
-   * do fim da conversa: se ficar grande depois de abrir, a rolagem não
-   * chegou lá.
-   *
-   * Sai daqui assim que a causa aparecer. */
-  const renders = useRef(0)
-  /* `cs` conta as vezes que o CONTEÚDO mudou de tamanho, e `se` as vezes que
-     a rolagem correu até o fim. Se os dois correrem sozinhos com o dedo
-     parado, a conversa ainda está crescendo por baixo e saltando — e o
-     conserto da foto que reserva o lugar não pegou tudo. Se estiverem
-     parados e mesmo assim piscar, o que pisca não é esta tela. */
-  const mudancasDeTamanho = useRef(0)
-  const rolagensAoFim = useRef(0)
-  renders.current += 1
-  const [medida, setMedida] = useState({ c: 0, l: 0, y: 0 })
 
   /* Mede e decide se a conversa continua grudada no fim. Chamado SÓ pelos
      eventos de arraste — ver o comentário na rolagem. */
@@ -230,29 +206,38 @@ export function MensagensScreen({
    * Dois `rAF` porque um só ainda cai dentro do mesmo ciclo de layout em
    * parte dos aparelhos. Isso é mais barato do que a terceira teoria. */
   const aoFim = useCallback(() => {
-    rolagensAoFim.current += 1
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => rolagem.current?.scrollToEnd({ animated: false })),
-    )
-  }, [])
-
-  const soMedir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
-    setMedida({
-      c: Math.round(contentSize.height),
-      l: Math.round(layoutMeasurement.height),
-      y: Math.round(contentOffset.y),
+    /* Uma RAJADA de avisos vira UMA rolagem.
+     *
+     * `onContentSizeChange` e `onLayout` disparam várias vezes seguidas
+     * enquanto a conversa se assenta, e cada um agendava a sua própria
+     * rolagem. Três rolagens em três quadros seguidos, cada uma mirando
+     * uma medida um pouco diferente, é o que se vê como a tela TREMENDO
+     * — e foi exatamente o que apareceu quando ela finalmente passou a
+     * abrir no fim.
+     *
+     * Cancelar o agendamento anterior deixa só o último valer, e o
+     * último é o certo: é o que tem a medida mais nova. */
+    if (agendado.current !== null) cancelAnimationFrame(agendado.current)
+    agendado.current = requestAnimationFrame(() => {
+      agendado.current = requestAnimationFrame(() => {
+        agendado.current = null
+        rolagem.current?.scrollToEnd({ animated: false })
+      })
     })
   }, [])
 
+  /* Mede e decide se a conversa continua grudada no fim. Chamado SÓ pelos
+     eventos de arraste: pô-lo no `onScroll` foi o que prendeu a conversa no
+     meio, porque o `onScroll` dispara também quando o conteúdo cresce. */
+  useEffect(
+    () => () => {
+      if (agendado.current !== null) cancelAnimationFrame(agendado.current)
+    },
+    [],
+  )
+
   const medir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
-    if (__DEV__)
-      setMedida({
-        c: Math.round(contentSize.height),
-        l: Math.round(layoutMeasurement.height),
-        y: Math.round(contentOffset.y),
-      })
     grudadoNoFim.current =
       contentSize.height - contentOffset.y - layoutMeasurement.height < 120
   }, [])
@@ -364,6 +349,9 @@ export function MensagensScreen({
    * imagem terminasse de carregar. */
   const grudadoNoFim = useRef(true)
   const ultimaAltura = useRef(0)
+  /* O quadro já agendado para rolar, para uma rajada não virar três.
+     Ver `aoFim`. */
+  const agendado = useRef<number | null>(null)
 
   /* Para sozinho no limite.
    *
@@ -597,21 +585,6 @@ export function MensagensScreen({
       style={[styles.tela, { paddingTop: top + 8 }]}
       onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}
     >
-      {__DEV__ && (
-        <Text
-          style={{
-            fontSize: 10,
-            color: paleta().cores.ink,
-            backgroundColor: paleta().cores.verdeMenta,
-            paddingHorizontal: 8,
-            paddingVertical: 2,
-          }}
-        >
-          {`r:${renders.current} cs:${mudancasDeTamanho.current} se:${rolagensAoFim.current} c:${medida.c} l:${medida.l} y:${medida.y} fim:${
-            medida.c - medida.y - medida.l
-          } g:${grudadoNoFim.current ? 1 : 0} n:${mensagens.length}`}
-        </Text>
-      )}
       <View style={styles.cabecalho}>
         <Pressable
           onPress={onFechar}
@@ -682,7 +655,6 @@ export function MensagensScreen({
               /* Só quando a altura MUDA de verdade. Rolar de dentro deste
                  tratador provoca outra medida, e sem esta guarda a conversa
                  entrava num vai-e-vem de saltos — mais pisca-pisca. */
-              mudancasDeTamanho.current += 1
               if (altura === ultimaAltura.current) return
               ultimaAltura.current = altura
               if (grudadoNoFim.current) aoFim()
@@ -701,11 +673,6 @@ export function MensagensScreen({
              *
              * 120 de folga porque o fim "quase exato" tem de contar — exigir
              * zero faria meio pixel de sobra desgrudar a conversa. */
-/* SÓ para a faixa de números, e só em desenvolvimento: não mexe em
-               `grudadoNoFim`. Foi pô-lo aqui que prendeu a conversa no meio
-               — ver o comentário acima. */
-            scrollEventThrottle={100}
-            onScroll={__DEV__ ? soMedir : undefined}
             onScrollEndDrag={medir}
             onMomentumScrollEnd={medir}
             /* Puxar para tentar de novo é o gesto óbvio de quem viu a conversa
