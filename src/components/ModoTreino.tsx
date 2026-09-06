@@ -644,6 +644,16 @@ export function ModoTreino({
    *
    * `__DEV__` porque é diagnóstico: no build ele não existe. */
   const [ultimoOuvido, setUltimoOuvido] = useState('')
+  /* Quanto tempo a viagem do áudio levou, em segundos, e quanto disso foi
+     esperando o servidor.
+     Pedido assim: "tenta rodar um teste de envio e recebimento do audio pra
+     tentar melhorar ele". Não dá para cronometrar o Whisper de fora — as
+     credenciais dele são segredo do servidor —, então quem mede é
+     quem espera: o próprio app.
+     Dois números porque eles apontam para consertos diferentes: se quase tudo
+     for SERVIDOR, ajustar o app não adianta e a saída é reconhecimento
+     no aparelho; se sobrar tempo fora dele, ainda há o que espremer aqui. */
+  const [demora, setDemora] = useState('')
 
   /* ── ESTA CAPTURANDO A SUA FALA AGORA? ─────────────────────────────────
    *
@@ -948,6 +958,9 @@ export function ModoTreino({
   const recortarVivo = useRef<(duracao: number) => void>(() => {})
 
   async function recortarEEntender(duracao: number) {
+    /* Quando este trecho começou a valer para a conta do tempo: o instante em
+       que o app decidiu cortar. O que vem antes disso é a pessoa falando. */
+    const comecouOTrecho = Date.now()
     /* Pela REFERÊNCIA, e não pelo estado: quem chama é o intervalo, e lá o
        estado está congelado no valor de quando ele foi criado. */
     if (entendendoVivo.current) return
@@ -997,7 +1010,13 @@ export function ModoTreino({
         /* 'treino' e nao o padrao: o servidor troca o contexto que manda ao
            Whisper. Com o de refeicao, um comando voltava como a lista de
            comidas do proprio prompt -- ver `AssuntoDoAudio`, em lib/voz. */
+        const antesDoServidor = Date.now()
         const r = await transcrever(uri, duracao, 'treino')
+        if (__DEV__) {
+          const servidor = (Date.now() - antesDoServidor) / 1000
+          const total = (Date.now() - comecouOTrecho) / 1000
+          setDemora(`trecho ${duracao.toFixed(1)}s + servidor ${servidor.toFixed(1)}s = ${total.toFixed(1)}s`)
+        }
         if (r.tipo === 'ok') responder(r.texto)
         else {
           /* A FALHA APARECE. Antes ela era engolida "para não atrapalhar quem
@@ -1814,6 +1833,7 @@ export function ModoTreino({
                   {__DEV__ && vozLigada && (
                     <Text style={styles.medidorVoz} selectable>
                       {ultimoOuvido ? `ouvi: "${ultimoOuvido}"` : 'ainda não voltou nada do servidor'}
+                      {demora ? '  —  ' + demora : ''}
                     </Text>
                   )}
 
