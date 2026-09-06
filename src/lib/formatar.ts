@@ -126,3 +126,24 @@ export const dataCurta = (d: Date) =>
   naoEhData(d)
     ? SEM_DATA
     : `${DIAS_CURTOS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()].slice(0, 3)}.`
+
+/* "Bom dia", "Boa tarde", "Boa noite".
+ *
+ * ── Por que isto e uma funcao, e nao um `if` na tela ──────────────────────
+ * Porque as bordas sao decisao, e decisao se exercita. Meia-noite e meio-dia
+ * caem em cima de uma fronteira cada um, e um `>=` trocado por `>` faz o app
+ * dizer "boa noite" ao meio-dia -- erro que ninguem ve escrevendo e todo mundo
+ * ve usando.
+ *
+ * As faixas sao as do portugues falado, e nao as do relogio de 8 horas: a tarde
+ * comeca ao meio-dia e a noite as 18. Quem abre o app as 19h nao quer ler "boa
+ * tarde".
+ *
+ * `hora` entra por parametro para a funcao nao depender do relogio -- e o que
+ * permite exercita-la com casos de mesa. */
+export function saudacaoDaHora(hora: number): string {
+  if (!Number.isFinite(hora) || hora < 0 || hora > 23) return 'Ola'
+  if (hora < 12) return 'Bom dia'
+  if (hora < 18) return 'Boa tarde'
+  return 'Boa noite'
+}

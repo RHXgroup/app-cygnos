@@ -29,7 +29,7 @@ import { MenuTopo } from '../components/MenuTopo'
 import { MiniGrafico } from '../components/MiniGrafico'
 import { TotaisPlano } from '../components/TotaisPlano'
 import { supabase } from '../lib/supabase'
-import { dataISO, dataNumerica, milhar, rotuloDoDia } from '../lib/formatar'
+import { dataISO, dataNumerica, milhar, rotuloDoDia, saudacaoDaHora } from '../lib/formatar'
 import {
   carregarAgua,
   coposDaMeta,
@@ -885,8 +885,19 @@ export function HomeScreen({
           espaço vai para o que a pessoa precisa fazer agora. */}
       <View style={styles.saudacao}>
         <View style={styles.textoSaudacao}>
+          {/* "Bom dia, Helton", e não "Olá, Helton".
+           *
+           * A frase de efeito que morava aqui saiu há tempos, e com razão — ela
+           * ocupava a área mais valiosa da tela sem responder nada. O que entra
+           * agora não é frase de efeito: é a hora do dia, que é verdade, custa
+           * uma linha, e faz a tela abrir falando como gente em vez de como
+           * sistema.
+           *
+           * A decisão mora em `saudacaoDaHora`, com caso de teste — meio-dia é
+           * TARDE, e um `>=` trocado por `>` faria o app dizer "boa noite" ao
+           * meio-dia. */}
           <Text style={styles.ola} numberOfLines={1}>
-            Olá, {primeiroNome(nome)} 👋
+            {saudacaoDaHora(new Date().getHours())}, {primeiroNome(nome)} 👋
           </Text>
         </View>
 
@@ -931,7 +942,28 @@ export function HomeScreen({
        * A faixa de dias veio junto porque ela SELECIONA o que este cartão
        * mostra: separadas, a pessoa mudava o dia e o número mudava fora da
        * vista. */}
+      {/* ── O RECADO DELA ABRE A TELA ────────────────────────────────────
+       *
+       * Ele estava depois do cartão de calorias, sob a placa da nutricionista.
+       * Ali ele é mais um item; aqui ele é a primeira coisa que a pessoa lê
+       * depois do próprio nome — e é o único conteúdo desta tela que veio de
+       * uma PESSOA, e não de uma conta.
+       *
+       * Pedido assim: "não seria melhor se aparecesse um card na tela inicial
+       * assim que abre o app, dando uma saudação?". É isso, e o texto é dela,
+       * o que vale mais do que qualquer frase que o app inventasse.
+       *
+       * Some sozinho quando não há recado — nada de moldura dizendo "sua
+       * nutricionista ainda não escreveu", que é cobrança do profissional na
+       * cara de quem abriu o app. E fica antes da faixa de dias de propósito:
+       * ele não muda com o dia escolhido, então não pertence ao que vem depois
+       * dela. */}
+      {recado !== null && (
+        <CartaoDoRecado recado={recado} onAbrirMensagens={onAbrirMensagens} />
+      )}
+
       <FaixaDeDias selecionado={diaSelecionado} onSelecionar={setDiaSelecionado} />
+
 
       {/* ── AS SEÇÕES, e por que a tela precisava delas ─────────────────
        *
@@ -976,13 +1008,6 @@ export function HomeScreen({
       {/* O título só nasce com recado. `CartaoDoRecado` devolve null quando
           não há, e um "Da sua nutricionista" sobre o vazio pareceria falha do
           app — ou, pior, cobrança dela. */}
-      {ehHoje(diaSelecionado) && recado !== null && (
-        <>
-          <Secao titulo="Da sua nutricionista" icone="chatbubble-ellipses-outline" />
-          <CartaoDoRecado recado={recado} onAbrirMensagens={onAbrirMensagens} />
-        </>
-      )}
-
       {/* A SEQUÊNCIA, antes de tudo.
           Acima do próximo passo de propósito: ela é o MOTIVO de fazer, e o
           passo é a tarefa. Motivo vem antes de tarefa — a ordem contrária
