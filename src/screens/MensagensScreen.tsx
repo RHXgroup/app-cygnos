@@ -219,6 +219,32 @@ export function MensagensScreen({
 
   /* Mede e decide se a conversa continua grudada no fim. Chamado SÓ pelos
      eventos de arraste — ver o comentário na rolagem. */
+/* Rolar para o fim NO QUADRO SEGUINTE, e não dentro do tratador.
+   *
+   * `onContentSizeChange` e `onLayout` avisam que a medida MUDOU; a rolagem
+   * pedida ali dentro corre contra o desenho que ainda está acontecendo, e no
+   * Android ela às vezes pára onde o conteúdo estava antes — que
+   * é "abriu no meio". Um quadro de espera é o que garante que o alvo já
+   * é o tamanho novo.
+   *
+   * Dois `rAF` porque um só ainda cai dentro do mesmo ciclo de layout em
+   * parte dos aparelhos. Isso é mais barato do que a terceira teoria. */
+  const aoFim = useCallback(() => {
+    rolagensAoFim.current += 1
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => rolagem.current?.scrollToEnd({ animated: false })),
+    )
+  }, [])
+
+  const soMedir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
+    setMedida({
+      c: Math.round(contentSize.height),
+      l: Math.round(layoutMeasurement.height),
+      y: Math.round(contentOffset.y),
+    })
+  }, [])
+
   const medir = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
     if (__DEV__)
@@ -650,7 +676,7 @@ export function MensagensScreen({
                conversa abria no meio quando a ordem das duas medidas se
                invertia, e a ordem depende do aparelho. */
             onLayout={() => {
-              if (grudadoNoFim.current) rolagem.current?.scrollToEnd({ animated: false })
+              if (grudadoNoFim.current) aoFim()
             }}
             onContentSizeChange={(_, altura) => {
               /* Só quando a altura MUDA de verdade. Rolar de dentro deste
@@ -659,10 +685,7 @@ export function MensagensScreen({
               mudancasDeTamanho.current += 1
               if (altura === ultimaAltura.current) return
               ultimaAltura.current = altura
-              if (grudadoNoFim.current) {
-                rolagensAoFim.current += 1
-                rolagem.current?.scrollToEnd({ animated: false })
-              }
+              if (grudadoNoFim.current) aoFim()
             }}
             /* QUEM DESGRUDA A CONVERSA DO FIM É O DEDO, e mais ninguém.
              *
@@ -678,6 +701,11 @@ export function MensagensScreen({
              *
              * 120 de folga porque o fim "quase exato" tem de contar — exigir
              * zero faria meio pixel de sobra desgrudar a conversa. */
+/* SÓ para a faixa de números, e só em desenvolvimento: não mexe em
+               `grudadoNoFim`. Foi pô-lo aqui que prendeu a conversa no meio
+               — ver o comentário acima. */
+            scrollEventThrottle={100}
+            onScroll={__DEV__ ? soMedir : undefined}
             onScrollEndDrag={medir}
             onMomentumScrollEnd={medir}
             /* Puxar para tentar de novo é o gesto óbvio de quem viu a conversa
