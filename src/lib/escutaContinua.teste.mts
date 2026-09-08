@@ -99,15 +99,16 @@ function correr(leituras: [number | null, number][], inicial: Estado = ESTADO_IN
      abaixo do limiar por 700 ms seguidos. Entao o teto nao e o caso raro que
      ele foi desenhado para ser -- ele e a espera de cada comando.
 
-     A fronteira de baixo: precisa caber "Cygnos, terminei a serie" dito
-     devagar, que da menos de dois segundos. Se um dia comecar a cortar comando
-     no meio, sobe.
+     A fronteira de baixo e 2,4 s, MEDIDA por bissecao contra os outros casos
+     deste arquivo -- 2000 reprova tres, 2200 reprova dois, 2400 passa: "Cygnos, terminei a serie"
+     dito devagar da perto de 1,8 s. Abaixo disso o corte cai DENTRO da frase,
+     e o sintoma deixa de ser lentidao e passa a ser comando que some.
 
      A fronteira de cima: quem recebe descarta acima de COMANDO_LONGO_DEMAIS_S
      (7 s, em ModoTreino). Acima disso o teto so produz trecho jogado fora. */
   ok(
     'o teto cabe num comando falado devagar',
-    MAXIMO_DO_TRECHO_MS >= 2_500 && MAXIMO_DO_TRECHO_MS <= 5_000,
+    MAXIMO_DO_TRECHO_MS >= 2_400 && MAXIMO_DO_TRECHO_MS <= 5_000,
     String(MAXIMO_DO_TRECHO_MS),
   )
   ok(

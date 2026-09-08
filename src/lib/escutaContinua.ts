@@ -114,7 +114,28 @@ export const SILENCIO_QUE_FECHA_MS = 700
    ou não entender nada de uma frase inteira — ele sobe de volta. O caso
    "não corta no meio" continua no teste para essa fronteira não ser
    cruzada sem alguem ver. */
-export const MAXIMO_DO_TRECHO_MS = 2_800
+/* ── E agora 2,4, que é o CHÃO MEDIDO ──────────────────
+   Pedido: baixar para 2 s. Tentei, e o TESTE recusou — dois casos, e os
+   dois são exatamente a fronteira que eles existem para guardar: "não corta
+   no meio" (uma frase com pausa curta passou a ser partida em duas) e "fecha
+   por silêncio, e não pelo teto" (o teto passou a disparar antes de a
+   escuta perceber que a pessoa parou de falar).
+
+   Bissetei: 2000 reprova três casos, 2200 reprova dois, 2400 passa. Então
+   2,4 s é o chão de verdade, e não um número escolhido por gosto.
+   Abaixo dele o sintoma deixa de ser lentidão e passa a ser COMANDO QUE
+   SOME, que é muito pior: quem espera demais repete, quem fala e some
+   conclui que a voz quebrou.
+
+   O que sobrou de espera aqui é isto mais a transcrição. Rede e TLS
+   até o servidor dão ≈0,45 s, medido de fora em seis amostras; o resto
+   é o modelo, e ele não está ao alcance deste arquivo.
+
+   Daqui para baixo não há mais o que espremer. O próximo ganho de
+   verdade é reconhecimento DENTRO do aparelho — resposta em menos de um
+   segundo, sem rede —, e ele exige um build de verdade, porque no Expo Go
+   não entra módulo nativo. */
+export const MAXIMO_DO_TRECHO_MS = 2_400
 
 export type Estado = {
   /* Se estamos dentro de um trecho de fala. */
