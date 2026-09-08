@@ -1,48 +1,27 @@
 import { supabase } from './supabase'
 
-/* Esta conta é de paciente do app?
+/* A frase de quem autentica e não tem tela nenhuma para ver.
  *
- * O Auth do Supabase é um só para os dois sistemas: a mesma tabela de usuários
- * atende o painel da nutricionista e o aplicativo do paciente. Autenticar,
- * portanto, não quer dizer nada sobre QUEM entrou. Quem separa os dois mundos é
- * a existência da linha em `app_contas`.
+ * ──────────────────── Ela mudou de significado, e é por isso que mudou de nome ────────────────────
+ * Enquanto o app era só do paciente, a pergunta era "é de paciente?" e a
+ * resposta não mandava a nutricionista embora com "entre pelo site". Agora a
+ * conta dela TEM destino aqui -- o painel do dia --, e a frase antiga passou a
+ * ser mentira para o caso mais comum de quem a via.
  *
- * Sem esta verificação, uma nutricionista entra no app com a conta do sistema
- * web e vê a casca vazia: sem nome, sem vínculo, sem registro. E a conclusão
- * natural de quem vê isso é que os dados sumiram.
+ * O que sobra é um caso menor e real: conta que existe no Auth e em nenhuma das
+ * duas tabelas. Uma colaboradora do sistema web, um cadastro de teste. Deixar
+ * entrar mostraria um app sem nada dentro, e a conclusão natural de quem vê
+ * isso é que os dados sumiram.
  *
- * Devolve `null` quando não deu para perguntar. Erro de rede não pode barrar
- * ninguém: paciente legítimo no elevador sem sinal seria expulso do próprio
- * app. Na dúvida, deixa entrar, e as telas lidam com a ausência de dados como
- * já lidam hoje. */
+ * Quem responde a pergunta agora é `quemEntrou()`, em lib/souNutri -- e ele
+ * pergunta pelas DUAS tabelas de uma vez, que é o que esta lib não fazia.
+ * `ehContaDePaciente` foi apagada junto, e não deixada de reserva: duas
+ * respostas para "quem entrou" divergem, e ninguém descobre por qual das duas a
+ * tela passou. Armadilha 5. */
 /* Mora aqui, e não no App, para a tela de recuperação poder usar a mesma frase
    sem importar do App e fechar um ciclo de importação. */
-export const AVISO_NAO_E_PACIENTE =
-  'Esta conta é do sistema Cygnos para nutricionistas, e o aplicativo é para pacientes. Entre pelo site com ela, ou crie sua conta de paciente aqui.'
-
-export async function ehContaDePaciente(): Promise<boolean | null> {
-  /* Do storage local, sem ida à rede — o cliente já tem a sessão na mão. */
-  const { data: sessao } = await supabase.auth.getSession()
-  const id = sessao.session?.user.id
-  /* Sem sessão não há o que perguntar, e `null` já quer dizer "não deu para
-     perguntar" — o App trata isso deixando entrar, que é o certo aqui também. */
-  if (!id) return null
-
-  const { data, error } = await supabase
-    .from('app_contas')
-    .select('id')
-    /* O filtro por id é redundante COM a RLS funcionando, e é justamente por
-       isso que ele entra: sem ele, esta pergunta — que decide quem entra no app
-       — depende inteira de uma política que mora noutro repositório. Uma RLS
-       frouxa devolveria a linha de outra pessoa (ou duas linhas, e aí o
-       maybeSingle erra e a função responde `null`, liberando). Com o filtro, o
-       pior caso volta a ser uma resposta errada só sobre a própria conta. */
-    .eq('id', id)
-    .maybeSingle()
-
-  if (error) return null
-  return data !== null
-}
+export const AVISO_CONTA_SEM_CADASTRO =
+  'Esta conta não tem cadastro de paciente nem de nutricionista no Cygnos. Se ela é do sistema web, entre por lá; ou crie sua conta de paciente aqui.'
 
 /* Exclusão da própria conta.
  *

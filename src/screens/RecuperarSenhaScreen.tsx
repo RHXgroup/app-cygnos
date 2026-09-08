@@ -14,7 +14,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CampoTexto } from '../components/CampoTexto'
 import { ForcaSenha } from '../components/ForcaSenha'
-import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from '../lib/conta'
+import { AVISO_CONTA_SEM_CADASTRO } from '../lib/conta'
+import { quemEntrou } from '../lib/souNutri'
 import { validarSenha } from '../lib/formulario'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
@@ -208,13 +209,17 @@ export function RecuperarSenhaScreen({
        A sessão também é o que torna possível a checagem abaixo: só autenticado
        dá para perguntar ao banco se esta conta é de paciente, e é assim que a
        pergunta não vira um verificador de contas para quem está de fora. */
-    const paciente = await ehContaDePaciente()
-    if (paciente === false) {
+    /* A MESMA pergunta que o App faz na entrada, e de propósito.
+       Enquanto aqui se perguntava só "é paciente?", a nutricionista podia
+       entrar no app e não podia recuperar a própria senha dentro dele -- duas
+       portas com regras diferentes para a mesma conta. */
+    const quem = await quemEntrou()
+    if (quem === 'nenhum') {
       await supabase.auth.signOut()
       setEtapa('pedir')
       setCodigo('')
       setEmailDestino(null)
-      setErro(AVISO_NAO_E_PACIENTE)
+      setErro(AVISO_CONTA_SEM_CADASTRO)
       setCarregando(false)
       return
     }

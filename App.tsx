@@ -22,7 +22,9 @@ import {
 import type { Session } from '@supabase/supabase-js'
 import { BarraAbas, ORDEM_ABAS, type Aba } from './src/components/BarraAbas'
 import { MARCA_DO_PACOTE } from './src/lib/marcaDoPacote'
-import { AVISO_NAO_E_PACIENTE, ehContaDePaciente } from './src/lib/conta'
+import { AVISO_CONTA_SEM_CADASTRO } from './src/lib/conta'
+import { quemEntrou } from './src/lib/souNutri'
+import { PainelDaNutriScreen } from './src/screens/PainelDaNutriScreen'
 import { supabase } from './src/lib/supabase'
 import { AguaScreen } from './src/screens/AguaScreen'
 import { AvisosScreen } from './src/screens/AvisosScreen'
@@ -130,7 +132,7 @@ function Raiz() {
   const [verificando, setVerificando] = useState(true)
   /* Autenticado não é o mesmo que ser paciente: o Auth é compartilhado com o
      sistema web. Ver `ehContaDePaciente`. */
-  const [acesso, setAcesso] = useState<'checando' | 'liberado'>('checando')
+  const [acesso, setAcesso] = useState<'checando' | 'liberado' | 'nutricionista'>('checando')
   /* Recado que sobrevive ao logout e aparece na tela de login. Sem ele, quem é
      barrado volta para o login sem entender por quê. */
   const [aviso, setAviso] = useState('')
@@ -176,10 +178,30 @@ function Raiz() {
     let vivo = true
     setAcesso('checando')
 
-    ehContaDePaciente().then(paciente => {
+    quemEntrou().then(quem => {
       if (!vivo) return
-      if (paciente === false) {
-        setAviso(AVISO_NAO_E_PACIENTE)
+      /* ── A VIRADA DE CHAVE ───────────────────────
+       *
+       * Aqui estava escrito "barra": quem não fosse paciente levava o aviso
+       * "entre pelo site" e era desconectada. Agora tem destino.
+       *
+       * A conta dela sempre valeu no app — o site e o aplicativo dividem o
+       * MESMO projeto de autenticação. O que faltava não era permissão,
+       * era ter para onde mandar.
+       *
+       * `nenhum` continua sendo barrado: conta que existe no Auth e em nenhuma
+       * das duas tabelas não tem tela nenhuma para ver, e deixar entrar seria
+       * mostrar um app vazio sem explicação.
+       *
+       * `null` é "não deu para perguntar" — sem rede, servidor fora —
+       * e libera como paciente, que é o comportamento de sempre. Trancar
+       * alguém para fora por causa de um túnel seria o pior dos erros. */
+      if (quem === 'nutricionista') {
+        setAcesso('nutricionista')
+        return
+      }
+      if (quem === 'nenhum') {
+        setAviso(AVISO_CONTA_SEM_CADASTRO)
         supabase.auth.signOut()
         return
       }
@@ -219,6 +241,13 @@ function Raiz() {
           </View>
         </>
       )
+    }
+    /* A ÁREA DELA, e não a do paciente.
+       Duas árvores separadas de propósito: nada da tela dela passa por
+       nenhuma tela do paciente, então não existe caminho — nem por
+       engano — de uma para a outra. */
+    if (acesso === 'nutricionista') {
+      return <PainelDaNutriScreen onSair={() => void supabase.auth.signOut()} />
     }
     return <AreaLogada sessao={sessao} />
   }

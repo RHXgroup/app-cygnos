@@ -12,6 +12,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { consultarCodigo, type ProdutoLido } from '../lib/codigoBarras'
+import { mandarParaMinhaBase } from '../lib/baseDaNutri'
 import { porcao } from '../lib/alimentos'
 import { novaChave, type AlimentoEscolhido } from '../lib/plano'
 import { milhar } from '../lib/formatar'
@@ -42,9 +43,15 @@ type CampoRotulo = (typeof CAMPOS_ROTULO)[number]['chave']
 export function LerCodigoScreen({
   onAdicionar,
   onFechar,
+  paraBaseDaNutri = false,
 }: {
-  onAdicionar: (item: AlimentoEscolhido) => void
+  /* Opcional. Quando a nutricionista abre esta tela não há refeição para
+     onde mandar o produto: ela está montando a base dela, e não comendo. */
+  onAdicionar?: (item: AlimentoEscolhido) => void
   onFechar: () => void
+  /* Mostra a opção de guardar o produto na base de alimentos DELA. Só a tela
+     dela liga isto -- o paciente não tem base própria. */
+  paraBaseDaNutri?: boolean
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
@@ -58,6 +65,11 @@ export function LerCodigoScreen({
      base dizia outra coisa, ou não saberá que corrigiu. */
   const [doRotulo, setDoRotulo] = useState<Record<string, string>>({})
   const [editando, setEditando] = useState(false)
+  /* O que aconteceu com o "salvar na minha base". Um estado só, e não um
+     booleano de carregando mais outro de pronto: os casos são exclusivos, e
+     dois booleanos permitiriam "salvando e salvo" ao mesmo tempo. */
+  const [naBase, setNaBase] = useState<'nao' | 'salvando' | 'salvo' | 'repetido'>('nao')
+  const [erroDaBase, setErroDaBase] = useState('')
 
   /* O leitor dispara várias vezes por segundo enquanto o código está no
      enquadramento. Sem esta trava, uma leitura vira dez consultas. */
@@ -68,8 +80,7 @@ export function LerCodigoScreen({
       if (produto) {
         /* Volta a ler em vez de sair: quem escaneou o produto errado quer o
            próximo, não a tela anterior. */
-        setProduto(null)
-        lendo.current = false
+        voltarALer()
         return true
       }
       onFechar()
@@ -116,8 +127,47 @@ export function LerCodigoScreen({
     return Number.isFinite(n) ? n : original
   }
 
+  /* Volta à câmera zerando o que era do produto anterior.
+     Sem isto, o "guardado na sua base" do produto de trás continuaria escrito
+     na tela por cima do produto novo -- e ela sairia achando que salvou. */
+  function voltarALer() {
+    setProduto(null)
+    setNaBase('nao')
+    setErroDaBase('')
+    setDoRotulo({})
+    setEditando(false)
+    lendo.current = false
+  }
+
+  /* Guardar o produto na base de alimentos DELA.
+   *
+   * O que ela corrigiu do rótulo é o que entra, e não o que veio da consulta:
+   * quem está com o pacote na mão está lendo a fonte primária. */
+  async function salvarNaBase() {
+    if (!produto || naBase === 'salvando') return
+
+    setNaBase('salvando')
+    setErroDaBase('')
+
+    const r = await mandarParaMinhaBase(produto, {
+      calorias: valorFinal('calorias', produto.calorias),
+      proteinas: valorFinal('proteinas', produto.proteinas),
+      carboidratos: valorFinal('carboidratos', produto.carboidratos),
+      gorduras: valorFinal('gorduras', produto.gorduras),
+    })
+
+    if (r.tipo === 'erro') {
+      /* Volta ao botão, e não para um estado de falha permanente: o caso comum
+         é o sinal do supermercado, e tocar de novo costuma resolver. */
+      setNaBase('nao')
+      setErroDaBase(r.mensagem)
+      return
+    }
+    setNaBase(r.tipo === 'repetido' ? 'repetido' : 'salvo')
+  }
+
   function adicionar() {
-    if (!produto) return
+    if (!produto || !onAdicionar) return
 
     onAdicionar({
       chave: novaChave(),
@@ -271,41 +321,95 @@ export function LerCodigoScreen({
             </View>
           )}
 
-          <Text style={styles.rotuloQuantidade}>Quanto você comeu</Text>
-          <View style={styles.atalhos}>
-            {atalhosDePeso(produto.porcaoEmbalagem).map(g => (
+          {/* A quantidade e o "adicionar" só existem para quem está registrando
+              uma refeição. Para a nutricionista o produto não vai para diário
+              nenhum -- perguntar quanto ela comeu seria pergunta sem destino. */}
+          {onAdicionar && (
+            <>
+              <Text style={styles.rotuloQuantidade}>Quanto você comeu</Text>
+              <View style={styles.atalhos}>
+                {atalhosDePeso(produto.porcaoEmbalagem).map(g => (
+                  <Pressable
+                    key={g}
+                    onPress={() => setGramas(g)}
+                    style={({ pressed }) => [
+                      styles.atalho,
+                      gramas === g && styles.atalhoAtivo,
+                      pressed && styles.pressionado,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: gramas === g }}
+                  >
+                    <Text style={[styles.textoAtalho, gramas === g && styles.textoAtalhoAtivo]}>
+                      {milhar(g)} g
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
               <Pressable
-                key={g}
-                onPress={() => setGramas(g)}
-                style={({ pressed }) => [
-                  styles.atalho,
-                  gramas === g && styles.atalhoAtivo,
-                  pressed && styles.pressionado,
-                ]}
+                onPress={adicionar}
+                style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
                 accessibilityRole="button"
-                accessibilityState={{ selected: gramas === g }}
               >
-                <Text style={[styles.textoAtalho, gramas === g && styles.textoAtalhoAtivo]}>
-                  {milhar(g)} g
-                </Text>
+                <Ionicons name="add" size={18} color={paleta().cores.branco} />
+                <Text style={styles.textoBotao}>Adicionar</Text>
               </Pressable>
-            ))}
-          </View>
+            </>
+          )}
+
+          {/* ──────────────────── GUARDAR NA BASE DELA ────────────────────
+              O produto lido não entra na base genérica, e isso continua valendo:
+              dado colaborativo com erro vira erro de TODOS os pacientes. O que
+              entra aqui tem dono -- `nutricionista_id` preenchido, visível só
+              para ela, e errado só para ela se estiver errado. */}
+          {paraBaseDaNutri && (
+            <View style={styles.blocoBase}>
+              {naBase === 'salvo' || naBase === 'repetido' ? (
+                <View style={styles.baseFeita}>
+                  <Ionicons name="checkmark-circle" size={18} color={paleta().cores.verde} />
+                  <Text style={styles.textoBaseFeita}>
+                    {naBase === 'salvo'
+                      ? 'Guardado na sua base de alimentos.'
+                      : 'Este produto já estava na sua base.'}
+                  </Text>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={salvarNaBase}
+                  disabled={naBase === 'salvando'}
+                  style={({ pressed }) => [styles.botaoBase, pressed && styles.pressionado]}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: naBase === 'salvando' }}
+                >
+                  {naBase === 'salvando' ? (
+                    <ActivityIndicator color={paleta().cores.verde} />
+                  ) : (
+                    <>
+                      <Ionicons name="bookmark-outline" size={17} color={paleta().cores.verde} />
+                      <Text style={styles.textoBotaoBase}>Salvar na minha base de alimentos</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
+
+              {/* O aviso vem ANTES de ela tocar, e não depois. Um produto que
+                  entra na base dela vai aparecer no plano de quem ela atende, e
+                  a hora de conferir o rótulo é com o pacote ainda na mão. */}
+              {naBase !== 'salvo' && naBase !== 'repetido' && (
+                <Text style={styles.ajudaBase}>
+                  {produto.origem === 'base'
+                    ? 'Guarda uma cópia sua deste produto, com o que você corrigiu.'
+                    : 'Confira o rótulo antes: o dado vem do Open Food Facts, que é colaborativo.'}
+                </Text>
+              )}
+
+              {!!erroDaBase && <Text style={styles.erroDaBase}>{erroDaBase}</Text>}
+            </View>
+          )}
 
           <Pressable
-            onPress={adicionar}
-            style={({ pressed }) => [styles.botao, pressed && styles.pressionado]}
-            accessibilityRole="button"
-          >
-            <Ionicons name="add" size={18} color={paleta().cores.branco} />
-            <Text style={styles.textoBotao}>Adicionar</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              setProduto(null)
-              lendo.current = false
-            }}
+            onPress={voltarALer}
             style={styles.linkOutro}
             accessibilityRole="button"
           >
@@ -566,6 +670,38 @@ const estilos = estilosDe(t =>
   },
   textoBotao: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
   pressionado: { opacity: 0.75 },
+
+  /* O botão da base é contornado, e não preenchido: onde os dois aparecem
+     juntos, o cheio é o "adicionar à refeição" e o contornado é o guardar.
+     Dois botões cheios lado a lado não dizem qual é o gesto principal. */
+  blocoBase: { gap: 8, marginTop: 4 },
+  botaoBase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 48,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: t.cores.verde,
+    backgroundColor: t.cores.superficie,
+  },
+  textoBotaoBase: { fontSize: 14.5, fontWeight: '800', color: t.cores.verde },
+  baseFeita: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    minHeight: 48,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: t.cores.verdeMenta,
+  },
+  textoBaseFeita: { flex: 1, fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+  ajudaBase: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingHorizontal: 4 },
+  erroDaBase: { fontSize: 12.5, color: t.cores.ink, lineHeight: 18, paddingHorizontal: 4 },
 
   linkOutro: { alignItems: 'center', paddingVertical: 10 },
   textoLinkOutro: { fontSize: 13.5, fontWeight: '700', color: t.inkMedio },
