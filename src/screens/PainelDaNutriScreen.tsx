@@ -12,7 +12,12 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
-import { consultasDoDia, consultasNoPeriodo, pedidosDeConsulta } from '../lib/agendaDaNutri'
+import {
+  consultasDoDia,
+  consultasNoPeriodo,
+  pedidosDeConsulta,
+  responderPedido,
+} from '../lib/agendaDaNutri'
 import { quemPedeAtencao } from '../lib/atencaoDaNutri'
 import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia'
 import {
@@ -99,6 +104,11 @@ export function PainelDaNutriScreen({
   /* A ficha abre POR CIMA do painel. Ela lê "14:00 Marina Alves" e quer saber
      quem é a Marina -- é o clique que este painel existe para poupar. */
   const [fichaAberta, setFichaAberta] = useState<number | null>(null)
+  /* Qual pedido está sendo respondido agora, e o que o banco disse do último.
+     Um id, e não um booleano: com dois pedidos na tela, um booleano faria os
+     dois cartões piscarem quando ela toca em um. */
+  const [respondendo, setRespondendo] = useState<number | null>(null)
+  const [respostaDoBanco, setRespostaDoBanco] = useState('')
 
   const buscar = useCallback(async () => {
     /* As três juntas: são consultas independentes, e esperar uma para começar a
@@ -161,6 +171,23 @@ export function PainelDaNutriScreen({
     })
     return () => sub.remove()
   }, [buscar])
+
+  async function responder(id: number, aceitar: boolean) {
+    /* Um por vez: dois toques rapidos em cartões diferentes mandariam duas
+       respostas e a segunda leria o estado de antes da primeira. */
+    if (respondendo !== null) return
+    setRespondendo(id)
+    setRespostaDoBanco('')
+
+    const r = await responderPedido(id, aceitar)
+    setRespondendo(null)
+    setRespostaDoBanco(r.mensagem)
+
+    /* Relê SEMPRE, e não só no sucesso. A recusa por choque não mudou o pedido,
+       mas "já foi respondido" mudou -- e nesse caso a lista na tela está velha,
+       que é justamente quando reler importa. */
+    void buscar()
+  }
 
   const dia: Dia = dividirODia(consultas, agora)
 
@@ -263,16 +290,63 @@ export function PainelDaNutriScreen({
             </View>
 
             {pedidos.slice(0, 4).map(c => (
-              <Linha key={c.id} consulta={c} comDia onAbrir={setFichaAberta} />
+              <View key={c.id} style={styles.umPedido}>
+                <Linha consulta={c} comDia onAbrir={setFichaAberta} />
+                <View style={styles.botoesDoPedido}>
+                  {/* Recusar é o largo e Aceitar o estreito, como no cartão da
+                      Aurora: o gesto sem atenção toca no maior, e o maior tem de
+                      ser o que NÃO compromete a agenda dela.
+
+                      E aceitar aqui grava de uma vez, sem segundo cartão: o
+                      horário e o nome estão na linha logo acima, lidos por ela.
+                      Um cartão repetindo o que está um dedo acima ensina a
+                      confirmar sem ler. */}
+                  <Pressable
+                    onPress={() => void responder(c.id, false)}
+                    disabled={respondendo !== null}
+                    style={({ pressed }) => [
+                      styles.recusar,
+                      respondendo !== null && styles.desligado,
+                      pressed && styles.pressionada,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={'Recusar o pedido de ' + c.nome}
+                  >
+                    <Text style={styles.textoRecusar}>Recusar</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => void responder(c.id, true)}
+                    disabled={respondendo !== null}
+                    style={({ pressed }) => [
+                      styles.aceitar,
+                      respondendo !== null && styles.desligado,
+                      pressed && styles.pressionada,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={'Aceitar o pedido de ' + c.nome}
+                  >
+                    {respondendo === c.id ? (
+                      <ActivityIndicator color={paleta().cores.branco} size="small" />
+                    ) : (
+                      <Text style={styles.textoAceitar}>Aceitar</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
             ))}
             {pedidos.length > 4 && (
               <Text style={styles.maisPedidos}>e mais {pedidos.length - 4}</Text>
             )}
 
-            {/* Dito porque a tela MOSTRA e não deixa responder: uma lista de
-                gente esperando, sem saída, é pior do que não mostrar. */}
+            {/* A frase que o BANCO escreveu, e não um "pronto" montado aqui: a
+                recusa por choque precisa chegar com o nome de quem já está
+                naquele horário, e quem sabe isso é quem consultou. */}
+            {!!respostaDoBanco && <Text style={styles.respostaDoBanco}>{respostaDoBanco}</Text>}
+
             <Text style={styles.ondeResponder}>
-              Aceitar ou recusar ainda é no sistema, no computador.
+              Aceitar confirma a consulta no horário pedido. Remarcar continua no
+              sistema, no computador.
             </Text>
           </View>
         )}
@@ -615,6 +689,38 @@ const estilos = estilosDe(t =>
       color: t.cores.gold,
     },
     maisPedidos: { fontSize: 12.5, color: t.inkFraco, paddingVertical: 6 },
+    umPedido: { paddingBottom: 6 },
+    botoesDoPedido: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
+    recusar: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 9,
+      borderRadius: 10,
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+    },
+    textoRecusar: { fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+    aceitar: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 96,
+      paddingVertical: 9,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      backgroundColor: t.cores.verde,
+    },
+    textoAceitar: { fontSize: 13.5, fontWeight: '800', color: t.cores.branco },
+    desligado: { opacity: 0.5 },
+    respostaDoBanco: {
+      fontSize: 12.5,
+      color: t.cores.ink,
+      lineHeight: 18,
+      backgroundColor: t.cores.verdeMenta,
+      padding: 10,
+      borderRadius: 10,
+      marginTop: 4,
+    },
     ondeResponder: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingTop: 6 },
 
     amanha: { fontSize: 13, color: t.inkSuave, paddingHorizontal: 4, paddingTop: 2 },

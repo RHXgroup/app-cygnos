@@ -134,6 +134,43 @@ export async function pedidosDeConsulta(): Promise<ResultadoAgenda> {
   return { tipo: 'ok', consultas: await comNomes((data ?? []) as LinhaConsulta[]) }
 }
 
+/* ──────────────────── RESPONDER AO PEDIDO ────────────────────
+ *
+ * Quem decide é `app_responder_pedido`, no banco, e não esta função -- porque a
+ * mesma regra tem de valer para o botão daqui e para a Aurora. Aceitar um
+ * pedido é marcar uma consulta, e aceitar sem conferir é marcar em cima de
+ * outra: a conferência de choque é a MESMA do agendamento, e mora lá.
+ *
+ * A frase que volta é a que a função escreveu, e não uma montada aqui: a recusa
+ * por choque precisa chegar à tela com o nome de quem já está naquele horário,
+ * e quem sabe isso é quem consultou. */
+export type ResultadoDaResposta = { ok: boolean; mensagem: string }
+
+export async function responderPedido(
+  consultaId: number,
+  aceitar: boolean,
+  motivo?: string,
+): Promise<ResultadoDaResposta> {
+  const { data, error } = await supabase.rpc('app_responder_pedido', {
+    p_consulta_id: consultaId,
+    p_aceitar: aceitar,
+    p_motivo: motivo ?? null,
+  })
+
+  if (error) {
+    return {
+      ok: false,
+      mensagem: falha('Não consegui responder agora. Verifique a conexão.', error),
+    }
+  }
+
+  const r = data as { ok?: boolean; mensagem?: string } | null
+  /* Resposta vazia é tratada como FALHA, e não como sucesso silencioso: depois
+     de ela tocar em Aceitar, "não sei o que aconteceu" é informação, e um visto
+     verde sem base seria a pior saída. */
+  return { ok: r?.ok === true, mensagem: r?.mensagem ?? 'Não consegui responder agora.' }
+}
+
 async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
   const { data, error } = await supabase
     .from('consultas')
