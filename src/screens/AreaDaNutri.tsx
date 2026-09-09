@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BackHandler, StyleSheet, View } from 'react-native'
+import { useRef } from 'react'
+import { BackHandler, PanResponder, StyleSheet, View } from 'react-native'
 import { BarraDaNutri, type AbaDaNutri } from '../components/BarraDaNutri'
 import { AgendaDaNutriScreen } from './AgendaDaNutriScreen'
 import { AuroraDaNutriScreen } from './AuroraDaNutriScreen'
@@ -8,6 +9,7 @@ import { MaisDaNutriScreen } from './MaisDaNutriScreen'
 import { PacientesDaNutriScreen } from './PacientesDaNutriScreen'
 import { PainelDaNutriScreen } from './PainelDaNutriScreen'
 import { estilosDe } from '../lib/tema'
+import { abaDoDeslize } from '../lib/deslizarEntreAbas'
 
 /* A área dela: as abas, e o que abre por cima delas.
  *
@@ -33,6 +35,41 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
   const [aba, setAba] = useState<AbaDaNutri>('hoje')
   const [auroraAberta, setAuroraAberta] = useState(false)
   const [lendoCodigo, setLendoCodigo] = useState(false)
+
+  /* ──────────────────── DESLIZAR ENTRE AS ABAS ────────────────────
+   *
+   * Pedido dele depois de usar: "raspo o lado com o dedo no do paciente e ele
+   * vai navegando entre os menus; aqui não vai, tem que clicar".
+   *
+   * `PanResponder` e não um carrossel. O app do paciente monta as quatro abas
+   * ao mesmo tempo dentro de um ScrollView horizontal, e isso custou os dois
+   * defeitos da armadilha 13 -- `useEffect` com `[]` rodando uma vez por SESSÃO
+   * e aba invisível marcando mensagem como lida. Esta área monta UMA por vez de
+   * propósito, e o gesto não pode desfazer essa decisão: ele só troca qual
+   * está montada.
+   *
+   * ── E por que na fase de BOLHA, e não de captura ──
+   * `onMoveShouldSetPanResponder` (sem `Capture`) só é consultado depois que os
+   * filhos recusam o gesto. É isso que deixa a faixa de chips de Pacientes e a
+   * de sugestões da Aurora rolarem na horizontal sem trocar de aba -- elas
+   * pedem o gesto primeiro, e ganham. Com `Capture`, o pai roubaria o toque e
+   * as duas faixas parariam de rolar, sem erro nenhum para explicar.
+   *
+   * `useRef` porque `PanResponder.create` guarda as funções que recebeu: um
+   * responder recriado a cada renderização deixa o gesto em curso apontando
+   * para o `aba` de duas renderizações atrás. */
+  const abaAgora = useRef<AbaDaNutri>('hoje')
+  abaAgora.current = aba
+
+  const gesto = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => abaDoDeslize(abaAgora.current, g.dx, g.dy) !== null,
+      onPanResponderRelease: (_e, g) => {
+        const destino = abaDoDeslize(abaAgora.current, g.dx, g.dy)
+        if (destino) setAba(destino)
+      },
+    }),
+  ).current
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -68,7 +105,7 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
 
   return (
     <View style={styles.tela}>
-      <View style={styles.conteudo}>
+      <View style={styles.conteudo} {...gesto.panHandlers}>
         {aba === 'hoje' && (
           <PainelDaNutriScreen
             onSair={onSair}
