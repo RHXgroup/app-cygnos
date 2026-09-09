@@ -27,6 +27,11 @@ export type ConsultaDoDia = {
   diaISO?: string
   /* Nome do paciente, ou o avulso quando não há ficha. */
   nome: string
+  /* A ficha, quando existe. Nulo no encaixe avulso -- alguém que ela atendeu
+     sem cadastrar --, e é por isso que a linha da agenda só abre quando há id:
+     tocar num nome e não acontecer nada é pior do que o nome não parecer
+     tocável. */
+  pacienteId?: number | null
   /* Minutos reservados. Nulo quando ninguém informou. */
   duracao: number | null
   status: string

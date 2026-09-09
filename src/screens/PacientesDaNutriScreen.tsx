@@ -98,7 +98,7 @@ export function PacientesDaNutriScreen() {
   }, [buscar, termo])
 
   if (aberto !== null) {
-    return <Ficha id={aberto} onFechar={() => setAberto(null)} />
+    return <FichaDoPacienteScreen id={aberto} onFechar={() => setAberto(null)} />
   }
 
   return (
@@ -209,7 +209,20 @@ export function PacientesDaNutriScreen() {
   )
 }
 
-function Ficha({ id, onFechar }: { id: number; onFechar: () => void }) {
+/* A ficha, exportada para a AGENDA e o PAINEL também abrirem.
+ *
+ * ──────────────────── Por que ela não virou arquivo próprio ────────────────────
+ * Porque ela divide a folha de estilos com a lista, e mover significaria copiar
+ * a folha -- duas definições do mesmo cartão, que divergem no dia em que
+ * alguém ajustar o espaçamento de uma. É a armadilha 5 pelo lado do CSS, e o
+ * preço de evitá-la é um import que parece estranho: uma tela importando de
+ * outra.
+ *
+ * ──────────────────── E por que a agenda precisa dela ────────────────────
+ * Ela lê "14:00 Marina Alves" e quer saber quem é a Marina -- o plano, o que
+ * ficou combinado da última vez, se há conta em aberto. Sem isto, o nome na
+ * agenda é um texto que não leva a lugar nenhum, e ela abre o computador. */
+export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: () => void }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
 

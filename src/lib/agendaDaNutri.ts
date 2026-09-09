@@ -142,6 +142,7 @@ async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
        hoje para ela e de amanhã para o UTC, e a grade do mês pintaria a bolinha
        na célula errada. A lib do calendário é pura e recebe isto pronto. */
     diaISO: diaLocalDe(l.data_hora),
+    pacienteId: l.paciente_id,
     /* A ordem importa: a ficha primeiro, o avulso depois, e por fim um genérico.
        `nome_avulso` existe para o encaixe de quem ainda não tem ficha, e é o
        nome certo justamente nesse caso. */

@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import { consultasDoDia } from '../lib/agendaDaNutri'
 import { quemPedeAtencao } from '../lib/atencaoDaNutri'
 import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia'
@@ -90,6 +91,9 @@ export function PainelDaNutriScreen({
      Abrir sozinho faria uma lista de oito empurrar a agenda para fora da tela
      -- e a agenda é o que ela veio ver. */
   const [nomesAbertos, setNomesAbertos] = useState(false)
+  /* A ficha abre POR CIMA do painel. Ela lê "14:00 Marina Alves" e quer saber
+     quem é a Marina -- é o clique que este painel existe para poupar. */
+  const [fichaAberta, setFichaAberta] = useState<number | null>(null)
 
   const buscar = useCallback(async () => {
     /* As três juntas: são consultas independentes, e esperar uma para começar a
@@ -141,6 +145,10 @@ export function PainelDaNutriScreen({
   }, [buscar])
 
   const dia: Dia = dividirODia(consultas, agora)
+
+  if (fichaAberta !== null) {
+    return <FichaDoPacienteScreen id={fichaAberta} onFechar={() => setFichaAberta(null)} />
+  }
 
   if (carregando) {
     return (
@@ -195,21 +203,33 @@ export function PainelDaNutriScreen({
             O único cartão grande da tela. Se tudo tivesse o mesmo peso, a
             resposta que ela procura de relance estaria no meio de uma lista. */}
         {dia.agora && (
-          <View style={styles.agora}>
+          <Pressable
+            onPress={() => dia.agora?.pacienteId && setFichaAberta(dia.agora.pacienteId)}
+            /* Sem ficha não é botão: o encaixe avulso não tem para onde levar, e
+               tocar num nome e nada acontecer é pior do que ele não parecer
+               tocável. */
+            disabled={!dia.agora.pacienteId}
+            style={({ pressed }) => [styles.agora, pressed && styles.pressionada]}
+            accessibilityRole={dia.agora.pacienteId ? 'button' : 'text'}
+            accessibilityLabel={
+              'Agora: ' + dia.agora.nome + ', ' + hhmm(dia.agora.quando) +
+              (dia.agora.pacienteId ? '. Toque para abrir a ficha.' : '')
+            }
+          >
             <Text style={styles.rotuloAgora}>AGORA</Text>
             <Text style={styles.nomeAgora}>{dia.agora.nome}</Text>
             <Text style={styles.horaAgora}>
               {hhmm(dia.agora.quando)}
               {dia.agora.duracao ? ` · ${dia.agora.duracao} min` : ''}
             </Text>
-          </View>
+          </Pressable>
         )}
 
         {dia.aindaHoje.length > 0 && (
           <View style={styles.bloco}>
             <Text style={styles.rotuloBloco}>{dia.agora ? 'DEPOIS' : 'HOJE'}</Text>
             {dia.aindaHoje.map(c => (
-              <Linha key={c.id} consulta={c} />
+              <Linha key={c.id} consulta={c} onAbrir={setFichaAberta} />
             ))}
           </View>
         )}
@@ -218,7 +238,7 @@ export function PainelDaNutriScreen({
           <View style={styles.bloco}>
             <Text style={styles.rotuloBloco}>JÁ PASSARAM</Text>
             {dia.jaForam.map(c => (
-              <Linha key={c.id} consulta={c} apagada />
+              <Linha key={c.id} consulta={c} apagada onAbrir={setFichaAberta} />
             ))}
           </View>
         )}
@@ -343,10 +363,27 @@ export function PainelDaNutriScreen({
   )
 }
 
-function Linha({ consulta, apagada = false }: { consulta: ConsultaDoDia; apagada?: boolean }) {
+function Linha({
+  consulta,
+  apagada = false,
+  onAbrir,
+}: {
+  consulta: ConsultaDoDia
+  apagada?: boolean
+  onAbrir?: (id: number) => void
+}) {
   const styles = estilos()
   return (
-    <View style={styles.linha}>
+    <Pressable
+      onPress={() => consulta.pacienteId && onAbrir?.(consulta.pacienteId)}
+      disabled={!consulta.pacienteId || !onAbrir}
+      style={({ pressed }) => [styles.linha, pressed && styles.pressionada]}
+      accessibilityRole={consulta.pacienteId && onAbrir ? 'button' : 'text'}
+      accessibilityLabel={
+        hhmm(consulta.quando) + ', ' + consulta.nome +
+        (consulta.pacienteId && onAbrir ? '. Toque para abrir a ficha.' : '')
+      }
+    >
       <Text style={[styles.hora, apagada && styles.apagado]}>{hhmm(consulta.quando)}</Text>
       <Text style={[styles.nome, apagada && styles.apagado]} numberOfLines={1}>
         {consulta.nome}
@@ -356,7 +393,10 @@ function Linha({ consulta, apagada = false }: { consulta: ConsultaDoDia; apagada
       {consulta.status === 'realizada' && (
         <Ionicons name="checkmark" size={15} color={paleta().inkFraco} />
       )}
-    </View>
+      {!!consulta.pacienteId && (
+        <Ionicons name="chevron-forward" size={14} color={paleta().inkFraco} />
+      )}
+    </Pressable>
   )
 }
 

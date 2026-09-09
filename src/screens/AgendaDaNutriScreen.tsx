@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import { consultasNoPeriodo } from '../lib/agendaDaNutri'
 import {
   CABECALHO_DA_SEMANA,
@@ -64,6 +65,10 @@ export function AgendaDaNutriScreen() {
   const [carregando, setCarregando] = useState(true)
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
+  /* A ficha abre por cima da agenda. É o gesto que fecha o ciclo: ela procura
+     um horário, vê quem está nele, e abre para saber quem é -- sem trocar de
+     aba e procurar o nome de novo. */
+  const [fichaAberta, setFichaAberta] = useState<number | null>(null)
 
   /* Que pedaço do calendário está na tela. O mês pede a grade INTEIRA, sobras
      inclusive: as células de 31 de agosto e 4 de outubro também mostram
@@ -123,6 +128,10 @@ export function AgendaDaNutriScreen() {
   )
 
   const hoje = hojeLocal()
+
+  if (fichaAberta !== null) {
+    return <FichaDoPacienteScreen id={fichaAberta} onFechar={() => setFichaAberta(null)} />
+  }
 
   function andar(passo: number) {
     if (vista === 'dia') return setFoco(somandoDias(foco, passo))
@@ -238,15 +247,19 @@ export function AgendaDaNutriScreen() {
                 dia={dia}
                 hoje={hoje}
                 consultas={consultas.filter(c => c.diaISO === dia)}
-                onAbrir={() => {
+                onAbrirDia={() => {
                   setFoco(dia)
                   setVista('dia')
                 }}
+                onAbrirFicha={setFichaAberta}
               />
             ))}
 
           {vista === 'dia' && (
-            <ListaDoDia consultas={consultas.filter(c => c.diaISO === foco)} />
+            <ListaDoDia
+              consultas={consultas.filter(c => c.diaISO === foco)}
+              onAbrirFicha={setFichaAberta}
+            />
           )}
         </ScrollView>
       )}
@@ -371,44 +384,57 @@ function BlocoDeDia({
   dia,
   hoje,
   consultas,
-  onAbrir,
+  onAbrirDia,
+  onAbrirFicha,
 }: {
   dia: string
   hoje: string
   consultas: ConsultaDoDia[]
-  onAbrir: () => void
+  onAbrirDia: () => void
+  onAbrirFicha: (id: number) => void
 }) {
   const styles = estilos()
 
   return (
-    <Pressable
-      onPress={onAbrir}
-      style={({ pressed }) => [styles.blocoDia, pressed && styles.pressionado]}
-      accessibilityRole="button"
-      accessibilityLabel={tituloDoDia(dia)}
-    >
-      <View style={styles.topoDoBloco}>
-        <Text style={[styles.tituloDoBloco, dia === hoje && styles.tituloDeHoje]}>
-          {tituloDoDia(dia)}
-          {dia === hoje ? ' · hoje' : ''}
-        </Text>
-        {consultas.length > 0 && (
-          <Text style={styles.contadorDoBloco}>{consultas.length}</Text>
-        )}
-      </View>
+    /* O CABEÇALHO abre o dia; cada NOME abre a ficha. Duas ações no mesmo
+       cartão, e é de propósito: o bloco inteiro tocável engoliria o toque no
+       nome, e o nome é o que ela quer na maior parte das vezes. */
+    <View style={styles.blocoDia}>
+      <Pressable
+        onPress={onAbrirDia}
+        style={({ pressed }) => pressed && styles.pressionado}
+        accessibilityRole="button"
+        accessibilityLabel={tituloDoDia(dia) + '. Toque para ver o dia inteiro.'}
+      >
+        <View style={styles.topoDoBloco}>
+          <Text style={[styles.tituloDoBloco, dia === hoje && styles.tituloDeHoje]}>
+            {tituloDoDia(dia)}
+            {dia === hoje ? ' · hoje' : ''}
+          </Text>
+          {consultas.length > 0 && (
+            <Text style={styles.contadorDoBloco}>{consultas.length}</Text>
+          )}
+        </View>
+      </Pressable>
 
       {consultas.length === 0 ? (
-        /* "Livre" e não "nada": o app só enxerga a agenda, e ela pode ter mil
-           coisas nesse dia. A palavra fala do que o app SABE. */
+        /* "Sem consulta marcada", e não "livre": o app só enxerga a agenda, e
+           ela pode ter mil coisas nesse dia. A frase fala do que o app SABE. */
         <Text style={styles.blocoLivre}>Sem consulta marcada</Text>
       ) : (
-        consultas.map(c => <Linha key={c.id} consulta={c} />)
+        consultas.map(c => <Linha key={c.id} consulta={c} onAbrirFicha={onAbrirFicha} />)
       )}
-    </Pressable>
+    </View>
   )
 }
 
-function ListaDoDia({ consultas }: { consultas: ConsultaDoDia[] }) {
+function ListaDoDia({
+  consultas,
+  onAbrirFicha,
+}: {
+  consultas: ConsultaDoDia[]
+  onAbrirFicha: (id: number) => void
+}) {
   const styles = estilos()
 
   if (consultas.length === 0) {
@@ -423,24 +449,43 @@ function ListaDoDia({ consultas }: { consultas: ConsultaDoDia[] }) {
   return (
     <View style={styles.listaDoDia}>
       {consultas.map(c => (
-        <Linha key={c.id} consulta={c} />
+        <Linha key={c.id} consulta={c} onAbrirFicha={onAbrirFicha} />
       ))}
     </View>
   )
 }
 
-function Linha({ consulta }: { consulta: ConsultaDoDia }) {
+function Linha({
+  consulta,
+  onAbrirFicha,
+}: {
+  consulta: ConsultaDoDia
+  onAbrirFicha: (id: number) => void
+}) {
   const styles = estilos()
   const passada = consulta.status === 'realizada'
+  const temFicha = !!consulta.pacienteId
 
   return (
-    <View style={styles.linha}>
+    <Pressable
+      onPress={() => consulta.pacienteId && onAbrirFicha(consulta.pacienteId)}
+      /* Encaixe avulso não tem ficha para abrir, e por isso não é botão: tocar
+         num nome e nada acontecer é pior do que ele não parecer tocável. */
+      disabled={!temFicha}
+      style={({ pressed }) => [styles.linha, pressed && styles.pressionado]}
+      accessibilityRole={temFicha ? 'button' : 'text'}
+      accessibilityLabel={
+        hhmm(consulta.quando) + ', ' + consulta.nome +
+        (temFicha ? '. Toque para abrir a ficha.' : '')
+      }
+    >
       <Text style={[styles.hora, passada && styles.apagado]}>{hhmm(consulta.quando)}</Text>
       <Text style={[styles.nome, passada && styles.apagado]} numberOfLines={1}>
         {consulta.nome}
       </Text>
       {passada && <Ionicons name="checkmark" size={15} color={paleta().inkFraco} />}
-    </View>
+      {temFicha && <Ionicons name="chevron-forward" size={14} color={paleta().inkFraco} />}
+    </Pressable>
   )
 }
 
