@@ -1,4 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+/* `segundaDa` mora em `datas.ts`, que não importa nada e por isso pode ser
+   usada pelas libs puras -- inclusive a da agenda dela. */
+import { segundaDa } from './datas.ts'
+/* Reexportado porque o chamador antigo pode continuar importando daqui. */
+export { segundaDa }
 
 /* Se o cartão da semana já foi visto nesta semana.
  *
@@ -18,19 +23,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
  * cartão uma vez a mais, e isso não é problema nenhum. */
 
 export const RASCUNHO_SEMANA = 'cygnos:semana-vista'
-
-/* A segunda-feira da semana daquela data, em ISO.
- *
- * `getUTCDay()` devolve 0 para domingo. Domingo pertence à semana que COMEÇOU
- * na segunda anterior — seis dias atrás, e não no dia seguinte. Sem esse ajuste
- * o cartão apareceria duas vezes em toda virada de domingo para segunda. */
-export function segundaDa(iso: string): string {
-  const ms = Date.parse(iso + 'T00:00:00Z')
-  if (!Number.isFinite(ms)) return iso
-  const d = new Date(ms).getUTCDay()
-  const recuo = d === 0 ? 6 : d - 1
-  return new Date(ms - recuo * 86400000).toISOString().slice(0, 10)
-}
 
 export async function semanaJaVista(hoje: string): Promise<boolean> {
   try {

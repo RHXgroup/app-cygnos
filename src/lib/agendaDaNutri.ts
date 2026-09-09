@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { diaLocalDe } from './calendarioDaAgenda'
 import type { ConsultaDoDia } from './diaDaNutri'
 
 /* A agenda dela, lida do banco. O que DECIDE mora em `diaDaNutri`.
@@ -44,6 +45,18 @@ function limitesDoDia(dia: Date): { inicio: string; fim: string } {
   return { inicio: inicio.toISOString(), fim: fim.toISOString() }
 }
 
+/* O intervalo de um PER~II~ODO, para a vista de semana e de mês. Mesma conta, com
+   os dois extremos abertos: a meia-noite local do primeiro dia até a meia-noite
+   local do dia seguinte ao último. */
+function limitesDoPeriodo(de: Date, ate: Date): { inicio: string; fim: string } {
+  const inicio = new Date(de)
+  inicio.setHours(0, 0, 0, 0)
+  const fim = new Date(ate)
+  fim.setHours(0, 0, 0, 0)
+  fim.setDate(fim.getDate() + 1)
+  return { inicio: inicio.toISOString(), fim: fim.toISOString() }
+}
+
 type LinhaConsulta = {
   id: number
   data_hora: string
@@ -60,13 +73,37 @@ export type ResultadoAgenda =
 
 export async function consultasDoDia(dia: Date): Promise<ResultadoAgenda> {
   const { inicio, fim } = limitesDoDia(dia)
+  return ler(inicio, fim)
+}
 
+/* A agenda de um período inteiro, para a semana e para o mês.
+ *
+ * ──────────────────── Um pedido só, e não um por dia ────────────────────
+ * A vista de mês desenha 35 células. Trinta e cinco consultas ao banco para
+ * pintar uma grade seria a tela abrindo em segundos no 4G do consultório -- e
+ * cada uma delas cobrando a mesma política de RLS de novo. Um intervalo resolve.
+ *
+ * ──────────────────── E o teto ────────────────────
+ * Um mês cheio dela tem dezenas de consultas, não milhares. O teto existe para
+ * o caso que ninguém previu -- uma agenda importada, um ano inteiro pedido por
+ * engano -- não virar megabytes no aparelho dela. Quando bate no teto, o que
+ * falta é o fim do período, e é por isso que a ordem é crescente: o começo, que
+ * é o que ela está olhando, chega inteiro. */
+const TETO_DO_PERIODO = 500
+
+export async function consultasNoPeriodo(de: Date, ate: Date): Promise<ResultadoAgenda> {
+  const { inicio, fim } = limitesDoPeriodo(de, ate)
+  return ler(inicio, fim)
+}
+
+async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
   const { data, error } = await supabase
     .from('consultas')
     .select('id, data_hora, duracao, status, tipo, paciente_id, nome_avulso')
     .gte('data_hora', inicio)
     .lt('data_hora', fim)
     .order('data_hora', { ascending: true })
+    .limit(TETO_DO_PERIODO)
 
   if (error) {
     return {
@@ -101,6 +138,10 @@ export async function consultasDoDia(dia: Date): Promise<ResultadoAgenda> {
   const consultas: ConsultaDoDia[] = linhas.map(l => ({
     id: l.id,
     quando: l.data_hora,
+    /* O dia LOCAL dela, calculado aqui e não na tela: uma consulta das 22h é de
+       hoje para ela e de amanhã para o UTC, e a grade do mês pintaria a bolinha
+       na célula errada. A lib do calendário é pura e recebe isto pronto. */
+    diaISO: diaLocalDe(l.data_hora),
     /* A ordem importa: a ficha primeiro, o avulso depois, e por fim um genérico.
        `nome_avulso` existe para o encaixe de quem ainda não tem ficha, e é o
        nome certo justamente nesse caso. */

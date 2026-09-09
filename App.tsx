@@ -24,7 +24,7 @@ import { BarraAbas, ORDEM_ABAS, type Aba } from './src/components/BarraAbas'
 import { MARCA_DO_PACOTE } from './src/lib/marcaDoPacote'
 import { AVISO_CONTA_SEM_CADASTRO } from './src/lib/conta'
 import { quemEntrou } from './src/lib/souNutri'
-import { PainelDaNutriScreen } from './src/screens/PainelDaNutriScreen'
+import { AreaDaNutri } from './src/screens/AreaDaNutri'
 import { supabase } from './src/lib/supabase'
 import { AguaScreen } from './src/screens/AguaScreen'
 import { AvisosScreen } from './src/screens/AvisosScreen'
@@ -247,7 +247,7 @@ function Raiz() {
        nenhuma tela do paciente, então não existe caminho — nem por
        engano — de uma para a outra. */
     if (acesso === 'nutricionista') {
-      return <PainelDaNutriScreen onSair={() => void supabase.auth.signOut()} />
+      return <AreaDaNutri onSair={() => void supabase.auth.signOut()} />
     }
     return <AreaLogada sessao={sessao} />
   }

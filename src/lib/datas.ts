@@ -59,3 +59,23 @@ export const emDias = (de: string, ate: string): number =>
  * colocaria a célula na coluna errada do calendário. */
 export const diaDaSemana = (iso: string): number =>
   ehDataReal(iso) ? new Date(doISO(iso)).getUTCDay() : -1
+
+/* A segunda-feira da semana daquela data, em ISO.
+ *
+ * `getUTCDay()` devolve 0 para domingo. Domingo pertence à semana que COMEÇOU
+ * na segunda anterior -- seis dias atrás, e não no dia seguinte. Sem esse
+ * ajuste o cartão da semana aparecia duas vezes em toda virada de domingo para
+ * segunda.
+ *
+ * ──────────────────── Por que ela veio de `semanaVista` para cá ────────────────────
+ * Lá ela morava ao lado de duas funções de AsyncStorage, e por isso ninguém
+ * conseguia importá-la de uma lib pura -- qualquer import daquele arquivo
+ * arrasta o aparelho inteiro junto. A agenda da nutricionista precisa da mesma
+ * conta para desenhar a semana, e o próximo passo óbvio seria escrever a
+ * segunda cópia. Armadilha 5: ao invés disso, ela mudou de casa e o chamador
+ * antigo passou a importar daqui. */
+export const segundaDa = (iso: string): string => {
+  if (!ehDataReal(iso)) return iso
+  const dia = diaDaSemana(iso)
+  return somandoDias(iso, -(dia === 0 ? 6 : dia - 1))
+}

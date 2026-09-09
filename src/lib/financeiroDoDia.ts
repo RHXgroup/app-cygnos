@@ -28,8 +28,14 @@ export type DinheiroDoDia = {
   /* Centavos não: ela lê "R$ 640" e segue a vida. */
   recebido: number
   quantasBaixas: number
+  /* A receber que vence HOJE e ainda não entrou. */
   vencendo: number
   quantasVencendo: number
+  /* A PAGAR que vence hoje. Entra porque é a pergunta que ela faz de manhã --
+     "o que eu tenho para pagar hoje" -- e porque não saber disso custa juro,
+     que é o único número desta tela que piora sozinho com o tempo. */
+  aPagar: number
+  quantasAPagar: number
 }
 
 const soma = (linhas: { valor: unknown }[]): number =>
@@ -51,7 +57,7 @@ function hojeLocal(): string {
 export async function dinheiroDoDia(): Promise<DinheiroDoDia | null> {
   const hoje = hojeLocal()
 
-  const [baixas, vencendo] = await Promise.all([
+  const [baixas, vencendo, aPagar] = await Promise.all([
     supabase
       .from('contas_receber_baixas')
       .select('valor_pago')
@@ -61,26 +67,39 @@ export async function dinheiroDoDia(): Promise<DinheiroDoDia | null> {
       .select('valor')
       .eq('status', 'pendente')
       .eq('data_vencimento', hoje),
+    /* 'pago_parcial' entra junto com 'pendente': uma conta paga pela metade
+       AINDA vence hoje, e some-la só no 'pendente' faria ela sumir da lista no
+       dia em que foi parcialmente paga -- justo o dia em que falta pagar o
+       resto. Mesmo critério do painel do site. */
+    supabase
+      .from('contas_pagar')
+      .select('valor')
+      .in('status', ['pendente', 'pago_parcial'])
+      .eq('data_vencimento', hoje),
   ])
 
   /* Erro nas DUAS é "não deu para perguntar", e a o bloco não aparece --
      que é o mesmo desfecho de "não tem permissão". As duas ausências se
      parecem de propósito: nenhuma delas autoriza a tela a afirmar um número. */
-  if (baixas.error && vencendo.error) {
+  if (baixas.error && vencendo.error && aPagar.error) {
     falha('Não consegui ler o financeiro do dia.', baixas.error)
     return null
   }
   if (baixas.error) falha('Não consegui ler o que entrou hoje.', baixas.error)
   if (vencendo.error) falha('Não consegui ler o que vence hoje.', vencendo.error)
+  if (aPagar.error) falha('Não consegui ler o que há para pagar hoje.', aPagar.error)
 
   const pagas = (baixas.data ?? []) as { valor_pago: number | null }[]
   const abertas = (vencendo.data ?? []) as { valor: number | null }[]
+  const devidas = (aPagar.data ?? []) as { valor: number | null }[]
 
   return {
     recebido: soma(pagas.map(l => ({ valor: l.valor_pago }))),
     quantasBaixas: pagas.length,
     vencendo: soma(abertas.map(l => ({ valor: l.valor }))),
     quantasVencendo: abertas.length,
+    aPagar: soma(devidas.map(l => ({ valor: l.valor }))),
+    quantasAPagar: devidas.length,
   }
 }
 

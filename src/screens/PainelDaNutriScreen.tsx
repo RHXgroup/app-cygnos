@@ -23,8 +23,6 @@ import {
 import { dividirODia, hhmm, resumoDaAgenda, type ConsultaDoDia, type Dia } from '../lib/diaDaNutri'
 import { carregarPerfilDaNutri, primeiroNome, type PerfilDaNutri } from '../lib/souNutri'
 import { saudacaoDaHora } from '../lib/formatar'
-import { AuroraDaNutriScreen } from './AuroraDaNutriScreen'
-import { LerCodigoScreen } from './LerCodigoScreen'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 
 /* O painel do dia da nutricionista — a primeira tela dela no app.
@@ -64,7 +62,19 @@ function useAgora(): number {
   return agora
 }
 
-export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
+export function PainelDaNutriScreen({
+  onSair,
+  onVerAgenda,
+  onLerCodigo,
+}: {
+  onSair: () => void
+  /* Quem abre a agenda e o leitor é a área que hospeda as abas, e não esta
+     tela. Sem isso, o painel teria o próprio estado de "leitor aberto" e a
+     barra de abas continuaria embaixo dele -- duas saídas para a mesma coisa,
+     e um `BackHandler` disputando com o de cima. */
+  onVerAgenda: () => void
+  onLerCodigo: () => void
+}) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const agora = useAgora()
@@ -74,12 +84,6 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
   const [carregando, setCarregando] = useState(true)
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
-  /* O leitor de código abre POR CIMA do painel, e não como aba: ele é um gesto
-     de um minuto no supermercado, e não um lugar onde ela fica. Quem cuida do
-     botão voltar é a própria `LerCodigoScreen`, que já registra o dela e, sendo
-     o componente mais interno, decide primeiro. Armadilha 1. */
-  const [lendoCodigo, setLendoCodigo] = useState(false)
-  const [auroraAberta, setAuroraAberta] = useState(false)
   const [dinheiro, setDinheiro] = useState<DinheiroDoDia | null>(null)
   const [atencao, setAtencao] = useState<Sinalizado[]>([])
   /* Fechado por padrão: a linha é o aviso, e os nomes são o passo seguinte.
@@ -138,17 +142,6 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
 
   const dia: Dia = dividirODia(consultas, agora)
 
-  /* Antes do "carregando": a câmera não depende de a agenda ter chegado, e
-     esconder o leitor atrás de uma leitura de rede seria fazer ela esperar por
-     um dado que a tela do leitor nem usa. */
-  if (lendoCodigo) {
-    return <LerCodigoScreen paraBaseDaNutri onFechar={() => setLendoCodigo(false)} />
-  }
-
-  if (auroraAberta) {
-    return <AuroraDaNutriScreen onFechar={() => setAuroraAberta(false)} />
-  }
-
   if (carregando) {
     return (
       <View style={[styles.tela, styles.centro]}>
@@ -160,9 +153,8 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
       <ScrollView
-        /* A folga conta a barra da Aurora, que flutua por cima: sem ela o
-           rodapé nasce escondido atrás do botão. */
-        contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 96 }]}
+        /* A barra de abas já ocupa o rodapé da área; aqui basta o respiro. */
+        contentContainerStyle={[styles.conteudo, { paddingBottom: 20 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -310,7 +302,21 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
             ferramenta. Juntar os dois faria a lista de horários terminar num
             botão que não tem nada a ver com horário nenhum. */}
         <Pressable
-          onPress={() => setLendoCodigo(true)}
+          onPress={onVerAgenda}
+          style={({ pressed }) => [styles.ferramenta, pressed && styles.pressionada]}
+          accessibilityRole="button"
+          accessibilityLabel="Ver a agenda da semana e do mês"
+        >
+          <Ionicons name="calendar-outline" size={22} color={paleta().cores.verde} />
+          <View style={styles.textosFerramenta}>
+            <Text style={styles.tituloFerramenta}>Ver a agenda inteira</Text>
+            <Text style={styles.textoFerramenta}>Semana, mês, e qualquer dia</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+        </Pressable>
+
+        <Pressable
+          onPress={onLerCodigo}
           style={({ pressed }) => [styles.ferramenta, pressed && styles.pressionada]}
           accessibilityRole="button"
           accessibilityLabel="Ler código de barras de um produto"
@@ -328,32 +334,11 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
         {/* Dito por escrito porque a ausência do resto é uma DECISÃO, e não uma
             tela pela metade. Sem isto, a primeira impressão é de app inacabado. */}
         <Text style={styles.rodape}>
-          Por enquanto o app traz a sua agenda do dia e o leitor de produtos. O
-          resto do acompanhamento continua no sistema, no computador.
+          Isto é o seu dia. A agenda inteira, os pacientes e o financeiro estão
+          nas abas · e o que não tem tela, a Aurora faz.
         </Text>
       </ScrollView>
 
-      {/* ──────────────────── A AURORA FICA FIXA, E FORA DA ROLAGEM ────────────────────
-          Ela é o que permite a lista de telas ser curta: não há tela de
-          financeiro aqui e mesmo assim dá para saber quanto entrou hoje. Uma
-          entrada que só aparece depois de rolar até o fim seria uma entrada que
-          ninguém encontra -- e aí o painel volta a precisar de um cartão para
-          cada pergunta.
-
-          Parece campo de texto e é botão, de propósito: digitar aqui e ver o
-          texto pular para outra tela é pior do que tocar e a tela abrir. Por
-          isso é `accessibilityRole="button"`, e não um campo de mentira. */}
-      <View style={[styles.rodapeDaAurora, { paddingBottom: bottom + 10 }]}>
-        <Pressable
-          onPress={() => setAuroraAberta(true)}
-          style={({ pressed }) => [styles.barraAurora, pressed && styles.pressionada]}
-          accessibilityRole="button"
-          accessibilityLabel="Perguntar à Aurora"
-        >
-          <Ionicons name="sparkles-outline" size={17} color={paleta().cores.verde} />
-          <Text style={styles.textoBarraAurora}>Pergunte à Aurora…</Text>
-        </Pressable>
-      </View>
     </View>
   )
 }

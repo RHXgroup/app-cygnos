@@ -21,6 +21,10 @@ export type ConsultaDoDia = {
   id: number
   /* ISO com fuso, como o banco devolve. */
   quando: string
+  /* O dia local dela, 'AAAA-MM-DD'. Vem calculado da leitura -- ver o
+     comentário em `agendaDaNutri`. Opcional porque quem só divide o DIA não
+     precisa dele, e os testes montam consulta sem ele. */
+  diaISO?: string
   /* Nome do paciente, ou o avulso quando não há ficha. */
   nome: string
   /* Minutos reservados. Nulo quando ninguém informou. */
