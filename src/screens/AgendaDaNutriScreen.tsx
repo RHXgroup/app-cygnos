@@ -630,7 +630,14 @@ function Linha({
         {consulta.nome}
       </Text>
       {passada && <Ionicons name="checkmark" size={15} color={paleta().inkFraco} />}
-      {temFicha && <Ionicons name="chevron-forward" size={14} color={paleta().inkFraco} />}
+      {/* A seta some quando ha o botao de acao ao lado.
+          Duas marcas no mesmo canto direito -- uma seta e tres pontinhos --
+          disputam o mesmo toque e nao dizem qual faz o que. Com o botao
+          presente, quem abre a ficha e a LINHA inteira; sem ele, a seta volta
+          a ser o unico sinal de que da para tocar. */}
+      {temFicha && !podeAgir && (
+        <Ionicons name="chevron-forward" size={14} color={paleta().inkFraco} />
+      )}
     </Pressable>
 
     {/* Botão próprio, e não toque longo: toque longo não se descobre sozinho, e
@@ -666,7 +673,17 @@ function Linha({
  * uma ganhasse um caso novo. A recusa também vem de lá inteira -- é ela que diz
  * QUEM ocupa o horário, ou que há parcela paga, ou que a série continua marcada.
  * Traduzir aqui seria reescrever com menos informação. */
-function PainelDaConsulta({
+/* Exportado para a tela Hoje usar o MESMO painel.
+ *
+ * O Helton pediu remarcar direto do cartao do proximo paciente: "clico na
+ * minha consulta de agora e nao consigo fazer mais nada". Uma segunda folha
+ * escrita la teria os mesmos dois botoes e divergiria na primeira regra nova --
+ * armadilha 5, e desta vez em cima de cancelar consulta, que mexe em dinheiro.
+ *
+ * Mora aqui e nao num arquivo proprio porque ela usa a folha de estilo desta
+ * tela inteira; mover exigiria duplicar a folha, que e o mesmo problema com
+ * outro nome. */
+export function PainelDaConsulta({
   consulta,
   onFechar,
   onMudou,
@@ -1125,7 +1142,20 @@ const estilos = estilosDe(t =>
       paddingHorizontal: 14,
       paddingVertical: 4,
     },
-    linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+    /* `flex: 1` e `minWidth: 0`, e sem eles os tres pontinhos saem do cartao.
+       Este Pressable e o irmao esquerdo do botao de acao dentro de
+       `linhaComAcao`, e ele carrega um texto com `flex: 1` dentro. Sem um limite
+       proprio, o filho flexivel faz o pai crescer ate a largura toda -- o botao
+       nao cabe, e o Android nao corta: ele desenha fora. Foi o que o Helton viu
+       na vista Dia, com o `...` pendurado do lado de fora da tela. */
+    linha: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 10,
+    },
 
     /* Tracejado e sem preenchimento: o vazio precisa PARECER vazio ao lado de
        uma consulta, senão as duas viram a mesma linha com texto diferente. */

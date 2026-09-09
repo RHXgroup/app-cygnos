@@ -72,7 +72,6 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
         {aba === 'hoje' && (
           <PainelDaNutriScreen
             onSair={onSair}
-            onVerAgenda={() => setAba('agenda')}
             onLerCodigo={() => setLendoCodigo(true)}
           />
         )}

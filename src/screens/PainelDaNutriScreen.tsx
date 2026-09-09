@@ -12,6 +12,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
+import { PainelDaConsulta } from './AgendaDaNutriScreen'
 import {
   consultasDoDia,
   consultasNoPeriodo,
@@ -78,7 +79,6 @@ function useAgora(): number {
 
 export function PainelDaNutriScreen({
   onSair,
-  onVerAgenda,
   onLerCodigo,
 }: {
   onSair: () => void
@@ -86,7 +86,6 @@ export function PainelDaNutriScreen({
      tela. Sem isso, o painel teria o próprio estado de "leitor aberto" e a
      barra de abas continuaria embaixo dele -- duas saídas para a mesma coisa,
      e um `BackHandler` disputando com o de cima. */
-  onVerAgenda: () => void
   onLerCodigo: () => void
 }) {
   const styles = estilos()
@@ -112,6 +111,10 @@ export function PainelDaNutriScreen({
   /* A ficha abre POR CIMA do painel. Ela lê "14:00 Marina Alves" e quer saber
      quem é a Marina -- é o clique que este painel existe para poupar. */
   const [fichaAberta, setFichaAberta] = useState<number | null>(null)
+  /* A consulta em que ela tocou para remarcar ou cancelar, aqui na tela Hoje.
+     Antes so dava para agir pela aba Agenda: ela via o proximo paciente na
+     frente dela, tocava, e a unica coisa que acontecia era abrir a ficha. */
+  const [agindoEm, setAgindoEm] = useState<ConsultaDoDia | null>(null)
   /* Qual pedido está sendo respondido agora, e o que o banco disse do último.
      Um id, e não um booleano: com dois pedidos na tela, um booleano faria os
      dois cartões piscarem quando ela toca em um. */
@@ -223,6 +226,17 @@ export function PainelDaNutriScreen({
     return <FichaDoPacienteScreen id={fichaAberta} onFechar={() => setFichaAberta(null)} />
   }
 
+  const folhaDaConsulta = agindoEm ? (
+    <PainelDaConsulta
+      consulta={agindoEm}
+      onFechar={() => setAgindoEm(null)}
+      onMudou={() => {
+        setAgindoEm(null)
+        void buscar()
+      }}
+    />
+  ) : null
+
   if (carregando) {
     return (
       <View style={[styles.tela, styles.centro]}>
@@ -329,6 +343,25 @@ export function PainelDaNutriScreen({
               </View>
               <Text style={styles.horaDoHeroi}>{hhmm(destaque.quando)}</Text>
             </View>
+
+            {/* Remarcar e cancelar DAQUI, e nao so pela aba Agenda.
+                Era a reclamacao mais concreta que ele fez sobre esta tela: o
+                cartao mostra a proxima consulta em letra grande e nao deixava
+                fazer nada com ela. Botoes dentro do heroi, e o toque no resto
+                do cartao continua abrindo a ficha. */}
+            {destaque.status !== 'cancelada' && destaque.status !== 'realizada' && (
+              <View style={styles.acoesDoHeroi}>
+                <Pressable
+                  onPress={() => setAgindoEm(destaque)}
+                  style={({ pressed }) => [styles.botaoDoHeroi, pressed && styles.pressionada]}
+                  accessibilityRole="button"
+                  accessibilityLabel={'Remarcar ou cancelar a consulta de ' + destaque.nome}
+                >
+                  <Ionicons name="swap-horizontal" size={15} color={paleta().cores.mist} />
+                  <Text style={styles.textoBotaoDoHeroi}>Remarcar ou cancelar</Text>
+                </Pressable>
+              </View>
+            )}
           </Pressable>
         )}
 
@@ -459,6 +492,31 @@ export function PainelDaNutriScreen({
             orfaos`: o objeto existe, e o caminho não passa por ele. Nada falha,
             nada avisa, e ninguém descobre olhando a tela -- só olhando os dois
             lados juntos. */}
+        {/* ──── O BLOCO APARECE SEMPRE, e antes sumia por inteiro ────
+            Ele só existia quando havia movimento, e a razão estava certa: a
+            política de baixas exige permissão, e quem não a tem recebe ZERO
+            LINHA -- idêntico a "não entrou nada hoje". Escrever "R$ 0" nos dois
+            casos seria o app afirmando um número que ele não sabe.
+
+            Só que sumir por inteiro fez o Helton abrir a tela e dizer "não tem
+            informação financeira aqui ainda". A tela não estava mentindo -- ela
+            estava calada, e calado se lê como ausente.
+
+            Agora a frase aparece no lugar dos números, e ela diz exatamente o
+            que o app sabe: que não há recebimento REGISTRADO que ele consiga
+            ver. Continua sem afirmar zero. */}
+        {!!dinheiro && !(dinheiro.quantasBaixas > 0 || dinheiro.quantasVencendo > 0 || dinheiro.quantasAPagar > 0) && (
+          <View>
+            <Text style={styles.rotuloDeSecao}>Dinheiro de hoje</Text>
+            <View style={styles.diaSemMovimento}>
+              <Text style={styles.textoSemMovimento}>
+                Nada registrado hoje que eu consiga ver. O financeiro completo
+                está no sistema.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {!!dinheiro &&
           (dinheiro.quantasBaixas > 0 || dinheiro.quantasVencendo > 0 || dinheiro.quantasAPagar > 0) && (
           <View style={styles.caixaDoDia}>
@@ -538,22 +596,13 @@ export function PainelDaNutriScreen({
 
         {/* ──────────────────── O QUE ELA FAZ COM O CELULAR NA MÃO ────────────────────
             Separado da agenda de propósito: a agenda é o dia dela, isto é
-            ferramenta. Juntar os dois faria a lista de horários terminar num
-            botão que não tem nada a ver com horário nenhum. */}
-        <Pressable
-          onPress={onVerAgenda}
-          style={({ pressed }) => [styles.ferramenta, pressed && styles.pressionada]}
-          accessibilityRole="button"
-          accessibilityLabel="Ver a agenda da semana e do mês"
-        >
-          <Ionicons name="calendar-outline" size={22} color={paleta().cores.verde} />
-          <View style={styles.textosFerramenta}>
-            <Text style={styles.tituloFerramenta}>Ver a agenda inteira</Text>
-            <Text style={styles.textoFerramenta}>Semana, mês, e qualquer dia</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
-        </Pressable>
+            ferramenta.
 
+            "Ver a agenda inteira" SAIU daqui. Era um botão que ia para a aba
+            Agenda -- que está na barra de baixo, sempre visível, a um toque.
+            Duas portas para a mesma sala não dão mais acesso: dão a impressão
+            de que uma delas leva a outro lugar, e quem toca descobre que não.
+            Apontado pelo Helton, e ele estava certo. */}
         <Pressable
           onPress={onLerCodigo}
           style={({ pressed }) => [styles.ferramenta, pressed && styles.pressionada]}
@@ -578,6 +627,7 @@ export function PainelDaNutriScreen({
         </Text>
       </ScrollView>
 
+      {folhaDaConsulta}
     </View>
   )
 }
@@ -842,6 +892,20 @@ const estilos = estilosDe(t =>
       color: 'rgba(244,239,228,0.66)',
       marginTop: 1,
     },
+    acoesDoHeroi: { flexDirection: 'row' },
+    botaoDoHeroi: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: 'rgba(244,239,228,0.11)',
+      borderWidth: 1,
+      borderColor: 'rgba(244,239,228,0.15)',
+    },
+    textoBotaoDoHeroi: { fontFamily: FONTE.meia, fontSize: 13.5, color: t.cores.mist },
     horaDoHeroi: {
       fontFamily: FONTE.forte,
       fontSize: 20,
@@ -929,6 +993,15 @@ const estilos = estilosDe(t =>
        resumo do dinheiro passa a ser a única coisa emoldurada da metade de
        baixo. É o que faz três valores se lerem como três respostas. */
     caixaDoDia: { flexDirection: 'row', gap: 9 },
+    diaSemMovimento: {
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 13,
+    },
+    textoSemMovimento: { fontFamily: FONTE.normal, fontSize: 13, color: t.inkSuave, lineHeight: 19 },
     verba: {
       flex: 1,
       gap: 1,

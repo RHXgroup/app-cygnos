@@ -58,8 +58,28 @@ export function interpretarRemarcacao(
 
   /* As duas faltas são dita uma de cada vez, e nomeando qual: "preencha os
      campos" faz ela olhar os dois procurando o que está errado. */
-  if (d.length < 4) return { tipo: 'erro', mensagem: 'Escreva a data assim: 16/09.' }
   if (h.length < 4) return { tipo: 'erro', mensagem: 'Escreva a hora assim: 14:30.' }
+
+  /* ── SÓ A HORA, sem data ────────────────────────────────────────────────
+   *
+   * Ela digita "15:30" e nada mais, porque está remarcando para HOJE -- é o
+   * caso mais comum de todos, alguém ligou pedindo para adiantar. Exigir a
+   * data ali é pedir que ela digite o que o aparelho já sabe.
+   *
+   * Se essa hora já passou, vai para amanhã. Não é adivinhação: um horário que
+   * já foi não é um destino possível (o banco recusa remarcar para trás), então
+   * a única leitura que sobra é a de amanhã -- e a tela DIZ para qual dia foi,
+   * porque a resposta traz o instante inteiro. */
+  if (d.length === 0) {
+    const so = new Date(agora)
+    so.setHours(Number(h.slice(0, 2)), Number(h.slice(2, 4)), 0, 0)
+    if (Number(h.slice(0, 2)) > 23) return { tipo: 'erro', mensagem: 'A hora vai de 00 a 23.' }
+    if (Number(h.slice(2, 4)) > 59) return { tipo: 'erro', mensagem: 'Os minutos vão de 00 a 59.' }
+    if (so.getTime() <= agora.getTime()) so.setDate(so.getDate() + 1)
+    return { tipo: 'ok', quando: so }
+  }
+
+  if (d.length < 4) return { tipo: 'erro', mensagem: 'Escreva a data assim: 16/09, ou deixe em branco para hoje.' }
 
   const dia = Number(d.slice(0, 2))
   const mes = Number(d.slice(2, 4))

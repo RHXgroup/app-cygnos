@@ -91,7 +91,11 @@ const r14 = interpretarRemarcacao('29/02/2027', '14:30', SETEMBRO)
 ok('29/02/2027 nao existe', r14.tipo === 'erro')
 
 // ──── Entrada torta ────
-ok('data vazia pede a data', interpretarRemarcacao('', '14:30', SETEMBRO).tipo === 'erro')
+/* Este caso dizia "data vazia pede a data", e passou a ser falso de propósito:
+   o Helton reclamou de ter que digitar a data para remarcar para hoje. A
+   expectativa mudou, e não o código -- ver o bloco de "só a hora" mais acima. */
+ok('data vazia agora vale, e é hoje ou amanhã',
+  interpretarRemarcacao('', '14:30', SETEMBRO).tipo === 'ok')
 ok('hora vazia pede a hora', interpretarRemarcacao('16/09', '', SETEMBRO).tipo === 'erro')
 ok('data pela metade pede a data', interpretarRemarcacao('16/', '14:30', SETEMBRO).tipo === 'erro')
 ok('hora pela metade pede a hora', interpretarRemarcacao('16/09', '14:', SETEMBRO).tipo === 'erro')
@@ -112,6 +116,27 @@ for (const [dt, hr] of [['', ''], ['aa', 'bb'], ['99/99', '99:99'], ['31/02', '2
   const r = interpretarRemarcacao(dt, hr, SETEMBRO)
   ok('sem podridao em "' + dt + ' ' + hr + '"',
     r.tipo === 'erro' && !/undefined|null|NaN|\[object/.test(r.mensagem) && r.mensagem.length > 5)
+}
+
+/* ──── SÓ A HORA, que é o caso mais comum ────
+   "Remarca para 15:30" sem dizer o dia: é hoje. Exigir a data ali é pedir que
+   ela digite o que o aparelho já sabe. */
+{
+  const r = interpretarRemarcacao('', '15:30', SETEMBRO)
+  ok('só a hora vale, e é hoje', r.tipo === 'ok' && r.quando.getDate() === 9)
+  ok('e guarda a hora', r.tipo === 'ok' && r.quando.getHours() === 15 && r.quando.getMinutes() === 30)
+
+  /* Já passou hoje: só resta amanhã -- o banco recusa remarcar para trás. */
+  const s = interpretarRemarcacao('', '08:00', SETEMBRO)
+  ok('hora que já passou vai para amanhã', s.tipo === 'ok' && s.quando.getDate() === 10)
+
+  const agora = interpretarRemarcacao('', '11:00', SETEMBRO)
+  ok('o minuto exato de agora também vai para amanhã', agora.tipo === 'ok' && agora.quando.getDate() === 10)
+
+  ok('sem hora continua pedindo a hora', interpretarRemarcacao('', '', SETEMBRO).tipo === 'erro')
+  ok('hora inválida sem data ainda é recusada', interpretarRemarcacao('', '25:00', SETEMBRO).tipo === 'erro')
+  ok('minuto inválido sem data também', interpretarRemarcacao('', '14:99', SETEMBRO).tipo === 'erro')
+  ok('data pela metade continua recusada', interpretarRemarcacao('16', '15:30', SETEMBRO).tipo === 'erro')
 }
 
 console.log(passou + ' passaram, ' + falhas.length + ' falharam')
