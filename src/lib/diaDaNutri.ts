@@ -36,6 +36,16 @@ export type ConsultaDoDia = {
   duracao: number | null
   status: string
   tipo: string | null
+  /* Marcada como encaixe.
+   *
+   * Encaixe se sobrepõe de propósito -- ele existe para caber onde não cabia.
+   * Quem precisa saber disso é `buracosDaAgenda`: se um encaixe fechasse o
+   * buraco, marcar um apagaria da tela uma vaga que continua vaga.
+   *
+   * Opcional porque os testes montam consulta sem ele, e porque a coluna pode
+   * vir nula do banco -- `!c.encaixe` trata os dois iguais, que é o certo:
+   * ausente é "não é encaixe". */
+  encaixe?: boolean | null
 }
 
 /* ── OS STATUS QUE CONTAM COMO AGENDA ──────────────────────────────────────

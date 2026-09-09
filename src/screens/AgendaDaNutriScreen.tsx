@@ -14,7 +14,19 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
-import { cancelarConsulta, consultasNoPeriodo, remarcarConsulta } from '../lib/agendaDaNutri'
+import {
+  cancelarConsulta,
+  consultasNoPeriodo,
+  expedienteDaNutri,
+  remarcarConsulta,
+} from '../lib/agendaDaNutri'
+import {
+  buracosDoDia,
+  duracaoPorExtenso,
+  EXPEDIENTE_PADRAO,
+  type Buraco,
+  type Expediente,
+} from '../lib/buracosDaAgenda'
 import { interpretarRemarcacao, mascaraDeData, mascaraDeHora } from '../lib/remarcacao'
 import { FONTE } from '../lib/fontes'
 import {
@@ -79,6 +91,10 @@ export function AgendaDaNutriScreen() {
      ir buscar isso de novo por id seria uma leitura para um dado que já estava
      na mão. */
   const [agindoEm, setAgindoEm] = useState<ConsultaDoDia | null>(null)
+
+  /* O expediente dela, lido uma vez. Não entra no `buscar` porque não muda
+     quando ela troca de dia -- e põ-lo lá faria uma ida ao banco a cada seta. */
+  const [expediente, setExpediente] = useState<Expediente>(EXPEDIENTE_PADRAO)
 
   /* ──── O voltar do Android, que esta tela não tinha ────
      Armadilha 1: a navegação é `useState`, então o botão do aparelho não
@@ -147,6 +163,10 @@ export function AgendaDaNutriScreen() {
       vivo = false
     }
   }, [buscar])
+
+  useEffect(() => {
+    void expedienteDaNutri().then(setExpediente)
+  }, [])
 
   /* O que muda do lado do sistema nunca chega sozinho -- item 8. Ela marca no
      computador e volta ao celular. */
@@ -305,6 +325,12 @@ export function AgendaDaNutriScreen() {
           {vista === 'dia' && (
             <ListaDoDia
               consultas={consultas.filter(c => c.diaISO === foco)}
+              buracos={buracosDoDia(
+                consultas.filter(c => c.diaISO === foco),
+                new Date(foco + 'T12:00:00'),
+                new Date(),
+                expediente,
+              )}
               onAbrirFicha={setFichaAberta}
               onAgir={setAgindoEm}
             />
@@ -484,16 +510,32 @@ function BlocoDeDia({
 
 function ListaDoDia({
   consultas,
+  buracos,
   onAbrirFicha,
   onAgir,
 }: {
   consultas: ConsultaDoDia[]
+  buracos: Buraco[]
   onAbrirFicha: (id: number) => void
   onAgir: (c: ConsultaDoDia) => void
 }) {
   const styles = estilos()
 
-  if (consultas.length === 0) {
+  /* ──────────────────── CONSULTA E BURACO NA MESMA LISTA, em ordem de hora ────────────────────
+   *
+   * Duas listas separadas -- "consultas" em cima e "vagas" embaixo -- fariam ela
+   * ler as duas e cruzar de cabeça, que é exatamente o trabalho que isto veio
+   * tirar. Intercalado, o dia se lê de cima a baixo: cheio, vago, cheio.
+   *
+   * A chave do buraco é o instante, e não o índice: dois buracos podem trocar
+   * de posição quando uma consulta é cancelada, e chave por índice faria o
+   * React reaproveitar a linha errada. */
+  const doDia = [
+    ...consultas.map(c => ({ chave: 'c' + c.id, quando: Date.parse(c.quando), consulta: c, buraco: null as Buraco | null })),
+    ...buracos.map(b => ({ chave: 'b' + b.de, quando: b.de, consulta: null as ConsultaDoDia | null, buraco: b })),
+  ].sort((a, b) => a.quando - b.quando)
+
+  if (doDia.length === 0) {
     return (
       <View style={styles.vazio}>
         <Ionicons name="calendar-clear-outline" size={22} color={paleta().inkFraco} />
@@ -504,9 +546,49 @@ function ListaDoDia({
 
   return (
     <View style={styles.listaDoDia}>
-      {consultas.map(c => (
-        <Linha key={c.id} consulta={c} onAbrirFicha={onAbrirFicha} onAgir={onAgir} />
-      ))}
+      {doDia.map(x =>
+        x.consulta ? (
+          <Linha key={x.chave} consulta={x.consulta} onAbrirFicha={onAbrirFicha} onAgir={onAgir} />
+        ) : (
+          <VagaLivre key={x.chave} buraco={x.buraco!} />
+        ),
+      )}
+    </View>
+  )
+}
+
+/* ──────────────────── UMA VAGA ────────────────────
+ *
+ * Tracejada, e sem cartão. É o oposto visual de uma consulta de propósito: o
+ * contorno cheio diz "isto está ocupado" e o tracejado diz "isto está vazio",
+ * e as duas coisas na mesma lista precisam se distinguir sem ela ler.
+ *
+ * ──── NÃO é botão, e isso é escolha ────
+ * Tocar aqui deveria abrir "agendar neste horário" -- e agendar exige escolher
+ * o paciente, o tipo e a duração, que é uma tela que ainda não existe no
+ * celular. Um retângulo que parece tocável e não faz nada é pior do que um
+ * que não promete: ela toca, nada acontece, e passa a desconfiar do resto da
+ * tela. Quando a tela de agendar existir, esta linha vira botão. */
+function VagaLivre({ buraco }: { buraco: Buraco }) {
+  const styles = estilos()
+  const hora = (t: number) => {
+    const x = new Date(t)
+    return String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0')
+  }
+  const de = hora(buraco.de)
+  const ate = hora(buraco.ate)
+
+  return (
+    <View
+      style={styles.vaga}
+      accessibilityRole="text"
+      accessibilityLabel={`Livre das ${de} às ${ate}, ${duracaoPorExtenso(buraco.minutos)}`}
+    >
+      <Text style={styles.horaDaVaga}>{de}</Text>
+      <Text style={styles.textoDaVaga}>
+        Livre até {ate}
+      </Text>
+      <Text style={styles.duracaoDaVaga}>{duracaoPorExtenso(buraco.minutos)}</Text>
     </View>
   )
 }
@@ -1044,6 +1126,35 @@ const estilos = estilosDe(t =>
       paddingVertical: 4,
     },
     linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+
+    /* Tracejado e sem preenchimento: o vazio precisa PARECER vazio ao lado de
+       uma consulta, senão as duas viram a mesma linha com texto diferente. */
+    vaga: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginVertical: 5,
+      paddingVertical: 9,
+      paddingHorizontal: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: t.cores.trilho,
+    },
+    horaDaVaga: {
+      width: 46,
+      fontFamily: FONTE.meia,
+      fontSize: 13.5,
+      color: t.inkFraco,
+      fontVariant: ['tabular-nums'],
+    },
+    textoDaVaga: { flex: 1, fontFamily: FONTE.normal, fontSize: 14, color: t.inkSuave },
+    duracaoDaVaga: {
+      fontFamily: FONTE.meia,
+      fontSize: 12,
+      color: t.inkFraco,
+      fontVariant: ['tabular-nums'],
+    },
     /* Deixa de ser VERDE. Verde é a cor da ação nesta área -- Aceitar,
        Confirmar, Remarcar --, e uma coluna inteira de horários verdes fazia a
        agenda parecer uma lista de botões. O horário é dado, e dado é tinta

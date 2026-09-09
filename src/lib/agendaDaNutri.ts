@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { falha } from './erros'
 import { diaLocalDe } from './calendarioDaAgenda'
 import type { ConsultaDoDia } from './diaDaNutri'
+import { EXPEDIENTE_PADRAO, type Expediente } from './buracosDaAgenda'
 
 /* A agenda dela, lida do banco. O que DECIDE mora em `diaDaNutri`.
  *
@@ -65,6 +66,7 @@ type LinhaConsulta = {
   tipo: string | null
   paciente_id: number | null
   nome_avulso: string | null
+  encaixe: boolean | null
 }
 
 export type ResultadoAgenda =
@@ -118,7 +120,7 @@ export async function pedidosDeConsulta(): Promise<ResultadoAgenda> {
   const agora = new Date().toISOString()
   const { data, error } = await supabase
     .from('consultas')
-    .select('id, data_hora, duracao, status, tipo, paciente_id, nome_avulso')
+    .select('id, data_hora, duracao, status, tipo, paciente_id, nome_avulso, encaixe')
     .eq('status', 'solicitada')
     .gte('data_hora', agora)
     .order('data_hora', { ascending: true })
@@ -241,10 +243,53 @@ export async function cancelarConsulta(
   return { ok: r?.ok === true, mensagem: r?.mensagem ?? 'Não consegui cancelar agora.' }
 }
 
+/* ──────────────────── O EXPEDIENTE DELA ────────────────────
+ *
+ * De onde sai o começo e o fim do dia na hora de calcular os buracos. As três
+ * colunas já existem em `configuracoes` desde a grade da semana -- não inventei
+ * horário nenhum, e usar as mesmas é o que impede a agenda do celular de
+ * discordar da grade do computador.
+ *
+ * ──── Falhar aqui devolve o PADRÃO, e não vazio ────
+ * Sem sinal, ou sem permissão de ler `configuracoes`, a resposta é 08:00-18:00
+ * de segunda a sexta -- que é exatamente o `default` das colunas no banco. A
+ * alternativa seria a tela dizer que não há vaga nenhuma, e "sem vaga" é uma
+ * afirmação forte para fazer a partir de uma leitura que falhou.
+ *
+ * Item 11: função que alimenta tela não rejeita. */
+export async function expedienteDaNutri(): Promise<Expediente> {
+  const { data, error } = await supabase
+    .from('configuracoes')
+    .select('agenda_hora_inicio, agenda_hora_fim, agenda_dias_semana')
+    .maybeSingle()
+
+  if (error) {
+    falha('Não consegui ler o seu horário de atendimento.', error)
+    return EXPEDIENTE_PADRAO
+  }
+
+  const c = data as {
+    agenda_hora_inicio?: string | null
+    agenda_hora_fim?: string | null
+    agenda_dias_semana?: number[] | null
+  } | null
+
+  /* Campo a campo, e não o objeto inteiro de uma vez: a conta pode ter a hora
+     configurada e os dias nulos, e um `??` no objeto jogaria fora o que veio
+     certo junto com o que veio vazio. */
+  return {
+    inicio: c?.agenda_hora_inicio?.trim() || EXPEDIENTE_PADRAO.inicio,
+    fim: c?.agenda_hora_fim?.trim() || EXPEDIENTE_PADRAO.fim,
+    diasDaSemana: c?.agenda_dias_semana?.length
+      ? c.agenda_dias_semana
+      : EXPEDIENTE_PADRAO.diasDaSemana,
+  }
+}
+
 async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
   const { data, error } = await supabase
     .from('consultas')
-    .select('id, data_hora, duracao, status, tipo, paciente_id, nome_avulso')
+    .select('id, data_hora, duracao, status, tipo, paciente_id, nome_avulso, encaixe')
     .gte('data_hora', inicio)
     .lt('data_hora', fim)
     .order('data_hora', { ascending: true })
@@ -301,5 +346,6 @@ async function comNomes(linhas: LinhaConsulta[]): Promise<ConsultaDoDia[]> {
     duracao: l.duracao,
     status: l.status ?? '',
     tipo: l.tipo,
+    encaixe: l.encaixe,
   }))
 }
