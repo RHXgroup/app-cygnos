@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia'
 import { carregarPerfilDaNutri, type PerfilDaNutri } from '../lib/souNutri'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
+import { FONTE } from '../lib/fontes'
 
 /* O resto: o dinheiro do dia inteiro, as ferramentas, e a saída.
  *
@@ -214,18 +215,29 @@ const estilos = estilosDe(t =>
     tela: { flex: 1, backgroundColor: t.cores.fundo },
     conteudo: { paddingHorizontal: 16, gap: 12 },
     titulo: {
-      fontSize: 22,
-      fontWeight: '800',
+      fontFamily: FONTE.bruta,
+      fontSize: 29,
       color: t.cores.ink,
-      letterSpacing: -0.3,
-      paddingBottom: 2,
+      letterSpacing: -1,
+      lineHeight: 32,
+      paddingBottom: 4,
     },
 
-    cartao: { backgroundColor: t.cores.cartao, borderRadius: RAIO_CARTAO, padding: 16, gap: 2 },
+    cartao: {
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 16,
+      padding: 16,
+      gap: 2,
+    },
+    /* Deixa de ser MAIÚSCULA ESPAÇADA de 10,5. Era o rótulo padrão da área
+       inteira, repetido em cada bloco de cada tela -- e rótulo em tudo é
+       rótulo em nada: o olho para de ler os que importam junto com os que não
+       importam. Vira texto normal, um degrau abaixo do conteúdo. */
     rotuloDoBloco: {
-      fontSize: 10.5,
-      fontWeight: '800',
-      letterSpacing: 1.1,
+      fontFamily: FONTE.meia,
+      fontSize: 12.5,
       color: t.inkFraco,
       paddingBottom: 8,
     },
@@ -237,15 +249,15 @@ const estilos = estilosDe(t =>
       paddingVertical: 8,
     },
     textosDoValor: { flex: 1 },
-    rotuloDoValor: { fontSize: 14, color: t.cores.ink },
-    quantasDoValor: { fontSize: 12, color: t.inkFraco, marginTop: 1 },
+    rotuloDoValor: { fontFamily: FONTE.normal, fontSize: 14, color: t.cores.ink },
+    quantasDoValor: { fontFamily: FONTE.normal, fontSize: 12, color: t.inkFraco, marginTop: 1 },
     valor: {
-      fontSize: 18,
-      fontWeight: '800',
-      letterSpacing: -0.3,
+      fontFamily: FONTE.forte,
+      fontSize: 19,
+      letterSpacing: -0.6,
       fontVariant: ['tabular-nums'],
     },
-    dica: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingTop: 8 },
+    dica: { fontFamily: FONTE.normal, fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingTop: 8 },
 
     opcao: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
     textosDaOpcao: { flex: 1 },

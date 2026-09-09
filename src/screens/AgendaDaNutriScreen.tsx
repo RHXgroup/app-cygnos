@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import { cancelarConsulta, consultasNoPeriodo, remarcarConsulta } from '../lib/agendaDaNutri'
 import { interpretarRemarcacao, mascaraDeData, mascaraDeHora } from '../lib/remarcacao'
+import { FONTE } from '../lib/fontes'
 import {
   CABECALHO_DA_SEMANA,
   contarPorDia,
@@ -855,7 +856,7 @@ const estilos = estilosDe(t =>
       backgroundColor: t.cores.borda,
       marginBottom: 8,
     },
-    tituloDaFolha: { fontSize: 17, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
+    tituloDaFolha: { fontFamily: FONTE.forte, fontSize: 17, color: t.cores.ink, letterSpacing: -0.4 },
     subtituloDaFolha: { fontSize: 13, color: t.inkFraco, marginBottom: 6 },
 
     opcaoDaFolha: {
@@ -867,12 +868,12 @@ const estilos = estilosDe(t =>
       borderRadius: 12,
       backgroundColor: t.cores.superficie,
     },
-    textoDaOpcao: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+    textoDaOpcao: { fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink },
     textoPerigo: { color: t.cores.erroTexto },
 
     doisCampos: { flexDirection: 'row', gap: 10 },
     campoCurto: { flex: 1, gap: 4 },
-    rotulo: { fontSize: 12, fontWeight: '700', color: t.inkFraco, letterSpacing: 0.2 },
+    rotulo: { fontFamily: FONTE.meia, fontSize: 12, color: t.inkFraco, letterSpacing: 0.2 },
     campo: {
       backgroundColor: t.cores.superficie,
       borderWidth: 1,
@@ -907,7 +908,7 @@ const estilos = estilosDe(t =>
       borderWidth: 1,
       borderColor: t.cores.borda,
     },
-    textoVoltar: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+    textoVoltar: { fontFamily: FONTE.meia, fontSize: 14, color: t.cores.ink },
     confirmarDaFolha: {
       alignItems: 'center',
       justifyContent: 'center',
@@ -918,7 +919,7 @@ const estilos = estilosDe(t =>
       backgroundColor: t.cores.verde,
     },
     confirmarPerigo: { backgroundColor: t.cores.erroTexto },
-    textoConfirmar: { fontSize: 14, fontWeight: '800', color: t.cores.branco },
+    textoConfirmar: { fontFamily: FONTE.forte, fontSize: 14, color: t.cores.branco },
     /* Cor pr'+chr(243)+'pria, e n'+chr(227)+'o `opacity`. O `cores.desligado` existe exatamente por
        isto, e o coment'+chr(225)+'rio dele traz a medi'+chr(231)+chr(227)+'o: opacidade comp'+chr(245)+'e o texto E o
        fundo contra a p'+chr(225)+'gina e destr'+chr(243)+'i a raz'+chr(227)+'o entre os dois -- um prim'+chr(225)+'rio a
@@ -935,8 +936,17 @@ const estilos = estilosDe(t =>
     },
     seta: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     tituloArea: { flex: 1, alignItems: 'center' },
-    titulo: { fontSize: 18, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
-    voltarAHoje: { fontSize: 11.5, color: t.cores.verde, fontWeight: '700', marginTop: 1 },
+    /* 23 e não 18. É o título desta tela, e ele estava do tamanho de um
+       subtítulo -- espremido entre duas setas, sem peso nenhum para dizer que
+       ele é o assunto. Fica menor que os 29 de Hoje e Pacientes de propósito:
+       aquelas são telas de entrada, esta é uma tela de navegar. */
+    titulo: {
+      fontFamily: FONTE.forte,
+      fontSize: 23,
+      color: t.cores.ink,
+      letterSpacing: -0.7,
+    },
+    voltarAHoje: { fontFamily: FONTE.meia, fontSize: 11.5, color: t.cores.verde, marginTop: 1 },
 
     /* Três opções num trilho, e não três botões soltos: o trilho diz que uma
        delas está sempre ligada, que é o que separa "escolher a vista" de
@@ -951,8 +961,12 @@ const estilos = estilosDe(t =>
     },
     opcao: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10 },
     opcaoAtiva: { backgroundColor: t.cores.cartao },
-    textoOpcao: { fontSize: 13.5, color: t.inkSuave },
-    textoOpcaoAtivo: { color: t.cores.ink, fontWeight: '800' },
+    textoOpcao: { fontFamily: FONTE.media, fontSize: 13.5, color: t.inkSuave },
+    /* Família, e não `fontWeight`. Com a fonte carregada o peso é arquivo, e
+       `fontWeight: '800'` sobre `Archivo_500Medium` desenharia o medium sem erro
+       -- a opção escolhida ficaria igual às outras, com só o fundo do trilho
+       separando. Ver `lib/fontes.ts`. */
+    textoOpcaoAtivo: { fontFamily: FONTE.forte, color: t.cores.ink },
 
     erro: {
       marginHorizontal: 16,
@@ -970,8 +984,8 @@ const estilos = estilosDe(t =>
     letraDoDia: {
       flex: 1,
       textAlign: 'center',
+      fontFamily: FONTE.forte,
       fontSize: 11,
-      fontWeight: '800',
       color: t.inkFraco,
     },
     grade: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -986,52 +1000,66 @@ const estilos = estilosDe(t =>
     },
     hojeArea: { backgroundColor: t.cores.verde },
     escolhidaArea: { borderWidth: 1.5, borderColor: t.cores.verde },
-    numeroDoDia: { fontSize: 14, color: t.cores.ink, fontVariant: ['tabular-nums'] },
+    numeroDoDia: { fontFamily: FONTE.media, fontSize: 14, color: t.cores.ink, fontVariant: ['tabular-nums'] },
     /* As sobras dos meses vizinhos ficam apagadas, e não em branco: buraco na
        primeira linha se lê como defeito, e 31 de agosto é um dia real. */
     numeroDeFora: { color: t.inkFraco },
-    numeroDeHoje: { color: t.cores.branco, fontWeight: '800' },
+    numeroDeHoje: { fontFamily: FONTE.forte, color: t.cores.branco },
 
     pontos: { flexDirection: 'row', gap: 2, height: 10, alignItems: 'center' },
     ponto: { width: 4.5, height: 4.5, borderRadius: 3, backgroundColor: t.cores.verde },
     pontoDeFora: { backgroundColor: t.inkFraco },
-    muitas: { fontSize: 9.5, fontWeight: '800', color: t.cores.verde },
+    muitas: { fontFamily: FONTE.forte, fontSize: 9.5, color: t.cores.verde },
 
-    totalDoMes: { fontSize: 12.5, color: t.inkFraco, textAlign: 'center', paddingTop: 12 },
+    totalDoMes: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco, textAlign: 'center', paddingTop: 12 },
 
+    /* Ganha borda, como todo cartão das telas novas. Sem ela, creme sobre
+       creme se separava só pela diferença de tom entre `cartao` e `fundo` --
+       que é de propósito pequena, e num aparelho ao sol some. */
     blocoDia: {
       backgroundColor: t.cores.cartao,
-      borderRadius: RAIO_CARTAO,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 16,
       paddingHorizontal: 14,
       paddingVertical: 10,
     },
     topoDoBloco: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 2 },
-    tituloDoBloco: { flex: 1, fontSize: 13.5, fontWeight: '800', color: t.inkSuave },
+    tituloDoBloco: { flex: 1, fontFamily: FONTE.forte, fontSize: 13.5, color: t.inkSuave, letterSpacing: -0.2 },
     tituloDeHoje: { color: t.cores.verde },
     contadorDoBloco: {
+      fontFamily: FONTE.meia,
       fontSize: 11.5,
-      fontWeight: '800',
       color: t.inkFraco,
       fontVariant: ['tabular-nums'],
     },
-    blocoLivre: { fontSize: 13, color: t.inkFraco, paddingVertical: 6 },
+    blocoLivre: { fontFamily: FONTE.normal, fontSize: 13, color: t.inkFraco, paddingVertical: 6 },
 
     listaDoDia: {
       backgroundColor: t.cores.cartao,
-      borderRadius: RAIO_CARTAO,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 16,
       paddingHorizontal: 14,
       paddingVertical: 4,
     },
     linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+    /* Deixa de ser VERDE. Verde é a cor da ação nesta área -- Aceitar,
+       Confirmar, Remarcar --, e uma coluna inteira de horários verdes fazia a
+       agenda parecer uma lista de botões. O horário é dado, e dado é tinta
+       normal; quem separa a coluna do nome é a largura fixa e o dígito
+       tabular, que continuam aqui. */
     hora: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: t.cores.verde,
+      fontFamily: FONTE.meia,
+      fontSize: 13.5,
+      color: t.inkSuave,
       width: 46,
       fontVariant: ['tabular-nums'],
     },
-    nome: { flex: 1, fontSize: 15, color: t.cores.ink },
-    apagado: { color: t.inkFraco, fontWeight: '400' },
+    nome: { flex: 1, fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink, letterSpacing: -0.2 },
+    /* Só cor: o peso vem da família, e `fontWeight: '400'` aqui não afinaria
+       nada -- desenharia o mesmo arquivo. */
+    apagado: { color: t.inkFraco },
 
     vazio: {
       alignItems: 'center',

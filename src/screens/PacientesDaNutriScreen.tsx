@@ -704,28 +704,32 @@ const estilos = estilosDe(t =>
       paddingBottom: 8,
     },
     voltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-    tituloDaFicha: { flex: 1, fontSize: 17, fontWeight: '800', color: t.cores.ink, textAlign: 'center' },
+    tituloDaFicha: { flex: 1, fontFamily: FONTE.forte, fontSize: 17, color: t.cores.ink, textAlign: 'center' },
 
     cartao: {
       backgroundColor: t.cores.cartao,
-      borderRadius: RAIO_CARTAO,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 16,
       padding: 16,
       gap: 3,
     },
-    nomeGrande: { fontSize: 20, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
-    subtitulo: { fontSize: 13.5, color: t.inkSuave },
-    contato: { fontSize: 14, color: t.cores.verde, marginTop: 6 },
+    /* 24, e o nome é a única coisa grande da ficha. Era 20, do tamanho de um
+       subtítulo -- e a ficha abre para responder "quem é essa pessoa". */
+    nomeGrande: { fontFamily: FONTE.bruta, fontSize: 24, color: t.cores.ink, letterSpacing: -0.8 },
+    subtitulo: { fontFamily: FONTE.normal, fontSize: 13.5, color: t.inkSuave },
+    contato: { fontFamily: FONTE.media, fontSize: 14, color: t.cores.verde, marginTop: 6 },
 
+    /* O mesmo corte do resto da área: sai a maiúscula espaçada. */
     rotuloDoBloco: {
-      fontSize: 10.5,
-      fontWeight: '800',
-      letterSpacing: 1.1,
+      fontFamily: FONTE.meia,
+      fontSize: 12.5,
       color: t.inkFraco,
       paddingBottom: 6,
     },
     item: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 7 },
-    rotuloDoItem: { flex: 1, fontSize: 13.5, color: t.inkSuave },
-    valorDoItem: { flex: 1.3, fontSize: 14, color: t.cores.ink, textAlign: 'right' },
+    rotuloDoItem: { flex: 1, fontFamily: FONTE.normal, fontSize: 13.5, color: t.inkSuave },
+    valorDoItem: { flex: 1.3, fontFamily: FONTE.meia, fontSize: 14, color: t.cores.ink, textAlign: 'right' },
     /* Ausência em tom apagado, e não em vermelho: não ter plano ativo não é
        erro, é um fato que ela pode querer resolver. */
     valorAusente: { color: t.inkFraco },
@@ -733,19 +737,19 @@ const estilos = estilosDe(t =>
     numeros: { flexDirection: 'row', gap: 8, paddingTop: 2 },
     numero: { flex: 1, alignItems: 'center', gap: 1 },
     valorNumero: {
-      fontSize: 17,
-      fontWeight: '800',
+      fontFamily: FONTE.forte,
+      fontSize: 18,
       color: t.cores.ink,
-      letterSpacing: -0.3,
+      letterSpacing: -0.5,
       fontVariant: ['tabular-nums'],
     },
     /* A seta em tom neutro, e não em verde ou vermelho: ela diz o sentido, e
        quem julga se é bom é a nutricionista. */
-    delta: { fontSize: 11, fontWeight: '700', color: t.inkSuave },
-    rotuloNumero: { fontSize: 10.5, color: t.inkFraco, textAlign: 'center', marginTop: 1 },
-    comparadoCom: { fontSize: 11, color: t.inkFraco, paddingTop: 10 },
+    delta: { fontFamily: FONTE.meia, fontSize: 11, color: t.inkSuave },
+    rotuloNumero: { fontFamily: FONTE.normal, fontSize: 10.5, color: t.inkFraco, textAlign: 'center', marginTop: 1 },
+    comparadoCom: { fontFamily: FONTE.normal, fontSize: 11, color: t.inkFraco, paddingTop: 10 },
 
-    notas: { fontSize: 14, color: t.cores.ink, lineHeight: 21 },
+    notas: { fontFamily: FONTE.normal, fontSize: 14, color: t.cores.ink, lineHeight: 21 },
 
     rodape: { fontSize: 12, color: t.inkFraco, lineHeight: 18, paddingHorizontal: 4, paddingTop: 4 },
     pressionado: { opacity: 0.7 },

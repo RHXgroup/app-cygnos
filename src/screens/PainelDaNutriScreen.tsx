@@ -1034,7 +1034,7 @@ const estilos = estilosDe(t =>
     },
     linhaAtencao: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
     textosAtencao: { flex: 1 },
-    fraseAtencao: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+    fraseAtencao: { fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink },
     quebraAtencao: { fontSize: 12.5, color: t.inkSuave, marginTop: 2 },
     pessoaAtencao: {
       borderTopWidth: StyleSheet.hairlineWidth,
@@ -1055,7 +1055,7 @@ const estilos = estilosDe(t =>
       marginTop: 2,
     },
     textosFerramenta: { flex: 1 },
-    tituloFerramenta: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+    tituloFerramenta: { fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink },
     textoFerramenta: { fontSize: 12.5, color: t.inkSuave, marginTop: 1 },
     pressionada: { opacity: 0.75 },
 
