@@ -47,7 +47,12 @@ const MESES = [
 ]
 
 /* "2026-09" a partir de um dia. */
-export const mesDe = (iso: string): string => (ehDataReal(iso) ? iso.slice(0, 7) : iso)
+/* "2026-09" a partir de um dia.
+   `mesDaData`, e nao `mesDe`: ja existe um `mesDe` em `calendarioDoCiclo`, e
+   la ele monta a GRADE do mes -- (ano, mes, hoje) => DiaDoMes[]. O mesmo nome
+   para 'o mes daquela data' e para 'os dias daquele mes' faz quem le a chamada
+   ter de abrir o outro arquivo. Armadilha 5: o nome diz o objeto. */
+export const mesDaData = (iso: string): string => (ehDataReal(iso) ? iso.slice(0, 7) : iso)
 
 /* O primeiro dia do mês, em ISO. Devolve vazio para mês que não existe: quem
    desenha decide o que fazer, e uma grade a partir de lixo seria uma tela de

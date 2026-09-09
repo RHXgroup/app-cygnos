@@ -74,6 +74,38 @@ export const diaDaSemana = (iso: string): number =>
  * conta para desenhar a semana, e o próximo passo óbvio seria escrever a
  * segunda cópia. Armadilha 5: ao invés disso, ela mudou de casa e o chamador
  * antigo passou a importar daqui. */
+/* '1990-04-27' -> a idade em anos completos hoje.
+ *
+ * ──────────────────── Por que ela mora aqui, e não em `energia` nem em `pacientesDaNutri` ────────────────────
+ * Porque existiam DUAS, com a mesma forma -- `(string, Date) => number` -- e
+ * comportamentos diferentes para entrada torta. Trocar o import compilava, e o
+ * `tsc` não tinha como avisar: é a armadilha 5 na sua forma mais cara, a de
+ * duas funções que só diferem no que fazem quando o dado está errado.
+ *
+ * A que ficou é a cuidadosa, e a diferença não é acadêmica: a outra devolvia
+ * `NaN` para data vazia, e `NaN !== null` -- então a tela de gasto energético,
+ * que guarda `number | null` e libera o cálculo com `idade !== null`, aceitava
+ * a idade inválida e produzia uma caloria NaN sem nada reclamar.
+ *
+ * Contada na mão porque diferença de datas em milissegundos erra em ano
+ * bissexto. E o "hoje" entra por parâmetro para dar para exercitar a véspera do
+ * aniversário sem esperar o dia chegar. */
+export function idadeDe(nascimento: string | null | undefined, hoje: Date = new Date()): number | null {
+  if (!ehDataReal(nascimento)) return null
+
+  const [ano, mes, dia] = nascimento.split('-').map(Number)
+  let anos = hoje.getFullYear() - ano
+  /* O ajuste do aniversário que ainda não veio este ano. Sem ele, quem faz anos
+     em dezembro aparece um ano mais velho durante onze meses. */
+  const jaFez =
+    hoje.getMonth() + 1 > mes || (hoje.getMonth() + 1 === mes && hoje.getDate() >= dia)
+  if (!jaFez) anos--
+
+  /* Fora da faixa devolve nulo, e nunca zero: um bebê de meses e uma data
+     absurda são coisas diferentes, e "0 anos" mistura as duas. */
+  return anos >= 0 && anos < 130 ? anos : null
+}
+
 export const segundaDa = (iso: string): string => {
   if (!ehDataReal(iso)) return iso
   const dia = diaDaSemana(iso)

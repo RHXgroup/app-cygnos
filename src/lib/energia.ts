@@ -394,13 +394,8 @@ export async function salvarAltura(contaId: string, alturaCm: number): Promise<{
   }
 }
 
-/* '1990-04-27' → idade em anos completos hoje. Contada na mão porque a
-   diferença de datas em milissegundos erra em ano bissexto. */
-export function idadeDe(nascimentoISO: string, hoje = new Date()): number {
-  const [ano, mes, dia] = nascimentoISO.split('-').map(Number)
-  let idade = hoje.getFullYear() - ano
-  const jaFezAniversario =
-    hoje.getMonth() + 1 > mes || (hoje.getMonth() + 1 === mes && hoje.getDate() >= dia)
-  if (!jaFezAniversario) idade--
-  return idade
-}
+/* `idadeDe` mudou para `datas.ts`: existiam duas, com a MESMA forma
+   `(string, Date) => number`, diferindo só no que faziam com entrada torta --
+   e esta devolvia `NaN`, que passa por `idade !== null` e virava caloria NaN na
+   tela de gasto energético. Reexportada para quem já importava daqui. */
+export { idadeDe } from './datas'

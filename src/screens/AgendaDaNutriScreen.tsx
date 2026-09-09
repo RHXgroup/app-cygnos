@@ -21,7 +21,7 @@ import {
   gradeDoMes,
   hojeLocal,
   mesAndando,
-  mesDe,
+  mesDaData,
   nomeDoMes,
   primeiroDiaDoMes,
   tituloDaSemana,
@@ -79,7 +79,7 @@ export function AgendaDaNutriScreen() {
       const dias = diasDaSemana(foco)
       return { de: dias[0] ?? foco, ate: dias[6] ?? foco }
     }
-    const grade = gradeDoMes(mesDe(foco), new Map())
+    const grade = gradeDoMes(mesDaData(foco), new Map())
     return { de: grade[0]?.iso ?? foco, ate: grade[grade.length - 1]?.iso ?? foco }
   }, [vista, foco])
 
@@ -139,14 +139,14 @@ export function AgendaDaNutriScreen() {
     /* No mês o passo é de M~EC~S, e o dia em foco vai para o dia 1 -- somar 30
        dias faria janeiro pular fevereiro em anos de 31. `mesAndando` não deixa
        o dia entrar na conta. */
-    const novo = mesAndando(mesDe(foco), passo)
+    const novo = mesAndando(mesDaData(foco), passo)
     setFoco(primeiroDiaDoMes(novo) || foco)
   }
 
   const titulo =
     vista === 'dia' ? tituloDoDia(foco)
     : vista === 'semana' ? tituloDaSemana(foco)
-    : nomeDoMes(mesDe(foco))
+    : nomeDoMes(mesDaData(foco))
 
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
@@ -172,7 +172,7 @@ export function AgendaDaNutriScreen() {
           </Text>
           {/* Só aparece quando ela SAIU de hoje. Um "hoje" permanente ali seria
               um botão que na maior parte do tempo não faz nada. */}
-          {mesDe(foco) !== mesDe(hoje) || (vista !== 'mes' && foco !== hoje) ? (
+          {mesDaData(foco) !== mesDaData(hoje) || (vista !== 'mes' && foco !== hoje) ? (
             <Text style={styles.voltarAHoje}>voltar a hoje</Text>
           ) : null}
         </Pressable>
@@ -229,7 +229,7 @@ export function AgendaDaNutriScreen() {
         >
           {vista === 'mes' && (
             <Mes
-              anoMes={mesDe(foco)}
+              anoMes={mesDaData(foco)}
               contagem={contagem}
               hoje={hoje}
               foco={foco}

@@ -21,7 +21,7 @@ import {
   gradeDoMes,
   hojeLocal,
   mesAndando,
-  mesDe,
+  mesDaData,
   nomeDoMes,
   primeiroDiaDoMes,
   tituloDaSemana,
@@ -172,7 +172,7 @@ function ok(nome: string, condicao: boolean, extra = '') {
   ok('sabado com acento', tituloDoDia('2026-09-12') === 'Sábado, 12 de setembro', tituloDoDia('2026-09-12'))
   ok('data torta nao vira titulo', tituloDoDia('2026-02-31') === '')
 
-  ok('mesDe recorta', mesDe('2026-09-08') === '2026-09')
+  ok('mesDaData recorta', mesDaData('2026-09-08') === '2026-09')
   ok('primeiro dia', primeiroDiaDoMes('2026-09') === '2026-09-01')
   ok('mes que nao existe', primeiroDiaDoMes('2026-13') === '')
 }

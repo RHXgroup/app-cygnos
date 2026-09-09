@@ -325,21 +325,6 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
   }
 }
 
-/* A idade, para o cabeçalho da ficha.
- *
- * Nulo quando não dá para saber, e nunca zero: um bebê de meses e uma data de
- * nascimento em branco são coisas diferentes, e "0 anos" mistura as duas. */
-export function idadeDe(nascimento: string | null, hoje: Date = new Date()): number | null {
-  if (!nascimento || !/^\d{4}-\d{2}-\d{2}$/.test(nascimento)) return null
-  const ms = Date.parse(nascimento + 'T00:00:00')
-  if (!Number.isFinite(ms)) return null
-
-  const nasceu = new Date(ms)
-  let anos = hoje.getFullYear() - nasceu.getFullYear()
-  /* O ajuste do aniversário que ainda não veio este ano. Sem ele, quem faz
-     anos em dezembro aparece um ano mais velho durante onze meses. */
-  const mes = hoje.getMonth() - nasceu.getMonth()
-  if (mes < 0 || (mes === 0 && hoje.getDate() < nasceu.getDate())) anos--
-
-  return anos >= 0 && anos < 130 ? anos : null
-}
+/* A idade da ficha vem de `datas.ts`, e é a mesma que a tela de gasto
+   energético usa. Reexportada porque a tela desta ficha importa daqui. */
+export { idadeDe } from './datas'
