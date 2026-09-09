@@ -429,7 +429,13 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
                   rotulo="Plano terapêutico"
                   valor={
                     ficha.planoTerapeutico
-                      ? ficha.planoTerapeutico.titulo + ' · ' + ficha.planoTerapeutico.status
+                      /* Parênteses, e não o `·`.
+                         "Introdução alimentar · em andamento" se lê como duas
+                         coisas emendadas, e o Helton leu o ponto como um
+                         sublinhado. O título é o NOME do plano e o resto é o
+                         ESTADO dele -- o parêntese diz isso sem precisar de
+                         legenda. */
+                      ? ficha.planoTerapeutico.titulo + ' (' + ficha.planoTerapeutico.status + ')'
                       : 'Nenhum'
                   }
                   aviso={!ficha.planoTerapeutico}
