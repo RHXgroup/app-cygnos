@@ -232,16 +232,37 @@ export function LoginScreen({
       if (!erroSessao) return
     }
 
-    if (semResposta) {
-      setErro('Não consegui entrar agora. Tente de novo em instantes.')
+    /* ──────────────────── "SENHA INCORRETA" SÓ QUANDO O SERVIDOR DISSE ISSO ────────────────────
+     *
+     * Aqui o ramo final era o `else` de tudo, e isso produziu um engano real: a
+     * função ainda não estava publicada, o Supabase respondeu 404 com um corpo
+     * que não tem `error` nenhum, e a tela acusou "Código MT, usuário ou senha
+     * incorretos" para uma credencial que estava certa. Quem lê isso vai
+     * procurar a própria senha, e não o deploy.
+     *
+     * Agora a acusação exige `credenciais_invalidas` escrito pela função. Tudo
+     * o que não for um desfecho conhecido é problema NOSSO, e a frase diz isso.
+     *
+     * O sigilo não se perde: par inexistente e senha errada continuam chegando
+     * com a MESMA resposta, porque quem os junta é a função, e não esta tela. */
+    if (resposta?.error === 'credenciais_invalidas') {
+      setErro(CREDENCIAL_INVALIDA_NUTRI)
     } else if (resposta?.error === 'muitas_tentativas') {
       setErro(frasaDaEspera(resposta.espera_seg ?? 900))
     } else if (resposta?.error === 'suspenso') {
       setErro('O acesso desta conta está suspenso. Resolva no sistema, no computador.')
     } else if (resposta?.error === 'teste_expirado') {
       setErro('O período de teste terminou. Continue no sistema, no computador.')
+    } else if (resposta?.error === 'campos_obrigatorios') {
+      setErro('Preencha o código MT, o usuário e a senha.')
+    } else if (semResposta) {
+      setErro('Não consegui entrar agora. Tente de novo em instantes.')
     } else {
-      setErro(CREDENCIAL_INVALIDA_NUTRI)
+      /* Chega aqui quando a resposta veio e não é nenhum desfecho previsto:
+         função não publicada, versão antiga no ar, erro dentro dela. O console
+         guarda o corpo; a tela não culpa a senha de ninguém. */
+      console.warn('[login] resposta inesperada da app-login-profissional:', resposta)
+      setErro('Não consegui entrar agora. Tente de novo em instantes.')
     }
     setCarregando(false)
   }
