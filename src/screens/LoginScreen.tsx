@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   Pressable,
   ScrollView,
@@ -27,6 +28,20 @@ function saudacaoDoDia() {
 const CREDENCIAL_INVALIDA =
   'E-mail, usuário ou senha incorretos. Se você acabou de criar a conta, confirme seu e-mail antes de entrar.'
 
+/* A do modo profissional é outra frase porque os campos são outros: dizer
+   "e-mail ou usuário" para quem digitou MT manda ela procurar erro num campo
+   que nem está na tela. E vale a mesma regra -- par inexistente e senha errada
+   caem juntos, porque separar devolveria o verificador de contas. */
+const CREDENCIAL_INVALIDA_NUTRI = 'Código MT, usuário ou senha incorretos.'
+
+/* Resposta própria, e não "credenciais incorretas": quem está trancado por ter
+   errado quatro vezes precisa saber que é para ESPERAR. Sem isto ela ficaria
+   tentando a senha certa achando que ela é a errada. */
+function frasaDaEspera(segundos: number): string {
+  const min = Math.max(1, Math.ceil(segundos / 60))
+  return `Muitas tentativas seguidas. Tente de novo em ${min} ${min === 1 ? 'minuto' : 'minutos'}.`
+}
+
 /* A tradutora de mensagem do supabase-js saiu daqui junto com o
    `signInWithPassword`: quem responde agora é a `app-login`, e ela responde
    IGUAL para usuário inexistente, senha errada e e-mail não confirmado —
@@ -49,6 +64,18 @@ export function LoginScreen({
   onIrParaRecuperar: () => void
 }) {
   const styles = estilos()
+  /* ──────────────────── DUAS PORTAS NA MESMA TELA ────────────────────
+   *
+   * O paciente entra com e-mail ou usuário. A profissional entra com CÓDIGO MT
+   * + usuário + senha, que é o mesmo trio do site -- e não é preferência: a
+   * conta dela nasce com e-mail SINTÉTICO (`nutri_<usuario>@sano.internal`), que
+   * não existe como caixa e que ela nunca viu. E-mail é opcional no cadastro
+   * dela. MT + usuário é a única credencial que ela tem.
+   *
+   * E o MT não pode ser campo fixo, porque paciente não tem MT. Por isso o
+   * modo, e não um terceiro campo sempre visível. */
+  const [modo, setModo] = useState<'paciente' | 'nutri'>('paciente')
+  const [mt, setMt] = useState('')
   const [identificador, setIdentificador] = useState('')
   const [senha, setSenha] = useState('')
   const [mostrarSenha, setMostrarSenha] = useState(false)
@@ -71,6 +98,25 @@ export function LoginScreen({
    * teclado mais a área segura, que SOMAM. A altura vem do `onLayout` e não de
    * `useWindowDimensions`, para o hook saber distinguir a janela que encolhe
    * (num build de verdade) da que não encolhe (Expo Go) e não somar duas vezes. */
+  /* O voltar tem de desfazer o MODO antes de sair do app.
+   *
+   * Registrado aqui e SEM lista de dependências, de propósito: o App tem um
+   * tratador central que devolve `false` estando no login -- ou seja, encerra o
+   * app. Como o React roda os efeitos do filho antes dos do pai, um efeito com
+   * lista faria o pai registrar por último e ganhar. Re-registrar a cada
+   * renderização é o que põe este na frente. Armadilha 1 do AGENTS.md. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (modo === 'nutri') {
+        trocarModo('paciente')
+        return true
+      }
+      /* Nada a desfazer: devolve ao central, que sabe encerrar. */
+      return false
+    })
+    return () => sub.remove()
+  })
+
   const { bottom } = useSafeAreaInsets()
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
@@ -111,12 +157,104 @@ export function LoginScreen({
     ondeEstaOCampo.current[nome] = e.nativeEvent.layout.y + e.nativeEvent.layout.height
   }
 
-  const podeEnviar = identificador.trim().length > 0 && senha.length > 0 && !carregando
+  const podeEnviar =
+    identificador.trim().length > 0 &&
+    senha.length > 0 &&
+    (modo === 'paciente' || mt.trim().length > 0) &&
+    !carregando
+
+  /* Trocar de porta limpa o que era da outra.
+   *
+   * Não é zelo: "maria@gmail.com" ficaria no campo Usuário depois da troca, e
+   * o erro seguinte seria "usuário ou senha incorretos" apontando para um campo
+   * que a pessoa nem preencheu naquele modo. A senha some junto porque as duas
+   * contas podem ter senhas diferentes. */
+  function trocarModo(novo: 'paciente' | 'nutri') {
+    setModo(novo)
+    setMt('')
+    setIdentificador('')
+    setSenha('')
+    setErro('')
+    if (aviso) onLimparAviso()
+  }
+
+  /* MT + usuário + senha, contra `app-login-profissional`.
+   *
+   * Função separada da do site (`login-profissional`) por duas diferenças que
+   * não dá para conciliar numa só:
+   *
+   *   · O site exige Turnstile, que é widget da web -- exigiria WebView aqui, e
+   *     a site key que este projeto nunca teve. A do app troca isso por um freio
+   *     de tentativas no banco (migração 20260908200000). Os `mt_code` são
+   *     SEQUENCIAIS, então esta porta sem freio nenhum seria a entrada fraca
+   *     para as contas que enxergam centenas de fichas.
+   *   · O site devolve um token de checkout quando o teste venceu. Link de
+   *     pagamento dentro de um app Android infringe a política de faturamento
+   *     do Google Play, então aqui a frase manda resolver no sistema. */
+  async function entrarComoNutri() {
+    const { data, error: erroFn } = await supabase.functions.invoke('app-login-profissional', {
+      body: { mt_code: mt.trim(), username: identificador.trim().toLowerCase(), senha },
+    })
+
+    /* `invoke` deixa `data` nulo em resposta não-2xx e joga o corpo em
+       `error.context` -- e é justamente ali que moram os desfechos que valem
+       mensagem própria. O site perdeu três deles por ler só `data`, e quem
+       estava inadimplente lia "tente de novo" e ia procurar a senha, que estava
+       certa. `context` é uma Response e só pode ser lida UMA vez. */
+    let resposta = data as {
+      error?: string
+      espera_seg?: number
+      access_token?: string
+      refresh_token?: string
+    } | null
+    let semResposta = false
+
+    if (erroFn) {
+      const ctx = (erroFn as { context?: Response }).context
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          resposta = await ctx.json()
+        } catch {
+          semResposta = true
+        }
+      } else {
+        semResposta = true
+      }
+    }
+
+    if (resposta?.access_token && resposta?.refresh_token) {
+      const { error: erroSessao } = await supabase.auth.setSession({
+        access_token: resposta.access_token,
+        refresh_token: resposta.refresh_token,
+      })
+      /* Em caso de sucesso não mexemos no estado: o `onAuthStateChange` do App
+         troca de tela e este componente é desmontado. */
+      if (!erroSessao) return
+    }
+
+    if (semResposta) {
+      setErro('Não consegui entrar agora. Tente de novo em instantes.')
+    } else if (resposta?.error === 'muitas_tentativas') {
+      setErro(frasaDaEspera(resposta.espera_seg ?? 900))
+    } else if (resposta?.error === 'suspenso') {
+      setErro('O acesso desta conta está suspenso. Resolva no sistema, no computador.')
+    } else if (resposta?.error === 'teste_expirado') {
+      setErro('O período de teste terminou. Continue no sistema, no computador.')
+    } else {
+      setErro(CREDENCIAL_INVALIDA_NUTRI)
+    }
+    setCarregando(false)
+  }
 
   async function entrar() {
     if (!podeEnviar) return
     setErro('')
     setCarregando(true)
+
+    if (modo === 'nutri') {
+      await entrarComoNutri()
+      return
+    }
 
     const login = identificador.trim().toLowerCase()
 
@@ -184,7 +322,9 @@ export function LoginScreen({
           <Text style={styles.saudacao}>{saudacaoDoDia()}!</Text>
           <Text style={styles.titulo}>Bem-vindo ao Cygnos</Text>
           <Text style={styles.subtitulo}>
-            Entre para acompanhar seu plano, suas medidas e suas consultas.
+            {modo === 'nutri'
+              ? 'Use o mesmo código, usuário e senha do sistema.'
+              : 'Entre para acompanhar seu plano, suas medidas e suas consultas.'}
           </Text>
         </View>
 
@@ -194,8 +334,41 @@ export function LoginScreen({
             ondeComecaOFormulario.current = e.nativeEvent.layout.y
           }}
         >
+          {/* O MT vem PRIMEIRO, e com o prefixo fixo do lado -- idêntico ao
+              site. Ela já digita este trio todo dia; mudar a ordem ou pedir o
+              "MT" por extenso faria a mesma credencial parecer outra. */}
+          {modo === 'nutri' && (
+            <View onLayout={medir('mt')}>
+              <Text style={styles.rotulo}>Código MT</Text>
+              <View style={styles.campoComPrefixo}>
+                <Text style={styles.prefixoMT}>MT</Text>
+                <TextInput
+                  value={mt}
+                  /* Só dígitos, e teclado numérico: o "MT" já está escrito ao
+                     lado, e um teclado com letras aqui só produziria "MTMT1001".
+                     Armadilha 3 -- nunca oferecer teclado que o campo descarta. */
+                  onChangeText={v => {
+                    setMt(v.replace(/[^0-9]/g, ''))
+                    if (erro) setErro('')
+                  }}
+                  placeholder="1000"
+                  placeholderTextColor={paleta().inkFraco}
+                  keyboardAppearance="dark"
+                  keyboardType="number-pad"
+                  maxLength={8}
+                  returnKeyType="next"
+                  onFocus={() => setEmFoco('mt')}
+                  style={[styles.campo, styles.campoDoMT]}
+                  accessibilityLabel="Código MT, só os números"
+                />
+              </View>
+            </View>
+          )}
+
           <View onLayout={medir('identificador')}>
-            <Text style={styles.rotulo}>E-mail ou usuário</Text>
+            <Text style={styles.rotulo}>
+              {modo === 'nutri' ? 'Usuário' : 'E-mail ou usuário'}
+            </Text>
             <TextInput
               value={identificador}
               onChangeText={v => {
@@ -203,12 +376,14 @@ export function LoginScreen({
                 if (erro) setErro('')
                 if (aviso) onLimparAviso()
               }}
-              placeholder="voce@email.com ou maria.silva"
+              placeholder={modo === 'nutri' ? 'maria.silva' : 'voce@email.com ou maria.silva'}
               placeholderTextColor={paleta().inkFraco}
               keyboardAppearance="dark"
               /* Teclado de e-mail mesmo aceitando usuário: deixa o "@" à mão
-                 para a maioria e não atrapalha quem digita o apelido. */
-              keyboardType="email-address"
+                 para a maioria e não atrapalha quem digita o apelido. No modo
+                 profissional não há e-mail nenhum a digitar, e o "@" ali só
+                 ocuparia tecla. */
+              keyboardType={modo === 'nutri' ? 'default' : 'email-address'}
               autoCapitalize="none"
               autoCorrect={false}
               /* "username" e não "email": o preenchimento automático do iOS
@@ -254,15 +429,28 @@ export function LoginScreen({
           </View>
 
           {/* Logo abaixo da senha, que é onde a pessoa está olhando quando
-              descobre que não lembra dela. */}
-          <Pressable
-            onPress={onIrParaRecuperar}
-            hitSlop={8}
-            style={styles.linkEsqueci}
-            accessibilityRole="button"
-          >
-            <Text style={styles.textoEsqueci}>Esqueci minha senha</Text>
-          </Pressable>
+              descobre que não lembra dela.
+
+              ──────────────────── E por que a profissional NÃO vê este link ────────────────────
+              A recuperação do app manda um código para o e-mail do Auth. O da
+              conta dela é sintético (`nutri_<usuario>@sano.internal`), então o
+              código iria para um endereço que não existe e ela ficaria
+              esperando um e-mail que nunca chega. Melhor dizer onde resolve. */}
+          {modo === 'paciente' ? (
+            <Pressable
+              onPress={onIrParaRecuperar}
+              hitSlop={8}
+              style={styles.linkEsqueci}
+              accessibilityRole="button"
+            >
+              <Text style={styles.textoEsqueci}>Esqueci minha senha</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.avisoSenhaNutri}>
+              Esqueceu a senha? A troca de senha de profissional é feita no
+              sistema, no computador.
+            </Text>
+          )}
 
           {/* O aviso do portão tem caixa própria, em tom de recado e não de
               erro: quem foi barrado não digitou nada errado. */}
@@ -285,15 +473,19 @@ export function LoginScreen({
             onPress={entrar}
           />
 
-          <Pressable
-            onPress={onIrParaCadastro}
-            style={styles.linkCriarConta}
-            accessibilityRole="button"
-          >
-            <Text style={styles.textoLinkSuave}>
-              Ainda não tem conta? <Text style={styles.textoLinkForte}>Criar conta</Text>
-            </Text>
-          </Pressable>
+          {/* Criar conta é de paciente. A de profissional nasce no sistema, e
+              oferecer o cadastro aqui levaria ela para a tela errada. */}
+          {modo === 'paciente' && (
+            <Pressable
+              onPress={onIrParaCadastro}
+              style={styles.linkCriarConta}
+              accessibilityRole="button"
+            >
+              <Text style={styles.textoLinkSuave}>
+                Ainda não tem conta? <Text style={styles.textoLinkForte}>Criar conta</Text>
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.divisor}>
@@ -302,12 +494,28 @@ export function LoginScreen({
           <View style={styles.linhaDivisor} />
         </View>
 
-        {/* Placeholder combinado: a entrada da nutricionista usa outro fluxo
-            (Código MT + usuário + senha) e fica para uma etapa seguinte. */}
+        {/* ──────────────────── AS DUAS PORTAS ────────────────────
+            Aqui havia um botão "Sou nutricionista" que não levava a lugar
+            nenhum: escrevia "ainda não está disponível" e parava ali. Ele foi
+            escrito quando a entrada dela era uma ideia, e apontava para o
+            desenho certo -- só nunca tinha sido construído.
+
+            ──────────────────── Por que MT, e não e-mail ────────────────────
+            Porque em geral ela NÃO TEM e-mail na conta: ele é opcional no
+            cadastro, e a conta nasce com um endereço sintético
+            (`nutri_<usuario>@sano.internal`) que não existe como caixa e que ela
+            nunca viu. MT + usuário + senha não é preferência: é a única
+            credencial que ela tem, e é a mesma do site.
+
+            ──────────────────── E por que MODO, e não um campo a mais ────────────────────
+            Paciente não tem MT. Um terceiro campo sempre visível faria a
+            primeira tela do app pedir um código que a maioria das pessoas não
+            tem -- e campo que a pessoa não entende é campo que ela tenta
+            preencher. */}
         <Botao
-          rotulo="Sou nutricionista"
+          rotulo={modo === 'nutri' ? 'Sou paciente' : 'Sou nutricionista'}
           tipo="secundario"
-          onPress={() => setErro('A entrada de nutricionista ainda não está disponível no app.')}
+          onPress={() => trocarModo(modo === 'nutri' ? 'paciente' : 'nutri')}
         />
 
         <Text style={styles.rodape}>Cygnos, sistemas de saúde com clareza</Text>
@@ -327,6 +535,34 @@ const estilos = estilosDe(t =>
     /* `paddingBottom` vem de fora, somado ao desvio do teclado. */
   },
   cabecalho: { alignItems: 'center', marginBottom: 32 },
+  /* O prefixo "MT" é desenho, e não texto do campo: ele fica FORA do
+     `TextInput` para o valor guardado continuar sendo só os dígitos. Escrever
+     "MT" dentro do valor faria o filtro de dígitos comê-lo no primeiro toque
+     -- que é a armadilha 3 pelo lado de dentro. */
+  campoComPrefixo: { flexDirection: 'row', alignItems: 'stretch' },
+  prefixoMT: {
+    paddingHorizontal: 14,
+    textAlignVertical: 'center',
+    fontSize: 14,
+    fontWeight: '800',
+    color: t.inkMedio,
+    backgroundColor: t.cores.superficie,
+    borderWidth: 1,
+    borderRightWidth: 0,
+    borderColor: t.cores.borda,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    overflow: 'hidden',
+    lineHeight: 46,
+  },
+  campoDoMT: { flex: 1, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
+  avisoSenhaNutri: {
+    fontSize: 12,
+    color: t.inkFraco,
+    lineHeight: 17,
+    marginTop: 2,
+    paddingHorizontal: 2,
+  },
   logo: { width: 72, height: 72, borderRadius: 20 },
   saudacao: {
     marginTop: 20,

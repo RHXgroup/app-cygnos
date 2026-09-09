@@ -66,6 +66,34 @@ export async function quemEntrou(): Promise<QuemEntrou | null> {
 
   if (conta.data !== null) return 'paciente'
   if (nutri.data !== null) return 'nutricionista'
+
+  /* ──────────────────── A FUNCIONÁRIA DO CONSULTÓRIO ────────────────────
+   *
+   * Ela não está em nenhuma das duas tabelas: mora em `funcionarios`, ligada ao
+   * Auth por `auth_user_id`. E não adianta perguntar lá direto -- a RLS daquela
+   * tabela exige `func_pode('{funcionarios,acessar}')`, que é a permissão de
+   * GERENCIAR funcionários, e a maioria das recepcionistas não a tem. Ela nem a
+   * própria linha consegue ler.
+   *
+   * Sem isto o desfecho é o pior possível: ela entra com o MT do consultório, o
+   * usuário e a senha certos, o login FUNCIONA -- e o app responde que a conta
+   * dela não existe e a desconecta.
+   *
+   * ──────────────────── Por que só agora, e não na primeira pergunta ────────────────────
+   * Duas razões. A chamada custa uma ida a mais, e o caso comum é paciente ou
+   * nutricionista -- os dois já responderam acima. E, principalmente: enquanto a
+   * migração 20260908200000 não rodar, esta função NÃO EXISTE no banco, e o erro
+   * cai no `catch` devolvendo 'nenhum' -- que é exatamente o comportamento de
+   * hoje. Nada quebra antes do SQL rodar. */
+  try {
+    const { data, error } = await supabase.rpc('app_quem_sou')
+    if (error) return 'nenhum'
+    const quem = data as { tipo?: string } | null
+    if (quem?.tipo === 'funcionario' || quem?.tipo === 'nutricionista') return 'nutricionista'
+  } catch {
+    /* Função ausente ou rede caindo no meio: segue como antes. */
+  }
+
   return 'nenhum'
 }
 
@@ -86,8 +114,21 @@ export async function carregarPerfilDaNutri(): Promise<PerfilDaNutri | null> {
     .eq('id', id)
     .maybeSingle()
 
-  if (error || !data) {
+  /* Linha ausente não quer dizer erro: pode ser a FUNCIONÁRIA, que não está em
+     `nutricionistas`. Nesse caso o nome vem da mesma função que a identificou,
+     e o cabeçalho a cumprimenta pelo nome dela em vez de ficar sem nome. */
+  if (!data) {
     if (error) falha('Não consegui carregar o seu perfil agora.', error)
+    const { data: quem } = await supabase.rpc('app_quem_sou')
+    const q = quem as { tipo?: string; nome?: string | null } | null
+    if (q?.tipo === 'funcionario' && q.nome?.trim()) {
+      return { id, nome: q.nome.trim(), tratamento: null }
+    }
+    return null
+  }
+
+  if (error) {
+    falha('Não consegui carregar o seu perfil agora.', error)
     return null
   }
 
