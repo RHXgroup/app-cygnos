@@ -66,7 +66,7 @@ export function primeiroDiaDoMes(anoMes: string): string {
  *
  * Sem `Date.setMonth`, que é a armadilha clássica: partir de 31 de janeiro e
  * somar um mês dá 3 de março, porque 31 de fevereiro escorrega. Aqui a conta é
- * sobre ANO e M~EC~S, e o dia nunca entra. */
+ * sobre ANO e MÊS, e o dia nunca entra. */
 export function mesAndando(anoMes: string, n: number): string {
   const ano = Number(anoMes.slice(0, 4))
   const mes = Number(anoMes.slice(5, 7))

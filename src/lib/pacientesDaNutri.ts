@@ -251,7 +251,7 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
     status: string | null
   }
 
-  /* Cada peça acessória que falha vira AUS~EC~NCIA, e não erro na tela: a ficha
+  /* Cada peça acessória que falha vira AUSÊNCIA, e não erro na tela: a ficha
      sem o plano ainda é útil, e trocar tudo por uma mensagem seria perder o
      nome e o telefone por causa de um plano que não carregou. Item 11. */
   const pendentes = (contas.data ?? []) as { valor: number | null }[]

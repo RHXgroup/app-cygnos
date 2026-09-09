@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  BackHandler,
   Pressable,
+  TextInput,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,7 +14,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
-import { consultasNoPeriodo } from '../lib/agendaDaNutri'
+import { cancelarConsulta, consultasNoPeriodo, remarcarConsulta } from '../lib/agendaDaNutri'
+import { interpretarRemarcacao, mascaraDeData, mascaraDeHora } from '../lib/remarcacao'
 import {
   CABECALHO_DA_SEMANA,
   contarPorDia,
@@ -41,7 +44,7 @@ import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
  * relance numa grade -- rolando uma lista, ela conta dias na cabeça. "Como está
  * a semana?" é a que ela olha com a paciente na frente pedindo retorno.
  *
- * ──────────────────── Uma leitura por PER~II~ODO, e não uma por célula ────────────────────
+ * ──────────────────── Uma leitura por PERÍODO, e não uma por célula ────────────────────
  * A grade do mês tem até 42 células. Uma consulta ao banco por célula seria a
  * tela abrindo em segundos no 4G de dentro de um prédio -- e cada uma cobrando
  * a mesma política de RLS outra vez.
@@ -69,6 +72,37 @@ export function AgendaDaNutriScreen() {
      um horário, vê quem está nele, e abre para saber quem é -- sem trocar de
      aba e procurar o nome de novo. */
   const [fichaAberta, setFichaAberta] = useState<number | null>(null)
+
+  /* A consulta em que ela tocou nos três pontinhos, para remarcar ou cancelar.
+     Guarda a CONSULTA inteira, e não o id: o painel mostra nome e horário, e
+     ir buscar isso de novo por id seria uma leitura para um dado que já estava
+     na mão. */
+  const [agindoEm, setAgindoEm] = useState<ConsultaDoDia | null>(null)
+
+  /* ──── O voltar do Android, que esta tela não tinha ────
+     Armadilha 1: a navegação é `useState`, então o botão do aparelho não
+     encontra pilha nenhuma e faz a única coisa que sabe -- e aqui isso jogava
+     ela para fora da agenda inteira com a ficha aberta.
+
+     SEM lista de dependências, de propósito: o `AreaDaNutri` registra o dele no
+     PAI, e o React roda os efeitos do filho ANTES dos do pai -- então na
+     primeira renderização o pai fica por último e ganha. Re-registrar a cada
+     renderização põe este na frente a partir da segunda, que sempre acontece
+     (nem que seja na carga dos dados). Não é código morto, e não é desleixo. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (agindoEm) {
+        setAgindoEm(null)
+        return true
+      }
+      if (fichaAberta !== null) {
+        setFichaAberta(null)
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
 
   /* Que pedaço do calendário está na tela. O mês pede a grade INTEIRA, sobras
      inclusive: as células de 31 de agosto e 4 de outubro também mostram
@@ -133,10 +167,21 @@ export function AgendaDaNutriScreen() {
     return <FichaDoPacienteScreen id={fichaAberta} onFechar={() => setFichaAberta(null)} />
   }
 
+  const painel = agindoEm ? (
+    <PainelDaConsulta
+      consulta={agindoEm}
+      onFechar={() => setAgindoEm(null)}
+      onMudou={() => {
+        setAgindoEm(null)
+        void buscar()
+      }}
+    />
+  ) : null
+
   function andar(passo: number) {
     if (vista === 'dia') return setFoco(somandoDias(foco, passo))
     if (vista === 'semana') return setFoco(somandoDias(foco, passo * 7))
-    /* No mês o passo é de M~EC~S, e o dia em foco vai para o dia 1 -- somar 30
+    /* No mês o passo é de MÊS, e o dia em foco vai para o dia 1 -- somar 30
        dias faria janeiro pular fevereiro em anos de 31. `mesAndando` não deixa
        o dia entrar na conta. */
     const novo = mesAndando(mesDaData(foco), passo)
@@ -252,6 +297,7 @@ export function AgendaDaNutriScreen() {
                   setVista('dia')
                 }}
                 onAbrirFicha={setFichaAberta}
+                onAgir={setAgindoEm}
               />
             ))}
 
@@ -259,10 +305,13 @@ export function AgendaDaNutriScreen() {
             <ListaDoDia
               consultas={consultas.filter(c => c.diaISO === foco)}
               onAbrirFicha={setFichaAberta}
+              onAgir={setAgindoEm}
             />
           )}
         </ScrollView>
       )}
+
+      {painel}
     </View>
   )
 }
@@ -386,12 +435,14 @@ function BlocoDeDia({
   consultas,
   onAbrirDia,
   onAbrirFicha,
+  onAgir,
 }: {
   dia: string
   hoje: string
   consultas: ConsultaDoDia[]
   onAbrirDia: () => void
   onAbrirFicha: (id: number) => void
+  onAgir: (c: ConsultaDoDia) => void
 }) {
   const styles = estilos()
 
@@ -422,7 +473,9 @@ function BlocoDeDia({
            ela pode ter mil coisas nesse dia. A frase fala do que o app SABE. */
         <Text style={styles.blocoLivre}>Sem consulta marcada</Text>
       ) : (
-        consultas.map(c => <Linha key={c.id} consulta={c} onAbrirFicha={onAbrirFicha} />)
+        consultas.map(c => (
+          <Linha key={c.id} consulta={c} onAbrirFicha={onAbrirFicha} onAgir={onAgir} />
+        ))
       )}
     </View>
   )
@@ -431,9 +484,11 @@ function BlocoDeDia({
 function ListaDoDia({
   consultas,
   onAbrirFicha,
+  onAgir,
 }: {
   consultas: ConsultaDoDia[]
   onAbrirFicha: (id: number) => void
+  onAgir: (c: ConsultaDoDia) => void
 }) {
   const styles = estilos()
 
@@ -449,7 +504,7 @@ function ListaDoDia({
   return (
     <View style={styles.listaDoDia}>
       {consultas.map(c => (
-        <Linha key={c.id} consulta={c} onAbrirFicha={onAbrirFicha} />
+        <Linha key={c.id} consulta={c} onAbrirFicha={onAbrirFicha} onAgir={onAgir} />
       ))}
     </View>
   )
@@ -458,15 +513,23 @@ function ListaDoDia({
 function Linha({
   consulta,
   onAbrirFicha,
+  onAgir,
 }: {
   consulta: ConsultaDoDia
   onAbrirFicha: (id: number) => void
+  onAgir: (c: ConsultaDoDia) => void
 }) {
   const styles = estilos()
   const passada = consulta.status === 'realizada'
   const temFicha = !!consulta.pacienteId
+  /* Cancelada já não tem o que remarcar nem o que cancelar, e realizada só
+     aceita cancelamento -- que é decisão de dinheiro e mora no computador
+     quando há pagamento. Esconder o botão nos dois casos evita um painel que
+     abre para dizer não. */
+  const podeAgir = consulta.status !== 'cancelada' && !passada
 
   return (
+    <View style={styles.linhaComAcao}>
     <Pressable
       onPress={() => consulta.pacienteId && onAbrirFicha(consulta.pacienteId)}
       /* Encaixe avulso não tem ficha para abrir, e por isso não é botão: tocar
@@ -486,12 +549,382 @@ function Linha({
       {passada && <Ionicons name="checkmark" size={15} color={paleta().inkFraco} />}
       {temFicha && <Ionicons name="chevron-forward" size={14} color={paleta().inkFraco} />}
     </Pressable>
+
+    {/* Botão próprio, e não toque longo: toque longo não se descobre sozinho, e
+        uma função que ninguém acha é uma função que não existe. Fica FORA do
+        Pressable de cima porque Pressable dentro de Pressable no Android deixa a
+        área de toque ambigua -- e o toque errado aqui abre a ficha de quem ela
+        queria cancelar. */}
+    {podeAgir && (
+      <Pressable
+        onPress={() => onAgir(consulta)}
+        hitSlop={10}
+        style={({ pressed }) => [styles.tresPontinhos, pressed && styles.pressionado]}
+        accessibilityRole="button"
+        accessibilityLabel={'Remarcar ou cancelar a consulta de ' + consulta.nome}
+      >
+        <Ionicons name="ellipsis-horizontal" size={16} color={paleta().inkFraco} />
+      </Pressable>
+    )}
+    </View>
+  )
+}
+
+/* ──────────────────── O PAINEL DE REMARCAR E CANCELAR ────────────────────
+ *
+ * Um degrau de cada vez: menu -> formulário. E o formulário de cancelar exige o
+ * motivo, porque o motivo NÃO é burocracia -- é o texto que o PACIENTE lê na
+ * tela de confirmação dele. Cancelar sem motivo deixa alguém sem consulta e sem
+ * explicação.
+ *
+ * ──── Quem decide é o banco, e a frase que aparece é a dele ────
+ * As duas ações são RPC. Nada de regra escrita aqui: a mesma função atende
+ * este botão e a Aurora, e uma segunda cópia da regra divergiria no dia em que
+ * uma ganhasse um caso novo. A recusa também vem de lá inteira -- é ela que diz
+ * QUEM ocupa o horário, ou que há parcela paga, ou que a série continua marcada.
+ * Traduzir aqui seria reescrever com menos informação. */
+function PainelDaConsulta({
+  consulta,
+  onFechar,
+  onMudou,
+}: {
+  consulta: ConsultaDoDia
+  onFechar: () => void
+  onMudou: () => void
+}) {
+  const styles = estilos()
+  const [modo, setModo] = useState<'menu' | 'remarcar' | 'cancelar'>('menu')
+  const [data, setData] = useState('')
+  const [hora, setHora] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [recado, setRecado] = useState('')
+
+  /* Sem lista de dependências, pelo mesmo motivo da tela: assim este fica na
+     frente do da agenda e do `AreaDaNutri`, e o voltar descasca um degrau por
+     vez em vez de fechar tudo. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (salvando) return true
+      if (modo !== 'menu') {
+        setModo('menu')
+        setRecado('')
+        return true
+      }
+      onFechar()
+      return true
+    })
+    return () => sub.remove()
+  })
+
+  async function confirmarRemarcacao() {
+    const lido = interpretarRemarcacao(data, hora)
+    if (lido.tipo === 'erro') {
+      setRecado(lido.mensagem)
+      return
+    }
+    setSalvando(true)
+    setRecado('')
+    const r = await remarcarConsulta(consulta.id, lido.quando)
+    setSalvando(false)
+    if (r.ok) onMudou()
+    /* A recusa fica NA TELA e o painel NÃO fecha: ela precisa ler com quem
+       chocou para escolher outro horário, e fechar levaria a frase junto. */
+    else setRecado(r.mensagem)
+  }
+
+  async function confirmarCancelamento() {
+    setSalvando(true)
+    setRecado('')
+    const r = await cancelarConsulta(consulta.id, motivo)
+    setSalvando(false)
+    if (r.ok) onMudou()
+    else setRecado(r.mensagem)
+  }
+
+  return (
+    <View style={styles.sobreposta}>
+      {/* O fundo fecha, como toda folha deste app. Nunca enquanto grava: fechar
+          no meio deixaria ela sem saber se cancelou ou não. */}
+      <Pressable
+        style={styles.fundoDaFolha}
+        onPress={() => !salvando && onFechar()}
+        accessibilityLabel="Fechar"
+      />
+
+      <View style={styles.folha}>
+        <View style={styles.puxador} />
+
+        <Text style={styles.tituloDaFolha} numberOfLines={1}>
+          {consulta.nome}
+        </Text>
+        <Text style={styles.subtituloDaFolha}>{hhmm(consulta.quando)}</Text>
+
+        {modo === 'menu' && (
+          <>
+            <Pressable
+              onPress={() => {
+                setModo('remarcar')
+                setRecado('')
+              }}
+              style={({ pressed }) => [styles.opcaoDaFolha, pressed && styles.pressionado]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="calendar-outline" size={18} color={paleta().cores.ink} />
+              <Text style={styles.textoDaOpcao}>Remarcar</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setModo('cancelar')
+                setRecado('')
+              }}
+              style={({ pressed }) => [styles.opcaoDaFolha, pressed && styles.pressionado]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle-outline" size={18} color={paleta().cores.erroTexto} />
+              <Text style={[styles.textoDaOpcao, styles.textoPerigo]}>Cancelar consulta</Text>
+            </Pressable>
+          </>
+        )}
+
+        {modo === 'remarcar' && (
+          <>
+            <View style={styles.doisCampos}>
+              <View style={styles.campoCurto}>
+                <Text style={styles.rotulo}>Data</Text>
+                <TextInput
+                  value={data}
+                  onChangeText={x => setData(mascaraDeData(x))}
+                  placeholder="16/09"
+                  placeholderTextColor={paleta().inkFraco}
+                  keyboardType="number-pad"
+                  style={styles.campo}
+                  maxLength={10}
+                />
+              </View>
+              <View style={styles.campoCurto}>
+                <Text style={styles.rotulo}>Hora</Text>
+                <TextInput
+                  value={hora}
+                  onChangeText={x => setHora(mascaraDeHora(x))}
+                  placeholder="14:30"
+                  placeholderTextColor={paleta().inkFraco}
+                  keyboardType="number-pad"
+                  style={styles.campo}
+                  maxLength={5}
+                />
+              </View>
+            </View>
+            <Text style={styles.dica}>
+              O ano entra sozinho. As outras sessões da série, se houver, ficam onde
+              estão.
+            </Text>
+            {!!recado && <Text style={styles.recado}>{recado}</Text>}
+            <BotoesDaFolha
+              rotulo="Remarcar"
+              salvando={salvando}
+              onVoltar={() => {
+                setModo('menu')
+                setRecado('')
+              }}
+              onConfirmar={() => void confirmarRemarcacao()}
+            />
+          </>
+        )}
+
+        {modo === 'cancelar' && (
+          <>
+            <Text style={styles.rotulo}>Motivo</Text>
+            <TextInput
+              value={motivo}
+              onChangeText={setMotivo}
+              placeholder="Imprevisto no consultório"
+              placeholderTextColor={paleta().inkFraco}
+              style={[styles.campo, styles.campoLargo]}
+              multiline
+              maxLength={200}
+            />
+            <Text style={styles.dica}>
+              O paciente lê esse texto na confirmação dele.
+            </Text>
+            {!!recado && <Text style={styles.recado}>{recado}</Text>}
+            <BotoesDaFolha
+              rotulo="Cancelar consulta"
+              perigo
+              salvando={salvando}
+              onVoltar={() => {
+                setModo('menu')
+                setRecado('')
+              }}
+              onConfirmar={() => void confirmarCancelamento()}
+            />
+          </>
+        )}
+      </View>
+    </View>
+  )
+}
+
+/* Voltar é o LARGO e confirmar o estreito, como no cartão da Aurora: o toque
+   sem atenção vai no maior, e o maior tem de ser o que NÃO muda a agenda de
+   ninguém. */
+function BotoesDaFolha({
+  rotulo,
+  perigo,
+  salvando,
+  onVoltar,
+  onConfirmar,
+}: {
+  rotulo: string
+  perigo?: boolean
+  salvando: boolean
+  onVoltar: () => void
+  onConfirmar: () => void
+}) {
+  const styles = estilos()
+  return (
+    <View style={styles.botoesDaFolha}>
+      <Pressable
+        onPress={onVoltar}
+        disabled={salvando}
+        style={({ pressed }) => [
+          styles.voltarDaFolha,
+          salvando && styles.desligado,
+          pressed && styles.pressionado,
+        ]}
+        accessibilityRole="button"
+      >
+        <Text style={styles.textoVoltar}>Voltar</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={onConfirmar}
+        disabled={salvando}
+        style={({ pressed }) => [
+          styles.confirmarDaFolha,
+          perigo && styles.confirmarPerigo,
+          salvando && styles.desligado,
+          pressed && styles.pressionado,
+        ]}
+        accessibilityRole="button"
+      >
+        {salvando ? (
+          <ActivityIndicator color={paleta().cores.branco} size="small" />
+        ) : (
+          <Text style={styles.textoConfirmar}>{rotulo}</Text>
+        )}
+      </Pressable>
+    </View>
   )
 }
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
     tela: { flex: 1, backgroundColor: t.cores.fundo },
+
+    /* ──── A linha, e os três pontinhos ao lado ──── */
+    linhaComAcao: { flexDirection: 'row', alignItems: 'center' },
+    tresPontinhos: {
+      width: 34,
+      height: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 17,
+    },
+
+    /* ──── A folha que sobe de baixo ──── */
+    sobreposta: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end' },
+    /* O fundo escurece o que está atrás em vez de esconder: ela continua vendo a
+       agenda, e é isso que diz que a folha é um degrau e não outra tela. */
+    fundoDaFolha: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.35)' },
+    folha: {
+      backgroundColor: t.cores.cartao,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 18,
+      paddingTop: 8,
+      paddingBottom: 26,
+      gap: 8,
+    },
+    puxador: {
+      alignSelf: 'center',
+      width: 38,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: t.cores.borda,
+      marginBottom: 8,
+    },
+    tituloDaFolha: { fontSize: 17, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
+    subtituloDaFolha: { fontSize: 13, color: t.inkFraco, marginBottom: 6 },
+
+    opcaoDaFolha: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      backgroundColor: t.cores.superficie,
+    },
+    textoDaOpcao: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+    textoPerigo: { color: t.cores.erroTexto },
+
+    doisCampos: { flexDirection: 'row', gap: 10 },
+    campoCurto: { flex: 1, gap: 4 },
+    rotulo: { fontSize: 12, fontWeight: '700', color: t.inkFraco, letterSpacing: 0.2 },
+    campo: {
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 16,
+      color: t.cores.ink,
+    },
+    campoLargo: { minHeight: 68, textAlignVertical: 'top' },
+    dica: { fontSize: 11.5, color: t.inkFraco, lineHeight: 16 },
+    /* A frase do banco, com folga para caber inteira: a recusa de choque traz
+       nome e horário, e cortar isso em duas linhas com reticências tiraria
+       justamente o que ela precisa para escolher outro horário. */
+    recado: {
+      fontSize: 12.5,
+      color: t.cores.ink,
+      lineHeight: 18,
+      backgroundColor: t.cores.superficie,
+      padding: 10,
+      borderRadius: 10,
+    },
+
+    botoesDaFolha: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    voltarDaFolha: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+    },
+    textoVoltar: { fontSize: 14, fontWeight: '700', color: t.cores.ink },
+    confirmarDaFolha: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 130,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: t.cores.verde,
+    },
+    confirmarPerigo: { backgroundColor: t.cores.erroTexto },
+    textoConfirmar: { fontSize: 14, fontWeight: '800', color: t.cores.branco },
+    /* Cor pr'+chr(243)+'pria, e n'+chr(227)+'o `opacity`. O `cores.desligado` existe exatamente por
+       isto, e o coment'+chr(225)+'rio dele traz a medi'+chr(231)+chr(227)+'o: opacidade comp'+chr(245)+'e o texto E o
+       fundo contra a p'+chr(225)+'gina e destr'+chr(243)+'i a raz'+chr(227)+'o entre os dois -- um prim'+chr(225)+'rio a
+       0.45 deu contraste 1,43, quando o m'+chr(237)+'nimo leg'+chr(237)+'vel '+chr(233)+' 4,5. Eu tinha escrito
+       `opacity: 0.5` aqui sem olhar; o tema j'+chr(225)+' sabia. */
+    desligado: { backgroundColor: t.cores.desligado, borderColor: t.cores.desligado },
     centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
     cabecalho: {

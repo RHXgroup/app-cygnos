@@ -36,7 +36,7 @@ export type Sinalizado = {
 
 export type Chave = keyof Sinais
 
-/* A ordem é de URG~EC~NCIA, e não alfabética nem de quantidade.
+/* A ordem é de URGÊNCIA, e não alfabética nem de quantidade.
  *
  * O terceiro trimestre encabeça porque é o único com prazo que fecha: a janela
  * é de 27 a 29 semanas, e passada ela o aviso perdeu a serventia. Peso subindo

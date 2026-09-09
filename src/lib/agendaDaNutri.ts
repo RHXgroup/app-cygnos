@@ -45,7 +45,7 @@ function limitesDoDia(dia: Date): { inicio: string; fim: string } {
   return { inicio: inicio.toISOString(), fim: fim.toISOString() }
 }
 
-/* O intervalo de um PER~II~ODO, para a vista de semana e de mês. Mesma conta, com
+/* O intervalo de um PERÍODO, para a vista de semana e de mês. Mesma conta, com
    os dois extremos abertos: a meia-noite local do primeiro dia até a meia-noite
    local do dia seguinte ao último. */
 function limitesDoPeriodo(de: Date, ate: Date): { inicio: string; fim: string } {
@@ -169,6 +169,76 @@ export async function responderPedido(
      de ela tocar em Aceitar, "não sei o que aconteceu" é informação, e um visto
      verde sem base seria a pior saída. */
   return { ok: r?.ok === true, mensagem: r?.mensagem ?? 'Não consegui responder agora.' }
+}
+
+/* ──────────────────── REMARCAR E CANCELAR ────────────────────
+ *
+ * As duas gravam pelo banco, e não daqui, pelo mesmo motivo de `responderPedido`:
+ * a regra tem de valer para o botão desta tela E para a Aurora. Um `update` de
+ * `status` escrito aqui seria o TERCEIRO caminho de cancelar consulta -- e a
+ * história dos outros dois está escrita em `financeiroDaConsulta.ts`, no site:
+ * havia um botão na agenda e outro na ficha, e só o da agenda desfazia o
+ * financeiro. O da ficha gravava o status e ia embora, e "o título continuava
+ * vivo, e o paciente seguia devendo por uma consulta que não houve".
+ *
+ * Então cancelar aqui é chamar `app_cancelar_consulta`, que faz as duas metades.
+ *
+ * ──── O que a função RECUSA, e por que isso é bom ────
+ * Parcela já paga, série inteira e encerrar mensalidade continuam no
+ * computador. Não é limitação por preguica: as três precisam de uma PERGUNTA
+ * antes ("estorno o que já foi pago?", "só esta ou as próximas?") e uma
+ * pergunta respondida no meio de um corredor, entre duas consultas, é como se
+ * estorna dinheiro sem querer.
+ *
+ * A frase que volta é a do BANCO, sempre -- inclusive na recusa. É ela que diz
+ * QUEM ocupa o horário, ou que há pagamento, ou que a série continua marcada.
+ * Traduzir aqui seria escrever de novo, com menos informação. */
+
+export async function remarcarConsulta(
+  consultaId: number,
+  novoInstante: Date,
+  duracao?: number,
+): Promise<ResultadoDaResposta> {
+  /* `toISOString()` leva o fuso junto (`...Z`), e é isso que evita o defeito que
+     já custou três horas numa consulta gravada: texto sem fuso numa coluna
+     `timestamptz` é lido como UTC. Aqui o `Date` é montado no aparelho, no
+     relógio dela, e sai daqui já carimbado. */
+  const { data, error } = await supabase.rpc('app_remarcar_consulta', {
+    p_consulta_id: consultaId,
+    p_nova_data_hora: novoInstante.toISOString(),
+    p_duracao: duracao ?? null,
+  })
+
+  if (error) {
+    return { ok: false, mensagem: falha('Não consegui remarcar agora. Verifique a conexão.', error) }
+  }
+  const r = data as { ok?: boolean; mensagem?: string } | null
+  return { ok: r?.ok === true, mensagem: r?.mensagem ?? 'Não consegui remarcar agora.' }
+}
+
+export async function cancelarConsulta(
+  consultaId: number,
+  motivo: string,
+): Promise<ResultadoDaResposta> {
+  /* Confere o motivo AQUI também, e não só no banco: uma ida à rede para ouvir
+     "preciso do motivo" é uma espera com o dedo no ar por algo que a tela já
+     sabia. O banco continua conferindo -- a Aurora entra por lá sem passar por
+     aqui. */
+  const limpo = motivo.trim()
+  if (!limpo) {
+    return { ok: false, mensagem: 'Escreva o motivo do cancelamento -- o paciente vê esse texto.' }
+  }
+
+  const { data, error } = await supabase.rpc('app_cancelar_consulta', {
+    p_consulta_id: consultaId,
+    p_motivo: limpo,
+  })
+
+  if (error) {
+    return { ok: false, mensagem: falha('Não consegui cancelar agora. Verifique a conexão.', error) }
+  }
+  const r = data as { ok?: boolean; mensagem?: string } | null
+  return { ok: r?.ok === true, mensagem: r?.mensagem ?? 'Não consegui cancelar agora.' }
 }
 
 async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
