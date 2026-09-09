@@ -25,6 +25,8 @@ import {
 } from '../lib/pacientesDaNutri'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
+import { FONTE } from '../lib/fontes'
+import { situacaoDoPaciente, type Selo } from '../lib/situacaoDoPaciente'
 
 /* A carteira dela, no bolso.
  *
@@ -101,12 +103,32 @@ export function PacientesDaNutriScreen() {
     return <FichaDoPacienteScreen id={aberto} onFechar={() => setAberto(null)} />
   }
 
+  /* Contado sobre o que ESTÁ na tela, e não sobre a carteira inteira: a lista
+     tem teto, e dizer "12 sem retorno" a partir de 40 linhas quando há 218
+     pessoas seria um número com cara de total. A frase ao lado diz "na lista",
+     e as duas só fazem sentido juntas. */
+  const semRetorno = lista.filter(
+    x => situacaoDoPaciente(x, new Date()).selo === 'semRetorno',
+  ).length
+
   return (
     <View
       style={[styles.tela, { paddingTop: top + 8 }]}
       onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}
     >
-      <Text style={styles.titulo}>Pacientes</Text>
+      <View style={styles.topo}>
+        <Text style={styles.titulo}>Pacientes</Text>
+        {/* Diz o TAMANHO da carteira e quantos estão pendurados. Sem isto o
+            título era a única coisa da tela que não informava nada -- e
+            "12 sem retorno" é a única linha aqui que faz ela agir. */}
+        {!carregando && lista.length > 0 && (
+          <Text style={styles.subtituloDaLista}>
+            {lista.length}
+            {temMais ? '+' : ''} na lista
+            {semRetorno > 0 ? ' · ' + semRetorno + ' sem retorno marcado' : ''}
+          </Text>
+        )}
+      </View>
 
       <View style={styles.busca}>
         <Ionicons name="search" size={17} color={paleta().inkFraco} />
@@ -168,30 +190,52 @@ export function PacientesDaNutriScreen() {
               </Text>
             </View>
           ) : (
-            <View style={styles.listaCartao}>
-              {lista.map(p => (
-                <Pressable
-                  key={p.id}
-                  onPress={() => setAberto(p.id)}
-                  style={({ pressed }) => [styles.linha, pressed && styles.pressionado]}
-                  accessibilityRole="button"
-                  accessibilityLabel={p.nome}
-                >
-                  <View style={styles.textosDaLinha}>
-                    <Text style={styles.nome} numberOfLines={1}>
-                      {p.nome}
-                    </Text>
-                    {(p.celular || p.status !== 'ativo') && (
-                      <Text style={styles.abaixoDoNome} numberOfLines={1}>
-                        {p.status !== 'ativo' ? 'Inativo' : ''}
-                        {p.status !== 'ativo' && p.celular ? ' · ' : ''}
-                        {p.celular ?? ''}
+            <View style={styles.pessoas}>
+              {lista.map(p => {
+                /* Calculada aqui e não lá dentro: a função recebe o relógio, e
+                   chamar por linha com `new Date()` daria quarenta relógios
+                   diferentes na mesma lista -- imperceptível hoje, e a raiz de
+                   "por que às vezes um aparece como hoje e o de baixo não". */
+                const s = situacaoDoPaciente(p, new Date())
+                return (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => setAberto(p.id)}
+                    style={({ pressed }) => [styles.pessoa, pressed && styles.pressionado]}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      p.nome + (s.detalhe ? '. ' + s.detalhe : '') + '. ' + s.rotulo + '.'
+                    }
+                  >
+                    <View style={[styles.avatar, corDoAvatar(s.selo)]}>
+                      <Text style={[styles.textoAvatar, corDoTextoDoAvatar(s.selo)]}>
+                        {iniciaisDe(p.nome)}
                       </Text>
-                    )}
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={paleta().inkFraco} />
-                </Pressable>
-              ))}
+                    </View>
+
+                    <View style={styles.textosDaLinha}>
+                      <Text style={styles.nome} numberOfLines={1}>
+                        {p.nome}
+                      </Text>
+                      {/* O celular sai da linha e a SITUAÇÃO entra.
+                          O número está na ficha, a um toque, e ele nunca
+                          respondeu a pergunta que se faz olhando uma lista de
+                          duzentos nomes. */}
+                      {!!s.detalhe && (
+                        <Text style={styles.abaixoDoNome} numberOfLines={1}>
+                          {s.detalhe}
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={[styles.selo, corDoSelo(s.selo)]}>
+                      <Text style={[styles.textoDoSelo, corDoTextoDoSelo(s.selo)]}>
+                        {s.rotulo}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )
+              })}
             </View>
           )}
 
@@ -519,19 +563,66 @@ function Item({ rotulo, valor, aviso = false }: { rotulo: string; valor: string;
   )
 }
 
+/* ──────────────────── A COR DO SELO, num lugar só ────────────────────
+ *
+ * Quatro funções e não um `Record`: `CORES[selo]` devolve `undefined` para
+ * qualquer valor fora dos cinco, e a linha seguinte lê `.backgroundColor` dele
+ * -- a tela inteira morre por causa de um selo novo. É o item 10 do AGENTS.md,
+ * e a forma que ele manda usar é esta: função com genérico de reserva.
+ *
+ * O genérico é o CINZA, e isso é escolha: um selo que o app não conhece não
+ * pode sair verde dizendo "em dia" nem dourado dizendo "olhe aqui". Cinza é o
+ * único tom que não afirma nada. */
+function corDoAvatar(selo: Selo) {
+  const t = paleta()
+  if (selo === 'hoje') return { backgroundColor: t.cores.atencaoFundo }
+  if (selo === 'emDia') return { backgroundColor: t.cores.verdeMenta }
+  return { backgroundColor: t.cores.trilho }
+}
+function corDoTextoDoAvatar(selo: Selo) {
+  const t = paleta()
+  if (selo === 'hoje') return { color: t.cores.gold }
+  if (selo === 'emDia') return { color: t.cores.verde }
+  return { color: t.inkSuave }
+}
+function corDoSelo(selo: Selo) {
+  const t = paleta()
+  if (selo === 'hoje') return { backgroundColor: t.cores.atencaoFundo }
+  if (selo === 'emDia') return { backgroundColor: t.cores.verdeMenta }
+  return { backgroundColor: t.cores.trilho }
+}
+function corDoTextoDoSelo(selo: Selo) {
+  const t = paleta()
+  if (selo === 'hoje') return { color: t.cores.gold }
+  if (selo === 'emDia') return { color: t.cores.verde }
+  return { color: t.inkSuave }
+}
+
+/* "MA" de Maria Alves: o primeiro e o ÚLTIMO nome. As duas primeiras letras do
+   primeiro nome dariam "MA" para Maria Alves e Maria Andrade, e numa carteira
+   cheia de Marias o círculo deixaria de distinguir qualquer coisa. */
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return '?'
+  const primeira = partes[0]?.[0] ?? ''
+  const ultima = partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? '') : ''
+  return (primeira + ultima).toUpperCase()
+}
+
 const estilos = estilosDe(t =>
   StyleSheet.create({
     tela: { flex: 1, backgroundColor: t.cores.fundo },
     centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
+    topo: { paddingHorizontal: 16, paddingBottom: 12 },
     titulo: {
-      fontSize: 22,
-      fontWeight: '800',
+      fontFamily: FONTE.bruta,
+      fontSize: 29,
       color: t.cores.ink,
-      letterSpacing: -0.3,
-      paddingHorizontal: 16,
-      paddingBottom: 10,
+      letterSpacing: -1,
+      lineHeight: 32,
     },
+    subtituloDaLista: { fontFamily: FONTE.normal, fontSize: 13, color: t.inkFraco, marginTop: 3 },
 
     busca: {
       flexDirection: 'row',
@@ -546,7 +637,7 @@ const estilos = estilosDe(t =>
       borderWidth: 1,
       borderColor: t.cores.borda,
     },
-    campoBusca: { flex: 1, fontSize: 15, color: t.cores.ink, padding: 0 },
+    campoBusca: { flex: 1, fontFamily: FONTE.normal, fontSize: 15, color: t.cores.ink, padding: 0 },
 
     erro: {
       marginHorizontal: 16,
@@ -560,16 +651,42 @@ const estilos = estilosDe(t =>
 
     conteudo: { paddingHorizontal: 16, gap: 12 },
 
-    listaCartao: {
+    /* ──────────────────── UM CARTÃO POR PESSOA, e não um cartão com linhas dentro ────────────────────
+       Era uma caixa só com divisões -- e uma caixa de duzentos nomes é uma
+       parede. Cada pessoa com a própria borda e o próprio respiro vira um
+       objeto que dá para mirar com o dedo, e a lista passa a ter ritmo em vez
+       de ter linhas. */
+    pessoas: { gap: 7 },
+    pessoa: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
       backgroundColor: t.cores.cartao,
-      borderRadius: RAIO_CARTAO,
-      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 15,
+      paddingHorizontal: 13,
+      paddingVertical: 11,
     },
-    linha: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13 },
-    textosDaLinha: { flex: 1 },
-    nome: { fontSize: 15.5, color: t.cores.ink },
-    abaixoDoNome: { fontSize: 12.5, color: t.inkFraco, marginTop: 1 },
-    temMais: { fontSize: 12, color: t.inkFraco, textAlign: 'center', paddingTop: 4 },
+    /* Quadrado de canto redondo, e não círculo. Nenhum destes pacientes tem
+       foto no app da nutricionista, então o que está ali é SEMPRE letra -- e
+       círculo com letra dentro promete uma foto que nunca vem. */
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    textoAvatar: { fontFamily: FONTE.forte, fontSize: 13.5, letterSpacing: 0.2 },
+    textosDaLinha: { flex: 1, minWidth: 0 },
+    nome: { fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink, letterSpacing: -0.25 },
+    abaixoDoNome: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco, marginTop: 1 },
+    /* `overflow: 'hidden'` junto do raio: sem ele, no Android o fundo escapa
+       pelos cantos da pastilha e ela sai com quina. */
+    selo: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, overflow: 'hidden' },
+    textoDoSelo: { fontFamily: FONTE.forte, fontSize: 10.5, letterSpacing: 0.1 },
+    temMais: { fontFamily: FONTE.normal, fontSize: 12, color: t.inkFraco, textAlign: 'center', paddingTop: 4 },
 
     vazio: {
       alignItems: 'center',

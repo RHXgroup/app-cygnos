@@ -26,6 +26,19 @@ export type PacienteDaLista = {
   celular: string | null
   nascimento: string | null
   status: string
+  /* ──────────────────── O SINAL DA LINHA ────────────────────
+   * A lista mostrava só o nome, e uma lista de nomes náo ajuda a decidir nada:
+   * ela abre esta tela justamente para saber DE QUEM cuidar primeiro, e a
+   * resposta não estava em lugar nenhum dela.
+   *
+   * Tudo aqui é opcional de verdade, e por dois motivos diferentes. A leitura
+   * é SEPARADA da principal e pode falhar sozinha -- e quando falha, a lista
+   * continua aparecendo com os nomes, que é o que não pode faltar. E mesmo
+   * dando certo, paciente novo não tem consulta nem peso: `null` aqui é "não
+   * sei", e a tela cala em vez de inventar. Item 6 do AGENTS.md, zero é
+   * mentira. */
+  proxima: string | null
+  ultima: string | null
 }
 
 const POR_PAGINA = 40
@@ -78,17 +91,89 @@ export async function buscarPacientes(
      isso, "40 resultados" e "40 ou mais" seriam indistinguíveis. */
   const temMais = linhas.length > POR_PAGINA
 
-  return {
-    tipo: 'ok',
-    temMais,
-    pacientes: linhas.slice(0, POR_PAGINA).map(l => ({
-      id: l.id,
-      nome: l.nome?.trim() || 'Sem nome',
-      celular: l.celular?.trim() || null,
-      nascimento: l.data_nascimento,
-      status: l.status ?? 'ativo',
-    })),
+  const pacientes: PacienteDaLista[] = linhas.slice(0, POR_PAGINA).map(l => ({
+    id: l.id,
+    nome: l.nome?.trim() || 'Sem nome',
+    celular: l.celular?.trim() || null,
+    nascimento: l.data_nascimento,
+    status: l.status ?? 'ativo',
+    proxima: null,
+    ultima: null,
+  }))
+
+  return { tipo: 'ok', temMais, pacientes: await comSinais(pacientes) }
+}
+
+/* ──────────────────── QUANDO CADA UM VOLTA, E QUANDO VEIO ────────────────────
+ *
+ * Uma consulta à base para a página INTEIRA, e não uma por paciente: quarenta
+ * linhas dariam quarenta idas, e este projeto já teve engasgo de vários
+ * segundos no PostgREST -- doze em fila fazem a tela parecer travada.
+ *
+ * ──── Falhar aqui não pode derrubar a lista ────
+ * É o item 11 do AGENTS.md com um caso concreto: a lista de pacientes é a
+ * tela, e o sinal é enfeite útil. Sem sinal, ela ainda acha quem procura pelo
+ * nome; sem lista, a tela não serve para nada. Então o erro é engolido no
+ * console e cada um volta sem sinal.
+ *
+ * ──── Por que NÃO entra o peso ────
+ * A maquete que ele aprovou mostrava "·3,4 kg" em cada linha. O peso mora em
+ * `antropometria_adulto`, pendurado em `avaliacoes` -- são duas tabelas mais e
+ * uma comparação entre a última avaliação e a anterior, POR paciente. Numa
+ * leitura só para quarenta pessoas isso não sai, e por linha voltaria a ser
+ * quarenta idas.
+ *
+ * Fica de fora e está escrito aqui para não parecer esquecimento: o que dá
+ * para fazer honestamente é a data, e a data já responde a pergunta que ela
+ * faz ("quem está sem retorno?"). Um número errado seria pior que nenhum. */
+async function comSinais(pacientes: PacienteDaLista[]): Promise<PacienteDaLista[]> {
+  const ids = pacientes.map(p => p.id)
+  if (ids.length === 0) return pacientes
+
+  const agora = new Date().toISOString()
+
+  const [futuras, passadas] = await Promise.all([
+    supabase
+      .from('consultas')
+      .select('paciente_id, data_hora')
+      .in('paciente_id', ids)
+      .gte('data_hora', agora)
+      .neq('status', 'cancelada')
+      .order('data_hora', { ascending: true }),
+    supabase
+      .from('consultas')
+      .select('paciente_id, data_hora')
+      .in('paciente_id', ids)
+      .lt('data_hora', agora)
+      .eq('status', 'realizada')
+      /* Decrescente: a última realizada é a mais RECENTE que passou, e a
+         primeira que aparecer por paciente é ela. */
+      .order('data_hora', { ascending: false }),
+  ])
+
+  if (futuras.error) falha('Não consegui ler os próximos retornos.', futuras.error)
+  if (passadas.error) falha('Não consegui ler as últimas consultas.', passadas.error)
+
+  /* A PRIMEIRA de cada paciente ganha, e as seguintes são ignoradas -- é o que
+     a ordem acima garante. `has` e não `??=` porque um valor nulo gravado de
+     propósito deve continuar valendo. */
+  const primeiroPorPaciente = (linhas: { paciente_id: number | null; data_hora: string | null }[]) => {
+    const mapa = new Map<number, string>()
+    for (const l of linhas) {
+      if (l.paciente_id == null || !l.data_hora) continue
+      if (!mapa.has(l.paciente_id)) mapa.set(l.paciente_id, l.data_hora)
+    }
+    return mapa
   }
+
+  const proximaDe = primeiroPorPaciente((futuras.data ?? []) as never[])
+  const ultimaDe = primeiroPorPaciente((passadas.data ?? []) as never[])
+
+  return pacientes.map(p => ({
+    ...p,
+    proxima: proximaDe.get(p.id) ?? null,
+    ultima: ultimaDe.get(p.id) ?? null,
+  }))
 }
 
 /* ──────────────────── A FICHA ────────────────────

@@ -58,6 +58,8 @@ import { QuestionarioScreen } from './src/screens/QuestionarioScreen'
 import { SonoScreen } from './src/screens/SonoScreen'
 import type { PlanoCompleto, RefeicaoSalva } from './src/lib/plano'
 import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/tema'
+import { useFonts } from 'expo-font'
+import { FONTES_PARA_CARREGAR } from './src/lib/fontes'
 import { carregarTratamento } from './src/lib/tratamentoGuardado'
 
 /* UM provider só, na raiz, e que nunca desmonta.
@@ -91,6 +93,18 @@ export default function App() {
   const [, redesenhar] = useReducer((n: number) => n + 1, 0)
   const [lendoTema, setLendoTema] = useState(true)
 
+  /* ──── A fonte da área da nutricionista ────
+     Carregada aqui, e não lá dentro: `useFonts` é um hook, então carregar na
+     entrada da área faria a família trocar DEPOIS do primeiro desenho -- e a
+     tela inteira pularia na frente dela.
+
+     O terceiro valor é o erro, e ele importa: sem sinal a fonte não carrega, e
+     `fontesProntas` fica falso para sempre. Tratar o erro como "pronto" faz o
+     app abrir com a fonte do sistema, que é exatamente o que ele fazia antes --
+     feio, e funcionando. Travar a entrada por causa de uma fonte seria trocar
+     um app feio por um app que não abre. */
+  const [fontesProntas, erroDeFonte] = useFonts(FONTES_PARA_CARREGAR)
+
   useEffect(() => {
     carregarTema().finally(() => setLendoTema(false))
     /* Junto com o tema, e sem ninguém esperar por ele: é a palavra com que
@@ -105,7 +119,7 @@ export default function App() {
 
   const styles = estilos()
 
-  if (lendoTema) return <View style={styles.raiz} />
+  if (lendoTema || (!fontesProntas && !erroDeFonte)) return <View style={styles.raiz} />
 
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>

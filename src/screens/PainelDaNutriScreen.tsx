@@ -26,7 +26,15 @@ import {
   resumoDaAtencao,
   type Sinalizado,
 } from '../lib/sinaisDaCarteira'
-import { dividirODia, hhmm, resumoDaAgenda, type ConsultaDoDia, type Dia } from '../lib/diaDaNutri'
+import {
+  dividirODia,
+  emQuanto,
+  hhmm,
+  resumoDaAgenda,
+  type ConsultaDoDia,
+  type Dia,
+} from '../lib/diaDaNutri'
+import { FONTE } from '../lib/fontes'
 import { carregarPerfilDaNutri, primeiroNome, type PerfilDaNutri } from '../lib/souNutri'
 import { saudacaoDaHora } from '../lib/formatar'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
@@ -191,6 +199,26 @@ export function PainelDaNutriScreen({
 
   const dia: Dia = dividirODia(consultas, agora)
 
+  /* Quem manda no herói: quem está na sala, ou a próxima que vem.
+     Nesta ordem, e nunca as duas: com alguém na frente dela, a próxima é
+     informação de daqui a uma hora. */
+  const destaque = dia.agora ?? dia.aindaHoje[0] ?? null
+  /* Vazio quando é noutro dia ou quando já começou -- e a leitura do vazio é
+     do JSX, que então mostra só 'AGORA'. */
+  const contagem = destaque && !dia.agora ? emQuanto(destaque.quando, agora) : ''
+
+  /* ──── O DIA INTEIRO, numa linha do tempo só ────
+     Antes eram dois blocos com rótulo em maiúscula, 'DEPOIS' e 'JÁ PASSARAM',
+     e o que passou ficava DEPOIS do que vem -- fora de ordem no eixo que a
+     tela inteira usa, que é o relógio. Numa linha única em ordem de hora,
+     nenhum rótulo precisa existir: o que passou está em cima porque passou.
+
+     O herói sai da lista para não aparecer duas vezes na mesma tela. */
+  const linhaDoDia = [...dia.jaForam, ...dia.aindaHoje]
+    .filter(c => c.id !== destaque?.id)
+    .sort((a, b) => Date.parse(a.quando) - Date.parse(b.quando))
+  const passou = (c: ConsultaDoDia) => dia.jaForam.some(j => j.id === c.id)
+
   if (fichaAberta !== null) {
     return <FichaDoPacienteScreen id={fichaAberta} onFechar={() => setFichaAberta(null)} />
   }
@@ -224,6 +252,12 @@ export function PainelDaNutriScreen({
       >
         <View style={styles.topo}>
           <View style={styles.textosTopo}>
+            {/* A data em cima e pequena, a saudação grande embaixo.
+                Invertido em relação ao que era, e de propósito: a saudação é o
+                que dá nome à tela, e uma tela sem título grande não tem início
+                -- o olho entra por qualquer lugar. A data é contexto, e
+                contexto vem antes e menor. */}
+            <Text style={styles.dataDeHoje}>{porExtensoCurto(new Date(agora))}</Text>
             <Text style={styles.saudacao}>
               {saudacaoDaHora(new Date(agora).getHours())}
               {perfil ? `, ${primeiroNome(perfil.nome)}` : ''}
@@ -247,26 +281,54 @@ export function PainelDaNutriScreen({
         {/* ── QUEM ESTÁ COM ELA AGORA ──────────────────────────────────
             O único cartão grande da tela. Se tudo tivesse o mesmo peso, a
             resposta que ela procura de relance estaria no meio de uma lista. */}
-        {dia.agora && (
+        {/* ──────────────────── O HERÓI DA TELA ────────────────────
+            UMA coisa manda, e o resto é apoio. Antes o cartão grande aparecia
+            só quando alguém estava na sala -- e o resto do dia a tela abria sem
+            nenhum ponto de entrada, seis linhas do mesmo tamanho.
+
+            Agora ele mostra quem está com ela OU quem é a próxima, e a
+            diferença entre as duas é dita pela contagem: 'agora' quando
+            começou, 'em 18 min' quando falta. É a pergunta que ela faz de
+            relance, e a resposta não pode estar no meio de uma lista. */}
+        {!!destaque && (
           <Pressable
-            onPress={() => dia.agora?.pacienteId && setFichaAberta(dia.agora.pacienteId)}
-            /* Sem ficha não é botão: o encaixe avulso não tem para onde levar, e
-               tocar num nome e nada acontecer é pior do que ele não parecer
-               tocável. */
-            disabled={!dia.agora.pacienteId}
-            style={({ pressed }) => [styles.agora, pressed && styles.pressionada]}
-            accessibilityRole={dia.agora.pacienteId ? 'button' : 'text'}
+            onPress={() => destaque.pacienteId && setFichaAberta(destaque.pacienteId)}
+            disabled={!destaque.pacienteId}
+            style={({ pressed }) => [styles.heroi, pressed && styles.heroiPressionado]}
+            accessibilityRole={destaque.pacienteId ? 'button' : 'text'}
             accessibilityLabel={
-              'Agora: ' + dia.agora.nome + ', ' + hhmm(dia.agora.quando) +
-              (dia.agora.pacienteId ? '. Toque para abrir a ficha.' : '')
+              (dia.agora ? 'Agora: ' : 'Próxima: ') + destaque.nome + ', ' +
+              hhmm(destaque.quando) +
+              (destaque.pacienteId ? '. Toque para abrir a ficha.' : '')
             }
           >
-            <Text style={styles.rotuloAgora}>AGORA</Text>
-            <Text style={styles.nomeAgora}>{dia.agora.nome}</Text>
-            <Text style={styles.horaAgora}>
-              {hhmm(dia.agora.quando)}
-              {dia.agora.duracao ? ` · ${dia.agora.duracao} min` : ''}
-            </Text>
+            {/* O círculo de acento cortado pelo canto. É o único enfeite da
+                tela, e existe para o cartão não ser um retângulo escuro liso --
+                mas fica ATRÁS de tudo e não carrega informação nenhuma. */}
+            <View pointerEvents="none" style={styles.brilhoDoHeroi} />
+
+            <View style={styles.rotuloDoHeroi}>
+              <View style={styles.pulso} />
+              <Text style={styles.textoRotuloHeroi}>
+                {dia.agora ? 'AGORA' : 'PRÓXIMA'}
+                {contagem ? '  ·  ' + contagem.toUpperCase() : ''}
+              </Text>
+            </View>
+
+            <View style={styles.linhaDoHeroi}>
+              <View style={styles.iniciais}>
+                <Text style={styles.textoIniciais}>{iniciaisDe(destaque.nome)}</Text>
+              </View>
+              <View style={styles.textosDoHeroi}>
+                <Text style={styles.nomeDoHeroi} numberOfLines={1}>
+                  {destaque.nome}
+                </Text>
+                {!!destaque.duracao && (
+                  <Text style={styles.metaDoHeroi}>{destaque.duracao} minutos</Text>
+                )}
+              </View>
+              <Text style={styles.horaDoHeroi}>{hhmm(destaque.quando)}</Text>
+            </View>
           </Pressable>
         )}
 
@@ -282,11 +344,8 @@ export function PainelDaNutriScreen({
           <View style={styles.pedidos}>
             <View style={styles.topoDosPedidos}>
               <Ionicons name="hand-left-outline" size={16} color={paleta().cores.gold} />
-              <Text style={styles.rotuloPedidos}>
-                {pedidos.length === 1
-                  ? '1 PEDIDO ESPERANDO RESPOSTA'
-                  : pedidos.length + ' PEDIDOS ESPERANDO RESPOSTA'}
-              </Text>
+              <Text style={styles.rotuloPedidos}>Esperando sua resposta</Text>
+              <Text style={styles.contagemDePedidos}>{pedidos.length}</Text>
             </View>
 
             {pedidos.slice(0, 4).map(c => (
@@ -351,21 +410,21 @@ export function PainelDaNutriScreen({
           </View>
         )}
 
-        {dia.aindaHoje.length > 0 && (
-          <View style={styles.bloco}>
-            <Text style={styles.rotuloBloco}>{dia.agora ? 'DEPOIS' : 'HOJE'}</Text>
-            {dia.aindaHoje.map(c => (
-              <Linha key={c.id} consulta={c} onAbrir={setFichaAberta} />
-            ))}
-          </View>
-        )}
-
-        {dia.jaForam.length > 0 && (
-          <View style={styles.bloco}>
-            <Text style={styles.rotuloBloco}>JÁ PASSARAM</Text>
-            {dia.jaForam.map(c => (
-              <Linha key={c.id} consulta={c} apagada onAbrir={setFichaAberta} />
-            ))}
+        {linhaDoDia.length > 0 && (
+          <View>
+            <Text style={styles.rotuloDeSecao}>O resto do dia</Text>
+            <View>
+              {linhaDoDia.map((c, i) => (
+                <NoTempo
+                  key={c.id}
+                  consulta={c}
+                  passada={passou(c)}
+                  primeira={i === 0}
+                  ultima={i === linhaDoDia.length - 1}
+                  onAbrir={setFichaAberta}
+                />
+              ))}
+            </View>
           </View>
         )}
 
@@ -523,6 +582,118 @@ export function PainelDaNutriScreen({
   )
 }
 
+/* ──────────────────── UM PONTO NA LINHA DO TEMPO ────────────────────
+ *
+ * Três colunas: hora, trilho, cartão. A do meio é desenho puro -- um fio
+ * vertical e um ponto -- e é ela que faz seis consultas se lerem como UM dia
+ * em vez de seis linhas parecidas.
+ *
+ * ──── O que passou perde o cartão ────
+ * Não só apaga: perde o fundo e a borda. Cartão é o que diz "isto é um
+ * objeto que ainda te pede alguma coisa", e uma consulta atendida não pede
+ * nada. Deixar os seis com a mesma caixa e mudar só a opacidade é pedir para
+ * o olho medir cinza -- e ele não mede.
+ *
+ * ──── O fio para nas pontas ────
+ * Na primeira linha ele começa NO ponto, e na última acaba nele. Um fio que
+ * sai da primeira hora para cima aponta para um passado que a tela não mostra,
+ * e para baixo da última promete uma consulta que não existe. */
+function NoTempo({
+  consulta,
+  passada,
+  primeira,
+  ultima,
+  onAbrir,
+}: {
+  consulta: ConsultaDoDia
+  passada: boolean
+  primeira: boolean
+  ultima: boolean
+  onAbrir: (id: number) => void
+}) {
+  const styles = estilos()
+  const cancelada = consulta.status === 'cancelada'
+  const temFicha = !!consulta.pacienteId
+
+  return (
+    <View style={styles.noTempo}>
+      <Text style={[styles.horaDoTempo, passada && styles.apagado]}>
+        {hhmm(consulta.quando)}
+      </Text>
+
+      <View style={styles.trilho}>
+        {/* Dois pedaços de fio, e não um só com a ponta escondida: assim a
+            primeira e a última param no ponto sem ninguém calcular altura. */}
+        {!primeira && <View style={styles.fioDeCima} />}
+        {!ultima && <View style={styles.fioDeBaixo} />}
+        <View
+          style={[
+            styles.pontoDoTempo,
+            passada && styles.pontoPassado,
+            cancelada && styles.pontoCancelado,
+          ]}
+        />
+      </View>
+
+      <Pressable
+        onPress={() => consulta.pacienteId && onAbrir(consulta.pacienteId)}
+        disabled={!temFicha}
+        style={({ pressed }) => [
+          styles.cartaoDoTempo,
+          passada && styles.cartaoPassado,
+          pressed && styles.pressionada,
+        ]}
+        accessibilityRole={temFicha ? 'button' : 'text'}
+        accessibilityLabel={
+          hhmm(consulta.quando) + ', ' + consulta.nome +
+          (cancelada ? ', cancelada' : passada ? ', já atendida' : '') +
+          (temFicha ? '. Toque para abrir a ficha.' : '')
+        }
+      >
+        <Text
+          style={[
+            styles.nomeDoTempo,
+            passada && styles.apagado,
+            cancelada && styles.riscado,
+          ]}
+          numberOfLines={1}
+        >
+          {consulta.nome}
+        </Text>
+        {!!consulta.tipo && !cancelada && (
+          <Text style={styles.tipoDoTempo} numberOfLines={1}>
+            {consulta.tipo === 'primeira_consulta' ? '1º consulta' : 'retorno'}
+          </Text>
+        )}
+        {cancelada && <Text style={styles.tipoDoTempo}>cancelada</Text>}
+      </Pressable>
+    </View>
+  )
+}
+
+/* "MA" de Maria Alves. O primeiro e o ÚLTIMO nome, e não as duas primeiras
+   letras: "MA" de "Maria" não distingue Maria Alves de Maria Andrade, e numa
+   agenda cheia de Marias o círculo deixaria de servir para qualquer coisa. */
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return '?'
+  const primeira = partes[0]?.[0] ?? ''
+  const ultima = partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? '') : ''
+  return (primeira + ultima).toUpperCase()
+}
+
+/* "Quarta, 9 de setembro". Sem o ano: a tela fala do dia de hoje, e o ano ali
+   seria o app conferindo o calendário na cara de quem já sabe em que ano está. */
+const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+const MESES = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+]
+function porExtensoCurto(dia: Date): string {
+  if (Number.isNaN(dia.getTime())) return ''
+  return `${DIAS[dia.getDay()]}, ${dia.getDate()} de ${MESES[dia.getMonth()]}`
+}
+
 function Linha({
   consulta,
   apagada = false,
@@ -583,56 +754,162 @@ const estilos = estilosDe(t =>
 
     topo: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingBottom: 4 },
     textosTopo: { flex: 1 },
-    saudacao: { fontSize: 22, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
-    resumo: { fontSize: 14, color: t.inkSuave, marginTop: 2 },
+    dataDeHoje: { fontFamily: FONTE.media, fontSize: 13, color: t.inkFraco },
+    /* 29 e não 22, e `bruta` e não `fontWeight: '800'`.
+       O peso vira FAMÍLIA quando a fonte é carregada: `fontWeight` sobre uma
+       família com nome próprio não engrossa nada no Android, e desenha o
+       regular sem erro nenhum. Ver `lib/fontes.ts`. */
+    saudacao: {
+      fontFamily: FONTE.bruta,
+      fontSize: 29,
+      color: t.cores.ink,
+      letterSpacing: -1,
+      lineHeight: 32,
+      marginTop: 1,
+    },
+    resumo: { fontFamily: FONTE.normal, fontSize: 13.5, color: t.inkSuave, marginTop: 4 },
+
+    /* O rótulo de seção deixa de ser MAIÚSCULA ESPAÇADA em toda a tela.
+       Sobrou UM, e é por isso que ele ainda funciona: quando tudo é rótulo,
+       rótulo nenhum separa coisa nenhuma. */
+    rotuloDeSecao: {
+      fontFamily: FONTE.meia,
+      fontSize: 12.5,
+      color: t.inkFraco,
+      marginBottom: 8,
+    },
     botaoSair: { padding: 8, marginTop: -4, marginRight: -8 },
 
     erro: { fontSize: 13.5, color: t.cores.ink, backgroundColor: t.cores.verdeMenta, padding: 12, borderRadius: 10 },
 
-    /* O cartão de "agora" é o único com preenchimento cheio da cor de acento.
-       Ele responde a pergunta que se faz de relance; o resto se lê depois. */
-    agora: {
-      backgroundColor: t.cores.verde,
-      borderRadius: RAIO_CARTAO,
-      padding: 18,
-      gap: 2,
+    /* ──────────────────── O HERÓI ────────────────────
+       Escuro, e não verde. O verde preenchido era a cor da AÇÃO -- a mesma do
+       botão Aceitar logo abaixo -- e um cartão inteiro dela dizia "toque aqui"
+       sobre uma coisa que é informação. Musgo escuro tira o cartão do fluxo
+       das cores de ação e devolve o verde para quem tem o que executar. */
+    heroi: {
+      backgroundColor: t.cores.forest,
+      borderRadius: 20,
+      padding: 17,
+      paddingBottom: 15,
+      gap: 13,
+      overflow: 'hidden',
     },
-    rotuloAgora: {
-      fontSize: 10.5,
-      fontWeight: '800',
-      letterSpacing: 1.2,
-      color: 'rgba(255,255,255,0.75)',
+    heroiPressionado: { opacity: 0.92 },
+    /* O único enfeite da tela. `pointerEvents="none"` no JSX porque um círculo
+       decorativo por cima do cartão comeria o toque no canto direito -- e o
+       canto direito é onde mora o horário. */
+    brilhoDoHeroi: {
+      position: 'absolute',
+      right: -46,
+      top: -46,
+      width: 150,
+      height: 150,
+      borderRadius: 75,
+      backgroundColor: t.cores.limao,
+      opacity: 0.14,
     },
-    nomeAgora: { fontSize: 24, fontWeight: '800', color: t.cores.branco, letterSpacing: -0.4 },
-    horaAgora: { fontSize: 14, color: 'rgba(255,255,255,0.85)' },
-
-    bloco: {
-      backgroundColor: t.cores.cartao,
-      borderRadius: RAIO_CARTAO,
-      paddingVertical: 6,
-      paddingHorizontal: 14,
-    },
-    rotuloBloco: {
-      fontSize: 10.5,
-      fontWeight: '800',
+    rotuloDoHeroi: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    pulso: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: t.cores.limao },
+    textoRotuloHeroi: {
+      fontFamily: FONTE.forte,
+      fontSize: 11,
       letterSpacing: 1.1,
-      color: t.inkFraco,
-      paddingTop: 10,
-      paddingBottom: 2,
+      color: t.cores.limao,
+    },
+    linhaDoHeroi: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+    iniciais: {
+      width: 46,
+      height: 46,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(244,239,228,0.13)',
+      borderWidth: 1,
+      borderColor: 'rgba(244,239,228,0.16)',
+    },
+    textoIniciais: { fontFamily: FONTE.forte, fontSize: 15, color: t.cores.mist },
+    textosDoHeroi: { flex: 1, minWidth: 0 },
+    nomeDoHeroi: {
+      fontFamily: FONTE.forte,
+      fontSize: 21,
+      color: t.cores.mist,
+      letterSpacing: -0.5,
+    },
+    metaDoHeroi: {
+      fontFamily: FONTE.normal,
+      fontSize: 13,
+      color: 'rgba(244,239,228,0.66)',
+      marginTop: 1,
+    },
+    horaDoHeroi: {
+      fontFamily: FONTE.forte,
+      fontSize: 20,
+      color: t.cores.mist,
+      letterSpacing: -0.4,
+      fontVariant: ['tabular-nums'],
     },
 
+    /* ──────────────────── A LINHA DO TEMPO ──────────────────── */
+    noTempo: { flexDirection: 'row', alignItems: 'stretch' },
+    horaDoTempo: {
+      width: 44,
+      paddingTop: 11,
+      fontFamily: FONTE.meia,
+      fontSize: 12.5,
+      color: t.inkFraco,
+      fontVariant: ['tabular-nums'],
+    },
+    trilho: { width: 20, alignItems: 'center' },
+    /* O fio de cima vai do topo até o ponto; o de baixo, do ponto ao fim.
+       Separados porque a primeira e a última linha escondem um deles, e um fio
+       só exigiria calcular a altura da linha -- que depende do texto. */
+    fioDeCima: { position: 'absolute', top: 0, height: 14, width: 1.5, backgroundColor: t.cores.trilho },
+    fioDeBaixo: { position: 'absolute', top: 14, bottom: 0, width: 1.5, backgroundColor: t.cores.trilho },
+    pontoDoTempo: {
+      position: 'absolute',
+      top: 9.5,
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+      backgroundColor: t.cores.verde,
+    },
+    pontoPassado: { backgroundColor: t.cores.trilho },
+    pontoCancelado: { backgroundColor: t.cores.fundo, borderWidth: 1.5, borderColor: t.cores.trilho },
+    cartaoDoTempo: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      marginTop: 3,
+      marginBottom: 7,
+    },
+    /* Sem fundo e sem borda. O que passou deixa de ser um objeto que pede algo,
+       e vira texto -- que é o que ele é. */
+    cartaoPassado: { backgroundColor: 'transparent', borderColor: 'transparent' },
+    nomeDoTempo: { flex: 1, fontFamily: FONTE.meia, fontSize: 14.5, color: t.cores.ink, letterSpacing: -0.2 },
+    tipoDoTempo: { fontFamily: FONTE.normal, fontSize: 12, color: t.inkFraco },
+    riscado: { textDecorationLine: 'line-through', textDecorationColor: t.cores.trilho },
     linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
     /* Largura fixa e dígitos tabulares: sem isso "09:00" e "11:30" desalinham o
        nome ao lado, e uma coluna torta se lê como tela desleixada. */
     hora: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: t.cores.verde,
+      fontFamily: FONTE.meia,
+      fontSize: 13.5,
+      color: t.inkSuave,
       width: 46,
       fontVariant: ['tabular-nums'],
     },
-    nome: { flex: 1, fontSize: 15, color: t.cores.ink },
-    apagado: { color: t.inkFraco, fontWeight: '400' },
+    nome: { flex: 1, fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink, letterSpacing: -0.2 },
+    /* Só cor. O peso vem da família agora, e trocar `fontWeight` aqui não
+       afinaria nada -- desenharia o mesmo arquivo, sem erro. */
+    apagado: { color: t.inkFraco },
 
     vazio: {
       alignItems: 'center',
@@ -641,28 +918,38 @@ const estilos = estilosDe(t =>
       backgroundColor: t.cores.cartao,
       borderRadius: RAIO_CARTAO,
     },
-    textoVazio: { fontSize: 14, color: t.inkSuave },
+    textoVazio: { fontFamily: FONTE.normal, fontSize: 14, color: t.inkSuave },
 
     /* Os dois lado a lado, e sem cartão em volta de cada um: são dois números
        de relance, e uma moldura por número faria a tela parecer um relatório. */
-    caixaDoDia: {
-      flexDirection: 'row',
-      gap: 10,
+    /* Uma caixa POR número, e não os três dentro de uma só.
+       Era o contrário, com o argumento de que moldura por número pareceria
+       relatório. O argumento estava certo numa tela onde tudo tinha moldura --
+       e essa tela deixou de existir: agora a linha do tempo NÃO tem, e o
+       resumo do dinheiro passa a ser a única coisa emoldurada da metade de
+       baixo. É o que faz três valores se lerem como três respostas. */
+    caixaDoDia: { flexDirection: 'row', gap: 9 },
+    verba: {
+      flex: 1,
+      gap: 1,
       backgroundColor: t.cores.cartao,
-      borderRadius: RAIO_CARTAO,
-      paddingVertical: 14,
-      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 14,
+      paddingVertical: 11,
+      paddingHorizontal: 13,
     },
-    verba: { flex: 1, gap: 3 },
     /* O que SAI não pode ter a cor do que entra, e também não é erro: dívida do
        dia é informação, e vermelho de erro neste app quer dizer "alguma coisa
        quebrou". Fica no tom de aviso, o mesmo do cartão de conferir. */
-    rotuloVerba: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: t.inkFraco },
+    /* Deixa de ser MAIÚSCULA ESPAÇADA. Três rótulos gritados lado a lado
+       competiam com os próprios números que eles nomeiam. */
+    rotuloVerba: { fontFamily: FONTE.normal, fontSize: 11.5, color: t.inkFraco },
     valorVerba: {
-      fontSize: 20,
-      fontWeight: '800',
+      fontFamily: FONTE.forte,
+      fontSize: 19,
       color: t.cores.ink,
-      letterSpacing: -0.4,
+      letterSpacing: -0.6,
       fontVariant: ['tabular-nums'],
     },
     /* O que vence ainda não entrou. Cor de atenção, e não de erro: não há nada
@@ -670,25 +957,37 @@ const estilos = estilosDe(t =>
     valorVencendo: { color: t.cores.gold },
     valorAPagar: { color: t.inkSuave },
 
-    /* Contorno em vez de preenchimento: o cartão cheio é o do AGORA, e dois
-       cheios na mesma tela brigam pelo olho. O contorno diz "olhe aqui" sem
-       disputar com "quem está com você". */
+    /* Preenchido em dourado FRACO, e não contornado.
+       O contorno existia para não brigar com o cartão do AGORA, que era verde
+       cheio. O herói virou musgo escuro, então a briga acabou -- e o dourado
+       preenchido separa este cartão de tudo o que é creme na tela, que é
+       exatamente o que ele precisa: é a única coisa aqui com uma PESSOA do
+       outro lado esperando resposta. */
     pedidos: {
-      backgroundColor: t.cores.cartao,
-      borderWidth: 1.5,
+      backgroundColor: t.cores.atencaoFundo,
+      borderWidth: 1,
       borderColor: t.cores.gold,
-      borderRadius: RAIO_CARTAO,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      borderRadius: 18,
+      paddingHorizontal: 15,
+      paddingVertical: 13,
     },
-    topoDosPedidos: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingBottom: 4 },
-    rotuloPedidos: {
-      fontSize: 10.5,
-      fontWeight: '800',
-      letterSpacing: 1,
-      color: t.cores.gold,
+    topoDosPedidos: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 2 },
+    rotuloPedidos: { flex: 1, fontFamily: FONTE.forte, fontSize: 13.5, color: t.cores.ink, letterSpacing: -0.2 },
+    /* O número sai do texto e vira pastilha. "3 PEDIDOS ESPERANDO RESPOSTA" é
+       uma frase que se lê; "Esperando sua resposta" mais um `3` é uma coisa que
+       se vê -- e ela olha isto de relance, entre duas consultas. */
+    contagemDePedidos: {
+      fontFamily: FONTE.forte,
+      fontSize: 11.5,
+      color: t.cores.branco,
+      backgroundColor: t.cores.gold,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 1,
+      overflow: 'hidden',
+      fontVariant: ['tabular-nums'],
     },
-    maisPedidos: { fontSize: 12.5, color: t.inkFraco, paddingVertical: 6 },
+    maisPedidos: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco, paddingVertical: 6 },
     umPedido: { paddingBottom: 6 },
     botoesDoPedido: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
     recusar: {
@@ -700,7 +999,7 @@ const estilos = estilosDe(t =>
       borderWidth: 1,
       borderColor: t.cores.borda,
     },
-    textoRecusar: { fontSize: 13.5, fontWeight: '700', color: t.cores.ink },
+    textoRecusar: { fontFamily: FONTE.meia, fontSize: 13.5, color: t.cores.ink },
     aceitar: {
       alignItems: 'center',
       justifyContent: 'center',
@@ -710,9 +1009,10 @@ const estilos = estilosDe(t =>
       borderRadius: 10,
       backgroundColor: t.cores.verde,
     },
-    textoAceitar: { fontSize: 13.5, fontWeight: '800', color: t.cores.branco },
+    textoAceitar: { fontFamily: FONTE.forte, fontSize: 13.5, color: t.cores.branco },
     desligado: { opacity: 0.5 },
     respostaDoBanco: {
+      fontFamily: FONTE.normal,
       fontSize: 12.5,
       color: t.cores.ink,
       lineHeight: 18,
@@ -721,9 +1021,9 @@ const estilos = estilosDe(t =>
       borderRadius: 10,
       marginTop: 4,
     },
-    ondeResponder: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingTop: 6 },
+    ondeResponder: { fontFamily: FONTE.normal, fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingTop: 6 },
 
-    amanha: { fontSize: 13, color: t.inkSuave, paddingHorizontal: 4, paddingTop: 2 },
+    amanha: { fontFamily: FONTE.normal, fontSize: 13, color: t.inkSuave, paddingHorizontal: 4, paddingTop: 2 },
     horaLarga: { width: 82 },
 
     blocoAtencao: {

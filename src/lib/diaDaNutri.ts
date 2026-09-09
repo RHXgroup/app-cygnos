@@ -156,6 +156,41 @@ export function resumoDaAgenda(dia: Dia): string {
  * Nome pelo FORMATO e não pelo assunto: já existe `relogio` em dois lugares
  * deste projeto, cada um recebendo uma unidade diferente, e trocar o import
  * compila e imprime um número plausível e errado. Armadilha 5 do AGENTS.md. */
+/* ──────────────────── "em 18 min", "em 2h10", "agora" ────────────────────
+ *
+ * O herói da tela Hoje diz quanto falta para a próxima consulta, e essa frase é
+ * a única coisa da tela que muda sozinha enquanto ela olha. Por isso mora aqui,
+ * fora do componente, e recebe o `agora`: uma conta de relógio escrita dentro
+ * do JSX só dá para conferir esperando a hora passar.
+ *
+ * ──── O que pode sair torto, e por que cada guarda existe ────
+ *   - data que não parseia devolve VAZIO, e não "em NaN min". `Number.isFinite`
+ *     porque `NaN !== null` é verdadeiro, e esse é o buraco que já produziu uma
+ *     caloria NaN neste app.
+ *   - horário que JÁ passou não vira "em -5 min": vira 'agora'. Acontece o
+ *     tempo todo, porque a tela fica aberta e a consulta começa.
+ *   - acima de um dia não vira "em 1512 min". Devolve vazio, e quem chama
+ *     mostra só o horário -- que é o que interessa quando é noutro dia.
+ *
+ * ──── Por que 'agora' e não "em 0 min" ────
+ * Porque a diferença entre faltar um minuto e ter começado é a diferença entre
+ * ela esperar e ela ir. "em 0 min" é o app fazendo aritmética em vez de
+ * responder. */
+export function emQuanto(iso: string, agora: number): string {
+  const quando = Date.parse(iso)
+  if (!Number.isFinite(quando)) return ''
+
+  const minutos = Math.round((quando - agora) / 60000)
+  if (minutos <= 0) return 'agora'
+  if (minutos > 60 * 24) return ''
+  if (minutos < 60) return 'em ' + minutos + ' min'
+
+  const horas = Math.floor(minutos / 60)
+  const resto = minutos % 60
+  /* "em 2h" quando é redondo, e não "em 2h00": o zero ali só ocupa espaço. */
+  return resto === 0 ? 'em ' + horas + 'h' : 'em ' + horas + 'h' + String(resto).padStart(2, '0')
+}
+
 export function hhmm(iso: string): string {
   const t = new Date(iso)
   if (Number.isNaN(t.getTime())) return ''

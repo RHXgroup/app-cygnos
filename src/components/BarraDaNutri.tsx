@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { estilosDe, paleta } from '../lib/tema'
+import { FONTE } from '../lib/fontes'
 
 export type AbaDaNutri = 'hoje' | 'agenda' | 'pacientes' | 'mais'
 
@@ -121,8 +122,12 @@ const estilos = estilosDe(t =>
     },
     item: { flex: 1, alignItems: 'center', gap: 4 },
     vao: { flex: 1 },
-    rotulo: { fontSize: 10.5, color: t.inkFraco },
-    rotuloAtivo: { color: t.cores.limao, fontWeight: '700' },
+    rotulo: { fontFamily: FONTE.media, fontSize: 10.5, color: t.inkFraco },
+    /* Familia, e nao `fontWeight`. Com a fonte carregada o peso vira arquivo:
+       `fontWeight: '700'` sobre `Archivo_500Medium` desenha o medium no Android
+       e nao levanta erro nenhum -- a aba ativa ficaria igual as outras, com so
+       a cor separando. Ver `lib/fontes.ts`. */
+    rotuloAtivo: { fontFamily: FONTE.forte, color: t.cores.limao },
 
     botaoAurora: {
       position: 'absolute',

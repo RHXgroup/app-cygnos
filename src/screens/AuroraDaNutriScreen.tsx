@@ -27,6 +27,7 @@ import {
 } from '../lib/menuDaAurora'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
+import { FONTE } from '../lib/fontes'
 
 /* A Aurora dela, no bolso.
  *
@@ -201,7 +202,14 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
       >
         {vazia && (
           <View style={styles.abertura}>
-            <Text style={styles.tituloAbertura}>O que você quer saber?</Text>
+            {/* A marca antes da frase. Uma tela de conversa que abre com texto
+                puro parece um aviso do sistema; um símbolo antes diz que há
+                alguém do outro lado -- e é o mesmo símbolo do botão redondo da
+                barra, que é por onde ela chegou aqui. */}
+            <View style={styles.marcaDaAurora}>
+              <Ionicons name="sparkles" size={21} color={paleta().cores.limao} />
+            </View>
+            <Text style={styles.tituloAbertura}>O que você quer resolver agora?</Text>
             {/* Dito por escrito, e antes da primeira pergunta. Sem isto a
                 primeira coisa que se pede é justamente o que ela não faz --
                 "remarca a Maria" --, e uma recusa de saída ensina em dez
@@ -222,6 +230,11 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
                   accessibilityRole="button"
                 >
                   <Text style={styles.textoExemplo}>{p}</Text>
+                  {/* A seta é o que diz que a linha É a pergunta, e não um
+                      exemplo do que escrever. Sem ela, quem lê "Quem eu atendo
+                      hoje?" vai digitar aquilo no campo de baixo -- e o toque
+                      que resolvia em um gesto nunca é descoberto. */}
+                  <Ionicons name="arrow-forward" size={15} color={paleta().inkFraco} />
                 </Pressable>
               ))}
             </View>
@@ -357,67 +370,142 @@ const estilos = estilosDe(t =>
       paddingBottom: 6,
     },
     botaoVoltar: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-    tituloTela: { fontSize: 17, fontWeight: '800', color: t.cores.ink },
+    tituloTela: { fontFamily: FONTE.forte, fontSize: 17, color: t.cores.ink },
 
     conversa: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
 
-    abertura: { paddingTop: 24, gap: 10 },
-    tituloAbertura: { fontSize: 20, fontWeight: '800', color: t.cores.ink, letterSpacing: -0.3 },
-    textoAbertura: { fontSize: 13.5, color: t.inkSuave, lineHeight: 20 },
-    exemplos: { gap: 8, marginTop: 8 },
-    exemplo: {
-      backgroundColor: t.cores.cartao,
-      borderRadius: 14,
-      paddingVertical: 13,
-      paddingHorizontal: 15,
+    abertura: { paddingTop: 20, gap: 12 },
+    marcaDaAurora: {
+      width: 44,
+      height: 44,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.forest,
     },
-    textoExemplo: { fontSize: 14, color: t.cores.ink },
+    /* 25 e não 20. É a pergunta que dá nome à tela, e a tela inteira existe
+       para respondê-la -- ela tem de ser a maior coisa aqui, e não um título
+       de parágrafo. */
+    tituloAbertura: {
+      fontFamily: FONTE.forte,
+      fontSize: 25,
+      color: t.cores.ink,
+      letterSpacing: -0.9,
+      lineHeight: 29,
+    },
+    textoAbertura: { fontFamily: FONTE.normal, fontSize: 13.5, color: t.inkSuave, lineHeight: 20 },
+    exemplos: { gap: 8, marginTop: 6 },
+    /* Ganha borda, e o texto ganha a seta ao lado. Sem borda o botão era um
+       retângulo creme sobre fundo creme -- e nada nele dizia que era tocável. */
+    exemplo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+    },
+    textoExemplo: { flex: 1, fontFamily: FONTE.normal, fontSize: 14, color: t.cores.ink },
 
     balao: { maxWidth: '86%', borderRadius: 16, paddingVertical: 11, paddingHorizontal: 14 },
-    balaoDela: { alignSelf: 'flex-end', backgroundColor: t.cores.verde },
-    balaoDaAurora: { alignSelf: 'flex-start', backgroundColor: t.cores.cartao },
-    textoDela: { fontSize: 14.5, color: t.cores.branco, lineHeight: 21 },
-    textoDaAurora: { fontSize: 14.5, color: t.cores.ink, lineHeight: 21 },
+    /* ──────────────────── O balão dela deixa de ser VERDE ────────────────────
+       Verde é a cor da ação neste app -- o botão Confirmar, o Aceitar. Uma
+       conversa inteira dela em verde punha a cor de "executa" em cima do que ela
+       DISSE, e deixava o cartão de confirmar competindo com dez balões da
+       mesma cor. Musgo escuro separa quem fala de quem age. */
+    balaoDela: {
+      alignSelf: 'flex-end',
+      backgroundColor: t.cores.forest,
+      borderBottomRightRadius: 5,
+    },
+    /* O canto quebrado do lado de quem fala: é o que faz duas falas seguidas
+       de pessoas diferentes se lerem como diálogo, sem nome em cima de cada
+       uma. */
+    balaoDaAurora: {
+      alignSelf: 'flex-start',
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderBottomLeftRadius: 5,
+    },
+    textoDela: { fontFamily: FONTE.normal, fontSize: 14.5, color: t.cores.mist, lineHeight: 21 },
+    textoDaAurora: { fontFamily: FONTE.normal, fontSize: 14.5, color: t.cores.ink, lineHeight: 21 },
     pensando: { paddingVertical: 14, paddingHorizontal: 18 },
 
     /* O cartão ocupa a largura toda, e os balões não. É o que faz o olho parar
        nele em vez de ler como mais uma fala da conversa. */
+    /* ──────────────────── O CARTÃO DE CONFIRMAR ────────────────────
+       Fundo BRANCO -- a única superfície elevada do tema -- em vez do creme dos
+       balões, e com a faixa dourada colada no topo. É a única coisa desta tela
+       que grava no sistema de verdade, e antes ela era um retângulo creme com
+       borda: a mesma cor dos balões, só que mais largo.
+
+       `overflow: 'hidden'` porque a faixa vai até as bordas, e sem isso ela
+       vaza pelos cantos arredondados no Android. */
     cartao: {
-      backgroundColor: t.cores.cartao,
-      borderWidth: 1.5,
-      borderColor: t.cores.gold,
-      borderRadius: 16,
-      padding: 15,
-      gap: 10,
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 18,
+      overflow: 'hidden',
     },
-    topoDoCartao: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    /* A faixa ocupa a largura toda e tem fundo próprio: um rótulo dourado
+       solto dentro do cartão era só mais uma linha de texto. */
+    topoDoCartao: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: t.cores.atencaoFundo,
+      borderBottomWidth: 1,
+      borderBottomColor: t.cores.gold,
+      paddingHorizontal: 15,
+      paddingVertical: 9,
+    },
     rotuloDoCartao: {
-      fontSize: 10.5,
-      fontWeight: '800',
-      letterSpacing: 1.1,
+      fontFamily: FONTE.forte,
+      fontSize: 11,
+      letterSpacing: 0.9,
       color: t.cores.gold,
     },
-    resumoDoCartao: { fontSize: 15.5, color: t.cores.ink, lineHeight: 23, fontWeight: '600' },
-    botoesDoCartao: { flexDirection: 'row', gap: 10, marginTop: 2 },
+    resumoDoCartao: {
+      fontFamily: FONTE.meia,
+      fontSize: 15.5,
+      color: t.cores.ink,
+      lineHeight: 23,
+      paddingHorizontal: 15,
+      paddingTop: 14,
+    },
+    /* O cartao perdeu o padding proprio quando a faixa dourada passou a ir ate
+       a borda -- entao ele volta aqui, e nos dois filhos que ficam por fora do
+       resumo. */
+    botoesDoCartao: { flexDirection: 'row', gap: 10, padding: 15 },
+    /* Creme, e nao `superficie`: `superficie` e o branco, que agora e o fundo
+       DO PROPRIO CARTAO -- o botao Cancelar sairia branco sobre branco, com so
+       uma borda de 12% para separar. Ficou um degrau abaixo do cartao, que e o
+       que faz um botao de contorno existir. */
     cancelar: {
       flex: 1,
       alignItems: 'center',
       paddingVertical: 13,
       borderRadius: 13,
-      backgroundColor: t.cores.superficie,
+      backgroundColor: t.cores.cartao,
       borderWidth: 1,
       borderColor: t.cores.borda,
     },
-    textoCancelar: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+    textoCancelar: { fontFamily: FONTE.meia, fontSize: 14.5, color: t.cores.ink },
     confirmar: {
       alignItems: 'center',
+      justifyContent: 'center',
       paddingVertical: 13,
       paddingHorizontal: 22,
       borderRadius: 13,
       backgroundColor: t.cores.verde,
     },
-    textoConfirmar: { fontSize: 14.5, fontWeight: '800', color: t.cores.branco },
-    decidido: { fontSize: 13, fontWeight: '700', color: t.inkFraco },
+    textoConfirmar: { fontFamily: FONTE.forte, fontSize: 14.5, color: t.cores.branco },
+    decidido: { fontFamily: FONTE.meia, fontSize: 13, color: t.inkFraco, padding: 15, paddingTop: 12 },
 
     /* Chips baixos e em linha, para caberem sem empurrar a conversa. A tira
        rola: quatro perguntas não cabem na largura de um celular, e cortar a

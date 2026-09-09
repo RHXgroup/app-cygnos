@@ -13,6 +13,7 @@ import {
   dividirODia,
   hhmm,
   resumoDaAgenda,
+  emQuanto,
   type ConsultaDoDia,
 } from './diaDaNutri.ts'
 
@@ -191,6 +192,41 @@ const DIA: ConsultaDoDia[] = [
   ok('hora cheia', hhmm(T('14:00')) === '14:00', hhmm(T('14:00')))
   ok('data invalida vira vazio', hhmm('xxx') === '')
   ok('vazio vira vazio', hhmm('') === '')
+}
+
+/* ──── A CONTAGEM DO HERÓI ────
+ * É a única frase da tela Hoje que muda sozinha enquanto ela olha, e a que
+ * mais tem como sair torta: relógio que passou, data que não parseia, consulta
+ * de amanhã. */
+{
+  const AGORA = Date.parse('2026-09-09T13:42:00-03:00')
+  const daqui = (min: number) => new Date(AGORA + min * 60000).toISOString()
+
+  ok('18 minutos', emQuanto(daqui(18), AGORA) === 'em 18 min')
+  ok('1 minuto', emQuanto(daqui(1), AGORA) === 'em 1 min')
+  ok('59 minutos ainda é minuto', emQuanto(daqui(59), AGORA) === 'em 59 min')
+  ok('60 minutos vira hora redonda', emQuanto(daqui(60), AGORA) === 'em 1h')
+  ok('130 minutos vira 2h10', emQuanto(daqui(130), AGORA) === 'em 2h10')
+  ok('125 minutos zera à esquerda', emQuanto(daqui(125), AGORA) === 'em 2h05')
+  ok('120 minutos não vira 2h00', emQuanto(daqui(120), AGORA) === 'em 2h')
+
+  /* O caso que acontece sozinho: a tela fica aberta e a consulta começa. */
+  ok('exatamente agora', emQuanto(daqui(0), AGORA) === 'agora')
+  ok('cinco minutos ATRÁS não vira "em -5 min"', emQuanto(daqui(-5), AGORA) === 'agora')
+  ok('ontem também é agora, e não negativo', emQuanto(daqui(-2000), AGORA) === 'agora')
+
+  /* Noutro dia a contagem não ajuda: "em 1512 min" é aritmética, não resposta. */
+  ok('amanhã devolve vazio', emQuanto(daqui(60 * 25), AGORA) === '')
+  ok('24h em ponto ainda conta', emQuanto(daqui(60 * 24), AGORA) === 'em 24h')
+
+  /* `NaN !== null` é verdadeiro, e foi assim que uma caloria NaN passou o
+     guarda neste app. Aqui a data torta não pode virar "em NaN min". */
+  ok('data que não parseia devolve vazio', emQuanto('amanhã de tarde', AGORA) === '')
+  ok('vazio devolve vazio', emQuanto('', AGORA) === '')
+  for (const lixo of ['amanhã de tarde', '', 'null', '2026-13-45T99:99']) {
+    const r = emQuanto(lixo, AGORA)
+    ok('sem podridão em "' + lixo + '"', r === '' && !/NaN|undefined|Infinity/.test(r))
+  }
 }
 
 console.log(`\n${passou} passaram, ${falhou} falharam`)
