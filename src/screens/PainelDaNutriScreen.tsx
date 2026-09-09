@@ -23,6 +23,7 @@ import {
 import { dividirODia, hhmm, resumoDaAgenda, type ConsultaDoDia, type Dia } from '../lib/diaDaNutri'
 import { carregarPerfilDaNutri, primeiroNome, type PerfilDaNutri } from '../lib/souNutri'
 import { saudacaoDaHora } from '../lib/formatar'
+import { AuroraDaNutriScreen } from './AuroraDaNutriScreen'
 import { LerCodigoScreen } from './LerCodigoScreen'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 
@@ -78,6 +79,7 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
      botão voltar é a própria `LerCodigoScreen`, que já registra o dela e, sendo
      o componente mais interno, decide primeiro. Armadilha 1. */
   const [lendoCodigo, setLendoCodigo] = useState(false)
+  const [auroraAberta, setAuroraAberta] = useState(false)
   const [dinheiro, setDinheiro] = useState<DinheiroDoDia | null>(null)
   const [atencao, setAtencao] = useState<Sinalizado[]>([])
   /* Fechado por padrão: a linha é o aviso, e os nomes são o passo seguinte.
@@ -143,6 +145,10 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
     return <LerCodigoScreen paraBaseDaNutri onFechar={() => setLendoCodigo(false)} />
   }
 
+  if (auroraAberta) {
+    return <AuroraDaNutriScreen onFechar={() => setAuroraAberta(false)} />
+  }
+
   if (carregando) {
     return (
       <View style={[styles.tela, styles.centro]}>
@@ -154,7 +160,9 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
       <ScrollView
-        contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 28 }]}
+        /* A folga conta a barra da Aurora, que flutua por cima: sem ela o
+           rodapé nasce escondido atrás do botão. */
+        contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 96 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -324,6 +332,28 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
           resto do acompanhamento continua no sistema, no computador.
         </Text>
       </ScrollView>
+
+      {/* ──────────────────── A AURORA FICA FIXA, E FORA DA ROLAGEM ────────────────────
+          Ela é o que permite a lista de telas ser curta: não há tela de
+          financeiro aqui e mesmo assim dá para saber quanto entrou hoje. Uma
+          entrada que só aparece depois de rolar até o fim seria uma entrada que
+          ninguém encontra -- e aí o painel volta a precisar de um cartão para
+          cada pergunta.
+
+          Parece campo de texto e é botão, de propósito: digitar aqui e ver o
+          texto pular para outra tela é pior do que tocar e a tela abrir. Por
+          isso é `accessibilityRole="button"`, e não um campo de mentira. */}
+      <View style={[styles.rodapeDaAurora, { paddingBottom: bottom + 10 }]}>
+        <Pressable
+          onPress={() => setAuroraAberta(true)}
+          style={({ pressed }) => [styles.barraAurora, pressed && styles.pressionada]}
+          accessibilityRole="button"
+          accessibilityLabel="Perguntar à Aurora"
+        >
+          <Ionicons name="sparkles-outline" size={17} color={paleta().cores.verde} />
+          <Text style={styles.textoBarraAurora}>Pergunte à Aurora…</Text>
+        </Pressable>
+      </View>
     </View>
   )
 }
@@ -470,5 +500,27 @@ const estilos = estilosDe(t =>
     pressionada: { opacity: 0.75 },
 
     rodape: { fontSize: 12.5, color: t.inkFraco, lineHeight: 18, paddingTop: 6, paddingHorizontal: 4 },
+
+    rodapeDaAurora: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      backgroundColor: t.cores.fundo,
+    },
+    barraAurora: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 22,
+      paddingVertical: 13,
+      paddingHorizontal: 16,
+    },
+    textoBarraAurora: { flex: 1, fontSize: 14, color: t.inkSuave },
   }),
 )
