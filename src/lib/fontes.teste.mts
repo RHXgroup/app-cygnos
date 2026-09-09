@@ -10,7 +10,7 @@
  * `require` de .ttf, que so existe dentro do Metro. No Node isso estoura.
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 const fonte = readFileSync(new URL('./fontes.ts', import.meta.url), 'utf8')
 
@@ -32,7 +32,17 @@ const bloco = (de: string) => {
 
 const usados = [...bloco('export const FONTE = {').matchAll(/'(Archivo_[A-Za-z0-9]+)'/g)].map(m => m[1])
 const registrados = [...bloco('export const FONTES_PARA_CARREGAR = {').matchAll(/^\s{2}([A-Za-z0-9_]+):/gm)].map(m => m[1])
-const arquivos = [...bloco('export const FONTES_PARA_CARREGAR = {').matchAll(/archivo\/([A-Za-z0-9_]+)\.ttf/g)].map(m => m[1])
+/* O CAMINHO INTEIRO, e nao so o nome do arquivo dentro dele.
+ *
+ * A primeira versao disto pegava so o `Archivo_400Regular` do fim do caminho e
+ * conferia contra a chave. Passava com folga -- e o caminho estava errado: os
+ * .ttf do pacote nao ficam na raiz, ficam em `400Regular/Archivo_400Regular.ttf`.
+ *
+ * O Metro nao resolveu, o pacote inteiro parou de montar, e o app nao abria.
+ * Ou seja: este teste existia exatamente para esta classe de erro, passou, e o
+ * erro derrubou tudo mesmo assim. Conferir NOME nao e conferir CAMINHO. */
+const caminhos = [...bloco('export const FONTES_PARA_CARREGAR = {').matchAll(/require\('([^']+)'\)/g)].map(m => m[1])
+const arquivos = caminhos.map(c => (/\/([A-Za-z0-9_]+)\.ttf$/.exec(c) ?? [])[1] ?? '')
 
 /* O teste conferindo a si mesmo, antes de conferir qualquer coisa. Se a regex
    parar de casar -- alguem troca aspas simples por duplas, ou reformata o
@@ -40,6 +50,14 @@ const arquivos = [...bloco('export const FONTES_PARA_CARREGAR = {').matchAll(/ar
 ok('achei os nomes usados', usados.length >= 5)
 ok('achei os nomes registrados', registrados.length >= 5)
 ok('achei os arquivos', arquivos.length >= 5)
+ok('achei os caminhos', caminhos.length >= 5)
+
+/* O QUE FALTAVA: o arquivo existe MESMO, no disco.
+   Sem isto, um caminho errado passa no teste e derruba o Metro. */
+for (const c of caminhos) {
+  const noDisco = new URL('../../node_modules/' + c, import.meta.url)
+  ok(`o arquivo de ${c} existe em node_modules`, existsSync(noDisco))
+}
 
 for (const u of usados) {
   ok(`${u} esta registrado no useFonts`, registrados.includes(u))

@@ -49,9 +49,9 @@ export const FONTE = {
    nome errado aqui não dá erro: dá a fonte do sistema de volta, e a tela fica
    exatamente como estava antes de eu ter feito nada. */
 export const FONTES_PARA_CARREGAR = {
-  Archivo_400Regular: require('@expo-google-fonts/archivo/Archivo_400Regular.ttf'),
-  Archivo_500Medium: require('@expo-google-fonts/archivo/Archivo_500Medium.ttf'),
-  Archivo_600SemiBold: require('@expo-google-fonts/archivo/Archivo_600SemiBold.ttf'),
-  Archivo_700Bold: require('@expo-google-fonts/archivo/Archivo_700Bold.ttf'),
-  Archivo_800ExtraBold: require('@expo-google-fonts/archivo/Archivo_800ExtraBold.ttf'),
+  Archivo_400Regular: require('@expo-google-fonts/archivo/400Regular/Archivo_400Regular.ttf'),
+  Archivo_500Medium: require('@expo-google-fonts/archivo/500Medium/Archivo_500Medium.ttf'),
+  Archivo_600SemiBold: require('@expo-google-fonts/archivo/600SemiBold/Archivo_600SemiBold.ttf'),
+  Archivo_700Bold: require('@expo-google-fonts/archivo/700Bold/Archivo_700Bold.ttf'),
+  Archivo_800ExtraBold: require('@expo-google-fonts/archivo/800ExtraBold/Archivo_800ExtraBold.ttf'),
 }
