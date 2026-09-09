@@ -95,7 +95,17 @@ type ModuloNotificacoes = typeof import('expo-notifications')
 
 let modulo: Promise<ModuloNotificacoes> | null = null
 
-function notificacoes(): Promise<ModuloNotificacoes> {
+/* Exportado porque `avisosDaNutri` precisa do MESMO carregador.
+ *
+ * Um segundo `import('expo-notifications')` noutro arquivo compila e roda -- e
+ * nasce sem nada do que esta funcao aprendeu a caro: o embrulho protegido, o
+ * `setNotificationHandler` conferido antes de ser chamado (a migracao para o
+ * SDK 57 derrubou o app inteiro por causa disso), e o `catch` que devolve um
+ * modulo de mentira em vez de rejeitar para sempre.
+ *
+ * O cache tambem e um so: dois carregadores dariam dois `setNotificationHandler`
+ * disputando quem mostra o aviso em primeiro plano. */
+export function notificacoes(): Promise<ModuloNotificacoes> {
   if (!modulo) {
     /* Cala um aviso que não é sobre nós, e que aparece como TELA VERMELHA.
      *

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  ActivityIndicator,
   AppState,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -14,6 +16,8 @@ import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia
 import { carregarPerfilDaNutri, type PerfilDaNutri } from '../lib/souNutri'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
+import { apagarAviso, avisosPendentes, criarAviso, type Aviso } from '../lib/avisosDaNutri'
+import { quandoDoAviso, quandoPorExtenso } from '../lib/quandoDoAviso'
 
 /* O resto: o dinheiro do dia inteiro, as ferramentas, e a saída.
  *
@@ -129,6 +133,8 @@ export function MaisDaNutriScreen({
           </View>
         )}
 
+        <MeusAvisos />
+
         <View style={styles.cartao}>
           <Text style={styles.rotuloDoBloco}>FERRAMENTAS</Text>
           <Opcao
@@ -210,6 +216,147 @@ function Opcao({
   )
 }
 
+/* ──────────────────── OS AVISOS DELA ────────────────────
+ *
+ * "Me lembra daqui duas horas de ligar para o laboratório." Dois campos e um
+ * botão -- e é de propósito que não tem mais nada: seletor de data, repetição
+ * e categoria transformariam trinta segundos em uma tarefa, e aí ela não usa.
+ *
+ * ──── Por que os avisos vivem no APARELHO ────
+ * Notificação local não precisa de servidor nem de token -- ver o cabeçalho de
+ * `avisosDaNutri`. A conta honesta é que eles não aparecem no computador e
+ * somem se ela reinstalar. A tela DIZ isso, em vez de deixar ela descobrir
+ * sozinha no dia em que trocar de telefone. */
+function MeusAvisos() {
+  const styles = estilos()
+  const [avisos, setAvisos] = useState<Aviso[]>([])
+  const [texto, setTexto] = useState('')
+  const [quando, setQuando] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [recado, setRecado] = useState('')
+
+  const reler = useCallback(() => {
+    void avisosPendentes().then(setAvisos)
+  }, [])
+
+  useEffect(reler, [reler])
+
+  /* Relê ao voltar do segundo plano: um aviso que tocou enquanto o app estava
+     fechado precisa sumir da lista quando ela volta -- senão ela vê na tela um
+     lembrete que já cumpriu o papel e fica em dúvida se vai tocar de novo. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', e => {
+      if (e === 'active') reler()
+    })
+    return () => sub.remove()
+  }, [reler])
+
+  async function criar() {
+    if (salvando) return
+    const lido = quandoDoAviso(quando)
+    if (lido.tipo === 'erro') {
+      setRecado(lido.mensagem)
+      return
+    }
+    setSalvando(true)
+    setRecado('')
+    const r = await criarAviso(texto, lido.quando)
+    setSalvando(false)
+
+    if (r.tipo === 'ok') {
+      setTexto('')
+      setQuando('')
+      /* Confirma DIZENDO QUANDO, e não "pronto". Ela escreveu "09:00" às 14h e
+         o aviso foi para amanhã -- se a tela não disser, ela só descobre isso
+         não sendo avisada hoje. */
+      setRecado('Combinado: ' + quandoPorExtenso(new Date(r.aviso.quando)) + '.')
+      reler()
+      return
+    }
+    if (r.tipo === 'sem_permissao') {
+      setRecado(
+        'O aparelho não deixou avisar. Ligue as notificações do Cygnos nas ' +
+        'configurações do telefone e tente de novo.',
+      )
+      return
+    }
+    setRecado(r.mensagem)
+  }
+
+  return (
+    <View style={styles.cartao}>
+      <Text style={styles.rotuloDoBloco}>MEUS AVISOS</Text>
+
+      {avisos.map(a => (
+        <View key={a.id} style={styles.aviso}>
+          <View style={styles.textosDoAviso}>
+            <Text style={styles.textoDoAviso}>{a.texto}</Text>
+            <Text style={styles.quandoDoAviso}>{quandoPorExtenso(new Date(a.quando))}</Text>
+          </View>
+          <Pressable
+            onPress={() => void apagarAviso(a.id).then(reler)}
+            hitSlop={10}
+            style={({ pressed }) => [styles.apagarAviso, pressed && styles.pressionado]}
+            accessibilityRole="button"
+            accessibilityLabel={'Apagar o aviso: ' + a.texto}
+          >
+            <Ionicons name="close" size={17} color={paleta().inkFraco} />
+          </Pressable>
+        </View>
+      ))}
+
+      <TextInput
+        value={texto}
+        onChangeText={setTexto}
+        placeholder="Do que você quer ser lembrada"
+        placeholderTextColor={paleta().inkFraco}
+        style={styles.campoDoAviso}
+        maxLength={120}
+        accessibilityLabel="O que avisar"
+      />
+
+      <View style={styles.linhaDoAviso}>
+        <TextInput
+          value={quando}
+          onChangeText={setQuando}
+          placeholder="2h, 30min ou 16:30"
+          placeholderTextColor={paleta().inkFraco}
+          style={[styles.campoDoAviso, styles.campoQuando]}
+          maxLength={20}
+          autoCapitalize="none"
+          autoCorrect={false}
+          accessibilityLabel="Quando avisar"
+        />
+        <Pressable
+          onPress={() => void criar()}
+          disabled={salvando || !texto.trim()}
+          style={({ pressed }) => [
+            styles.botaoDoAviso,
+            (salvando || !texto.trim()) && styles.botaoDesligado,
+            pressed && styles.pressionado,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Criar o aviso"
+        >
+          {salvando ? (
+            <ActivityIndicator size="small" color={paleta().cores.branco} />
+          ) : (
+            <Text style={styles.textoDoBotaoDoAviso}>Avisar</Text>
+          )}
+        </Pressable>
+      </View>
+
+      {!!recado && <Text style={styles.recadoDoAviso}>{recado}</Text>}
+
+      <Text style={styles.dica}>
+        {avisos.length === 0
+          ? 'Escreva o lembrete e quando ("2h", "30min", "16:30", "amanhã 09:00").'
+          : 'Os avisos tocam neste telefone. Eles não aparecem no computador.'}
+      </Text>
+    </View>
+  )
+}
+
 const estilos = estilosDe(t =>
   StyleSheet.create({
     tela: { flex: 1, backgroundColor: t.cores.fundo },
@@ -258,6 +405,60 @@ const estilos = estilosDe(t =>
       fontVariant: ['tabular-nums'],
     },
     dica: { fontFamily: FONTE.normal, fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingTop: 8 },
+
+    /* ──── OS AVISOS ──── */
+    aviso: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 9,
+      borderBottomWidth: 1,
+      borderBottomColor: t.cores.borda,
+    },
+    textosDoAviso: { flex: 1, minWidth: 0 },
+    textoDoAviso: { fontFamily: FONTE.meia, fontSize: 14.5, color: t.cores.ink },
+    quandoDoAviso: { fontFamily: FONTE.normal, fontSize: 12, color: t.inkFraco, marginTop: 1 },
+    apagarAviso: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+
+    campoDoAviso: {
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 11,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginTop: 8,
+      fontFamily: FONTE.normal,
+      fontSize: 14.5,
+      color: t.cores.ink,
+    },
+    linhaDoAviso: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    campoQuando: { flex: 1 },
+    botaoDoAviso: {
+      minWidth: 84,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 11,
+      paddingHorizontal: 14,
+      borderRadius: 11,
+      marginTop: 8,
+      backgroundColor: t.cores.verde,
+    },
+    /* Cor, e não opacidade: o tema tem um `desligado` medido justamente porque
+       opacity num botão compõe texto E fundo contra a página e destrói o
+       contraste entre os dois. */
+    botaoDesligado: { backgroundColor: t.cores.desligado },
+    textoDoBotaoDoAviso: { fontFamily: FONTE.forte, fontSize: 14, color: t.cores.branco },
+    recadoDoAviso: {
+      fontFamily: FONTE.normal,
+      fontSize: 12.5,
+      color: t.cores.ink,
+      lineHeight: 18,
+      backgroundColor: t.cores.verdeMenta,
+      padding: 10,
+      borderRadius: 10,
+      marginTop: 8,
+    },
 
     opcao: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
     textosDaOpcao: { flex: 1 },
