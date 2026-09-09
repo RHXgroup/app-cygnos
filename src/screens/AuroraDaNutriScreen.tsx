@@ -28,6 +28,7 @@ import {
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
+import { Ditado } from '../components/Ditado'
 
 /* A Aurora dela, no bolso.
  *
@@ -328,6 +329,45 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
       )}
 
       <View style={[styles.barra, { paddingBottom: 10 + respiro }]}>
+        {/* ──────────────────── FALAR EM VEZ DE DIGITAR ────────────────────
+         *
+         * O MESMO `<Ditado>` das outras duas telas, e não uma gravação escrita
+         * aqui. Ele já carrega a permissão do microfone com a explicação antes
+         * da caixa do sistema, o cronómetro, o limite de 60 segundos, o
+         * reenvio quando a transcrição volta vazia, e o `File` do
+         * expo-file-system no lugar do `{ uri, name, type }` que o `fetch` do
+         * SDK 57 anexa como "[object Object]" -- a armadilha 17, que custou uma
+         * semana e apareceu como quatro defeitos diferentes.
+         *
+         * Uma segunda gravação escrita para esta tela herdaria zero disso, e a
+         * primeira coisa que ela erraria seria justamente aquela linha.
+         *
+         * `assunto="nutri"` não é detalhe: o contexto padrão do servidor é uma
+         * lista de COMIDA, e o Whisper obedece o contexto. "Remarca a Maria pra
+         * sexta" com aquele prompt volta como uma frase sobre pão de queijo --
+         * é o caso já medido, com o comando de treino.
+         *
+         * O texto ditado vai para o CAMPO, e não direto para a Aurora. Ela lê
+         * antes de mandar, e corrige o nome que o modelo ouviu errado -- mandar
+         * de uma vez faria a única conferência possível acontecer depois de a
+         * pergunta já ter sido feita. */}
+        <Ditado
+          compacto
+          assunto="nutri"
+          onTexto={ouvido => {
+            /* Junta ao que já estiver escrito, e não substitui: quem digitou
+               meia frase e resolveu falar o resto perderia a metade digitada. */
+            setTexto(antes => (antes.trim() ? antes.trim() + ' ' + ouvido : ouvido))
+          }}
+          /* A falha da transcricao entra como fala da Aurora, e nao como
+             faixa no alto -- a mesma decisao que o resto desta tela ja tomou,
+             e pelo mesmo motivo: numa conversa, erro fora do fluxo fica acima
+             da rolagem e ninguem le. */
+          onErro={mensagem =>
+            setFalas(atual => [...atual, novaFala('aurora', mensagem)])
+          }
+        />
+
         <TextInput
           value={texto}
           onChangeText={setTexto}

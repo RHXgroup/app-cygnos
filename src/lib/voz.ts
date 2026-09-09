@@ -259,8 +259,13 @@ export type ResultadoTranscricao =
  * o modelo continuou de onde o contexto o deixou.
  *
  * Padrão 'refeicao' porque é o que o app fazia antes de este parâmetro existir —
- * quem chamar sem dizer nada continua funcionando igual. */
-export type AssuntoDoAudio = 'refeicao' | 'treino'
+ * quem chamar sem dizer nada continua funcionando igual.
+ *
+ * 'nutri' é o terceiro, e ele existe pelo MESMO motivo que o de treino: os
+ * verbos dela ("remarca", "cancela", "lança") e um horário ditado não batem com
+ * comida nenhuma, e sem contexto próprio o modelo continua de onde a lista de
+ * alimentos o deixou. */
+export type AssuntoDoAudio = 'refeicao' | 'treino' | 'nutri'
 
 export async function transcrever(
   uri: string,

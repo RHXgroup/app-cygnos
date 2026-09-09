@@ -11,6 +11,7 @@ import {
   EXPLICACAO_DO_MICROFONE,
   mmss,
   transcrever,
+  type AssuntoDoAudio,
 } from '../lib/voz'
 import { estilosDe, paleta } from '../lib/tema'
 import { Confirmacao } from './Confirmacao'
@@ -42,11 +43,25 @@ const ALTURA_MAX = 26
 export function Ditado({
   onTexto,
   onErro,
+  assunto = 'refeicao',
+  compacto = false,
 }: {
   /* O que foi ouvido. A tela decide onde colocar — aqui não se sabe se o campo
      já tem coisa escrita. */
   onTexto: (texto: string) => void
   onErro: (mensagem: string) => void
+  /* Qual vocabulário o servidor deve esperar. Padrão 'refeicao' porque é o que
+     as duas telas que já usam este componente pedem — acrescentar o parâmetro
+     não pode mudar o que elas fazem hoje. */
+  assunto?: AssuntoDoAudio
+  /* Só o botão, sem o convite escrito em volta.
+     A barra de escrever da Aurora é uma linha de 40 e poucos pixels, e o
+     componente inteiro nasceu para ocupar um bloco. Com `compacto` ele cabe ao
+     lado do campo — e continua sendo O MESMO componente, com a mesma
+     permissão, o mesmo cronómetro e o mesmo reenvio. Uma segunda gravação
+     escrita para a Aurora seria a armadilha 5 outra vez, e desta vez em cima de
+     um caminho que já custou uma semana. */
+  compacto?: boolean
 }) {
   const styles = estilos()
   const gravador = useAudioRecorder(OPCOES_DITADO)
@@ -207,7 +222,7 @@ export function Ditado({
       return
     }
 
-    const r = await transcrever(uri, mmss)
+    const r = await transcrever(uri, mmss, assunto)
     setEstado('parado')
 
     if (r.tipo === 'ok') {
@@ -227,11 +242,39 @@ export function Ditado({
   }
 
   if (estado === 'enviando') {
+    /* Compacto não mostra a frase, e mostra o giro NO LUGAR do microfone.
+       O botão fica onde estava, do mesmo tamanho: se ele sumisse, o campo de
+       escrever pularia de largura no meio do envio. */
+    if (compacto) {
+      return (
+        <View style={[styles.redondo, styles.redondoPensando]}>
+          <ActivityIndicator size="small" color={paleta().cores.verde} />
+        </View>
+      )
+    }
     return (
       <View style={[styles.botao, styles.pensando]}>
         <ActivityIndicator size="small" color={paleta().cores.verde} />
         <Text style={styles.textoPensando}>Entendendo o que você falou…</Text>
       </View>
+    )
+  }
+
+  if (estado === 'gravando' && compacto) {
+    /* Gravando, o botão compacto vira o cronómetro.
+       A onda e o "toque para parar" ficam de fora — não cabem numa linha de
+       barra, e espremidos quebram no meio da palavra, que é o defeito que a
+       versão grande já pagou. O que NÃO pode faltar é o tempo correndo: sem
+       ele, quem fala para um aparelho não tem como saber se ele está ouvindo. */
+    return (
+      <Pressable
+        onPress={parar}
+        style={({ pressed }) => [styles.redondo, styles.redondoGravando, pressed && styles.pressionado]}
+        accessibilityRole="button"
+        accessibilityLabel={'Parar de gravar. ' + mmss(segundos)}
+      >
+        <Text style={styles.relogioCompacto}>{mmss(segundos)}</Text>
+      </Pressable>
     )
   }
 
@@ -297,7 +340,18 @@ export function Ditado({
 
   return (
     <>
-      <BotaoDeVoz estado="parado" rotulo="Falar em vez de digitar" onPress={comecar} />
+      {compacto ? (
+        <Pressable
+          onPress={comecar}
+          style={({ pressed }) => [styles.redondo, pressed && styles.pressionado]}
+          accessibilityRole="button"
+          accessibilityLabel="Falar em vez de digitar"
+        >
+          <Ionicons name="mic-outline" size={19} color={paleta().cores.ink} />
+        </Pressable>
+      ) : (
+        <BotaoDeVoz estado="parado" rotulo="Falar em vez de digitar" onPress={comecar} />
+      )}
 
       {gravacaoMuda && (
         <Pressable
@@ -341,6 +395,36 @@ export function Ditado({
 
 const estilos = estilosDe(t =>
   StyleSheet.create({
+    /* ──────────────────── A FORMA COMPACTA ────────────────────
+       Redondo e do tamanho do botão de enviar ao lado dele. Os dois são
+       irmãos na mesma barra, e um redondo de 38 ao lado de um de 34 se lê
+       como desalinhamento, não como hierarquia. */
+    redondo: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+    },
+    redondoGravando: {
+      backgroundColor: t.cores.erroFundo,
+      borderColor: t.cores.erroBorda,
+      /* Cresce um pouco: o cronómetro não cabe em 38, e um número cortado
+         durante a gravação é o pior lugar possível para cortar. */
+      width: 56,
+      borderRadius: 19,
+    },
+    redondoPensando: { backgroundColor: t.cores.cartao },
+    relogioCompacto: {
+      fontSize: 12.5,
+      fontWeight: '700',
+      color: t.cores.erroTexto,
+      fontVariant: ['tabular-nums'],
+    },
+
   /* 52 de altura e canto redondo de pílula.
      46 num retângulo se lê como campo de formulário; o microfone é uma AÇÃO, e
      precisa parecer um botão em que se toca. */
@@ -357,7 +441,8 @@ const estilos = estilosDe(t =>
     backgroundColor: t.cores.cartao,
   },
   /* O ícone dentro de um círculo cheio, e não solto sobre o fundo. É o que
-     separa "um ícone ao lado de um texto" de um botão com identidade. */
+     separa "um ícone ao lado de um texto" de um botão com identidade. */
+
   pararLinha: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -365,7 +450,8 @@ const estilos = estilosDe(t =>
     gap: 7,
     marginTop: 10,
   },
-  pressionado: { opacity: 0.7 },
+  pressionado: { opacity: 0.7 },
+
 
   botaoOuvir: {
     flexDirection: 'row',
