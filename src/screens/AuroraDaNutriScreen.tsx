@@ -12,7 +12,6 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
-  confirmarAcao,
   novaFala,
   perguntarAAurora,
   type AcaoPendente,
@@ -28,6 +27,7 @@ import {
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
+import { executarAcaoConfirmada } from '../lib/acoesNoAparelho'
 import { Ditado } from '../components/Ditado'
 
 /* A Aurora dela, no bolso.
@@ -153,7 +153,12 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
     setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'feita' } : f)))
     setPensando(true)
 
-    const r = await confirmarAcao(acao)
+    /* `executarAcaoConfirmada`, e não `confirmarAcao` direto.
+       Quase toda ferramenta executa no servidor, e uma -- criar aviso -- só o
+       aparelho consegue fazer, porque a notificação é agendada pelo sistema
+       operacional do telefone. Um ponto único de saída é o que faz a próxima
+       ferramenta local não precisar de um `if` novo aqui. */
+    const r = await executarAcaoConfirmada(acao)
     setPensando(false)
     setFalas(atual => [
       ...atual,
