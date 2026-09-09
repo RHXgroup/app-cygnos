@@ -12,6 +12,14 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { consultasDoDia } from '../lib/agendaDaNutri'
+import { quemPedeAtencao } from '../lib/atencaoDaNutri'
+import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia'
+import {
+  motivoDe,
+  porUrgencia,
+  resumoDaAtencao,
+  type Sinalizado,
+} from '../lib/sinaisDaCarteira'
 import { dividirODia, hhmm, resumoDaAgenda, type ConsultaDoDia, type Dia } from '../lib/diaDaNutri'
 import { carregarPerfilDaNutri, primeiroNome, type PerfilDaNutri } from '../lib/souNutri'
 import { saudacaoDaHora } from '../lib/formatar'
@@ -70,9 +78,28 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
      botão voltar é a própria `LerCodigoScreen`, que já registra o dela e, sendo
      o componente mais interno, decide primeiro. Armadilha 1. */
   const [lendoCodigo, setLendoCodigo] = useState(false)
+  const [dinheiro, setDinheiro] = useState<DinheiroDoDia | null>(null)
+  const [atencao, setAtencao] = useState<Sinalizado[]>([])
+  /* Fechado por padrão: a linha é o aviso, e os nomes são o passo seguinte.
+     Abrir sozinho faria uma lista de oito empurrar a agenda para fora da tela
+     -- e a agenda é o que ela veio ver. */
+  const [nomesAbertos, setNomesAbertos] = useState(false)
 
   const buscar = useCallback(async () => {
-    const r = await consultasDoDia(new Date())
+    /* As três juntas: são consultas independentes, e esperar uma para começar a
+       outra triplicaria a espera de uma tela que ela abre várias vezes por dia.
+
+       E só a AGENDA vira erro na tela. As outras duas são complemento: um
+       consultório sem permissão de financeiro não pode ver a agenda escondida
+       atrás de um recado sobre dinheiro que ela nem deveria ver. */
+    const [r, caixa, sinais] = await Promise.all([
+      consultasDoDia(new Date()),
+      dinheiroDoDia(),
+      quemPedeAtencao(),
+    ])
+
+    setDinheiro(caixa)
+    setAtencao(sinais.tipo === 'ok' ? sinais.pessoas : [])
     /* O erro é limpo no sucesso, e não só escrito na falha: esta tela relê
        sozinha ao voltar do segundo plano, e um erro que fica esconderia a
        agenda atrás de uma mensagem vencida. Armadilha 9. */
@@ -198,6 +225,71 @@ export function PainelDaNutriScreen({ onSair }: { onSair: () => void }) {
 
         {/* Dia sem consulta NÃO é dia livre: ela pode ter mil coisas que o app
             não enxerga. A frase diz o que o app sabe, e nada além. */}
+        {/* ──────────────────── O DINHEIRO DO DIA ────────────────────
+            Só aparece quando HÁ movimento, e isso é decisão e não esquecimento.
+            A política de `contas_receber_baixas` exige a permissão de baixar:
+            quem não a tem recebe ZERO LINHA, sem erro nenhum -- idêntico a "não
+            entrou nada hoje". Escrever "R$ 0" nos dois casos seria o app
+            afirmando um número que ele não sabe, para quem decide dinheiro com
+            ele. Item 6: zero é mentira. */}
+        {!!dinheiro && (dinheiro.quantasBaixas > 0 || dinheiro.quantasVencendo > 0) && (
+          <View style={styles.caixaDoDia}>
+            {dinheiro.quantasBaixas > 0 && (
+              <View style={styles.verba}>
+                <Text style={styles.rotuloVerba}>RECEBIDO HOJE</Text>
+                <Text style={styles.valorVerba}>{reais(dinheiro.recebido)}</Text>
+              </View>
+            )}
+            {dinheiro.quantasVencendo > 0 && (
+              <View style={styles.verba}>
+                <Text style={styles.rotuloVerba}>VENCE HOJE</Text>
+                <Text style={[styles.valorVerba, styles.valorVencendo]}>
+                  {reais(dinheiro.vencendo)}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ──────────────────── QUEM PEDE ATENÇÃO ────────────────────
+            Uma LINHA, e não o painel da Carteira. O site tem a leitura inteira,
+            com cinco colunas e análise por IA; repetir aquilo aqui daria uma
+            tela bonita e ignorada. Uma frase que aparece SÓ quando há alguém é
+            lida todo dia. */}
+        {atencao.length > 0 && (
+          <View style={styles.blocoAtencao}>
+            <Pressable
+              onPress={() => setNomesAbertos(v => !v)}
+              style={({ pressed }) => [styles.linhaAtencao, pressed && styles.pressionada]}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: nomesAbertos }}
+              accessibilityLabel={`${resumoDaAtencao(atencao).frase}. Toque para ver os nomes.`}
+            >
+              <View style={styles.textosAtencao}>
+                <Text style={styles.fraseAtencao}>{resumoDaAtencao(atencao).frase}</Text>
+                <Text style={styles.quebraAtencao}>{resumoDaAtencao(atencao).porSinal}</Text>
+              </View>
+              <Ionicons
+                name={nomesAbertos ? 'chevron-up' : 'chevron-down'}
+                size={17}
+                color={paleta().inkFraco}
+              />
+            </Pressable>
+
+            {nomesAbertos &&
+              porUrgencia(atencao).map(pessoa => (
+                <View key={pessoa.id} style={styles.pessoaAtencao}>
+                  <Text style={styles.nomeAtencao} numberOfLines={1}>
+                    {pessoa.nome}
+                  </Text>
+                  <Text style={styles.motivoAtencao} numberOfLines={1}>
+                    {motivoDe(pessoa)}
+                  </Text>
+                </View>
+              ))}
+          </View>
+        )}
+
         {dia.total === 0 && !erro && (
           <View style={styles.vazio}>
             <Ionicons name="calendar-outline" size={22} color={paleta().inkFraco} />
@@ -320,6 +412,47 @@ const estilos = estilosDe(t =>
       borderRadius: RAIO_CARTAO,
     },
     textoVazio: { fontSize: 14, color: t.inkSuave },
+
+    /* Os dois lado a lado, e sem cartão em volta de cada um: são dois números
+       de relance, e uma moldura por número faria a tela parecer um relatório. */
+    caixaDoDia: {
+      flexDirection: 'row',
+      gap: 10,
+      backgroundColor: t.cores.cartao,
+      borderRadius: RAIO_CARTAO,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    verba: { flex: 1, gap: 3 },
+    rotuloVerba: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: t.inkFraco },
+    valorVerba: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: t.cores.ink,
+      letterSpacing: -0.4,
+      fontVariant: ['tabular-nums'],
+    },
+    /* O que vence ainda não entrou. Cor de atenção, e não de erro: não há nada
+       errado em uma conta vencer hoje. */
+    valorVencendo: { color: t.cores.gold },
+
+    blocoAtencao: {
+      backgroundColor: t.cores.cartao,
+      borderRadius: RAIO_CARTAO,
+      paddingHorizontal: 16,
+      overflow: 'hidden',
+    },
+    linhaAtencao: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+    textosAtencao: { flex: 1 },
+    fraseAtencao: { fontSize: 15, fontWeight: '700', color: t.cores.ink },
+    quebraAtencao: { fontSize: 12.5, color: t.inkSuave, marginTop: 2 },
+    pessoaAtencao: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.cores.borda,
+      paddingVertical: 11,
+    },
+    nomeAtencao: { fontSize: 14.5, color: t.cores.ink },
+    motivoAtencao: { fontSize: 12.5, color: t.inkSuave, marginTop: 1 },
 
     ferramenta: {
       flexDirection: 'row',
