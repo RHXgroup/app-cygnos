@@ -12,7 +12,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
-import { consultasDoDia } from '../lib/agendaDaNutri'
+import { consultasDoDia, consultasNoPeriodo, pedidosDeConsulta } from '../lib/agendaDaNutri'
 import { quemPedeAtencao } from '../lib/atencaoDaNutri'
 import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia'
 import {
@@ -82,6 +82,11 @@ export function PainelDaNutriScreen({
 
   const [perfil, setPerfil] = useState<PerfilDaNutri | null>(null)
   const [consultas, setConsultas] = useState<ConsultaDoDia[]>([])
+  /* Os pedidos esperando resposta, e a agenda de amanhã. As duas coisas que o
+     painel não respondia: quem está aguardando ela, e como está o dia seguinte
+     -- que é a pergunta de quem olha o telefone à noite. */
+  const [pedidos, setPedidos] = useState<ConsultaDoDia[]>([])
+  const [amanha, setAmanha] = useState<ConsultaDoDia[]>([])
   const [carregando, setCarregando] = useState(true)
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
@@ -102,14 +107,27 @@ export function PainelDaNutriScreen({
        E só a AGENDA vira erro na tela. As outras duas são complemento: um
        consultório sem permissão de financeiro não pode ver a agenda escondida
        atrás de um recado sobre dinheiro que ela nem deveria ver. */
-    const [r, caixa, sinais] = await Promise.all([
+    const depoisDeAmanha = new Date()
+    depoisDeAmanha.setDate(depoisDeAmanha.getDate() + 1)
+
+    const [r, caixa, sinais, aguardando, oDiaSeguinte] = await Promise.all([
       consultasDoDia(new Date()),
       dinheiroDoDia(),
       quemPedeAtencao(),
+      pedidosDeConsulta(),
+      consultasNoPeriodo(depoisDeAmanha, depoisDeAmanha),
     ])
 
     setDinheiro(caixa)
     setAtencao(sinais.tipo === 'ok' ? sinais.pessoas : [])
+    setPedidos(aguardando.tipo === 'ok' ? aguardando.consultas : [])
+    /* Só o que CONTA como compromisso: pedido de amanhã já aparece no cartão de
+       pedidos, e contá-lo aqui também faria o mesmo pedido virar dois avisos. */
+    setAmanha(
+      oDiaSeguinte.tipo === 'ok'
+        ? oDiaSeguinte.consultas.filter(c => c.status !== 'cancelada' && c.status !== 'solicitada')
+        : [],
+    )
     /* O erro é limpo no sucesso, e não só escrito na falha: esta tela relê
        sozinha ao voltar do segundo plano, e um erro que fica esconderia a
        agenda atrás de uma mensagem vencida. Armadilha 9. */
@@ -225,6 +243,40 @@ export function PainelDaNutriScreen({
           </Pressable>
         )}
 
+        {/* ──────────────────── QUEM ESTÁ ESPERANDO RESPOSTA ────────────────────
+            A única coisa deste painel com uma PESSOA do outro lado aguardando --
+            e a que não aparecia em lugar nenhum do aplicativo. `solicitada` é
+            excluída da agenda de propósito (pedido não é compromisso), e
+            excluída dali ela sumia inteira.
+
+            Vem depois do AGORA e antes do resto: quem está na sala ganha da
+            fila, mas a fila ganha do que já está resolvido. */}
+        {pedidos.length > 0 && (
+          <View style={styles.pedidos}>
+            <View style={styles.topoDosPedidos}>
+              <Ionicons name="hand-left-outline" size={16} color={paleta().cores.gold} />
+              <Text style={styles.rotuloPedidos}>
+                {pedidos.length === 1
+                  ? '1 PEDIDO ESPERANDO RESPOSTA'
+                  : pedidos.length + ' PEDIDOS ESPERANDO RESPOSTA'}
+              </Text>
+            </View>
+
+            {pedidos.slice(0, 4).map(c => (
+              <Linha key={c.id} consulta={c} comDia onAbrir={setFichaAberta} />
+            ))}
+            {pedidos.length > 4 && (
+              <Text style={styles.maisPedidos}>e mais {pedidos.length - 4}</Text>
+            )}
+
+            {/* Dito porque a tela MOSTRA e não deixa responder: uma lista de
+                gente esperando, sem saída, é pior do que não mostrar. */}
+            <Text style={styles.ondeResponder}>
+              Aceitar ou recusar ainda é no sistema, no computador.
+            </Text>
+          </View>
+        )}
+
         {dia.aindaHoje.length > 0 && (
           <View style={styles.bloco}>
             <Text style={styles.rotuloBloco}>{dia.agora ? 'DEPOIS' : 'HOJE'}</Text>
@@ -243,6 +295,18 @@ export function PainelDaNutriScreen({
           </View>
         )}
 
+        {/* ──────────────────── AMANHÃ, NUMA LINHA ────────────────────
+            Ela olha o painel à noite, quando o dia já acabou -- e até agora a
+            tela respondia só a pergunta da manhã. Uma linha, e não um bloco: a
+            agenda de amanhã inteira está a um toque na aba Agenda, e repetir
+            aqui faria a tela do DIA falar de outro dia. */}
+        {amanha.length > 0 && (
+          <Text style={styles.amanha}>
+            Amanhã: {amanha.length === 1 ? '1 consulta' : amanha.length + ' consultas'}
+            {amanha[0] ? ', a primeira às ' + hhmm(amanha[0].quando) : ''}
+          </Text>
+        )}
+
         {/* Dia sem consulta NÃO é dia livre: ela pode ter mil coisas que o app
             não enxerga. A frase diz o que o app sabe, e nada além. */}
         {/* ──────────────────── O DINHEIRO DO DIA ────────────────────
@@ -252,7 +316,18 @@ export function PainelDaNutriScreen({
             entrou nada hoje". Escrever "R$ 0" nos dois casos seria o app
             afirmando um número que ele não sabe, para quem decide dinheiro com
             ele. Item 6: zero é mentira. */}
-        {!!dinheiro && (dinheiro.quantasBaixas > 0 || dinheiro.quantasVencendo > 0) && (
+        {/* ──────────────────── E O A PAGAR, QUE ERA LIDO E JOGADO FORA ────────────────────
+            `dinheiroDoDia` já buscava `aPagar` e `quantasAPagar`, com um
+            comentário explicando por que aquilo importa -- "é a pergunta que ela
+            faz de manhã, e não saber custa juro". Só que nenhuma tela lia os dois
+            campos: a consulta ia ao banco todo dia e a resposta era descartada.
+
+            É o mesmo formato dos três achados que fizeram nascer o `npm run
+            orfaos`: o objeto existe, e o caminho não passa por ele. Nada falha,
+            nada avisa, e ninguém descobre olhando a tela -- só olhando os dois
+            lados juntos. */}
+        {!!dinheiro &&
+          (dinheiro.quantasBaixas > 0 || dinheiro.quantasVencendo > 0 || dinheiro.quantasAPagar > 0) && (
           <View style={styles.caixaDoDia}>
             {dinheiro.quantasBaixas > 0 && (
               <View style={styles.verba}>
@@ -265,6 +340,17 @@ export function PainelDaNutriScreen({
                 <Text style={styles.rotuloVerba}>VENCE HOJE</Text>
                 <Text style={[styles.valorVerba, styles.valorVencendo]}>
                   {reais(dinheiro.vencendo)}
+                </Text>
+              </View>
+            )}
+            {dinheiro.quantasAPagar > 0 && (
+              <View style={styles.verba}>
+                {/* "A PAGAR HOJE", e não "DESPESAS": ela lê a caixa inteira de
+                    relance, e as três colunas precisam responder à mesma
+                    pergunta -- o que entrou, o que falta entrar, o que sai. */}
+                <Text style={styles.rotuloVerba}>A PAGAR HOJE</Text>
+                <Text style={[styles.valorVerba, styles.valorAPagar]}>
+                  {reais(dinheiro.aPagar)}
                 </Text>
               </View>
             )}
@@ -366,10 +452,15 @@ export function PainelDaNutriScreen({
 function Linha({
   consulta,
   apagada = false,
+  comDia = false,
   onAbrir,
 }: {
   consulta: ConsultaDoDia
   apagada?: boolean
+  /* O pedido pode ser para outro dia, e "14:00" sozinho faria ela achar que é
+     hoje. Na agenda do dia o dia é o título, e repeti-lo em cada linha seria
+     ruído. */
+  comDia?: boolean
   onAbrir?: (id: number) => void
 }) {
   const styles = estilos()
@@ -384,7 +475,9 @@ function Linha({
         (consulta.pacienteId && onAbrir ? '. Toque para abrir a ficha.' : '')
       }
     >
-      <Text style={[styles.hora, apagada && styles.apagado]}>{hhmm(consulta.quando)}</Text>
+      <Text style={[styles.hora, apagada && styles.apagado, comDia && styles.horaLarga]}>
+        {comDia ? diaCurto(consulta.quando) + ' ' + hhmm(consulta.quando) : hhmm(consulta.quando)}
+      </Text>
       <Text style={[styles.nome, apagada && styles.apagado]} numberOfLines={1}>
         {consulta.nome}
       </Text>
@@ -398,6 +491,14 @@ function Linha({
       )}
     </Pressable>
   )
+}
+
+/* "10/09". Sem o ano: um pedido é sempre para os próximos dias, e o ano ali só
+   ocuparia a largura que o nome precisa. */
+function diaCurto(iso: string): string {
+  const dt = new Date(iso)
+  if (Number.isNaN(dt.getTime())) return ''
+  return String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0')
 }
 
 const estilos = estilosDe(t =>
@@ -479,6 +580,9 @@ const estilos = estilosDe(t =>
       paddingHorizontal: 16,
     },
     verba: { flex: 1, gap: 3 },
+    /* O que SAI não pode ter a cor do que entra, e também não é erro: dívida do
+       dia é informação, e vermelho de erro neste app quer dizer "alguma coisa
+       quebrou". Fica no tom de aviso, o mesmo do cartão de conferir. */
     rotuloVerba: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: t.inkFraco },
     valorVerba: {
       fontSize: 20,
@@ -490,6 +594,31 @@ const estilos = estilosDe(t =>
     /* O que vence ainda não entrou. Cor de atenção, e não de erro: não há nada
        errado em uma conta vencer hoje. */
     valorVencendo: { color: t.cores.gold },
+    valorAPagar: { color: t.inkSuave },
+
+    /* Contorno em vez de preenchimento: o cartão cheio é o do AGORA, e dois
+       cheios na mesma tela brigam pelo olho. O contorno diz "olhe aqui" sem
+       disputar com "quem está com você". */
+    pedidos: {
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1.5,
+      borderColor: t.cores.gold,
+      borderRadius: RAIO_CARTAO,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    topoDosPedidos: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingBottom: 4 },
+    rotuloPedidos: {
+      fontSize: 10.5,
+      fontWeight: '800',
+      letterSpacing: 1,
+      color: t.cores.gold,
+    },
+    maisPedidos: { fontSize: 12.5, color: t.inkFraco, paddingVertical: 6 },
+    ondeResponder: { fontSize: 11.5, color: t.inkFraco, lineHeight: 17, paddingTop: 6 },
+
+    amanha: { fontSize: 13, color: t.inkSuave, paddingHorizontal: 4, paddingTop: 2 },
+    horaLarga: { width: 82 },
 
     blocoAtencao: {
       backgroundColor: t.cores.cartao,

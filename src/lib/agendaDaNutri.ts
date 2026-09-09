@@ -96,6 +96,44 @@ export async function consultasNoPeriodo(de: Date, ate: Date): Promise<Resultado
   return ler(inicio, fim)
 }
 
+/* ──────────────────── OS PEDIDOS ESPERANDO RESPOSTA ────────────────────
+ *
+ * `solicitada` é o paciente pedindo horário pelo app. `diaDaNutri` exclui esse
+ * status da agenda de propósito, e está certo: pedido não é compromisso, e
+ * mostrá-lo entre os confirmados faria ela contar com alguém que talvez não
+ * venha.
+ *
+ * Só que excluído dali, ele não aparecia em LUGAR NENHUM do aplicativo. São 7
+ * em produção. Alguém pediu consulta e ficou esperando, e a nutricionista não
+ * tinha como saber pelo celular -- é a única coisa do painel com uma pessoa do
+ * outro lado aguardando.
+ *
+ * ──────────────────── E por que NÃO só os de hoje ────────────────────
+ * Um pedido para a semana que vem chegou hoje, e é hoje que ela responde. O
+ * recorte é pelo que ainda está no futuro: pedido para um horário que já passou
+ * não tem mais o que responder, e mostrá-lo seria dívida que não dá para pagar. */
+const TETO_DE_PEDIDOS = 20
+
+export async function pedidosDeConsulta(): Promise<ResultadoAgenda> {
+  const agora = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('consultas')
+    .select('id, data_hora, duracao, status, tipo, paciente_id, nome_avulso')
+    .eq('status', 'solicitada')
+    .gte('data_hora', agora)
+    .order('data_hora', { ascending: true })
+    .limit(TETO_DE_PEDIDOS)
+
+  if (error) {
+    /* Falha aqui não derruba o painel: o cartão some e a agenda continua. Item
+       11 -- e o erro do pedido não pode custar a leitura do dia. */
+    falha('Não consegui ler os pedidos de consulta.', error)
+    return { tipo: 'ok', consultas: [] }
+  }
+
+  return { tipo: 'ok', consultas: await comNomes((data ?? []) as LinhaConsulta[]) }
+}
+
 async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
   const { data, error } = await supabase
     .from('consultas')
@@ -112,35 +150,38 @@ async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
     }
   }
 
-  const linhas = (data ?? []) as LinhaConsulta[]
-  if (linhas.length === 0) return { tipo: 'ok', consultas: [] }
+  return { tipo: 'ok', consultas: await comNomes((data ?? []) as LinhaConsulta[]) }
+}
 
-  /* Os nomes, numa segunda leitura. Só os ids que apareceram no dia — pedir a
-     carteira inteira para mostrar seis nomes seria trazer centenas de linhas
-     para o aparelho dela em cada abertura da tela. */
+/* Os nomes, numa SEGUNDA leitura -- e nunca por join.
+ *
+ * O nome mora em `pacientes`, que tem a própria política. Dava para pedir
+ * aninhado numa consulta só, mas isso depende de o PostgREST enxergar a
+ * relação -- e quando ele não enxerga, o erro não é "faltou o nome": é a
+ * consulta inteira falhando, e a agenda em branco.
+ *
+ * Duas leituras sempre funcionam, e a segunda só busca os ids que apareceram.
+ * Sem nome, a consulta ainda aparece com o horário, que é a informação que não
+ * pode faltar. */
+async function comNomes(linhas: LinhaConsulta[]): Promise<ConsultaDoDia[]> {
+  if (linhas.length === 0) return []
+
   const ids = [...new Set(linhas.map(l => l.paciente_id).filter((x): x is number => x !== null))]
   const nomes = new Map<number, string>()
 
   if (ids.length > 0) {
-    const { data: ps, error: erroNomes } = await supabase
-      .from('pacientes')
-      .select('id, nome')
-      .in('id', ids)
-
+    const { data: ps, error } = await supabase.from('pacientes').select('id, nome').in('id', ids)
     /* Nome que não veio não é motivo para esconder a consulta: o horário
        continua sendo a informação que ela precisa. Registra e segue. */
-    if (erroNomes) falha('Não consegui carregar os nomes dos pacientes.', erroNomes)
+    if (error) falha('Não consegui carregar os nomes dos pacientes.', error)
     else for (const p of (ps ?? []) as { id: number; nome: string | null }[]) {
       if (p.nome?.trim()) nomes.set(p.id, p.nome.trim())
     }
   }
 
-  const consultas: ConsultaDoDia[] = linhas.map(l => ({
+  return linhas.map(l => ({
     id: l.id,
     quando: l.data_hora,
-    /* O dia LOCAL dela, calculado aqui e não na tela: uma consulta das 22h é de
-       hoje para ela e de amanhã para o UTC, e a grade do mês pintaria a bolinha
-       na célula errada. A lib do calendário é pura e recebe isto pronto. */
     diaISO: diaLocalDe(l.data_hora),
     pacienteId: l.paciente_id,
     /* A ordem importa: a ficha primeiro, o avulso depois, e por fim um genérico.
@@ -154,6 +195,4 @@ async function ler(inicio: string, fim: string): Promise<ResultadoAgenda> {
     status: l.status ?? '',
     tipo: l.tipo,
   }))
-
-  return { tipo: 'ok', consultas }
 }
