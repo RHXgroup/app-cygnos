@@ -13,14 +13,16 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   PERGUNTAS_DE_EXEMPLO,
+  confirmarAcao,
   novaFala,
   perguntarAAurora,
+  type AcaoPendente,
   type Fala,
 } from '../lib/auroraDaNutri'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 
-/* A Aurora dela, no bolso. Passo 02 da análise: ela PERGUNTA, e mais nada.
+/* A Aurora dela, no bolso.
  *
  * ──────────────────── Por que uma tela de conversa, e não mais cartões no painel ────────────────────
  * Porque é a Aurora que permite a lista de telas ser curta. Não há tela de
@@ -28,11 +30,20 @@ import { estilosDe, paleta } from '../lib/tema'
  * cartão a mais no painel é uma tela que alguém precisa desenhar, manter e
  * traduzir para celular; uma pergunta não é.
  *
- * ──────────────────── E por que ela ainda não FAZ nada ────────────────────
- * Porque o cartão de confirmação vem antes de qualquer ação -- e o comando de
- * voz do treino já concluiu um treino sozinho duas vezes, sem ninguém falar
- * nada. Ali o custo foi um treino errado. Aqui seria uma paciente aparecendo no
- * consultório num dia em que ninguém a esperava.
+ * ──────────────────── O CARTÃO DE CONFIRMAÇÃO NÃO TEM EXCEÇÃO ────────────────────
+ * Nada que grave acontece sem ela ler e tocar em Confirmar. Nem para "comando
+ * simples", nem porque ela já confirmou parecido antes.
+ *
+ * Isso vem de um prejuízo real deste projeto: o comando de voz do treino
+ * concluiu um treino sozinho DUAS vezes, sem ninguém falar nada. Reconhecimento
+ * de fala erra, e vai continuar errando -- a defesa não é acertar mais, é
+ * limitar o que pode acontecer quando ele erra. Ali o custo foi um treino
+ * errado; numa agenda é uma paciente aparecendo no consultório num dia em que
+ * ninguém a esperava, e num lançamento é um número que ela só descobre no
+ * fechamento do mês.
+ *
+ * E o cartão mostra os VALORES, e não só o nome da ação. Um cartão que diz
+ * "Agendar consulta?" é um cartão que se confirma sem ler.
  *
  * ──────────────────── O teclado ────────────────────
  * Armadilha 2: a barra de escrever fica FORA da tela sem tratamento, porque no
@@ -90,6 +101,17 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
     const r = await perguntarAAurora(limpa, anteriores)
     setPensando(false)
 
+    if (r.tipo === 'confirmar') {
+      setFalas(atual => [
+        ...atual,
+        /* O texto vem antes do cartão quando existe: é ali que a Aurora
+           pergunta "confirma para quinta?". */
+        ...(r.texto ? [novaFala('aurora', r.texto)] : []),
+        { ...novaFala('aurora', r.acao.resumo), acao: r.acao },
+      ])
+      return
+    }
+
     /* A falha vira uma fala da Aurora, e não uma faixa de erro no alto.
        Numa conversa, erro fora do fluxo se perde: ela rola para ler a resposta
        e a explicação ficou lá em cima, fora da tela. */
@@ -97,6 +119,25 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
       ...atual,
       novaFala('aurora', r.tipo === 'ok' ? r.texto : r.mensagem),
     ])
+  }
+
+  async function confirmar(fala: Fala, acao: AcaoPendente) {
+    if (pensando) return
+    /* Marca ANTES de ir à rede: sem isso um toque duplo manda duas vezes, e
+       "agenda a Maria" viraria duas consultas no mesmo horário. */
+    setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'feita' } : f)))
+    setPensando(true)
+
+    const r = await confirmarAcao(acao)
+    setPensando(false)
+    setFalas(atual => [
+      ...atual,
+      novaFala('aurora', r.tipo === 'ok' ? r.texto : r.tipo === 'erro' ? r.mensagem : ''),
+    ])
+  }
+
+  function cancelar(fala: Fala) {
+    setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'cancelada' } : f)))
   }
 
   const vazia = falas.length === 0
@@ -154,16 +195,56 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
           </View>
         )}
 
-        {falas.map(f => (
-          <View
-            key={f.id}
-            style={[styles.balao, f.papel === 'nutri' ? styles.balaoDela : styles.balaoDaAurora]}
-          >
-            <Text style={f.papel === 'nutri' ? styles.textoDela : styles.textoDaAurora}>
-              {f.texto}
-            </Text>
-          </View>
-        ))}
+        {falas.map(f =>
+          f.acao ? (
+            <View key={f.id} style={styles.cartao}>
+              <View style={styles.topoDoCartao}>
+                <Ionicons name="alert-circle-outline" size={16} color={paleta().cores.gold} />
+                <Text style={styles.rotuloDoCartao}>CONFIRA ANTES</Text>
+              </View>
+
+              <Text style={styles.resumoDoCartao}>{f.texto}</Text>
+
+              {f.decidida === undefined ? (
+                <View style={styles.botoesDoCartao}>
+                  {/* Cancelar é o botão LARGO e Confirmar é o estreito, ao
+                      contrário do costume. Quem está com pressa toca no maior, e
+                      aí o gesto sem atenção precisa ser o que NÃO grava. */}
+                  <Pressable
+                    onPress={() => cancelar(f)}
+                    style={({ pressed }) => [styles.cancelar, pressed && styles.pressionado]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.textoCancelar}>Cancelar</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void confirmar(f, f.acao!)}
+                    style={({ pressed }) => [styles.confirmar, pressed && styles.pressionado]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.textoConfirmar}>Confirmar</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                /* A decisão fica escrita, e não some com os botões: rolar para
+                   cima e ver "Confirmado" é o que responde "eu marquei mesmo
+                   aquela consulta?" sem abrir o computador. */
+                <Text style={styles.decidido}>
+                  {f.decidida === 'feita' ? 'Confirmado por você' : 'Cancelado'}
+                </Text>
+              )}
+            </View>
+          ) : (
+            <View
+              key={f.id}
+              style={[styles.balao, f.papel === 'nutri' ? styles.balaoDela : styles.balaoDaAurora]}
+            >
+              <Text style={f.papel === 'nutri' ? styles.textoDela : styles.textoDaAurora}>
+                {f.texto}
+              </Text>
+            </View>
+          ),
+        )}
 
         {pensando && (
           <View style={[styles.balao, styles.balaoDaAurora, styles.pensando]}>
@@ -237,6 +318,45 @@ const estilos = estilosDe(t =>
     textoDela: { fontSize: 14.5, color: t.cores.branco, lineHeight: 21 },
     textoDaAurora: { fontSize: 14.5, color: t.cores.ink, lineHeight: 21 },
     pensando: { paddingVertical: 14, paddingHorizontal: 18 },
+
+    /* O cartão ocupa a largura toda, e os balões não. É o que faz o olho parar
+       nele em vez de ler como mais uma fala da conversa. */
+    cartao: {
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1.5,
+      borderColor: t.cores.gold,
+      borderRadius: 16,
+      padding: 15,
+      gap: 10,
+    },
+    topoDoCartao: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    rotuloDoCartao: {
+      fontSize: 10.5,
+      fontWeight: '800',
+      letterSpacing: 1.1,
+      color: t.cores.gold,
+    },
+    resumoDoCartao: { fontSize: 15.5, color: t.cores.ink, lineHeight: 23, fontWeight: '600' },
+    botoesDoCartao: { flexDirection: 'row', gap: 10, marginTop: 2 },
+    cancelar: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 13,
+      borderRadius: 13,
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+    },
+    textoCancelar: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
+    confirmar: {
+      alignItems: 'center',
+      paddingVertical: 13,
+      paddingHorizontal: 22,
+      borderRadius: 13,
+      backgroundColor: t.cores.verde,
+    },
+    textoConfirmar: { fontSize: 14.5, fontWeight: '800', color: t.cores.branco },
+    decidido: { fontSize: 13, fontWeight: '700', color: t.inkFraco },
 
     barra: {
       flexDirection: 'row',
