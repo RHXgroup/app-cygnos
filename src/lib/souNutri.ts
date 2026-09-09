@@ -85,16 +85,44 @@ export async function quemEntrou(): Promise<QuemEntrou | null> {
    * migração 20260908200000 não rodar, esta função NÃO EXISTE no banco, e o erro
    * cai no `catch` devolvendo 'nenhum' -- que é exatamente o comportamento de
    * hoje. Nada quebra antes do SQL rodar. */
-  try {
-    const { data, error } = await supabase.rpc('app_quem_sou')
-    if (error) return 'nenhum'
-    const quem = data as { tipo?: string } | null
-    if (quem?.tipo === 'funcionario' || quem?.tipo === 'nutricionista') return 'nutricionista'
-  } catch {
-    /* Função ausente ou rede caindo no meio: segue como antes. */
+  /* ──────────────────── FALHAR AQUI NÃO PODE DESCONECTAR NINGUÉM ────────────────────
+   *
+   * Este ramo devolvia 'nenhum' quando a chamada FALHAVA, e 'nenhum' faz o App
+   * mostrar "esta conta não tem cadastro" e chamar `signOut()`. Ou seja: uma
+   * falha de rede de um segundo expulsava do app uma funcionária com a
+   * credencial certa -- e ela voltaria para o login lendo que a conta dela não
+   * existe.
+   *
+   * É o erro que o próprio arquivo já avisava para não cometer, duas telas
+   * acima: confundir "não deu para perguntar" com "a resposta é não". Aconteceu
+   * de verdade, em teste, tocando na Aurora.
+   *
+   * Agora só uma RESPOSTA do banco decide. Erro devolve `null`, que quer dizer
+   * "não sei" -- e quem chama trata isso deixando entrar. */
+  const perguntar = async (): Promise<QuemEntrou | null> => {
+    try {
+      const { data, error } = await supabase.rpc('app_quem_sou')
+      if (error) return null
+      const quem = data as { tipo?: string } | null
+      if (quem?.tipo === 'funcionario' || quem?.tipo === 'nutricionista') return 'nutricionista'
+      /* O banco respondeu, e a resposta foi 'nenhum'. Essa sim é decisão. */
+      return quem?.tipo === 'nenhum' ? 'nenhum' : null
+    } catch {
+      return null
+    }
   }
 
-  return 'nenhum'
+  /* Uma segunda tentativa, e só uma.
+   *
+   * O custo de insistir é meio segundo na abertura; o custo de desistir é
+   * mandar embora quem tinha direito de entrar. E duas é o bastante: o que
+   * derruba a primeira é o pacote perdido do elevador, e não um servidor fora
+   * do ar -- esse não melhora com a terceira. */
+  const primeira = await perguntar()
+  if (primeira !== null) return primeira
+
+  await new Promise(r => setTimeout(r, 400))
+  return perguntar()
 }
 
 /* Os dados dela, para o cabeçalho da tela.

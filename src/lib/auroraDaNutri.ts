@@ -153,16 +153,6 @@ export async function confirmarAcao(acao: AcaoPendente): Promise<RespostaDaAuror
   }
 }
 
-/* O que oferecer antes de ela digitar qualquer coisa.
- *
- * Não é enfeite: uma caixa de texto vazia com "pergunte alguma coisa" não diz
- * o que a Aurora SABE, e a primeira pergunta de quem não sabe costuma ser
- * justamente a que ela não responde -- "remarca a Maria" --, o que ensina em
- * dez segundos que não serve para nada. Três exemplos do que ela responde HOJE
- * valem mais que qualquer texto de ajuda. */
-export const PERGUNTAS_DE_EXEMPLO = [
-  'Quem é o meu próximo paciente?',
-  'Quanto eu recebi hoje?',
-  'Quem está sem retorno?',
-  'Agenda um retorno para amanhã às 15h',
-]
+/* Os exemplos e os textos de abertura moram em `menuDaAurora.ts`, e não aqui:
+   este arquivo importa o Supabase, e nada que o importe roda no Node. Lá são
+   texto e decisão puros, e por isso têm teste. */

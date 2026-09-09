@@ -20,6 +20,7 @@ import {
   fichaDoPaciente,
   idadeDe,
   type FichaDoPaciente,
+  type Medida,
   type PacienteDaLista,
 } from '../lib/pacientesDaNutri'
 import { useDesvioDoTeclado } from '../lib/teclado'
@@ -321,15 +322,85 @@ function Ficha({ id, onFechar }: { id: number; onFechar: () => void }) {
                 />
               </View>
 
+              {/* ──────────────────── AS MEDIDAS ────────────────────
+                  Um peso sozinho não diz nada. "78,4 kg" é um número; "78,4, era
+                  81,0" é a conversa que ela vai ter com a pessoa na frente. Por
+                  isso a variação vem colada, e só aparece quando há com o que
+                  comparar. */}
+              {ficha.medidas.length > 0 && (
+                <View style={styles.cartao}>
+                  <Text style={styles.rotuloDoBloco}>
+                    MEDIDAS · {rotuloDaData(ficha.medidas[0].quando)}
+                  </Text>
+                  <View style={styles.numeros}>
+                    <Numero
+                      rotulo="Peso"
+                      valor={ficha.medidas[0].peso}
+                      unidade=" kg"
+                      antes={ficha.medidas[1]?.peso ?? null}
+                    />
+                    <Numero rotulo="IMC" valor={ficha.medidas[0].imc} antes={ficha.medidas[1]?.imc ?? null} />
+                    <Numero
+                      rotulo="Cintura"
+                      valor={ficha.medidas[0].cintura}
+                      unidade=" cm"
+                      antes={ficha.medidas[1]?.cintura ?? null}
+                    />
+                    <Numero
+                      rotulo="Gordura"
+                      valor={ficha.medidas[0].gordura}
+                      unidade="%"
+                      antes={ficha.medidas[1]?.gordura ?? null}
+                    />
+                  </View>
+                  {ficha.medidas.length > 1 && (
+                    <Text style={styles.comparadoCom}>
+                      Comparação com a avaliação de {rotuloDaData(ficha.medidas[1].quando)}
+                    </Text>
+                  )}
+                </View>
+              )}
+
               <View style={styles.cartao}>
                 <Text style={styles.rotuloDoBloco}>ACOMPANHAMENTO</Text>
                 <Item
-                  rotulo="Plano ativo"
+                  rotulo="Plano alimentar ativo"
                   valor={ficha.planoAtivo ?? 'Nenhum plano ativo'}
                   aviso={!ficha.planoAtivo}
                 />
+                <Item
+                  rotulo="Plano terapêutico"
+                  valor={
+                    ficha.planoTerapeutico
+                      ? ficha.planoTerapeutico.titulo + ' · ' + ficha.planoTerapeutico.status
+                      : 'Nenhum'
+                  }
+                  aviso={!ficha.planoTerapeutico}
+                />
+                <Item
+                  rotulo="Última anamnese"
+                  valor={ficha.ultimaAnamnese ? rotuloDaData(ficha.ultimaAnamnese) : 'Nenhuma'}
+                  aviso={!ficha.ultimaAnamnese}
+                />
+                <Item
+                  rotulo="Consultas realizadas"
+                  valor={String(ficha.quantasConsultas)}
+                />
                 <Item rotulo="Usa o aplicativo" valor={ficha.usaOApp ? 'Sim' : 'Não'} />
               </View>
+
+              {/* ──────────────────── ONDE A GENTE PAROU ────────────────────
+                  A observação da última consulta é o motivo pelo qual a maioria
+                  das fichas é aberta -- e é texto que ELA escreveu, então vai
+                  inteiro e selecionável, sem cortar em três linhas. */}
+              {!!ficha.notasDaUltima && (
+                <View style={styles.cartao}>
+                  <Text style={styles.rotuloDoBloco}>DA ÚLTIMA CONSULTA</Text>
+                  <Text style={styles.notas} selectable>
+                    {ficha.notasDaUltima}
+                  </Text>
+                </View>
+              )}
 
               {/* O financeiro só aparece quando HÁ algo em aberto. Zero aqui não
                   é resposta: a política de `contas_receber` exige permissão de
@@ -362,6 +433,65 @@ function Ficha({ id, onFechar }: { id: number; onFechar: () => void }) {
       )}
     </View>
   )
+}
+
+/* Um número com a variação desde a avaliação anterior.
+ *
+ * A seta diz o SENTIDO e nada mais -- sem verde de "bom" e vermelho de "ruim".
+ * Quem está em ganho de massa sobe de propósito, e pintar isso de vermelho
+ * seria o app dando conduta. Quem interpreta é ela. */
+function Numero({
+  rotulo,
+  valor,
+  antes,
+  unidade = '',
+}: {
+  rotulo: string
+  valor: number | null
+  antes?: number | null
+  unidade?: string
+}) {
+  const styles = estilos()
+  /* Null vira traço, e nunca zero: a base não tem todo campo de toda avaliação,
+     e um zero ali somaria como verdade. Item 6. */
+  if (valor === null) {
+    return (
+      <View style={styles.numero}>
+        <Text style={styles.valorNumero}>·</Text>
+        <Text style={styles.rotuloNumero}>{rotulo}</Text>
+      </View>
+    )
+  }
+
+  const delta = antes === null || antes === undefined ? null : valor - antes
+  /* Meio dígito de folga: uma diferença de 40 gramas entre duas balanças não é
+     evolução, e mostrar "↑ 0,0" é ruído que ensina a ignorar a seta. */
+  const mudou = delta !== null && Math.abs(delta) >= 0.05
+
+  return (
+    <View style={styles.numero}>
+      <Text style={styles.valorNumero}>
+        {String(Math.round(valor * 10) / 10).replace('.', ',')}
+        {unidade}
+      </Text>
+      {mudou && delta !== null && (
+        <Text style={styles.delta}>
+          {delta > 0 ? '↑' : '↓'}{' '}
+          {String(Math.abs(Math.round(delta * 10) / 10)).replace('.', ',')}
+        </Text>
+      )}
+      <Text style={styles.rotuloNumero}>{rotulo}</Text>
+    </View>
+  )
+}
+
+/* "12/08/2026" a partir de 'AAAA-MM-DD' ou de um instante.
+   Sem passar por `Date` quando já é data pura: lida como UTC, ela vira o dia
+   anterior no Brasil -- e a ficha mostraria a avaliação um dia antes. */
+function rotuloDaData(valor: string): string {
+  const so = valor.slice(0, 10)
+  const m = so.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : valor
 }
 
 function Item({ rotulo, valor, aviso = false }: { rotulo: string; valor: string; aviso?: boolean }) {
@@ -469,6 +599,23 @@ const estilos = estilosDe(t =>
     /* Ausência em tom apagado, e não em vermelho: não ter plano ativo não é
        erro, é um fato que ela pode querer resolver. */
     valorAusente: { color: t.inkFraco },
+
+    numeros: { flexDirection: 'row', gap: 8, paddingTop: 2 },
+    numero: { flex: 1, alignItems: 'center', gap: 1 },
+    valorNumero: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: t.cores.ink,
+      letterSpacing: -0.3,
+      fontVariant: ['tabular-nums'],
+    },
+    /* A seta em tom neutro, e não em verde ou vermelho: ela diz o sentido, e
+       quem julga se é bom é a nutricionista. */
+    delta: { fontSize: 11, fontWeight: '700', color: t.inkSuave },
+    rotuloNumero: { fontSize: 10.5, color: t.inkFraco, textAlign: 'center', marginTop: 1 },
+    comparadoCom: { fontSize: 11, color: t.inkFraco, paddingTop: 10 },
+
+    notas: { fontSize: 14, color: t.cores.ink, lineHeight: 21 },
 
     rodape: { fontSize: 12, color: t.inkFraco, lineHeight: 18, paddingHorizontal: 4, paddingTop: 4 },
     pressionado: { opacity: 0.7 },

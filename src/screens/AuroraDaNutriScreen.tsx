@@ -12,13 +12,19 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
-  PERGUNTAS_DE_EXEMPLO,
   confirmarAcao,
   novaFala,
   perguntarAAurora,
   type AcaoPendente,
   type Fala,
 } from '../lib/auroraDaNutri'
+import {
+  FECHAMENTO,
+  O_QUE_ELA_FAZ,
+  PERGUNTAS_DE_EXEMPLO,
+  RESPOSTA_DO_MENU,
+  ehPedidoDeMenu,
+} from '../lib/menuDaAurora'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 
@@ -90,6 +96,23 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
     const limpa = pergunta.trim()
     if (!limpa || pensando) return
 
+    /* "Menu principal" não vai ao modelo.
+     *
+     * Ela terminou um agendamento, quis voltar para as perguntas do começo, e
+     * digitou "Manu principal" -- a Aurora leu "Manu" como nome e devolveu
+     * cinco pacientes parecidas, perguntando qual era. Quem procurava a saída
+     * recebeu uma lista de gente.
+     *
+     * O prompt do servidor também aprendeu a regra, e é ele que cobre o que for
+     * escrito de um jeito que ninguém previu. Aqui ficam só as frases que não
+     * podem querer dizer outra coisa: é instantâneo, não custa uma ida ao
+     * modelo, e não tem como ser reinterpretado -- que foi o que deu errado. */
+    if (ehPedidoDeMenu(limpa)) {
+      setFalas(atual => [...atual, novaFala('nutri', limpa), novaFala('aurora', RESPOSTA_DO_MENU)])
+      setTexto('')
+      return
+    }
+
     /* A pergunta entra na lista ANTES da resposta, e o campo esvazia junto: sem
        isso ela fica olhando o próprio texto parado no campo sem saber se foi. */
     const minha = novaFala('nutri', limpa)
@@ -133,6 +156,13 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
     setFalas(atual => [
       ...atual,
       novaFala('aurora', r.tipo === 'ok' ? r.texto : r.tipo === 'erro' ? r.mensagem : ''),
+      /* Deu certo: pergunta o próximo passo, em vez de encerrar no relato seco
+         do banco. Num balão à parte, e não emendada no texto da RPC -- o
+         "Consulta agendada para..." é o que QUEM GRAVOU escreveu, e essa
+         fronteira é o que faz o histórico servir para conferir depois.
+         Na falha não vai: quem acabou de ler que nada foi gravado não está
+         procurando o que fazer em seguida. */
+      ...(r.tipo === 'ok' ? [novaFala('aurora', FECHAMENTO)] : []),
     ])
   }
 
@@ -141,6 +171,8 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
   }
 
   const vazia = falas.length === 0
+  /* Cartão esperando decisão. Enquanto houver um, nada mais é oferecido. */
+  const cartaoAberto = falas.some(f => f.acao && f.decidida === undefined)
 
   return (
     <View
@@ -173,12 +205,13 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
             {/* Dito por escrito, e antes da primeira pergunta. Sem isto a
                 primeira coisa que se pede é justamente o que ela não faz --
                 "remarca a Maria" --, e uma recusa de saída ensina em dez
-                segundos que a Aurora não serve para nada. */}
-            <Text style={styles.textoAbertura}>
-              Por enquanto eu só respondo sobre a sua agenda, o dinheiro do dia e
-              quem está pedindo atenção. Agendar, remarcar e lançar continuam no
-              sistema, no computador.
-            </Text>
+                segundos que a Aurora não serve para nada.
+
+                O texto vem de `menuDaAurora` porque é o MESMO que ela responde
+                a "menu principal". Escrito duas vezes, um dos dois envelhece --
+                e este já tinha envelhecido: dizia que agendar continuava no
+                computador depois de a Aurora passar a agendar. */}
+            <Text style={styles.textoAbertura}>{O_QUE_ELA_FAZ}</Text>
 
             <View style={styles.exemplos}>
               {PERGUNTAS_DE_EXEMPLO.map(p => (
@@ -252,6 +285,34 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
           </View>
         )}
       </ScrollView>
+
+      {/* O caminho de volta para o começo, e a resposta a "e agora?".
+          Os exemplos existiam SÓ com a conversa vazia: depois da primeira
+          pergunta não havia mais nada indicando o que ela podia pedir, e foi
+          procurando isso que "menu principal" virou busca de paciente.
+
+          Some enquanto ela digita (o teclado já ocupa a tela), enquanto a
+          Aurora pensa, e enquanto houver cartão esperando decisão -- ali a
+          única coisa a fazer é confirmar ou cancelar. */}
+      {!vazia && !pensando && !cartaoAberto && !texto.trim() && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.tira}
+        >
+          {PERGUNTAS_DE_EXEMPLO.map(p => (
+            <Pressable
+              key={p}
+              onPress={() => void mandar(p)}
+              style={({ pressed }) => [styles.sugestao, pressed && styles.pressionado]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.textoSugestao}>{p}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
 
       <View style={[styles.barra, { paddingBottom: 10 + respiro }]}>
         <TextInput
@@ -357,6 +418,20 @@ const estilos = estilosDe(t =>
     },
     textoConfirmar: { fontSize: 14.5, fontWeight: '800', color: t.cores.branco },
     decidido: { fontSize: 13, fontWeight: '700', color: t.inkFraco },
+
+    /* Chips baixos e em linha, para caberem sem empurrar a conversa. A tira
+       rola: quatro perguntas não cabem na largura de um celular, e cortar a
+       quarta seria esconder justamente a que ensina que a Aurora agenda. */
+    tira: { gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
+    sugestao: {
+      backgroundColor: t.cores.cartao,
+      borderRadius: 16,
+      paddingVertical: 9,
+      paddingHorizontal: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: t.cores.borda,
+    },
+    textoSugestao: { fontSize: 13, color: t.inkSuave },
 
     barra: {
       flexDirection: 'row',

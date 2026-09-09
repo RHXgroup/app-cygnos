@@ -95,6 +95,18 @@ export async function buscarPacientes(
  * O que ela precisa saber com a pessoa na frente, e nada de prontuário: exame,
  * antropometria e anamnese são entrada de muitos números, onde errar um dígito
  * muda a conduta, e continuam no computador. */
+/* Uma medida no tempo. Tudo pode ser nulo: a base não tem todo campo de toda
+   avaliação, e zero no lugar do desconhecido soma como se fosse verdade --
+   item 6. A tela mostra "·" onde não há número. */
+export type Medida = {
+  quando: string
+  peso: number | null
+  altura: number | null
+  imc: number | null
+  gordura: number | null
+  cintura: number | null
+}
+
 export type FichaDoPaciente = {
   id: number
   nome: string
@@ -112,6 +124,21 @@ export type FichaDoPaciente = {
   /* O que está em aberto no financeiro dele. */
   emAberto: number
   quantasEmAberto: number
+
+  /* ──────────────────── O ACOMPANHAMENTO ────────────────────
+   * Ela pediu o máximo de informação, e o critério do que entra é este: o que
+   * ela olharia com a pessoa na frente. Tudo aqui é LEITURA -- digitar
+   * antropometria e anamnese continua no computador, porque são dezenas de
+   * campos onde um dígito errado muda a conduta. */
+  medidas: Medida[]
+  planoTerapeutico: { titulo: string; status: string } | null
+  ultimaAnamnese: string | null
+  /* O que ela escreveu no fim da última consulta. É o campo que responde "onde
+     a gente parou?", e é o motivo de a maioria das fichas ser aberta. */
+  notasDaUltima: string | null
+  /* Quantas consultas realizadas desde sempre. Um número, e não a lista: diz o
+     tamanho da relação sem ocupar a tela. */
+  quantasConsultas: number
 }
 
 export type ResultadoFicha =
@@ -126,7 +153,18 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
      E nenhuma delas é join: quando o PostgREST não enxerga a relação o erro não
      é "faltou o campo", é a consulta inteira falhando -- e aí a ficha nasce em
      branco por causa de um dado acessório. */
-  const [base, vinculo, passada, futura, plano, contas] = await Promise.all([
+  const [
+    base,
+    vinculo,
+    passada,
+    futura,
+    plano,
+    contas,
+    antropometria,
+    terapeutico,
+    anamnese,
+    realizadas,
+  ] = await Promise.all([
     supabase
       .from('pacientes')
       .select('id, nome, celular, data_nascimento, email, genero, status')
@@ -135,7 +173,7 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
     supabase.from('app_contas').select('id').eq('paciente_id', id).limit(1),
     supabase
       .from('consultas')
-      .select('data_hora')
+      .select('data_hora, notas_atendimento')
       .eq('paciente_id', id)
       .eq('status', 'realizada')
       .order('data_hora', { ascending: false })
@@ -160,6 +198,38 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
       .select('valor')
       .eq('paciente_id', id)
       .eq('status', 'pendente'),
+
+    /* As duas últimas medidas, e não só a mais nova: um peso sozinho não diz
+       nada. "78,4 kg" é um número; "78,4, era 81,0" é a conversa que ela vai
+       ter. Três para a segunda sobreviver a uma avaliação sem peso. */
+    supabase
+      .from('antropometria_avaliacoes')
+      .select('data_avaliacao, antropometria_adulto(peso, altura, imc, percentual_gordura, circ_cintura)')
+      .eq('paciente_id', id)
+      .order('data_avaliacao', { ascending: false })
+      .limit(3),
+
+    supabase
+      .from('planos_terapeuticos')
+      .select('titulo, status, created_at')
+      .eq('paciente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1),
+
+    supabase
+      .from('anamnese_preenchidas')
+      .select('data_anamnese, created_at')
+      .eq('paciente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1),
+
+    /* `head: true` traz só a contagem, sem as linhas: são dezenas de consultas
+       e a tela quer UM número. */
+    supabase
+      .from('consultas')
+      .select('id', { count: 'exact', head: true })
+      .eq('paciente_id', id)
+      .eq('status', 'realizada'),
   ])
 
   if (base.error || !base.data) {
@@ -192,6 +262,38 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
 
   const primeira = <T,>(v: T[] | null | undefined): T | null => (v && v.length > 0 ? v[0] : null)
 
+  /* ──────────────────── AS MEDIDAS ────────────────────
+   * A leitura é aninhada (`antropometria_adulto` é tabela filha), e é a única
+   * aqui que é -- porque a avaliação sem as medidas não serve para nada, e duas
+   * leituras casadas por id dariam o mesmo resultado por mais código. Se o
+   * PostgREST não enxergar a relação, o bloco inteiro some da tela; o resto da
+   * ficha continua. */
+  const numeroOuNulo = (v: unknown): number | null => {
+    const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const medidas: Medida[] = ((antropometria.data ?? []) as Record<string, unknown>[])
+    .map(a => {
+      const filha = Array.isArray(a.antropometria_adulto)
+        ? (a.antropometria_adulto[0] as Record<string, unknown> | undefined)
+        : (a.antropometria_adulto as Record<string, unknown> | undefined)
+      return {
+        quando: String(a.data_avaliacao ?? ''),
+        peso: numeroOuNulo(filha?.peso),
+        altura: numeroOuNulo(filha?.altura),
+        imc: numeroOuNulo(filha?.imc),
+        gordura: numeroOuNulo(filha?.percentual_gordura),
+        cintura: numeroOuNulo(filha?.circ_cintura),
+      }
+    })
+    /* Avaliação sem nenhum número não entra: seria uma coluna de traços, que se
+       lê como app quebrado em vez de "não foi medido". */
+    .filter(m => m.peso !== null || m.imc !== null || m.cintura !== null)
+
+  const pt = primeira(terapeutico.data as { titulo: string | null; status: string | null }[] | null)
+  const am = primeira(anamnese.data as { data_anamnese: string | null; created_at: string }[] | null)
+
   return {
     tipo: 'ok',
     ficha: {
@@ -209,6 +311,16 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
         primeira(plano.data as { titulo: string | null }[] | null)?.titulo?.trim() || null,
       emAberto,
       quantasEmAberto: pendentes.length,
+      medidas,
+      planoTerapeutico:
+        pt && pt.titulo?.trim()
+          ? { titulo: pt.titulo.trim(), status: pt.status?.trim() || 'sem status' }
+          : null,
+      ultimaAnamnese: am?.data_anamnese ?? am?.created_at?.slice(0, 10) ?? null,
+      notasDaUltima:
+        primeira(passada.data as { notas_atendimento: string | null }[] | null)
+          ?.notas_atendimento?.trim() || null,
+      quantasConsultas: realizadas.count ?? 0,
     },
   }
 }
