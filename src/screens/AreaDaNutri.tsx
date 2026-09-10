@@ -16,6 +16,7 @@ import {
   totalNaoLidas,
   type MensagemQueChegou,
 } from '../lib/conversasDaNutri'
+import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { previaDaConversa } from '../lib/previaDaConversa'
 import { estilosDe } from '../lib/tema'
 import { abaDoDeslize } from '../lib/deslizarEntreAbas'
@@ -43,6 +44,20 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
   const styles = estilos()
   const [aba, setAba] = useState<AbaDaNutri>('hoje')
   const [auroraAberta, setAuroraAberta] = useState(false)
+  /* Quando a Aurora foi aberta de dentro de uma ficha, quem está nela.
+   *
+   * Estado separado do "aberta" porque os dois caminhos existem: pelo botão da
+   * barra ela abre SEM foco (a pergunta pode ser sobre o dia, o dinheiro, a
+   * agenda), e pela ficha abre COM. Um estado só, `foco | null`, faria "aberta
+   * sem foco" e "fechada" virarem o mesmo `null`. */
+  const [focoDaAurora, setFocoDaAurora] = useState<PacienteEmFoco | null>(null)
+
+  /* As duas entradas passam por aqui, e por isso ninguém esquece de limpar o
+     foco: abrir pela barra é abrir com foco nenhum, explicitamente. */
+  const abrirAurora = (foco: PacienteEmFoco | null) => {
+    setFocoDaAurora(foco)
+    setAuroraAberta(true)
+  }
   const [lendoCodigo, setLendoCodigo] = useState(false)
   const [fotografando, setFotografando] = useState(false)
   const [conversando, setConversando] = useState(false)
@@ -196,6 +211,10 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
       }
       if (auroraAberta) {
         setAuroraAberta(false)
+        /* O foco morre junto. Sem isto, abrir a Aurora pela barra depois de a
+           ter aberto por uma ficha traria a paciente anterior de volta -- e as
+           perguntas iriam sobre quem ela não está olhando. */
+        setFocoDaAurora(null)
         return true
       }
       /* De qualquer aba, o voltar leva à inicial antes de sair do app. É o que
@@ -229,7 +248,17 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
     )
   }
   if (auroraAberta) {
-    return <AuroraDaNutriScreen onFechar={() => setAuroraAberta(false)} />
+    return (
+      <AuroraDaNutriScreen
+        /* `?? undefined` porque a prop de lá é opcional e não aceita nulo.
+           Sem foco -- aberta pelo botão da barra -- a Aurora é a de sempre. */
+        sobre={focoDaAurora ?? undefined}
+        onFechar={() => {
+          setAuroraAberta(false)
+          setFocoDaAurora(null)
+        }}
+      />
+    )
   }
 
   return (
@@ -239,12 +268,13 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
           <PainelDaNutriScreen
             onSair={onSair}
             onLerCodigo={() => setLendoCodigo(true)}
+            onAurora={abrirAurora}
             naoLidas={naoLidas}
             onConversas={() => setConversando(true)}
           />
         )}
-        {aba === 'agenda' && <AgendaDaNutriScreen />}
-        {aba === 'pacientes' && <PacientesDaNutriScreen />}
+        {aba === 'agenda' && <AgendaDaNutriScreen onAurora={abrirAurora} />}
+        {aba === 'pacientes' && <PacientesDaNutriScreen onAurora={abrirAurora} />}
         {aba === 'mais' && (
           <MaisDaNutriScreen
             onSair={onSair}

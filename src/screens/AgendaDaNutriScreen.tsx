@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import {
   cancelarConsulta,
@@ -67,7 +68,11 @@ import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
  * pontos que ninguém lê; o nome aparece quando ela TOCA no dia, que é quando
  * ela quer saber de quem é. */
 
-export function AgendaDaNutriScreen() {
+export function AgendaDaNutriScreen({
+  onAurora,
+}: {
+  onAurora?: (foco: PacienteEmFoco) => void
+} = {}) {
   const styles = estilos()
   const { top } = useSafeAreaInsets()
 
@@ -185,7 +190,13 @@ export function AgendaDaNutriScreen() {
   const hoje = hojeLocal()
 
   if (fichaAberta !== null) {
-    return <FichaDoPacienteScreen id={fichaAberta} onFechar={() => setFichaAberta(null)} />
+    return (
+      <FichaDoPacienteScreen
+        id={fichaAberta}
+        onFechar={() => setFichaAberta(null)}
+        onAurora={onAurora}
+      />
+    )
   }
 
   const painel = agindoEm ? (

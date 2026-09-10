@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import { PainelDaConsulta } from './AgendaDaNutriScreen'
 import {
@@ -83,9 +84,12 @@ export function PainelDaNutriScreen({
   onSair,
   onLerCodigo,
   onConversas,
+  onAurora,
   naoLidas = 0,
 }: {
   onSair: () => void
+  /* Atravessa até a ficha, que é quem tem uma paciente para perguntar sobre. */
+  onAurora?: (foco: PacienteEmFoco) => void
   /* Abre as conversas com os pacientes. */
   onConversas?: () => void
   /* Quantas mensagens de pacientes esperam resposta. Vem da área, que é quem
@@ -267,7 +271,13 @@ export function PainelDaNutriScreen({
   const passou = (c: ConsultaDoDia) => dia.jaForam.some(j => j.id === c.id)
 
   if (fichaAberta !== null) {
-    return <FichaDoPacienteScreen id={fichaAberta} onFechar={() => setFichaAberta(null)} />
+    return (
+      <FichaDoPacienteScreen
+        id={fichaAberta}
+        onFechar={() => setFichaAberta(null)}
+        onAurora={onAurora}
+      />
+    )
   }
 
   const folhaDaConsulta = agindoEm ? (

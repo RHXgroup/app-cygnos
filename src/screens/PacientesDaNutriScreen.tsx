@@ -28,6 +28,7 @@ import { useDesvioDoTeclado } from '../lib/teclado'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
 import { situacaoDoPaciente, type Selo } from '../lib/situacaoDoPaciente'
+import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { PlanoDaPacienteScreen } from './PlanoDaPacienteScreen'
 import { DossieDaPacienteScreen, type SecaoDoDossie } from './DossieDaPacienteScreen'
 
@@ -52,7 +53,14 @@ import { DossieDaPacienteScreen, type SecaoDoDossie } from './DossieDaPacienteSc
    palavra. Medido no que dá para digitar sem pausa. */
 const ESPERA_DA_BUSCA = 350
 
-export function PacientesDaNutriScreen() {
+export function PacientesDaNutriScreen({
+  onAurora,
+}: {
+  /* Só atravessa até a ficha. A lista não tem o que perguntar sobre ninguém --
+     a pergunta é sobre UMA paciente, e a lista é o lugar onde ainda não se
+     escolheu qual. */
+  onAurora?: (foco: PacienteEmFoco) => void
+} = {}) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
 
@@ -119,7 +127,13 @@ export function PacientesDaNutriScreen() {
   }, [buscar, termo])
 
   if (aberto !== null) {
-    return <FichaDoPacienteScreen id={aberto} onFechar={() => setAberto(null)} />
+    return (
+      <FichaDoPacienteScreen
+        id={aberto}
+        onFechar={() => setAberto(null)}
+        onAurora={onAurora}
+      />
+    )
   }
 
   /* Contado sobre o que ESTÁ na tela, e não sobre a carteira inteira: a lista
@@ -285,7 +299,21 @@ export function PacientesDaNutriScreen() {
  * Ela lê "14:00 Marina Alves" e quer saber quem é a Marina -- o plano, o que
  * ficou combinado da última vez, se há conta em aberto. Sem isto, o nome na
  * agenda é um texto que não leva a lugar nenhum, e ela abre o computador. */
-export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: () => void }) {
+export function FichaDoPacienteScreen({
+  id,
+  onFechar,
+  onAurora,
+}: {
+  id: number
+  onFechar: () => void
+  /* Abre a Aurora com ESTA paciente no contexto.
+   *
+   * Opcional porque a ficha é aberta de três lugares (lista, agenda, painel) e
+   * quem hospeda a Aurora é a área, lá em cima -- sem o opcional, um caminho
+   * que ainda não passa a função quebraria a ficha inteira em vez de ficar
+   * sem um botão. */
+  onAurora?: (foco: PacienteEmFoco) => void
+}) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
 
@@ -543,6 +571,30 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
                     valor={reais(ficha.emAberto)}
                   />
                 </View>
+              )}
+
+              {/* —————————— PERGUNTAR SOBRE ELA ——————————
+                  "A Aurora tinha que abrir aqui, se eu quiser gerar o mesmo
+                  resumo que eu gero pelo sistema."
+
+                  Aberta pelo botão da barra, a Aurora não sabe de quem se está
+                  falando -- e ela teria de digitar o nome de quem está na tela
+                  na frente dela.
+
+                  No FIM da ficha, e não no alto: quem abre a ficha vem ler o
+                  que está nela. A pergunta é o que sobra depois de ler. */}
+              {!!onAurora && (
+                <Pressable
+                  onPress={() => onAurora({ pacienteId: id, nome: ficha.nome })}
+                  style={({ pressed }) => [styles.perguntar, pressed && { opacity: 0.8 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={'Perguntar à Aurora sobre ' + primeiroNomeDe(ficha.nome)}
+                >
+                  <Ionicons name="sparkles" size={17} color={paleta().cores.sobreLimao} />
+                  <Text style={styles.textoPerguntar}>
+                    Perguntar sobre {primeiroNomeDe(ficha.nome)}
+                  </Text>
+                </Pressable>
               )}
 
               {/* Dito por escrito porque a ausência do prontuário é decisão, e
@@ -855,6 +907,20 @@ const estilos = estilosDe(t =>
     comparadoCom: { fontFamily: FONTE.normal, fontSize: 11, color: t.inkFraco, paddingTop: 10 },
 
     notas: { fontFamily: FONTE.normal, fontSize: 14, color: t.cores.ink, lineHeight: 21 },
+
+    /* O botão da Aurora usa o limão e não o verde: é a cor DELA na barra de
+       baixo, e é o que faz a pessoa reconhecer que este botão leva ao mesmo
+       lugar que o círculo levantado. Cor nova aqui inventaria uma quarta ação. */
+    perguntar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 13,
+      borderRadius: 14,
+      backgroundColor: t.cores.limao,
+    },
+    textoPerguntar: { fontFamily: FONTE.forte, fontSize: 14.5, color: t.cores.sobreLimao },
 
     rodape: { fontSize: 12, color: t.inkFraco, lineHeight: 18, paddingHorizontal: 4, paddingTop: 4 },
     pressionado: { opacity: 0.7 },
