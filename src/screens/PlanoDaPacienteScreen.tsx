@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -18,6 +19,11 @@ import {
   type PlanoDaPaciente,
 } from '../lib/planoDoPacienteDaNutri'
 import { folhaDoPlano, nomeDoArquivo } from '../lib/folhaDoPlano'
+import {
+  procurarAlimento,
+  trocarItem,
+  type AlimentoDaBusca,
+} from '../lib/trocaDoItemDoPlano'
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
 import { falha } from '../lib/erros'
@@ -57,6 +63,10 @@ export function PlanoDaPacienteScreen({
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
   const [gerando, setGerando] = useState(false)
+  /* O item que ela tocou para trocar, ou nenhum. Guarda o rótulo junto e não
+     só o id: a folha mostra o nome do que está saindo, e ir buscar isso de novo
+     seria uma leitura para um dado que já estava na mão. */
+  const [trocando, setTrocando] = useState<{ id: number; rotulo: string } | null>(null)
 
   const carregar = useCallback(async () => {
     const r = await planoDaPaciente(pacienteId)
@@ -240,14 +250,24 @@ export function PlanoDaPacienteScreen({
                       <Text style={styles.refeicaoVazia}>Sem itens.</Text>
                     ) : (
                       r.itens.map(i => (
-                        <View key={i.id} style={styles.item}>
+                        /* Tocar no item abre a troca. É a única edição que esta
+                           tela faz, e é a que ele pediu com a paciente na
+                           frente: "agora pediu pra trocar". */
+                        <Pressable
+                          key={i.id}
+                          onPress={() => setTrocando({ id: i.id, rotulo: i.rotulo })}
+                          style={({ pressed }) => [styles.item, pressed && styles.pressionado]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${i.rotulo}. Toque para trocar por outro alimento.`}
+                        >
                           <Text style={styles.rotuloDoItem} numberOfLines={2}>
                             {i.rotulo}
                           </Text>
                           {!!i.quantidade && (
                             <Text style={styles.quantidadeDoItem}>{i.quantidade}</Text>
                           )}
-                        </View>
+                          <Ionicons name="swap-horizontal" size={14} color={paleta().inkFraco} />
+                        </Pressable>
                       ))
                     )}
 
@@ -298,6 +318,158 @@ export function PlanoDaPacienteScreen({
           )}
         </ScrollView>
       )}
+
+      {!!trocando && (
+        <FolhaDaTroca
+          item={trocando}
+          onFechar={() => setTrocando(null)}
+          onTrocou={() => {
+            setTrocando(null)
+            void carregar()
+          }}
+        />
+      )}
+    </View>
+  )
+}
+
+/* ──────────────────── A TROCA ────────────────────
+ *
+ * Busca, escolhe, pronto. Sem campo de gramagem e sem macro recalculando: a
+ * quantidade fica IGUAL, e a folha diz isso ANTES de ela escolher -- não
+ * depois, quando já não dá para desistir sem desfazer.
+ *
+ * E ela não confirma duas vezes. Escolher um alimento na lista JÁ é a
+ * confirmação: a linha mostra o nome e a caloria, e um segundo cartão
+ * perguntando "tem certeza?" sobre uma coisa reversível ensina a confirmar sem
+ * ler -- e o que ela confirma sem ler depois é o cartão de cancelar consulta. */
+function FolhaDaTroca({
+  item,
+  onFechar,
+  onTrocou,
+}: {
+  item: { id: number; rotulo: string }
+  onFechar: () => void
+  onTrocou: () => void
+}) {
+  const styles = estilos()
+  const [termo, setTermo] = useState('')
+  const [achados, setAchados] = useState<AlimentoDaBusca[]>([])
+  const [procurando, setProcurando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [recado, setRecado] = useState('')
+
+  /* Descarta resposta velha: quem digita "arr" e depois "arroz" pode receber a
+     de "arr" por último, e a lista mostraria o resultado da busca anterior.
+     Mesmo mecanismo do `daVez` da lista de pacientes. */
+  const daVez = useRef(0)
+
+  useEffect(() => {
+    const meu = ++daVez.current
+    if (termo.trim().length < 3) {
+      setAchados([])
+      return
+    }
+    setProcurando(true)
+    const espera = setTimeout(() => {
+      void procurarAlimento(termo).then(r => {
+        if (meu !== daVez.current) return
+        setProcurando(false)
+        if (r.tipo === 'ok') setAchados(r.alimentos)
+        else setRecado(r.mensagem)
+      })
+    }, 350)
+    return () => clearTimeout(espera)
+  }, [termo])
+
+  /* Sem lista de dependências -- põe este na frente do da tela do plano. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!salvando) onFechar()
+      return true
+    })
+    return () => sub.remove()
+  })
+
+  async function escolher(a: AlimentoDaBusca) {
+    if (salvando) return
+    setSalvando(true)
+    setRecado('')
+    const r = await trocarItem(item.id, a.id, a.nome)
+    setSalvando(false)
+    if (r.ok) onTrocou()
+    else setRecado(r.mensagem)
+  }
+
+  return (
+    <View style={styles.sobreposta}>
+      <Pressable
+        style={styles.fundoDaFolha}
+        onPress={() => !salvando && onFechar()}
+        accessibilityLabel="Fechar"
+      />
+      <View style={styles.folha}>
+        <View style={styles.puxador} />
+        <Text style={styles.tituloDaFolha} numberOfLines={1}>
+          Trocar {item.rotulo}
+        </Text>
+        <Text style={styles.subtituloDaFolha}>
+          A quantidade não muda. Para ajustar gramagem, o lugar é o sistema.
+        </Text>
+
+        <TextInput
+          value={termo}
+          onChangeText={setTermo}
+          placeholder="Procurar alimento"
+          placeholderTextColor={paleta().inkFraco}
+          autoFocus
+          autoCorrect={false}
+          style={styles.campoDaBusca}
+          accessibilityLabel="Procurar o alimento que vai entrar"
+        />
+
+        {!!recado && <Text style={styles.recadoDaFolha}>{recado}</Text>}
+
+        {salvando ? (
+          <View style={styles.centroDaFolha}>
+            <ActivityIndicator color={paleta().cores.verde} />
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.listaDaBusca}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {termo.trim().length < 3 ? (
+              <Text style={styles.dicaDaFolha}>Escreva ao menos três letras.</Text>
+            ) : procurando ? (
+              <Text style={styles.dicaDaFolha}>Procurando...</Text>
+            ) : achados.length === 0 ? (
+              <Text style={styles.dicaDaFolha}>
+                Nenhum alimento com esse nome na sua base nem na base pública.
+              </Text>
+            ) : (
+              achados.map(a => (
+                <Pressable
+                  key={a.id}
+                  onPress={() => void escolher(a)}
+                  style={({ pressed }) => [styles.achado, pressed && styles.pressionado]}
+                  accessibilityRole="button"
+                  accessibilityLabel={'Trocar por ' + a.nome}
+                >
+                  <Text style={styles.nomeDoAchado} numberOfLines={2}>
+                    {a.nome}
+                  </Text>
+                  {/* "—" quando não há caloria cadastrada. Zero seria mentira. */}
+                  <Text style={styles.kcalDoAchado}>
+                    {a.kcal100 === null ? '—' : Math.round(a.kcal100) + ' kcal/100g'}
+                  </Text>
+                </Pressable>
+              ))
+            )}
+          </ScrollView>
+        )}
+      </View>
     </View>
   )
 }
@@ -425,6 +597,92 @@ const estilos = estilosDe(t =>
        opacity destrói o contraste entre texto e fundo. */
     botaoDesligado: { backgroundColor: t.cores.desligado },
     pressionado: { opacity: 0.8 },
+
+    /* ──── A FOLHA DA TROCA ──── */
+    sobreposta: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end' },
+    /* Escurece o que está atrás em vez de esconder: ela continua vendo a
+       refeição de onde saiu, e é isso que diz que a folha é um degrau. */
+    fundoDaFolha: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.35)' },
+    folha: {
+      backgroundColor: t.cores.cartao,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 18,
+      paddingTop: 8,
+      paddingBottom: 20,
+      /* Altura fixa e não `flex`: a lista cresce e encolhe conforme ela digita,
+         e uma folha que muda de altura a cada letra é a tela inteira pulando
+         debaixo do dedo. */
+      height: '68%',
+    },
+    puxador: {
+      alignSelf: 'center',
+      width: 38,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: t.cores.borda,
+      marginBottom: 10,
+    },
+    tituloDaFolha: {
+      fontFamily: FONTE.forte,
+      fontSize: 17,
+      color: t.cores.ink,
+      letterSpacing: -0.4,
+    },
+    subtituloDaFolha: {
+      fontFamily: FONTE.normal,
+      fontSize: 12.5,
+      color: t.inkFraco,
+      lineHeight: 17,
+      marginTop: 3,
+    },
+    campoDaBusca: {
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 12,
+      paddingHorizontal: 13,
+      paddingVertical: 11,
+      marginTop: 12,
+      fontFamily: FONTE.normal,
+      fontSize: 15,
+      color: t.cores.ink,
+    },
+    recadoDaFolha: {
+      fontFamily: FONTE.normal,
+      fontSize: 12.5,
+      color: t.cores.ink,
+      lineHeight: 18,
+      backgroundColor: t.cores.verdeMenta,
+      padding: 10,
+      borderRadius: 10,
+      marginTop: 8,
+    },
+    centroDaFolha: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    listaDaBusca: { flex: 1, marginTop: 8 },
+    achado: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: t.cores.borda,
+    },
+    nomeDoAchado: { flex: 1, fontFamily: FONTE.media, fontSize: 14.5, color: t.cores.ink },
+    kcalDoAchado: {
+      fontFamily: FONTE.normal,
+      fontSize: 12,
+      color: t.inkFraco,
+      fontVariant: ['tabular-nums'],
+    },
+    dicaDaFolha: {
+      fontFamily: FONTE.normal,
+      fontSize: 13,
+      color: t.inkFraco,
+      textAlign: 'center',
+      paddingVertical: 24,
+      lineHeight: 18,
+    },
 
     vazio: {
       alignItems: 'center',
