@@ -33,9 +33,11 @@ import { quandoDoAviso, quandoPorExtenso } from '../lib/quandoDoAviso'
 export function MaisDaNutriScreen({
   onSair,
   onLerCodigo,
+  onFotoDoPrato,
 }: {
   onSair: () => void
   onLerCodigo: () => void
+  onFotoDoPrato: () => void
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
@@ -142,6 +144,15 @@ export function MaisDaNutriScreen({
             titulo="Ler código de barras"
             texto="Guardar um produto na sua base de alimentos"
             onPress={onLerCodigo}
+          />
+          {/* A mesma análise que o paciente usa, do lado dela. O caso é o do
+              consultório: a paciente mostra a foto do almoço, ou ela fotografa
+              o prato ali na mesa, e quer o número para conversar em cima. */}
+          <Opcao
+            icone="camera-outline"
+            titulo="Foto do prato"
+            texto="Estimar o que tem no prato, para conversar na hora"
+            onPress={onFotoDoPrato}
           />
         </View>
 

@@ -4,6 +4,7 @@ import { BackHandler, PanResponder, StyleSheet, View } from 'react-native'
 import { BarraDaNutri, type AbaDaNutri } from '../components/BarraDaNutri'
 import { AgendaDaNutriScreen } from './AgendaDaNutriScreen'
 import { AuroraDaNutriScreen } from './AuroraDaNutriScreen'
+import { FotoDoPratoDaNutriScreen } from './FotoDoPratoDaNutriScreen'
 import { LerCodigoScreen } from './LerCodigoScreen'
 import { MaisDaNutriScreen } from './MaisDaNutriScreen'
 import { PacientesDaNutriScreen } from './PacientesDaNutriScreen'
@@ -35,6 +36,7 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
   const [aba, setAba] = useState<AbaDaNutri>('hoje')
   const [auroraAberta, setAuroraAberta] = useState(false)
   const [lendoCodigo, setLendoCodigo] = useState(false)
+  const [fotografando, setFotografando] = useState(false)
 
   /* ──────────────────── DESLIZAR ENTRE AS ABAS ────────────────────
    *
@@ -83,6 +85,10 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (fotografando) {
+        setFotografando(false)
+        return true
+      }
       if (lendoCodigo) {
         setLendoCodigo(false)
         return true
@@ -109,6 +115,9 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
   if (lendoCodigo) {
     return <LerCodigoScreen paraBaseDaNutri onFechar={() => setLendoCodigo(false)} />
   }
+  if (fotografando) {
+    return <FotoDoPratoDaNutriScreen onFechar={() => setFotografando(false)} />
+  }
   if (auroraAberta) {
     return <AuroraDaNutriScreen onFechar={() => setAuroraAberta(false)} />
   }
@@ -125,7 +134,11 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
         {aba === 'agenda' && <AgendaDaNutriScreen />}
         {aba === 'pacientes' && <PacientesDaNutriScreen />}
         {aba === 'mais' && (
-          <MaisDaNutriScreen onSair={onSair} onLerCodigo={() => setLendoCodigo(true)} />
+          <MaisDaNutriScreen
+            onSair={onSair}
+            onLerCodigo={() => setLendoCodigo(true)}
+            onFotoDoPrato={() => setFotografando(true)}
+          />
         )}
       </View>
 
