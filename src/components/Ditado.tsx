@@ -58,7 +58,7 @@ export function Ditado({
      A barra de escrever da Aurora é uma linha de 40 e poucos pixels, e o
      componente inteiro nasceu para ocupar um bloco. Com `compacto` ele cabe ao
      lado do campo — e continua sendo O MESMO componente, com a mesma
-     permissão, o mesmo cronómetro e o mesmo reenvio. Uma segunda gravação
+     permissão, o mesmo cronômetro e o mesmo reenvio. Uma segunda gravação
      escrita para a Aurora seria a armadilha 5 outra vez, e desta vez em cima de
      um caminho que já custou uma semana. */
   compacto?: boolean
@@ -261,7 +261,7 @@ export function Ditado({
   }
 
   if (estado === 'gravando' && compacto) {
-    /* Gravando, o botão compacto vira o cronómetro.
+    /* Gravando, o botão compacto vira o cronômetro.
        A onda e o "toque para parar" ficam de fora — não cabem numa linha de
        barra, e espremidos quebram no meio da palavra, que é o defeito que a
        versão grande já pagou. O que NÃO pode faltar é o tempo correndo: sem
@@ -412,10 +412,10 @@ const estilos = estilosDe(t =>
     redondoGravando: {
       backgroundColor: t.cores.erroFundo,
       borderColor: t.cores.erroBorda,
-      /* Cresce um pouco: o cronómetro não cabe em 38, e um número cortado
+      /* Cresce um pouco: o cronômetro não cabe em 42, e um número cortado
          durante a gravação é o pior lugar possível para cortar. */
-      width: 56,
-      borderRadius: 19,
+      width: 60,
+      borderRadius: 21,
     },
     redondoPensando: { backgroundColor: t.cores.cartao },
     relogioCompacto: {

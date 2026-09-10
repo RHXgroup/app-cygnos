@@ -65,6 +65,10 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
 
   const [falas, setFalas] = useState<Fala[]>([])
   const [texto, setTexto] = useState('')
+  /* Qual dos dois botões a barra mostra. Derivado do campo, e não um estado
+     à parte: dois estados para a mesma coisa divergem, e o sintoma seria a seta
+     ficar na tela com o campo já vazio. */
+  const temTexto = texto.trim().length > 0
   const [pensando, setPensando] = useState(false)
 
   const [alturaDaTela, setAlturaDaTela] = useState(0)
@@ -333,71 +337,88 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
         </ScrollView>
       )}
 
+      {/* ──────────────────── A BARRA DE ESCREVER ────────────────────
+       *
+       * Um botão só à DIREITA, que troca de papel: microfone quando o campo
+       * está vazio, seta de enviar assim que ela escreve alguma coisa.
+       *
+       * É o arranjo do WhatsApp, e ele foi pedido com essas palavras. Não é
+       * imitação por imitação: o polegar de quem segura o telefone com uma mão
+       * alcança o canto direito de baixo, e é lá que fica a única ação que a
+       * barra tem em cada momento. Com o microfone à ESQUERDA -- como estava --
+       * a mão precisa atravessar a tela para falar, que é justamente o caso de
+       * quem está com as mãos ocupadas entre duas consultas.
+       *
+       * E os dois nunca aparecem juntos de propósito: dois botões redondos lado
+       * a lado, um deles desligado metade do tempo, é a barra pedindo uma
+       * escolha que não existe -- ou ela escreveu, e manda; ou não escreveu, e
+       * fala. */}
       <View style={[styles.barra, { paddingBottom: 10 + respiro }]}>
-        {/* ──────────────────── FALAR EM VEZ DE DIGITAR ────────────────────
-         *
-         * O MESMO `<Ditado>` das outras duas telas, e não uma gravação escrita
-         * aqui. Ele já carrega a permissão do microfone com a explicação antes
-         * da caixa do sistema, o cronómetro, o limite de 60 segundos, o
-         * reenvio quando a transcrição volta vazia, e o `File` do
-         * expo-file-system no lugar do `{ uri, name, type }` que o `fetch` do
-         * SDK 57 anexa como "[object Object]" -- a armadilha 17, que custou uma
-         * semana e apareceu como quatro defeitos diferentes.
-         *
-         * Uma segunda gravação escrita para esta tela herdaria zero disso, e a
-         * primeira coisa que ela erraria seria justamente aquela linha.
-         *
-         * `assunto="nutri"` não é detalhe: o contexto padrão do servidor é uma
-         * lista de COMIDA, e o Whisper obedece o contexto. "Remarca a Maria pra
-         * sexta" com aquele prompt volta como uma frase sobre pão de queijo --
-         * é o caso já medido, com o comando de treino.
-         *
-         * O texto ditado vai para o CAMPO, e não direto para a Aurora. Ela lê
-         * antes de mandar, e corrige o nome que o modelo ouviu errado -- mandar
-         * de uma vez faria a única conferência possível acontecer depois de a
-         * pergunta já ter sido feita. */}
-        <Ditado
-          compacto
-          assunto="nutri"
-          onTexto={ouvido => {
-            /* Junta ao que já estiver escrito, e não substitui: quem digitou
-               meia frase e resolveu falar o resto perderia a metade digitada. */
-            setTexto(antes => (antes.trim() ? antes.trim() + ' ' + ouvido : ouvido))
-          }}
-          /* A falha da transcricao entra como fala da Aurora, e nao como
-             faixa no alto -- a mesma decisao que o resto desta tela ja tomou,
-             e pelo mesmo motivo: numa conversa, erro fora do fluxo fica acima
-             da rolagem e ninguem le. */
-          onErro={mensagem =>
-            setFalas(atual => [...atual, novaFala('aurora', mensagem)])
-          }
-        />
+        <View style={styles.campoRedondo}>
+          <TextInput
+            value={texto}
+            onChangeText={setTexto}
+            placeholder="Pergunte alguma coisa"
+            placeholderTextColor={paleta().inkFraco}
+            keyboardAppearance="dark"
+            multiline
+            maxLength={600}
+            onSubmitEditing={() => void mandar(texto)}
+            style={styles.campo}
+            accessibilityLabel="Sua pergunta para a Aurora"
+          />
+        </View>
 
-        <TextInput
-          value={texto}
-          onChangeText={setTexto}
-          placeholder="Pergunte alguma coisa"
-          placeholderTextColor={paleta().inkFraco}
-          keyboardAppearance="dark"
-          multiline
-          maxLength={600}
-          onSubmitEditing={() => void mandar(texto)}
-          style={styles.campo}
-          accessibilityLabel="Sua pergunta para a Aurora"
-        />
-        <Pressable
-          onPress={() => void mandar(texto)}
-          disabled={!texto.trim() || pensando}
-          style={({ pressed }) => [
-            styles.botaoMandar,
-            (!texto.trim() || pensando) && styles.botaoDesligado,
-            pressed && styles.pressionado,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Enviar a pergunta"
-        >
-          <Ionicons name="arrow-up" size={19} color={paleta().cores.branco} />
-        </Pressable>
+        {temTexto ? (
+          <Pressable
+            onPress={() => void mandar(texto)}
+            disabled={pensando}
+            style={({ pressed }) => [
+              styles.botaoMandar,
+              pensando && styles.botaoDesligado,
+              pressed && styles.pressionado,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Enviar a pergunta"
+          >
+            <Ionicons name="arrow-up" size={19} color={paleta().cores.branco} />
+          </Pressable>
+        ) : (
+          /* ── FALAR EM VEZ DE DIGITAR ──
+           *
+           * O MESMO `<Ditado>` das outras duas telas, e não uma gravação escrita
+           * aqui. Ele já carrega a permissão do microfone com a explicação antes
+           * da caixa do sistema, o cronômetro, o limite de 60 segundos, o
+           * reenvio quando a transcrição volta vazia, e o `File` do
+           * expo-file-system no lugar do `{ uri, name, type }` que o `fetch` do
+           * SDK 57 anexa como "[object Object]" -- a armadilha 17, que custou
+           * uma semana e apareceu como quatro defeitos diferentes.
+           *
+           * `assunto="nutri"` não é detalhe: o contexto padrão do servidor é uma
+           * lista de COMIDA, e o Whisper obedece o contexto. "Remarca a Maria
+           * pra sexta" com aquele prompt volta como uma frase sobre pão de
+           * queijo -- é o caso já medido, com o comando de treino.
+           *
+           * O texto ditado vai para o CAMPO, e não direto para a Aurora. Ela lê
+           * antes de mandar, e corrige o nome que o modelo ouviu errado. E é o
+           * que faz o botão virar seta sozinho quando a transcrição chega: o
+           * gesto seguinte já é o de mandar. */
+          <Ditado
+            compacto
+            assunto="nutri"
+            onTexto={ouvido => {
+              /* Junta ao que já estiver escrito, e não substitui: quem digitou
+                 meia frase e resolveu falar o resto perderia a metade
+                 digitada. */
+              setTexto(antes => (antes.trim() ? antes.trim() + ' ' + ouvido : ouvido))
+            }}
+            /* A falha da transcrição entra como fala da Aurora, e não como
+               faixa no alto -- a mesma decisão que o resto desta tela já tomou:
+               numa conversa, erro fora do fluxo fica acima da rolagem e ninguém
+               lê. */
+            onErro={mensagem => setFalas(atual => [...atual, novaFala('aurora', mensagem)])}
+          />
+        )}
       </View>
     </View>
   )
@@ -572,18 +593,31 @@ const estilos = estilosDe(t =>
       gap: 8,
       paddingHorizontal: 12,
       paddingTop: 8,
-      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopWidth: 1,
       borderTopColor: t.cores.borda,
       backgroundColor: t.cores.fundo,
     },
-    campo: {
+    /* O campo numa cápsula, e o botão FORA dela.
+       Era uma caixa só com tudo dentro; separar é o que faz o botão parecer uma
+       ação e não um enfeite grudado no texto. */
+    campoRedondo: {
       flex: 1,
-      maxHeight: 120,
-      backgroundColor: t.cores.cartao,
-      borderRadius: 20,
+      minHeight: 42,
+      justifyContent: 'center',
+      backgroundColor: t.cores.superficie,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 21,
       paddingHorizontal: 16,
-      paddingTop: 11,
-      paddingBottom: 11,
+      paddingVertical: 4,
+    },
+    /* Sem fundo, sem borda e sem raio: quem desenha a cápsula agora é o pai
+       (`campoRedondo`). Deixar os dois com fundo dava uma cápsula dentro da
+       outra, com dois tons de creme quase iguais e uma borda fantasma no meio. */
+    campo: {
+      maxHeight: 120,
+      paddingVertical: 8,
+      fontFamily: FONTE.normal,
       fontSize: 14.5,
       color: t.cores.ink,
     },
@@ -595,7 +629,10 @@ const estilos = estilosDe(t =>
       justifyContent: 'center',
       backgroundColor: t.cores.verde,
     },
-    botaoDesligado: { opacity: 0.4 },
+    /* Cor, e não opacidade -- o tema tem um `desligado` medido justamente
+       porque opacity compõe texto E fundo contra a página e destrói o contraste
+       entre os dois (um primário a 0.45 dava 1,43, com o mínimo em 4,5). */
+    botaoDesligado: { backgroundColor: t.cores.desligado },
     pressionado: { opacity: 0.75 },
   }),
 )
