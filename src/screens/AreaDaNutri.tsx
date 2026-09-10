@@ -48,12 +48,22 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
    * propósito, e o gesto não pode desfazer essa decisão: ele só troca qual
    * está montada.
    *
-   * ── E por que na fase de BOLHA, e não de captura ──
-   * `onMoveShouldSetPanResponder` (sem `Capture`) só é consultado depois que os
-   * filhos recusam o gesto. É isso que deixa a faixa de chips de Pacientes e a
-   * de sugestões da Aurora rolarem na horizontal sem trocar de aba -- elas
-   * pedem o gesto primeiro, e ganham. Com `Capture`, o pai roubaria o toque e
-   * as duas faixas parariam de rolar, sem erro nenhum para explicar.
+   * ── CAPTURA, e não bolha. Eu tinha escrito o contrário, e não funcionava ──
+   *
+   * A primeira versão usava `onMoveShouldSetPanResponder` (fase de bolha), com
+   * o argumento de que assim as faixas horizontais -- os chips de Pacientes --
+   * continuariam rolando. O argumento estava certo e a premissa errada: em
+   * bolha o pai só é consultado se os filhos RECUSAREM, e cada aba é um
+   * `ScrollView` que ocupa a tela inteira e agarra o toque assim que ele se
+   * move. O pai nunca era perguntado, e o gesto simplesmente não existia.
+   *
+   * Eu commitei isso como pronto sem ter deslizado num aparelho. `tsc` limpo e
+   * 307 casos verdes não dizem nada sobre quem ganha o toque -- essa parte só
+   * o dedo responde.
+   *
+   * Com `Capture` o pai decide ANTES dos filhos, e por isso os limiares deixam
+   * de ser conforto e viram a única proteção: 60px e o dobro de horizontal
+   * sobre vertical. Rolagem comum passa longe dos dois.
    *
    * `useRef` porque `PanResponder.create` guarda as funções que recebeu: um
    * responder recriado a cada renderização deixa o gesto em curso apontando
@@ -63,7 +73,7 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
 
   const gesto = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => abaDoDeslize(abaAgora.current, g.dx, g.dy) !== null,
+      onMoveShouldSetPanResponderCapture: (_e, g) => abaDoDeslize(abaAgora.current, g.dx, g.dy) !== null,
       onPanResponderRelease: (_e, g) => {
         const destino = abaDoDeslize(abaAgora.current, g.dx, g.dy)
         if (destino) setAba(destino)

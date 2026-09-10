@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  BackHandler,
   AppState,
   Pressable,
   RefreshControl,
@@ -27,6 +28,7 @@ import { useDesvioDoTeclado } from '../lib/teclado'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
 import { situacaoDoPaciente, type Selo } from '../lib/situacaoDoPaciente'
+import { PlanoDaPacienteScreen } from './PlanoDaPacienteScreen'
 
 /* A carteira dela, no bolso.
  *
@@ -60,6 +62,22 @@ export function PacientesDaNutriScreen() {
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
   const [aberto, setAberto] = useState<number | null>(null)
+
+  /* O voltar do aparelho fecha a FICHA antes de sair da aba. Armadilha 1: sem
+     isto o botão caía no `AreaDaNutri`, que só sabe voltar para a inicial ou
+     sair do app -- e quem estava lendo uma ficha era jogado para fora de tudo.
+     Sem lista de dependências: é o que põe este na frente do tratador do pai a
+     partir da segunda renderização. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (aberto !== null) {
+        setAberto(null)
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
 
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
@@ -273,6 +291,10 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
   const [ficha, setFicha] = useState<FichaDoPaciente | null>(null)
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
+  /* O plano abre POR CIMA da ficha, e não numa aba: ela chegou aqui pela
+     paciente, e o plano é uma coisa da paciente. Voltar tem de devolver à
+     ficha, não à lista. */
+  const [planoAberto, setPlanoAberto] = useState(false)
 
   const carregar = useCallback(async () => {
     const r = await fichaDoPaciente(id)
@@ -297,6 +319,20 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
   }, [carregar])
 
   const idade = idadeDe(ficha?.nascimento ?? null)
+
+  /* O plano SUBSTITUI a ficha em vez de abrir por cima dela.
+     A ficha é uma tela cheia com rolagem própria; uma folha por cima daria duas
+     rolagens disputando o mesmo dedo. E o voltar de lá devolve para cá, que é o
+     degrau que a pessoa espera. */
+  if (planoAberto) {
+    return (
+      <PlanoDaPacienteScreen
+        pacienteId={id}
+        nome={primeiroNomeDe(ficha?.nome ?? '')}
+        onFechar={() => setPlanoAberto(false)}
+      />
+    )
+  }
 
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
@@ -420,10 +456,18 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
 
               <View style={styles.cartao}>
                 <Text style={styles.rotuloDoBloco}>ACOMPANHAMENTO</Text>
+                {/* Linha TOCÁVEL, e não texto. O relato foi este: "não consigo
+                    clicar pra ver nada aqui". A ficha dizia o NOME do plano, que
+                    é a única coisa sobre o plano que não interessa quando a
+                    paciente está na frente perguntando o que pode comer.
+
+                    Abre mesmo sem plano ativo: a tela de lá sabe dizer que não
+                    há, e some com a dúvida de "será que não carregou?". */}
                 <Item
                   rotulo="Plano alimentar ativo"
                   valor={ficha.planoAtivo ?? 'Nenhum plano ativo'}
                   aviso={!ficha.planoAtivo}
+                  onAbrir={() => setPlanoAberto(true)}
                 />
                 <Item
                   rotulo="Plano terapêutico"
@@ -557,15 +601,46 @@ function rotuloDaData(valor: string): string {
   return m ? m[3] + '/' + m[2] + '/' + m[1] : valor
 }
 
-function Item({ rotulo, valor, aviso = false }: { rotulo: string; valor: string; aviso?: boolean }) {
+function Item({
+  rotulo,
+  valor,
+  aviso = false,
+  onAbrir,
+}: {
+  rotulo: string
+  valor: string
+  aviso?: boolean
+  /* Quando existe, a linha vira botão e ganha a seta. Sem ele continua sendo
+     texto -- e é isso que impede a ficha inteira de PARECER tocável quando
+     metade dela não leva a lugar nenhum: uma seta que não abre nada ensina em
+     dez segundos a não tentar mais. */
+  onAbrir?: () => void
+}) {
   const styles = estilos()
-  return (
-    <View style={styles.item}>
+
+  const conteudo = (
+    <>
       <Text style={styles.rotuloDoItem}>{rotulo}</Text>
       <Text style={[styles.valorDoItem, aviso && styles.valorAusente]} numberOfLines={2}>
         {valor}
       </Text>
-    </View>
+      {!!onAbrir && (
+        <Ionicons name="chevron-forward" size={15} color={paleta().inkFraco} />
+      )}
+    </>
+  )
+
+  if (!onAbrir) return <View style={styles.item}>{conteudo}</View>
+
+  return (
+    <Pressable
+      onPress={onAbrir}
+      style={({ pressed }) => [styles.item, pressed && styles.pressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={`${rotulo}: ${valor}. Toque para abrir.`}
+    >
+      {conteudo}
+    </Pressable>
   )
 }
 
@@ -602,6 +677,12 @@ function corDoTextoDoSelo(selo: Selo) {
   if (selo === 'hoje') return { color: t.cores.gold }
   if (selo === 'emDia') return { color: t.cores.verde }
   return { color: t.inkSuave }
+}
+
+/* Só o primeiro nome, para "Plano de Maria Aparecida da Silva Santos" não
+   estourar o cabeçalho da tela. */
+function primeiroNomeDe(nome: string): string {
+  return nome.trim().split(/\s+/)[0] || 'paciente'
 }
 
 /* "MA" de Maria Alves: o primeiro e o ÚLTIMO nome. As duas primeiras letras do

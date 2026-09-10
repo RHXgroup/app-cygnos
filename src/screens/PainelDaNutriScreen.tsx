@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  BackHandler,
   AppState,
   Pressable,
   RefreshControl,
@@ -115,6 +116,34 @@ export function PainelDaNutriScreen({
      Antes so dava para agir pela aba Agenda: ela via o proximo paciente na
      frente dela, tocava, e a unica coisa que acontecia era abrir a ficha. */
   const [agindoEm, setAgindoEm] = useState<ConsultaDoDia | null>(null)
+
+  /* ──────────────────── O VOLTAR, que esta tela NUNCA teve ────────────────────
+   *
+   * Armadilha 1, e eu deixei passar justamente na tela que mais abre coisa por
+   * cima: a ficha do paciente e a folha de remarcar. Sem tratador aqui, o botão
+   * do aparelho caía no `AreaDaNutri`, que só sabe voltar para a aba inicial ou
+   * sair -- e o relato foi exatamente esse: "ele volta tudo, ele fecha o
+   * aplicativo".
+   *
+   * SEM lista de dependências, de propósito. O `AreaDaNutri` registra o dele no
+   * PAI, e o React roda os efeitos do FILHO antes dos do pai: na primeira
+   * renderização o pai fica por último e ganha. Re-registrar a cada
+   * renderização põe este na frente a partir da segunda, que sempre acontece --
+   * nem que seja na carga dos dados. Não é código morto, e não é desleixo. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (agindoEm) {
+        setAgindoEm(null)
+        return true
+      }
+      if (fichaAberta !== null) {
+        setFichaAberta(null)
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
   /* Qual pedido está sendo respondido agora, e o que o banco disse do último.
      Um id, e não um booleano: com dois pedidos na tela, um booleano faria os
      dois cartões piscarem quando ela toca em um. */
@@ -492,58 +521,53 @@ export function PainelDaNutriScreen({
             orfaos`: o objeto existe, e o caminho não passa por ele. Nada falha,
             nada avisa, e ninguém descobre olhando a tela -- só olhando os dois
             lados juntos. */}
-        {/* ──── O BLOCO APARECE SEMPRE, e antes sumia por inteiro ────
-            Ele só existia quando havia movimento, e a razão estava certa: a
-            política de baixas exige permissão, e quem não a tem recebe ZERO
-            LINHA -- idêntico a "não entrou nada hoje". Escrever "R$ 0" nos dois
-            casos seria o app afirmando um número que ele não sabe.
+        {/* ──────────────────── O DINHEIRO DE HOJE ────────────────────
+            As TRÊS linhas, sempre, e zero escrito como zero.
 
-            Só que sumir por inteiro fez o Helton abrir a tela e dizer "não tem
-            informação financeira aqui ainda". A tela não estava mentindo -- ela
-            estava calada, e calado se lê como ausente.
+            Isto já teve duas versões erradas, e as duas por conta minha. A
+            primeira escondia o bloco quando não havia movimento; a segunda
+            trocava os números por uma frase. As duas vinham do mesmo raciocínio:
+            a política de baixas exige permissão, quem não a tem recebe ZERO
+            LINHA, e isso é indistinguível de "não entrou nada" -- então
+            escrever "R$ 0" seria afirmar um número que o app não sabe.
 
-            Agora a frase aparece no lugar dos números, e ela diz exatamente o
-            que o app sabe: que não há recebimento REGISTRADO que ele consiga
-            ver. Continua sem afirmar zero. */}
-        {!!dinheiro && !(dinheiro.quantasBaixas > 0 || dinheiro.quantasVencendo > 0 || dinheiro.quantasAPagar > 0) && (
+            O raciocínio continua verdadeiro e a decisão era dele, não minha. As
+            palavras foram estas: "é pra colocar aqui que você tem pra receber
+            ou tem pra pagar. Ponto. Você não tem, coloca zero." Quem lê a tela
+            todo dia sabe se tem permissão de financeiro; quem não sabe é o app.
+
+            Fica a ressalva onde ela cabe -- uma linha embaixo, e só quando tudo
+            é zero, que é o único caso em que a dúvida existe. */}
+        {!!dinheiro && (
           <View>
             <Text style={styles.rotuloDeSecao}>Dinheiro de hoje</Text>
-            <View style={styles.diaSemMovimento}>
-              <Text style={styles.textoSemMovimento}>
-                Nada registrado hoje que eu consiga ver. O financeiro completo
-                está no sistema.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {!!dinheiro &&
-          (dinheiro.quantasBaixas > 0 || dinheiro.quantasVencendo > 0 || dinheiro.quantasAPagar > 0) && (
-          <View style={styles.caixaDoDia}>
-            {dinheiro.quantasBaixas > 0 && (
+            <View style={styles.caixaDoDia}>
               <View style={styles.verba}>
-                <Text style={styles.rotuloVerba}>RECEBIDO HOJE</Text>
-                <Text style={styles.valorVerba}>{reais(dinheiro.recebido)}</Text>
+                <Text style={styles.rotuloVerba}>Recebido</Text>
+                <Text style={[styles.valorVerba, styles.valorRecebido]}>
+                  {reais(dinheiro.recebido)}
+                </Text>
               </View>
-            )}
-            {dinheiro.quantasVencendo > 0 && (
               <View style={styles.verba}>
-                <Text style={styles.rotuloVerba}>VENCE HOJE</Text>
+                <Text style={styles.rotuloVerba}>A receber</Text>
                 <Text style={[styles.valorVerba, styles.valorVencendo]}>
                   {reais(dinheiro.vencendo)}
                 </Text>
               </View>
-            )}
-            {dinheiro.quantasAPagar > 0 && (
               <View style={styles.verba}>
-                {/* "A PAGAR HOJE", e não "DESPESAS": ela lê a caixa inteira de
-                    relance, e as três colunas precisam responder à mesma
-                    pergunta -- o que entrou, o que falta entrar, o que sai. */}
-                <Text style={styles.rotuloVerba}>A PAGAR HOJE</Text>
+                <Text style={styles.rotuloVerba}>A pagar</Text>
                 <Text style={[styles.valorVerba, styles.valorAPagar]}>
                   {reais(dinheiro.aPagar)}
                 </Text>
               </View>
+            </View>
+            {dinheiro.quantasBaixas === 0 &&
+              dinheiro.quantasVencendo === 0 &&
+              dinheiro.quantasAPagar === 0 && (
+              <Text style={styles.ressalvaDoDinheiro}>
+                Nada lançado hoje. Se a sua conta não vê o financeiro, aparece
+                zero do mesmo jeito.
+              </Text>
             )}
           </View>
         )}
@@ -1027,7 +1051,15 @@ const estilos = estilosDe(t =>
     },
     /* O que vence ainda não entrou. Cor de atenção, e não de erro: não há nada
        errado em uma conta vencer hoje. */
+    valorRecebido: { color: t.cores.verde },
     valorVencendo: { color: t.cores.gold },
+    ressalvaDoDinheiro: {
+      fontFamily: FONTE.normal,
+      fontSize: 11.5,
+      color: t.inkFraco,
+      lineHeight: 16,
+      paddingTop: 6,
+    },
     valorAPagar: { color: t.inkSuave },
 
     /* Preenchido em dourado FRACO, e não contornado.
