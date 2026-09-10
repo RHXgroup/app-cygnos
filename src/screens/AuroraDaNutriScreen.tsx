@@ -69,6 +69,10 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
      à parte: dois estados para a mesma coisa divergem, e o sintoma seria a seta
      ficar na tela com o campo já vazio. */
   const temTexto = texto.trim().length > 0
+  /* A trava do toque duplo. `useRef` e não estado: ele muda no mesmo instante
+     do toque, enquanto `setPensando` só vale na renderização seguinte -- e é
+     nessa janela que o segundo toque passava. */
+  const emVoo = useRef(false)
   const [pensando, setPensando] = useState(false)
 
   const [alturaDaTela, setAlturaDaTela] = useState(0)
@@ -151,10 +155,24 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
   }
 
   async function confirmar(fala: Fala, acao: AcaoPendente) {
-    if (pensando) return
-    /* Marca ANTES de ir à rede: sem isso um toque duplo manda duas vezes, e
-       "agenda a Maria" viraria duas consultas no mesmo horário. */
-    setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'feita' } : f)))
+    /* ──────────────────── O CARTÃO SÓ DIZ "CONFIRMADO" DEPOIS DE SER ────────────────────
+     *
+     * Antes ele era marcado ANTES da ida à rede, para um toque duplo não mandar
+     * duas vezes. O efeito colateral só apareceu quando a APP 2 perguntou o que
+     * acontece quando a ação FALHA: o cartão ficava dizendo "Confirmado por
+     * você" e o balão logo abaixo dizia que nada tinha sido gravado. Duas
+     * frases opostas, uma embaixo da outra, sobre a mesma consulta.
+     *
+     * E marcar antes nunca foi a trava que se pensava: `setFalas` é assíncrono
+     * como `setPensando`, então os dois têm a mesma janela. Quem barra o toque
+     * duplo de verdade é um `ref`, que muda no MESMO instante do toque -- e é o
+     * que está aqui agora.
+     *
+     * Vale para o servidor e para o aparelho igual. `criar_aviso` executa no
+     * telefone, então a frase de sucesso vem de nós e não do banco; a única
+     * coisa que não podia acontecer era o cartão afirmar o que a frase nega. */
+    if (pensando || emVoo.current) return
+    emVoo.current = true
     setPensando(true)
 
     /* `executarAcaoConfirmada`, e não `confirmarAcao` direto.
@@ -163,7 +181,16 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
        operacional do telefone. Um ponto único de saída é o que faz a próxima
        ferramenta local não precisar de um `if` novo aqui. */
     const r = await executarAcaoConfirmada(acao)
+    emVoo.current = false
     setPensando(false)
+
+    /* Só agora. Na falha o cartão CONTINUA aberto, com os dois botões: ela
+       acabou de ler que nada foi gravado, e o gesto seguinte é tentar de novo
+       ou desistir -- não há por que tirar dela essa escolha. */
+    if (r.tipo === 'ok') {
+      setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'feita' } : f)))
+    }
+
     setFalas(atual => [
       ...atual,
       novaFala('aurora', r.tipo === 'ok' ? r.texto : r.tipo === 'erro' ? r.mensagem : ''),
