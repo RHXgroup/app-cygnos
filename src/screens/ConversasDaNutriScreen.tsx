@@ -267,6 +267,31 @@ export function ConversasDaNutriScreen({
     if (fio.length) rolagem.current?.scrollToEnd({ animated: true })
   }, [fio])
 
+  /* O TECLADO também manda rolar, e isto era um defeito relatado em uso:
+   *
+   *   "se eu clico pra digitar, ele tinha que arrastar o texto pra cima. Ele
+   *    não faz isso, ele sobe o meu teclado pra digitar, e ele corta pra
+   *    debaixo, então eu não sei onde parou a mensagem -- tenho que ir lá com o
+   *    dedo e subir."
+   *
+   * A barra de escrever cresce com o teclado (`respiro`), e como ela é irmã da
+   * rolagem numa coluna, a rolagem ENCOLHE. Encolher por baixo mantém o topo
+   * parado: o que estava no fim sai da tela, e a última mensagem -- a que ela
+   * está respondendo -- fica escondida atrás do teclado.
+   *
+   * `respiro` na lista de dependências, e não um ouvinte próprio de teclado:
+   * ele JÁ é a altura medida, e um segundo ouvinte seria uma segunda fonte para
+   * o mesmo número. Sem animação: o teclado já está animando, e duas animações
+   * ao mesmo tempo dão um solavanco.
+   *
+   * `setTimeout` de zero porque a rolagem precisa acontecer DEPOIS do layout
+   * novo. Sem ele, o `scrollToEnd` mede a altura antiga e para no meio. */
+  useEffect(() => {
+    if (!fio.length) return
+    const id = setTimeout(() => rolagem.current?.scrollToEnd({ animated: false }), 0)
+    return () => clearTimeout(id)
+  }, [respiro, fio.length])
+
   /* A mensagem que chegou pelo tempo real entra sem reler o servidor.
    *
    * Duas coisas mudam, e as duas precisam: o FIO, se a conversa dela estiver
