@@ -24,12 +24,40 @@ export type ResultadoAtencao =
   | { tipo: 'erro' }
 
 export async function quemPedeAtencao(): Promise<ResultadoAtencao> {
+  /* ── A SESSÃO PRIMEIRO, e isto não é zelo ────────────────────────────────
+   *
+   * Uma leitura de TABELA sem sessão volta vazia e sem erro: a RLS recorta e
+   * pronto. Uma RPC sem sessão volta `42501 permission denied for function`,
+   * porque `anon` não tem EXECUTE nela -- e essa diferença é o que fazia esta
+   * chamada ser a ÚNICA da tela a gritar no console quando o problema era de
+   * todas: agenda, dinheiro e pedidos voltavam vazios, calados.
+   *
+   * Sem sessão não há o que ler, então não se lê -- e não se avisa, porque
+   * "ainda não entrou" não é falha.
+   *
+   * `getSession` lê do armazenamento local e não vai à rede, então isto não
+   * atrasa a abertura. */
+  const { data: sessao } = await supabase.auth.getSession()
+  if (!sessao.session) return { tipo: 'erro' }
+
   const { data, error } = await supabase.rpc('aurora_carteira_triagem', {})
 
   if (error) {
     /* Registrado no console e nada na tela. A agenda é o que ela veio ver; um
        recado sobre a carteira não pode roubar o lugar dela. */
-    falha('Não consegui ler quem pede atenção.', error)
+    /* 42501 COM sessão é outra coisa, e precisa dizer isso.
+       A função concede EXECUTE a `authenticated`; se ela recusou mesmo com
+       sessão na mão, o problema é da conta ou da concessão no banco, e não
+       desta tela. Sem esta linha o aviso é idêntico ao de rede caída, e o
+       próximo a investigar recomeça do zero. */
+    const negada = (error as { code?: string }).code === '42501'
+    falha(
+      negada
+        ? 'Sem permissão para ler quem pede atenção -- havia sessão, então confira ' +
+          'o GRANT de aurora_carteira_triagem para authenticated no banco.'
+        : 'Não consegui ler quem pede atenção.',
+      error,
+    )
     return { tipo: 'erro' }
   }
 
