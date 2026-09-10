@@ -29,6 +29,7 @@ import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
 import { situacaoDoPaciente, type Selo } from '../lib/situacaoDoPaciente'
 import { PlanoDaPacienteScreen } from './PlanoDaPacienteScreen'
+import { DossieDaPacienteScreen, type SecaoDoDossie } from './DossieDaPacienteScreen'
 
 /* A carteira dela, no bolso.
  *
@@ -295,6 +296,10 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
      paciente, e o plano é uma coisa da paciente. Voltar tem de devolver à
      ficha, não à lista. */
   const [planoAberto, setPlanoAberto] = useState(false)
+  /* Qual seção do dossiê está aberta por cima da ficha, ou nenhuma. Um estado
+     só para as duas: elas nunca aparecem juntas, e dois booleanos deixariam
+     existir o estado impossível de "as duas abertas". */
+  const [dossie, setDossie] = useState<SecaoDoDossie | null>(null)
 
   const carregar = useCallback(async () => {
     const r = await fichaDoPaciente(id)
@@ -330,6 +335,17 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
         pacienteId={id}
         nome={primeiroNomeDe(ficha?.nome ?? '')}
         onFechar={() => setPlanoAberto(false)}
+      />
+    )
+  }
+
+  if (dossie) {
+    return (
+      <DossieDaPacienteScreen
+        pacienteId={id}
+        nome={primeiroNomeDe(ficha?.nome ?? '')}
+        secao={dossie}
+        onFechar={() => setDossie(null)}
       />
     )
   }
@@ -483,6 +499,7 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
                       : 'Nenhum'
                   }
                   aviso={!ficha.planoTerapeutico}
+                  onAbrir={() => setDossie('terapeutico')}
                 />
                 <Item
                   rotulo="Última anamnese"
@@ -492,6 +509,7 @@ export function FichaDoPacienteScreen({ id, onFechar }: { id: number; onFechar: 
                 <Item
                   rotulo="Consultas realizadas"
                   valor={String(ficha.quantasConsultas)}
+                  onAbrir={() => setDossie('consultas')}
                 />
                 <Item rotulo="Usa o aplicativo" valor={ficha.usaOApp ? 'Sim' : 'Não'} />
               </View>

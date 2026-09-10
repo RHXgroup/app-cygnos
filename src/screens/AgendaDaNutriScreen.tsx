@@ -382,6 +382,44 @@ function Mes({
         ))}
       </View>
 
+      {/* ──────────────────── A LEGENDA ────────────────────
+          "Não tem bola de cristal para adivinhar aqui." Ele estava certo: a
+          grade desenha uma bolinha por consulta até três, e daí em diante um
+          número -- e nada na tela dizia isso. Quem vê "4" numa célula não tem
+          como saber se são quatro consultas ou o dia 4 repetido.
+
+          Fica embaixo da grade, e não em cima: legenda antes do desenho é lida
+          por ninguém, porque ainda não há o que explicar. */}
+      <View style={styles.legenda}>
+        <View style={styles.itemDaLegenda}>
+          <View style={styles.pontos}>
+            <View style={styles.ponto} />
+          </View>
+          <Text style={styles.textoDaLegenda}>1 consulta</Text>
+        </View>
+
+        <View style={styles.itemDaLegenda}>
+          <View style={styles.pontos}>
+            <View style={styles.ponto} />
+            <View style={styles.ponto} />
+            <View style={styles.ponto} />
+          </View>
+          <Text style={styles.textoDaLegenda}>até 3</Text>
+        </View>
+
+        <View style={styles.itemDaLegenda}>
+          <Text style={styles.muitas}>5</Text>
+          <Text style={styles.textoDaLegenda}>4 ou mais</Text>
+        </View>
+
+        <View style={styles.itemDaLegenda}>
+          <View style={styles.exemploDeHoje}>
+            <Text style={[styles.numeroDoDia, styles.numeroDeHoje]}>9</Text>
+          </View>
+          <Text style={styles.textoDaLegenda}>hoje</Text>
+        </View>
+      </View>
+
       <Text style={styles.totalDoMes}>
         {total === 0
           ? 'Nenhuma consulta marcada neste mês.'
@@ -1110,6 +1148,26 @@ const estilos = estilosDe(t =>
     pontoDeFora: { backgroundColor: t.inkFraco },
     muitas: { fontFamily: FONTE.forte, fontSize: 9.5, color: t.cores.verde },
 
+    legenda: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 16,
+      paddingTop: 14,
+    },
+    itemDaLegenda: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    textoDaLegenda: { fontFamily: FONTE.normal, fontSize: 11.5, color: t.inkFraco },
+    /* Do tamanho da célula de verdade, para o exemplo ser reconhecível: um
+       círculo menor ao lado da palavra "hoje" não se liga ao que está na grade
+       logo acima. */
+    exemploDeHoje: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.verde,
+    },
     totalDoMes: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco, textAlign: 'center', paddingTop: 12 },
 
     /* Ganha borda, como todo cartão das telas novas. Sem ela, creme sobre
