@@ -323,6 +323,20 @@ export async function transcrever(
   forma.append('audio', arquivo, aac ? 'ditado.aac' : 'ditado.m4a')
   forma.append('contexto', assunto)
 
+  /* ———————— ONDE OS SEGUNDOS VÃO ————————
+   *
+   * "Ela demorou muito pra transcrever" é verdade e não dá para consertar: entre
+   * o dedo dela e o texto na tela há três coisas -- subir o arquivo, o servidor
+   * de áudio pensar, e a resposta voltar --, e cada uma pede um conserto que não
+   * serve para as outras.
+   *
+   * O servidor devolve `ms`, que é só o tempo DELE. A subtração diz o resto.
+   *
+   * Armadilha 2: quando a segunda tentativa falhar, pare de trocar de mecanismo
+   * e imprima os números. Uma faixa com três valores encerrou o que seis
+   * deduções não encerraram. */
+  const saiuDaqui = Date.now()
+
   try {
     const { data, error } = await supabase.functions.invoke('app-transcrever', { body: forma })
 
@@ -346,6 +360,18 @@ export async function transcrever(
        Metro porque é lá que se lê enquanto se conserta — a tela continua
        dizendo só a frase de gente. Temporário. */
     if (data?.diagnostico) console.log('[cygnos] ditado vazio:', JSON.stringify(data.diagnostico))
+
+    /* Total, servidor, e a diferença -- que é rede mais fila. Uma linha por
+       ditado no terminal do Metro, com o prefixo [cygnos]. */
+    const total = Date.now() - saiuDaqui
+    const noServidor = Number(data?.ms)
+    console.log(
+      '[cygnos] ditado levou:', (total / 1000).toFixed(1) + 's total',
+      Number.isFinite(noServidor)
+        ? '· ' + (noServidor / 1000).toFixed(1) + 's no whisper · ' +
+          ((total - noServidor) / 1000).toFixed(1) + 's de rede'
+        : '· o servidor não disse quanto levou',
+    )
 
     const texto = String(data?.texto ?? '').trim()
     /* Silêncio não é erro: é o que sai de quem apertou e não falou, ou falou

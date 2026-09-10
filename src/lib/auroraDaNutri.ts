@@ -98,6 +98,11 @@ export async function perguntarAAurora(
      tamanho e na quantidade do lado de lá -- campo sem teto é custo sem teto. */
   historico: Fala[],
 ): Promise<RespostaDaAurora> {
+  /* O outro pedaço da espera dela. O ditado é o primeiro; este é o segundo, e
+     do lado de dentro ele pode custar VÁRIAS voltas de ferramenta. Sem os dois
+     medidos, "a Aurora está lenta" não diz qual dos dois consertar. */
+  const saiuDaqui = Date.now()
+
   const { data, error } = await supabase.functions.invoke('app-aurora-nutri', {
     body: {
       pergunta,
@@ -106,6 +111,8 @@ export async function perguntarAAurora(
       historico: historico.filter(f => !f.local).map(f => ({ papel: f.papel, texto: f.texto })),
     },
   })
+
+  console.log('[cygnos] aurora levou:', ((Date.now() - saiuDaqui) / 1000).toFixed(1) + 's')
 
   /* `invoke` deixa `data` nulo fora do 2xx e joga o corpo em `error.context`.
      Aqui os desfechos não mudam a tela -- todos viram uma frase --, mas ler o
