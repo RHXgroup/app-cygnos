@@ -108,13 +108,50 @@ export function PlanoDaPacienteScreen({
   async function gerarPdf() {
     if (!plano || gerando) return
     setGerando(true)
+    setErro('')
+
+    /* ── DUAS ETAPAS, DUAS FRASES ──
+     *
+     * Relatado em uso: "coloquei pra gerar um pdf e está extremamente lento...
+     * aí ele falou não consegui gerar o pdf". As duas etapas caíam no MESMO
+     * `catch` e na mesma frase, então "não consegui" cobria três defeitos
+     * diferentes: montar o arquivo, achar a bandeja de compartilhar, e abrir a
+     * bandeja.
+     *
+     * Cada um pede um conserto que não serve para os outros -- e um teste dela
+     * não distinguia nenhum. Agora a frase diz em qual etapa parou, em
+     * português, e o erro cru vai para o log com prefixo próprio.
+     *
+     * O tempo também sai medido: `printToFileAsync` sobe uma WebView por
+     * baixo, e a primeira vez é lenta por natureza. Sem o número, "lento" não
+     * diz se são dois segundos ou vinte. */
+    const comecou = Date.now()
+
+    let Print: typeof import('expo-print')
+    let Sharing: typeof import('expo-sharing')
     try {
-      const Print = await import('expo-print')
-      const Sharing = await import('expo-sharing')
+      Print = await import('expo-print')
+      Sharing = await import('expo-sharing')
+    } catch (e) {
+      setGerando(false)
+      setErro(falha('Este aplicativo não consegue gerar PDF neste aparelho.', e))
+      return
+    }
 
+    let uri = ''
+    try {
       const html = folhaDoPlano(plano, nome)
-      const { uri } = await Print.printToFileAsync({ html })
+      console.log('[cygnos] pdf: montando', html.length, 'caracteres')
+      const feito = await Print.printToFileAsync({ html })
+      uri = feito.uri
+      console.log('[cygnos] pdf: arquivo pronto em', ((Date.now() - comecou) / 1000).toFixed(1) + 's')
+    } catch (e) {
+      setGerando(false)
+      setErro(falha('Não consegui montar o arquivo do plano.', e))
+      return
+    }
 
+    try {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
           mimeType: 'application/pdf',
@@ -122,12 +159,14 @@ export function PlanoDaPacienteScreen({
           UTI: 'com.adobe.pdf',
         })
       } else {
-        /* Sem bandeja de compartilhar, imprimir direto ainda funciona -- e é o
-           que ela quer quando está no consultório com a impressora ao lado. */
-        await Print.printAsync({ html })
+        /* Sem bandeja de compartilhar, imprimir direto ainda funciona -- e e o
+           que ela quer quando esta no consultorio com a impressora ao lado. */
+        await Print.printAsync({ uri })
       }
     } catch (e) {
-      setErro(falha('Não consegui gerar o PDF agora.', e))
+      /* O ARQUIVO EXISTE. Dizer "não consegui gerar o PDF" aqui seria mentira:
+         o plano foi montado e o que falhou foi abrir a bandeja do sistema. */
+      setErro(falha('O plano foi montado, mas não consegui abrir para compartilhar.', e))
     } finally {
       setGerando(false)
     }

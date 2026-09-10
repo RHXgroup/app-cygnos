@@ -255,7 +255,23 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
       .select('id, nome, celular, data_nascimento, email, genero, status')
       .eq('id', id)
       .maybeSingle(),
-    supabase.from('app_contas').select('id').eq('paciente_id', id).limit(1),
+    /* `app_vinculos`, e NÃO `app_contas`.
+     *
+     * Estava em `app_contas.paciente_id`, que não existe: aquela tabela é o
+     * cadastro que o próprio paciente preenche no app, e não sabe nada da
+     * carteira de ninguém. Quem liga o paciente do consultório à conta do
+     * aplicativo é `app_vinculos`, que ganhou `paciente_id` na migração
+     * 20260801000009 justamente para isso.
+     *
+     * O sintoma era mudo: a consulta falhava, o `Promise.all` devolvia o erro
+     * naquela posicao, e a ficha mostrava "Usa o aplicativo: Não" para TODO
+     * mundo -- inclusive para quem estava conversando com ela pelo app naquele
+     * minuto. Uma coluna inventada não degrada: ela mente.
+     *
+     * Achado por causa do irmão: a função do recado da Aurora usava a mesma
+     * coluna e o erro chegou à tela dele em inglês. Ao descobrir a causa de uma
+     * coisa, varra pelos irmãos antes de dar por resolvida -- armadilha 5. */
+    supabase.from('app_vinculos').select('conta_id').eq('paciente_id', id).limit(1),
     supabase
       .from('consultas')
       .select('data_hora, notas_atendimento')

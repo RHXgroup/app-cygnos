@@ -136,6 +136,31 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
   const gesto = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_e, g) => abaDoDeslize(abaAgora.current, g.dx, g.dy) !== null,
+
+      /* ── E AGORA O QUE FALTAVA: SEGURAR O QUE FOI GANHO ──
+       *
+       * Relatado em uso: "eu estou na parte de hoje, eu arrasto pro lado
+       * esquerdo... Se eu tiver em cima de algum menu ele não vai, tem que
+       * estar fora de todos os menus."
+       *
+       * A captura acima é a metade que faz o pai ser PERGUNTADO antes dos
+       * filhos, e ela já tinha sido consertada uma vez (era bolha, e o
+       * ScrollView agarrava o toque). Mas ganhar o gesto é MANTER o gesto são
+       * duas coisas, e a segunda faltava:
+       *
+       * - `onPanResponderTerminationRequest` responde "posso te devolver o
+       *   gesto?". O padrão é SIM. Então o ScrollView de dentro do cartão pedia
+       *   de volta no meio do arrasto e levava -- e o dedo continuava andando
+       *   sem trocar de aba. Em cima de área vazia não há quem peça, e por isso
+       *   funcionava fora dos cartões: exatamente o que ele descreveu.
+       *
+       * - `onShouldBlockNativeResponder` é do ANDROID, e não existe no iOS. Sem
+       *   ele, a rolagem NATIVA continua correndo por baixo mesmo com o gesto
+       *   do JavaScript ganho -- a tela range de lado enquanto rola de cima
+       *   para baixo. */
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+
       onPanResponderRelease: (_e, g) => {
         const destino = abaDoDeslize(abaAgora.current, g.dx, g.dy)
         if (destino) setAba(destino)
