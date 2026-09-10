@@ -17,8 +17,10 @@ import {
   semCaloriaEm,
   type PlanoDaPaciente,
 } from '../lib/planoDoPacienteDaNutri'
+import { folhaDoPlano, nomeDoArquivo } from '../lib/folhaDoPlano'
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
+import { falha } from '../lib/erros'
 
 /* O plano alimentar da paciente, aberto pela ficha.
  *
@@ -54,6 +56,7 @@ export function PlanoDaPacienteScreen({
   const [carregando, setCarregando] = useState(true)
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
+  const [gerando, setGerando] = useState(false)
 
   const carregar = useCallback(async () => {
     const r = await planoDaPaciente(pacienteId)
@@ -77,6 +80,48 @@ export function PlanoDaPacienteScreen({
       vivo = false
     }
   }, [carregar])
+
+  /* ──────────────────── O PDF ────────────────────
+   *
+   * `expo-print` monta o arquivo a partir do HTML e `expo-sharing` abre a
+   * bandeja do sistema -- de onde ela manda por WhatsApp, salva no Drive ou
+   * imprime. Não é o app que decide o destino, e isso é o certo: a bandeja do
+   * telefone dela já tem os aplicativos que ela usa.
+   *
+   * Os dois entram por `import()` DENTRO da função, e não no topo do arquivo.
+   * Import estático desses dois faria o módulo nativo ser resolvido na abertura
+   * da tela; num Expo Go que não os tenha completos, isso derruba a tela em vez
+   * de derrubar o botão -- e a tela existe para LER o plano, que funciona sem
+   * PDF nenhum.
+   *
+   * Falhar aqui vira frase e não estouro: item 11. */
+  async function gerarPdf() {
+    if (!plano || gerando) return
+    setGerando(true)
+    try {
+      const Print = await import('expo-print')
+      const Sharing = await import('expo-sharing')
+
+      const html = folhaDoPlano(plano, nome)
+      const { uri } = await Print.printToFileAsync({ html })
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: nomeDoArquivo(nome),
+          UTI: 'com.adobe.pdf',
+        })
+      } else {
+        /* Sem bandeja de compartilhar, imprimir direto ainda funciona -- e é o
+           que ela quer quando está no consultório com a impressora ao lado. */
+        await Print.printAsync({ html })
+      }
+    } catch (e) {
+      setErro(falha('Não consegui gerar o PDF agora.', e))
+    } finally {
+      setGerando(false)
+    }
+  }
 
   /* Sem lista de dependências: é o que põe este tratador na frente do da ficha
      e do da área a partir da segunda renderização. Armadilha 1. */
@@ -219,9 +264,35 @@ export function PlanoDaPacienteScreen({
                 )
               })}
 
+              {/* O botão fica no FIM, e não no cabeçalho.
+                  Gerar o PDF é o que ela faz depois de ler e concordar com o
+                  que está ali -- no topo, seria a primeira coisa oferecida
+                  sobre um plano que ela ainda não conferiu. */}
+              <Pressable
+                onPress={() => void gerarPdf()}
+                disabled={gerando}
+                style={({ pressed }) => [
+                  styles.botaoPdf,
+                  gerando && styles.botaoDesligado,
+                  pressed && styles.pressionado,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Gerar o PDF deste plano"
+              >
+                {gerando ? (
+                  <ActivityIndicator size="small" color={paleta().cores.branco} />
+                ) : (
+                  <>
+                    <Ionicons name="document-text-outline" size={17} color={paleta().cores.branco} />
+                    <Text style={styles.textoDoBotaoPdf}>Gerar PDF</Text>
+                  </>
+                )}
+              </Pressable>
+
               <Text style={styles.ondeSeFaz}>
-                Trocar item, mudar quantidade e recalcular continuam no sistema, no
-                computador.
+                O PDF abre a bandeja do telefone -- dá para mandar no WhatsApp,
+                salvar ou imprimir. Trocar item e mudar quantidade continuam no
+                sistema.
               </Text>
             </>
           )}
@@ -338,6 +409,22 @@ const estilos = estilosDe(t =>
       lineHeight: 16,
       paddingTop: 6,
     },
+
+    botaoPdf: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: t.cores.verde,
+      borderRadius: 14,
+      paddingVertical: 13,
+      marginTop: 4,
+    },
+    textoDoBotaoPdf: { fontFamily: FONTE.forte, fontSize: 14.5, color: t.cores.branco },
+    /* Cor, e não opacidade: o tema tem um `desligado` medido justamente porque
+       opacity destrói o contraste entre texto e fundo. */
+    botaoDesligado: { backgroundColor: t.cores.desligado },
+    pressionado: { opacity: 0.8 },
 
     vazio: {
       alignItems: 'center',
