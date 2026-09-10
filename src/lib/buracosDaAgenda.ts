@@ -45,7 +45,7 @@ export const EXPEDIENTE_PADRAO: Expediente = {
   diasDaSemana: [1, 2, 3, 4, 5],
 }
 
-/* ~tr~ OS DOIS NUMEROS QUE PRECISAM CONCORDAR ~tr~
+/* ──────────────────── OS DOIS NUMEROS QUE PRECISAM CONCORDAR ────────────────────
  *
  * Um buraco so vale a pena quando cabe uma consulta inteira, e "uma consulta"
  * aqui e a mesma suposicao que o resto da agenda usa: `DURACAO_SUPOSTA_MIN`, em

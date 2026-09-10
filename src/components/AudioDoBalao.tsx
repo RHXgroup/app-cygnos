@@ -5,7 +5,8 @@ import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'
 
 import { enderecoNoDiario } from '../lib/fotoDoDiario'
 import { estilosDe, paleta } from '../lib/tema'
-import { mmss } from '../lib/voz'
+import { mmss } from '../lib/voz'
+
 import { dela } from '../lib/tratamentoDaNutri'
 
 /* O áudio da conversa, tocado dentro do balão.
@@ -29,7 +30,21 @@ import { dela } from '../lib/tratamentoDaNutri'
  * `createAudioPlayer` segura recurso nativo. Criar um por mensagem ao montar a
  * lista abriria dezenas de tocadores para ouvir um — por isso ele nasce no
  * primeiro toque e é liberado no desmonte. */
-export function AudioDoBalao({ caminho, minha }: { caminho: string; minha: boolean }) {
+export function AudioDoBalao({
+  caminho,
+  minha,
+  autor,
+}: {
+  caminho: string
+  minha: boolean
+  /* Quem mandou, para quem ouve a tela em vez de olhar.
+   *
+   * Padrão `dela()` porque este componente nasceu na conversa do PACIENTE,
+   * onde o áudio que não é dele é sempre o da nutricionista. Do lado dela a
+   * mesma frase fica errada -- quem manda áudio ali é a paciente --, e uma
+   * etiqueta errada é pior do que nenhuma para quem só tem ela. */
+  autor?: string
+}) {
   const styles = estilos()
   const [tocando, setTocando] = useState(false)
   const [carregando, setCarregando] = useState(false)
@@ -158,7 +173,11 @@ export function AudioDoBalao({ caminho, minha }: { caminho: string; minha: boole
       style={({ pressed }) => [styles.linha, pressed && { opacity: 0.65 }]}
       accessibilityRole="button"
       accessibilityLabel={
-        tocando ? 'Pausar o áudio' : minha ? 'Tocar o áudio que você mandou' : `Tocar o áudio ${dela()}`
+        tocando
+          ? 'Pausar o áudio'
+          : minha
+            ? 'Tocar o áudio que você mandou'
+            : `Tocar o áudio ${autor ?? dela()}`
       }
     >
       {carregando ? (

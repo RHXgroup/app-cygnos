@@ -82,8 +82,16 @@ function useAgora(): number {
 export function PainelDaNutriScreen({
   onSair,
   onLerCodigo,
+  onConversas,
+  naoLidas = 0,
 }: {
   onSair: () => void
+  /* Abre as conversas com os pacientes. */
+  onConversas?: () => void
+  /* Quantas mensagens de pacientes esperam resposta. Vem da área, que é quem
+     ouve o tempo real — e não de uma leitura desta tela: dois lugares contando
+     o mesmo número divergiriam, e o ponto ficaria aceso depois de ela ler. */
+  naoLidas?: number
   /* Quem abre a agenda e o leitor é a área que hospeda as abas, e não esta
      tela. Sem isso, o painel teria o próprio estado de "leitor aberto" e a
      barra de abas continuaria embaixo dele -- duas saídas para a mesma coisa,
@@ -314,6 +322,37 @@ export function PainelDaNutriScreen({
             </Text>
             <Text style={styles.resumo}>{resumoDaAgenda(dia)}</Text>
           </View>
+          {/* —— AS MENSAGENS, no alto e do lado ——
+              Aqui e não numa aba: uma quinta aba desequilibraria a barra, que é
+              duas de cada lado do botão da Aurora. E aqui é onde ela cai ao
+              abrir o app — um ponto vermelho no primeiro lugar em que o olho
+              bate é o que faz ela ir olhar. */}
+          {!!onConversas && (
+            <Pressable
+              onPress={onConversas}
+              style={styles.botaoSair}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={
+                naoLidas > 0
+                  ? `Conversas, ${naoLidas} sem ler`
+                  : 'Conversas com os pacientes'
+              }
+            >
+              <Ionicons
+                name={naoLidas > 0 ? 'chatbubble' : 'chatbubble-outline'}
+                size={20}
+                color={naoLidas > 0 ? paleta().cores.verde : paleta().inkFraco}
+              />
+              {naoLidas > 0 && (
+                <View style={styles.pontinho}>
+                  <Text style={styles.numeroDoPontinho}>
+                    {naoLidas > 9 ? '9+' : naoLidas}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          )}
           <Pressable
             onPress={onSair}
             style={styles.botaoSair}
@@ -894,6 +933,28 @@ const estilos = estilosDe(t =>
       color: t.inkFraco,
       marginBottom: 8,
     },
+    /* O ponto sobre o ícone. `position: absolute` dentro do botão, e não um
+       irmão ao lado: ao lado ele empurraria o botão de sair para a esquerda
+       toda vez que chegasse mensagem, e a saída mudaria de lugar sozinha. */
+    pontinho: {
+      position: 'absolute',
+      top: 2,
+      right: 2,
+      minWidth: 15,
+      height: 15,
+      borderRadius: 8,
+      paddingHorizontal: 3,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.verde,
+    },
+    numeroDoPontinho: {
+      fontFamily: FONTE.forte,
+      fontSize: 9,
+      color: t.cores.branco,
+      fontVariant: ['tabular-nums'],
+    },
+
     botaoSair: { padding: 8, marginTop: -4, marginRight: -8 },
 
     erro: { fontSize: 13.5, color: t.cores.ink, backgroundColor: t.cores.verdeMenta, padding: 12, borderRadius: 10 },

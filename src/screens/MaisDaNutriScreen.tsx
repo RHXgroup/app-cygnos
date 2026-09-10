@@ -34,10 +34,15 @@ export function MaisDaNutriScreen({
   onSair,
   onLerCodigo,
   onFotoDoPrato,
+  onConversas,
+  naoLidas = 0,
 }: {
   onSair: () => void
   onLerCodigo: () => void
   onFotoDoPrato: () => void
+  onConversas?: () => void
+  /* Ver o comentário igual em `PainelDaNutriScreen`: quem conta é a área. */
+  naoLidas?: number
 }) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
@@ -139,6 +144,22 @@ export function MaisDaNutriScreen({
 
         <View style={styles.cartao}>
           <Text style={styles.rotuloDoBloco}>FERRAMENTAS</Text>
+          {/* As conversas têm porta aqui TAMBÉM, e não só no alto do Hoje:
+              o ícone de lá é atalho para quem já sabe que ele existe, e ninguém
+              descobre função nova por ícone sem rótulo. Aqui ela tem nome e
+              uma linha dizendo o que faz. */}
+          {!!onConversas && (
+            <Opcao
+              icone="chatbubbles-outline"
+              titulo="Conversas"
+              texto={
+                naoLidas > 0
+                  ? `${naoLidas} ${naoLidas === 1 ? 'mensagem esperando' : 'mensagens esperando'} resposta`
+                  : 'Falar com os pacientes pelo aplicativo'
+              }
+              onPress={onConversas}
+            />
+          )}
           <Opcao
             icone="barcode-outline"
             titulo="Ler código de barras"

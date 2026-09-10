@@ -1,14 +1,22 @@
-import { useEffect, useState } from 'react'
-import { useRef } from 'react'
-import { BackHandler, PanResponder, StyleSheet, View } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AppState, BackHandler, PanResponder, StyleSheet, View } from 'react-native'
 import { BarraDaNutri, type AbaDaNutri } from '../components/BarraDaNutri'
 import { AgendaDaNutriScreen } from './AgendaDaNutriScreen'
 import { AuroraDaNutriScreen } from './AuroraDaNutriScreen'
+import { ConversasDaNutriScreen } from './ConversasDaNutriScreen'
 import { FotoDoPratoDaNutriScreen } from './FotoDoPratoDaNutriScreen'
 import { LerCodigoScreen } from './LerCodigoScreen'
 import { MaisDaNutriScreen } from './MaisDaNutriScreen'
 import { PacientesDaNutriScreen } from './PacientesDaNutriScreen'
 import { PainelDaNutriScreen } from './PainelDaNutriScreen'
+import {
+  avisarQueChegou,
+  conversasDaNutri,
+  ouvirConversas,
+  totalNaoLidas,
+  type MensagemQueChegou,
+} from '../lib/conversasDaNutri'
+import { previaDaConversa } from '../lib/previaDaConversa'
 import { estilosDe } from '../lib/tema'
 import { abaDoDeslize } from '../lib/deslizarEntreAbas'
 
@@ -37,6 +45,43 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
   const [auroraAberta, setAuroraAberta] = useState(false)
   const [lendoCodigo, setLendoCodigo] = useState(false)
   const [fotografando, setFotografando] = useState(false)
+  const [conversando, setConversando] = useState(false)
+  /* O mesmo valor, num ref, só para o ouvinte do tempo real.
+   *
+   * O ouvinte precisa saber se a tela de conversas está na frente — para não
+   * avisar de uma mensagem que ela está vendo chegar —, mas pô-lo na lista de
+   * dependências faria a inscrição cair e subir de novo a cada abertura e
+   * fechamento da tela. Entre a queda e a volta há uma janela em que nada
+   * chega, e é trabalho à toa: um websocket derrubado por uma mudança de
+   * booleano. */
+  const conversandoAgora = useRef(false)
+  conversandoAgora.current = conversando
+
+  /* —————————— AS MENSAGENS DOS PACIENTES ——————————
+   *
+   * "Se ela não tiver no computador e o paciente mandar uma mensagem, notifica
+   * ela aqui."
+   *
+   * —— Por que a inscrição mora AQUI, e não na tela de conversas ——
+   *
+   * Porque uma inscrição dentro da tela só existe com a tela ABERTA — e a tela
+   * só está aberta quando ela já foi olhar, que é exatamente o caso em que
+   * avisar não serve para nada. O aviso tem de valer de qualquer aba.
+   *
+   * A área é o lugar mais interno que continua montado em todas elas. O App
+   * inteiro seria mais alto e estaria errado: lá também mora o paciente, e a
+   * política que traz estas linhas é a da carteira dela.
+   *
+   * —— E até onde vai, sem promessa ——
+   *
+   * Com o app ABERTO. É um websocket vivendo no processo do app; com o app
+   * fechado não há processo. Isso é push, e push exige development build — o
+   * Expo Go não recebe push no Android desde o SDK 53. Está escrito na tela
+   * também, para ela não descobrir num dia em que importava. */
+  const [naoLidas, setNaoLidas] = useState(0)
+  /* A última que chegou pelo tempo real, repassada à tela de conversas para
+     entrar no fio sem ela precisar fechar e abrir. */
+  const [chegada, setChegada] = useState<MensagemQueChegou | null>(null)
 
   /* ──────────────────── DESLIZAR ENTRE AS ABAS ────────────────────
    *
@@ -83,8 +128,64 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
     }),
   ).current
 
+  const contar = useCallback(async () => {
+    const r = await conversasDaNutri()
+    /* Erro não vira zero nem faixa vermelha: o ponto é enfeite comparado ao
+       resto da área, e uma falha de rede aqui não pode interromper a agenda
+       dela. O número anterior fica, e a próxima leitura corrige. */
+    if (r.tipo === 'ok') setNaoLidas(totalNaoLidas(r.conversas))
+  }, [])
+
+  useEffect(() => {
+    void contar()
+  }, [contar])
+
+  /* Ao voltar do segundo plano. É também o caminho da mensagem que chegou com
+     o app fechado: sem isto, ela só apareceria na próxima vez que a área
+     montasse — ou seja, no próximo login. Armadilha 8. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', e => {
+      if (e === 'active') void contar()
+    })
+    return () => sub.remove()
+  }, [contar])
+
+  useEffect(() => {
+    const desligar = ouvirConversas(m => {
+      setChegada(m)
+      setNaoLidas(n => n + 1)
+
+      /* O balão só quando ela NÃO está com a tela de conversas na frente.
+         Notificar a mensagem que ela está vendo chegar é o app avisando de uma
+         coisa que a pessoa acabou de ler. */
+      if (conversandoAgora.current) return
+
+      /* O nome não vem no INSERT — a linha de `app_mensagens` tem `conta_id`, e
+         nome mora em `app_contas`. Pedir o nome aqui seria uma ida ao banco
+         dentro do ouvinte, a cada mensagem. "Mensagem nova" é menos do que o
+         nome e mais do que nada, e ela abre e vê de quem é. */
+      void avisarQueChegou(
+        'Mensagem nova',
+        previaDaConversa({
+          ultima: m.texto,
+          ultimaDe: m.de,
+          ultimaEm: m.criadaEm,
+          ultimaAnexoTipo: m.anexoTipo,
+        }),
+      )
+    })
+    return desligar
+    /* Lista vazia: a inscrição vive enquanto a área viver. O único valor de
+       fora que ela lê é o ref acima, que está sempre atual justamente para
+       esta lista poder ficar vazia. */
+  }, [])
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (conversando) {
+        setConversando(false)
+        return true
+      }
       if (fotografando) {
         setFotografando(false)
         return true
@@ -118,6 +219,15 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
   if (fotografando) {
     return <FotoDoPratoDaNutriScreen onFechar={() => setFotografando(false)} />
   }
+  if (conversando) {
+    return (
+      <ConversasDaNutriScreen
+        chegada={chegada}
+        onFechar={() => setConversando(false)}
+        aoMudarNaoLidas={setNaoLidas}
+      />
+    )
+  }
   if (auroraAberta) {
     return <AuroraDaNutriScreen onFechar={() => setAuroraAberta(false)} />
   }
@@ -129,6 +239,8 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
           <PainelDaNutriScreen
             onSair={onSair}
             onLerCodigo={() => setLendoCodigo(true)}
+            naoLidas={naoLidas}
+            onConversas={() => setConversando(true)}
           />
         )}
         {aba === 'agenda' && <AgendaDaNutriScreen />}
@@ -138,6 +250,8 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
             onSair={onSair}
             onLerCodigo={() => setLendoCodigo(true)}
             onFotoDoPrato={() => setFotografando(true)}
+            naoLidas={naoLidas}
+            onConversas={() => setConversando(true)}
           />
         )}
       </View>
