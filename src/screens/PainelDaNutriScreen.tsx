@@ -37,6 +37,7 @@ import {
   type Dia,
 } from '../lib/diaDaNutri'
 import { FONTE } from '../lib/fontes'
+import { comprasDaSemana, quantidadePorExtenso, type ItemDeCompra } from '../lib/comprasDaSemana'
 import { carregarPerfilDaNutri, primeiroNome, type PerfilDaNutri } from '../lib/souNutri'
 import { saudacaoDaHora } from '../lib/formatar'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
@@ -116,6 +117,10 @@ export function PainelDaNutriScreen({
      Antes so dava para agir pela aba Agenda: ela via o proximo paciente na
      frente dela, tocava, e a unica coisa que acontecia era abrir a ficha. */
   const [agindoEm, setAgindoEm] = useState<ConsultaDoDia | null>(null)
+  /* O que ela precisa comprar para as sessões dos próximos sete dias. Vazio
+     quando não há nada -- e aí o bloco não aparece, porque uma lista de compras
+     vazia é ruído numa tela que fala do dia. */
+  const [compras, setCompras] = useState<ItemDeCompra[]>([])
 
   /* ──────────────────── O VOLTAR, que esta tela NUNCA teve ────────────────────
    *
@@ -160,15 +165,17 @@ export function PainelDaNutriScreen({
     const depoisDeAmanha = new Date()
     depoisDeAmanha.setDate(depoisDeAmanha.getDate() + 1)
 
-    const [r, caixa, sinais, aguardando, oDiaSeguinte] = await Promise.all([
+    const [r, caixa, sinais, aguardando, oDiaSeguinte, mercado] = await Promise.all([
       consultasDoDia(new Date()),
       dinheiroDoDia(),
       quemPedeAtencao(),
       pedidosDeConsulta(),
       consultasNoPeriodo(depoisDeAmanha, depoisDeAmanha),
+      comprasDaSemana(),
     ])
 
     setDinheiro(caixa)
+    setCompras(mercado.tipo === 'ok' ? mercado.itens : [])
     setAtencao(sinais.tipo === 'ok' ? sinais.pessoas : [])
     setPedidos(aguardando.tipo === 'ok' ? aguardando.consultas : [])
     /* Só o que CONTA como compromisso: pedido de amanhã já aparece no cartão de
@@ -521,6 +528,41 @@ export function PainelDaNutriScreen({
             orfaos`: o objeto existe, e o caminho não passa por ele. Nada falha,
             nada avisa, e ninguém descobre olhando a tela -- só olhando os dois
             lados juntos. */}
+        {/* ──────────────────── O QUE COMPRAR ────────────────────
+            "A lista de compra também, se tiver alguma coisa pendente de alguma
+            consulta que ela for ter, deve colocar aqui."
+
+            É a única coisa desta tela que tem hora certa para ser lida: no
+            supermercado, na véspera. Descobrir no dia da sessão que faltou o
+            iogurte é descobrir tarde.
+
+            Só aparece quando há o que comprar. Um bloco vazio dizendo "nada a
+            comprar" seria ruído todo dia para uma nutricionista que não faz
+            terapia alimentar -- e são a maioria. */}
+        {compras.length > 0 && (
+          <View>
+            <Text style={styles.rotuloDeSecao}>Comprar para os próximos 7 dias</Text>
+            <View style={styles.listaDeCompras}>
+              {compras.slice(0, 8).map(i => (
+                <View key={i.nome + (i.unidade ?? '')} style={styles.itemDeCompra}>
+                  <Text style={styles.nomeDaCompra} numberOfLines={1}>
+                    {i.nome}
+                  </Text>
+                  {/* Quantidade vazia quando as unidades divergiam e não deu
+                      para somar -- e aí ela vê o item sem número, que é honesto,
+                      em vez de um total inventado. */}
+                  {!!quantidadePorExtenso(i) && (
+                    <Text style={styles.quantidadeDaCompra}>{quantidadePorExtenso(i)}</Text>
+                  )}
+                </View>
+              ))}
+              {compras.length > 8 && (
+                <Text style={styles.maisCompras}>e mais {compras.length - 8} itens</Text>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* ──────────────────── O DINHEIRO DE HOJE ────────────────────
             As TRÊS linhas, sempre, e zero escrito como zero.
 
@@ -1017,6 +1059,34 @@ const estilos = estilosDe(t =>
        resumo do dinheiro passa a ser a única coisa emoldurada da metade de
        baixo. É o que faz três valores se lerem como três respostas. */
     caixaDoDia: { flexDirection: 'row', gap: 9 },
+
+    listaDeCompras: {
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 14,
+      paddingHorizontal: 13,
+      paddingVertical: 4,
+    },
+    itemDeCompra: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 12,
+      paddingVertical: 7,
+    },
+    nomeDaCompra: { flex: 1, fontFamily: FONTE.normal, fontSize: 14, color: t.cores.ink },
+    quantidadeDaCompra: {
+      fontFamily: FONTE.meia,
+      fontSize: 13,
+      color: t.inkSuave,
+      fontVariant: ['tabular-nums'],
+    },
+    maisCompras: {
+      fontFamily: FONTE.normal,
+      fontSize: 12,
+      color: t.inkFraco,
+      paddingVertical: 7,
+    },
     diaSemMovimento: {
       backgroundColor: t.cores.cartao,
       borderWidth: 1,
