@@ -59,9 +59,29 @@ import { useDesvioDoTeclado } from '../lib/teclado'
  * faz.
  *
  * O microfone da barra é DITADO, não gravação: vira texto no campo, ela lê antes
- * de mandar. É o mesmo `<Ditado>` da Aurora -- e com `assunto="nutri"`, porque
- * o contexto padrão do servidor é uma lista de comida e o Whisper obedece o
- * contexto. */
+ * de mandar. É o mesmo `<Ditado>` da Aurora, com `assunto="recado"`.
+ *
+ * Esta linha dizia `assunto="nutri"`, e estava errada -- achado caçando defeito
+ * na mesma tarde. `nutri` é vocabulário de COMANDO ("remarca", "cancela",
+ * horários), e aqui ela escreve PARA a paciente. O `initial_prompt` do Whisper
+ * não é conselho, é continuação: ele segue de onde o contexto parou. O padrão
+ * (`refeicao`) seria pior ainda, que é lista de alimento. */
+/* Quantas linhas a lista desenha.
+ *
+ * `nutri_conversas` devolve TODO vínculo, e não só quem já conversou -- é o que
+ * permite ela começar a conversa com quem nunca escreveu. Numa carteira de 300
+ * pacientes isso são 300 linhas, e esta tela usa `ScrollView`: todas montam de
+ * uma vez, e a maioria diz "Nenhuma mensagem ainda".
+ *
+ * Achado caçando defeito, e não em uso -- o consultório de teste tem poucos
+ * pacientes, então isto só apareceria no dia em que uma carteira de verdade
+ * abrisse a tela. A lista de pacientes já tinha teto pelo mesmo motivo.
+ *
+ * 60: a ordem põe quem tem mensagem nova em cima e quem nunca falou embaixo,
+ * então as 60 primeiras são sempre as que importam. O resto ganha uma linha
+ * dizendo quantos são e por onde se começa uma conversa nova. */
+const TETO_DA_LISTA = 60
+
 export function ConversasDaNutriScreen({
   onFechar,
   aoMudarNaoLidas,
@@ -384,7 +404,15 @@ export function ConversasDaNutriScreen({
           ) : (
             <Ditado
               compacto
-              assunto="nutri"
+              /* 'recado', e nao 'nutri'. Achado cacando defeito depois de
+                 subir: 'nutri' e vocabulario de COMANDO -- "remarca",
+                 "cancela", "lanca", horarios --, e aqui ela esta escrevendo
+                 PARA a paciente: "oi Ana, seu exame chegou". O
+                 `initial_prompt` do Whisper nao e conselho, e continuacao: um
+                 recado ditado contra uma lista de comandos puxa para comando.
+                 O padrao ('refeicao') seria pior ainda, que e lista de
+                 alimento. */
+              assunto="recado"
               onTexto={ouvido =>
                 setTexto(antes => (antes.trim() ? antes.trim() + ' ' + ouvido : ouvido))
               }
@@ -440,7 +468,7 @@ export function ConversasDaNutriScreen({
           </Text>
         )}
 
-        {conversas.map(c => (
+        {conversas.slice(0, TETO_DA_LISTA).map(c => (
           <Pressable
             key={c.contaId}
             onPress={() => void abrir(c)}
@@ -479,6 +507,17 @@ export function ConversasDaNutriScreen({
             </View>
           </Pressable>
         ))}
+
+        {conversas.length > TETO_DA_LISTA && (
+          /* Dito por escrito porque lista que acaba sem avisar é pior do que
+             lista curta: ela veria terminar e não teria como desconfiar. Mesma
+             decisão da lista de pacientes. */
+          <Text style={styles.rodape}>
+            Mostrando as {TETO_DA_LISTA} primeiras. Outros{' '}
+            {conversas.length - TETO_DA_LISTA} pacientes usam o aplicativo · para
+            falar com alguém pela primeira vez, abra a ficha dele.
+          </Text>
+        )}
 
         {conversas.length > 0 && (
           /* A limitação, escrita. Ela vai descobrir isto sozinha num dia em que

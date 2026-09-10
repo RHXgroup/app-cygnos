@@ -265,7 +265,7 @@ export type ResultadoTranscricao =
  * verbos dela ("remarca", "cancela", "lança") e um horário ditado não batem com
  * comida nenhuma, e sem contexto próprio o modelo continua de onde a lista de
  * alimentos o deixou. */
-export type AssuntoDoAudio = 'refeicao' | 'treino' | 'nutri'
+export type AssuntoDoAudio = 'refeicao' | 'treino' | 'nutri' | 'recado'
 
 export async function transcrever(
   uri: string,
