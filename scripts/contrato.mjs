@@ -137,8 +137,78 @@ function chamadasDoApp() {
   return [...achadas.entries()].sort(([a], [b]) => a.localeCompare(b))
 }
 
-const chamadas = chamadasDoApp()
-console.log(`\n${chamadas.length} chamadas de RPC no src/lib\n`)
+/* ── O buraco que o grep não alcança: as RPCs que a Aurora chama do SERVIDOR ──
+ *
+ * A premissa lá em cima -- "a lista sai do código" -- vale enquanto o app for
+ * quem chama. A Aurora da nutricionista quebrou essa premissa: ela pede a
+ * ferramenta, a edge function `app-aurora-nutri` (no outro repositório) executa
+ * a RPC, e o `src/lib` daqui não tem uma linha com esse nome. Um `grep` neste
+ * repositório nunca vai encontrá-las.
+ *
+ * Só que a consequência de uma assinatura mudada é a MESMA, e pior de achar:
+ * não quebra tela nenhuma, não falha teste nenhum -- a nutri toca em Confirmar
+ * e lê "Não consegui agendar: could not find function". Por isso elas entram
+ * aqui à mão, e a lista escrita à mão é o preço de a chamada morar noutro repo.
+ *
+ * Ao acrescentar ferramenta nova lá (o registro é
+ * `supabase/functions/_shared/ferramentas.ts`, no Nutriviet), acrescente aqui
+ * também -- os nomes dos argumentos saem de `rpc.argumentos` daquele arquivo.
+ * E acrescente DEPOIS de a migração ter rodado: uma função que ainda não existe
+ * no banco aparece aqui como AUSENTE, que é alarme falso, e alarme falso ensina
+ * a ignorar o alarme.
+ *
+ * ── O que ISTO cobre e o que o outro lado cobre ────────────────────────────
+ * Existe um segundo teste, no Nutriviet (`oRegistroBateComOBanco.test.ts`), que
+ * compara o registro com o SQL das migrações e pega ferramenta nova sozinho, sem
+ * lista à mão. Ele NÃO substitui esta lista, e vice-versa:
+ *
+ *   lá   registro × migração, offline. Passa se a migração foi escrita e nunca
+ *        rodou -- e sabe de ferramenta nova sem ninguém lembrar.
+ *   aqui a chamada contra o banco DE VERDADE. É a única que sabe o que está NO
+ *        AR, e a única que separa "barrada para anônimo" de "executa sem
+ *        sessão" (armadilha 14).
+ *
+ * Uma responde "escrevemos certo?"; a outra, "chegou lá?".
+ *
+ * Elas são de ESCRITA e são chamadas de verdade, como todas as outras: sem
+ * sessão, `get_nutricionista_id()` volta nulo e a RLS de `consultas` recusa o
+ * insert. O esperado é 42501, barrada antes disso -- e se um dia aparecer
+ * "EXECUTA SEM LOGIN", é a armadilha 14 batendo na porta. */
+const DA_AURORA = [
+  ['app_agendar_consulta',
+    ['p_paciente_id', 'p_data_hora', 'p_duracao', 'p_tipo', 'p_observacoes']],
+  ['app_lancar_conta',
+    ['p_receber', 'p_descricao', 'p_valor', 'p_data_vencimento', 'p_observacoes',
+     'p_paciente_id', 'p_fornecedor_id', 'p_categoria_despesa_id', 'p_parcelas']],
+  ['app_cadastrar_paciente',
+    ['p_nome', 'p_data_nascimento', 'p_celular', 'p_email', 'p_cpf', 'p_genero']],
+  ['app_cadastrar_alimento',
+    ['p_nome', 'p_grupo', 'p_calorias', 'p_proteinas', 'p_carboidratos', 'p_gorduras',
+     'p_fibras', 'p_porcao_g', 'p_medida_caseira', 'p_medidas']],
+  ['app_criar_tag_paciente', ['p_nome', 'p_cor']],
+  ['app_vincular_tags_paciente', ['p_paciente_id', 'p_tag_ids']],
+  ['app_cadastrar_fornecedor',
+    ['p_nome', 'p_cnpj', 'p_telefone', 'p_email', 'p_observacoes']],
+  ['app_cadastrar_categoria_despesa', ['p_nome']],
+  ['app_cadastrar_forma_pagamento', ['p_nome']],
+  ['app_confirmar_consultas', ['p_consulta_ids']],
+  ['app_financeiro_no_periodo', ['p_de', 'p_ate']],
+  /* Esta tem uma trava a mais DENTRO dela: recusa enquanto a conta não tiver
+     aceitado o DPA 1.7. Aqui isso não aparece -- sem sessão ela para antes, no
+     42501 -- e é bom lembrar que "existe e está barrada" continua não sendo o
+     mesmo que "responde". */
+  ['app_dados_do_paciente', ['p_paciente_id']],
+]
+
+const chamadas = [
+  ...chamadasDoApp(),
+  ...DA_AURORA.map(([nome, args]) => [nome, { args, arquivo: 'app-aurora-nutri (servidor)' }]),
+].sort(([a], [b]) => a.localeCompare(b))
+
+console.log(
+  `\n${chamadas.length} chamadas de RPC` +
+  ` (${chamadas.length - DA_AURORA.length} no src/lib, ${DA_AURORA.length} pela Aurora, no servidor)\n`,
+)
 
 let ausentes = 0
 let executamSemLogin = []

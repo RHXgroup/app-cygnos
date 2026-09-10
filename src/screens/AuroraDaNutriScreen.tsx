@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
   Pressable,
   ScrollView,
@@ -12,6 +13,10 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
+  conversaAnterior,
+  dequemEAConversa,
+  esquecerConversa,
+  guardarConversa,
   novaFala,
   perguntarAAurora,
   type AcaoPendente,
@@ -22,8 +27,10 @@ import {
   O_QUE_ELA_FAZ,
   PERGUNTAS_DE_EXEMPLO,
   RESPOSTA_DO_MENU,
+  semRestos,
   ehPedidoDeMenu,
 } from '../lib/menuDaAurora'
+import { consultasDoDia, pedidosDeConsulta } from '../lib/agendaDaNutri'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
@@ -59,11 +66,37 @@ import { Ditado } from '../components/Ditado'
  * a altura vem do `onLayout` -- não de `useWindowDimensions`, que não encolhe
  * junto e faria a conta somar duas vezes num build de verdade. */
 
-export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
+export function AuroraDaNutriScreen({
+  onFechar,
+  /* ──────────────────── ABRIR JÁ FALANDO DE ALGUÉM ────────────────────
+   *
+   * Quando a Aurora é aberta de dentro da ficha, ela chega sabendo de quem se
+   * trata -- e a nutricionista não precisa dizer "a Maria Alves" para uma tela
+   * que acabou de mostrar a Maria Alves.
+   *
+   * O NOME serve só para a tela: aparece na primeira fala, que é LOCAL e não
+   * entra no histórico mandado ao servidor. Para o servidor vai `#412`, que é
+   * o recorte do DPA 1.7. Duas coisas diferentes com a mesma origem, e é a
+   * separação inteira desta funcionalidade. */
+  sobre,
+}: {
+  onFechar: () => void
+  sobre?: { pacienteId: number; nome: string }
+}) {
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
 
-  const [falas, setFalas] = useState<Fala[]>([])
+  /* Começa de onde parou. Ver `conversaAnterior` em `auroraDaNutri`: dura a
+     sessão do app e não escreve nada no aparelho. */
+  const [falas, setFalas] = useState<Fala[]>(() => {
+    /* Conversa nova quando o paciente é OUTRO -- ou quando a anterior era geral
+       e esta é sobre alguém. Continuar a conversa da Maria dentro da ficha do
+       João daria resposta certa sobre a pessoa errada. */
+    if (sobre && dequemEAConversa() !== sobre.pacienteId) {
+      return [{ ...novaFala('aurora', 'Sobre ' + sobre.nome + '. O que você quer saber?'), local: true }]
+    }
+    return conversaAnterior()
+  })
   const [texto, setTexto] = useState('')
   /* Qual dos dois botões a barra mostra. Derivado do campo, e não um estado
      à parte: dois estados para a mesma coisa divergem, e o sintoma seria a seta
@@ -73,12 +106,58 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
      do toque, enquanto `setPensando` só vale na renderização seguinte -- e é
      nessa janela que o segundo toque passava. */
   const emVoo = useRef(false)
+
+  /* ──────────────────── O QUE O DIA PEDE, na frente dos exemplos ────────────────────
+   *
+   * Os quatro exemplos ensinam o que ela PODE perguntar, e continuam. O que
+   * faltava era o que ela PRECISA fazer hoje: pedido de consulta esperando
+   * resposta é a única coisa nesta tela com alguém do outro lado, e sem isto
+   * ela só descobre abrindo o painel -- ou não descobre.
+   *
+   * Uma leitura pequena, e SÓ ela: a tela de conversa não vira painel. Se
+   * falhar, o chip não aparece e o resto da tela nem fica sabendo (item 11). */
+  const [pedidos, setPedidos] = useState(0)
+  /* As de HOJE que ainda estão como pendente -- "agendada e não confirmada",
+     que é outra coisa que pedido (item que já custou uma conversa inteira). */
+  const [aConfirmar, setAConfirmar] = useState(0)
+
+  const contar = useCallback(async () => {
+    /* As duas juntas: são independentes, e esperar uma para começar a outra
+       dobraria a espera de uma tela que abre para uma pergunta rápida. */
+    const [p, d] = await Promise.all([pedidosDeConsulta(), consultasDoDia(new Date())])
+    if (p.tipo === 'ok') setPedidos(p.consultas.length)
+    if (d.tipo === 'ok') {
+      setAConfirmar(d.consultas.filter(c => c.status === 'pendente').length)
+    }
+  }, [])
+
+  useEffect(() => {
+    void contar()
+  }, [contar])
+
+  /* Relê ao voltar do segundo plano -- item 8 do AGENTS. Ela confirma uma
+     consulta no computador, volta ao celular, e sem isto o chip continuaria
+     oferecendo confirmar o que já está confirmado. E ao contrário do painel,
+     aqui não há o que piscar: são dois números que só mudam um rótulo. */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', e => {
+      if (e === 'active') void contar()
+    })
+    return () => sub.remove()
+  }, [contar])
   const [pensando, setPensando] = useState(false)
 
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
 
   const rolagem = useRef<ScrollView>(null)
+
+  /* Guarda a cada mudança, e não só ao sair: a tela pode ser desmontada pelo
+     voltar do aparelho, e um `useEffect` de limpeza roda depois de o estado já
+     ter ido embora em alguns caminhos. Gravar sempre custa uma atribuição. */
+  useEffect(() => {
+    guardarConversa(falas, sobre ? sobre.pacienteId : undefined)
+  }, [falas, sobre])
 
   /* Rola quando CHEGA fala, e não quando o conteúdo muda de tamanho.
      `onContentSizeChange` dispara também no crescimento provocado pela própria
@@ -118,7 +197,13 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
      * podem querer dizer outra coisa: é instantâneo, não custa uma ida ao
      * modelo, e não tem como ser reinterpretado -- que foi o que deu errado. */
     if (ehPedidoDeMenu(limpa)) {
-      setFalas(atual => [...atual, novaFala('nutri', limpa), novaFala('aurora', RESPOSTA_DO_MENU)])
+      setFalas(atual => [
+        ...atual,
+        novaFala('nutri', limpa),
+        /* LOCAL: este texto é nosso, e mandá-lo de volta ao modelo na pergunta
+           seguinte gastaria contexto para ensinar a ele o que ele já sabe. */
+        { ...novaFala('aurora', RESPOSTA_DO_MENU), local: true },
+      ])
       setTexto('')
       return
     }
@@ -131,7 +216,13 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
     setTexto('')
     setPensando(true)
 
-    const r = await perguntarAAurora(limpa, anteriores)
+    /* Na tela ela lê o que escreveu; o servidor recebe de quem se trata, por
+       número. Sem isto a Aurora teria de adivinhar o paciente a cada pergunta
+       -- ou pedir o nome, dentro da ficha da pessoa. */
+    const r = await perguntarAAurora(
+      sobre ? 'Sobre o paciente #' + sobre.pacienteId + ': ' + limpa : limpa,
+      anteriores,
+    )
     setPensando(false)
 
     if (r.tipo === 'confirmar') {
@@ -150,7 +241,12 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
        e a explicação ficou lá em cima, fora da tela. */
     setFalas(atual => [
       ...atual,
-      novaFala('aurora', r.tipo === 'ok' ? r.texto : r.mensagem),
+      r.tipo === 'ok'
+        ? novaFala('aurora', r.texto)
+        /* A falha guarda a pergunta junto: é ela que o "tentar de novo" reenvia.
+           Sem isso, sem sinal, a pessoa redigita tudo -- e uma pergunta longa
+           ditada no meio do consultório ninguém redigita: desiste. */
+        : { ...novaFala('aurora', r.mensagem), falhou: true, pergunta: limpa },
     ])
   }
 
@@ -189,6 +285,11 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
        ou desistir -- não há por que tirar dela essa escolha. */
     if (r.tipo === 'ok') {
       setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'feita' } : f)))
+      /* E reconta: ela acabou de confirmar as três consultas de hoje, e o chip
+         continuaria oferecendo confirmar as três. Oferta que não some depois de
+         atendida é a mesma coisa que uma tela que não percebeu o que a pessoa
+         fez. */
+      void contar()
     }
 
     setFalas(atual => [
@@ -207,6 +308,24 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
   function cancelar(fala: Fala) {
     setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'cancelada' } : f)))
   }
+
+  /* O chip do dia vem PRIMEIRO, e some quando não há pedido nenhum -- um chip
+     que diz "0 pedidos" seria uma linha a mais para ler todo dia sem motivo. */
+  const sugestoes = [
+    ...(pedidos > 0
+      ? [pedidos === 1
+          ? 'Responder o pedido de consulta que está esperando'
+          : 'Responder os ' + pedidos + ' pedidos de consulta']
+      : []),
+    /* Depois do pedido, e não antes: pedido tem alguém esperando resposta;
+       confirmar é arrumação da agenda dela. */
+    ...(aConfirmar > 0
+      ? [aConfirmar === 1
+          ? 'Confirmar a consulta de hoje que está pendente'
+          : 'Confirmar as ' + aConfirmar + ' consultas de hoje']
+      : []),
+    ...PERGUNTAS_DE_EXEMPLO,
+  ]
 
   const vazia = falas.length === 0
   /* Cartão esperando decisão. Enquanto houver um, nada mais é oferecido. */
@@ -228,7 +347,27 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela}>Aurora</Text>
-        <View style={styles.botaoVoltar} />
+        {/* Recomeçar. Aparece só com conversa na tela -- botão que não faz nada
+            ensina que os botões daqui não fazem nada. E não pergunta antes: o
+            que se perde é uma conversa, não um dado, e a confirmação para uma
+            coisa reversível é atrito em cima de quem já decidiu. */}
+        {falas.length > 0 ? (
+          <Pressable
+            onPress={() => {
+              esquecerConversa()
+              setFalas([])
+              setTexto('')
+            }}
+            style={styles.botaoVoltar}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Começar uma conversa nova"
+          >
+            <Ionicons name="create-outline" size={20} color={paleta().inkFraco} />
+          </Pressable>
+        ) : (
+          <View style={styles.botaoVoltar} />
+        )}
       </View>
 
       <ScrollView
@@ -259,7 +398,7 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
             <Text style={styles.textoAbertura}>{O_QUE_ELA_FAZ}</Text>
 
             <View style={styles.exemplos}>
-              {PERGUNTAS_DE_EXEMPLO.map(p => (
+              {sugestoes.map(p => (
                 <Pressable
                   key={p}
                   onPress={() => void mandar(p)}
@@ -323,8 +462,18 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
               style={[styles.balao, f.papel === 'nutri' ? styles.balaoDela : styles.balaoDaAurora]}
             >
               <Text style={f.papel === 'nutri' ? styles.textoDela : styles.textoDaAurora}>
-                {f.texto}
+                {semRestos(f.texto)}
               </Text>
+              {f.falhou && f.pergunta ? (
+                <Pressable
+                  onPress={() => void mandar(f.pergunta!)}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Perguntar de novo"
+                >
+                  <Text style={styles.tentarDeNovo}>Tentar de novo</Text>
+                </Pressable>
+              ) : null}
             </View>
           ),
         )}
@@ -351,7 +500,7 @@ export function AuroraDaNutriScreen({ onFechar }: { onFechar: () => void }) {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.tira}
         >
-          {PERGUNTAS_DE_EXEMPLO.map(p => (
+          {sugestoes.map(p => (
             <Pressable
               key={p}
               onPress={() => void mandar(p)}
@@ -504,6 +653,12 @@ const estilos = estilosDe(t =>
     textoExemplo: { flex: 1, fontFamily: FONTE.normal, fontSize: 14, color: t.cores.ink },
 
     balao: { maxWidth: '86%', borderRadius: 16, paddingVertical: 11, paddingHorizontal: 14 },
+    tentarDeNovo: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: t.cores.verde,
+      marginTop: 8,
+    },
     /* ──────────────────── O balão dela deixa de ser VERDE ────────────────────
        Verde é a cor da ação neste app -- o botão Confirmar, o Aceitar. Uma
        conversa inteira dela em verde punha a cor de "executa" em cima do que ela

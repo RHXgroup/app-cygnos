@@ -68,7 +68,11 @@ export function LerCodigoScreen({
   /* O que aconteceu com o "salvar na minha base". Um estado só, e não um
      booleano de carregando mais outro de pronto: os casos são exclusivos, e
      dois booleanos permitiriam "salvando e salvo" ao mesmo tempo. */
-  const [naBase, setNaBase] = useState<'nao' | 'salvando' | 'salvo' | 'repetido'>('nao')
+  /* `jaNaBase`: o produto já existe na base pública do app, e não na dela. Não
+     é sucesso nem falha -- é "não precisa cadastrar, é só procurar pelo nome",
+     e era o desfecho que faltava. Ver `baseDaNutri.ts`. */
+  const [naBase, setNaBase] = useState<'nao' | 'salvando' | 'salvo' | 'repetido' | 'jaNaBase'>('nao')
+  const [nomeNaBase, setNomeNaBase] = useState<string | null>(null)
   const [erroDaBase, setErroDaBase] = useState('')
 
   /* O leitor dispara várias vezes por segundo enquanto o código está no
@@ -161,6 +165,11 @@ export function LerCodigoScreen({
          é o sinal do supermercado, e tocar de novo costuma resolver. */
       setNaBase('nao')
       setErroDaBase(r.mensagem)
+      return
+    }
+    if (r.tipo === 'jaNaBase') {
+      setNomeNaBase(r.nome)
+      setNaBase('jaNaBase')
       return
     }
     setNaBase(r.tipo === 'repetido' ? 'repetido' : 'salvo')
@@ -365,13 +374,20 @@ export function LerCodigoScreen({
               para ela, e errado só para ela se estiver errado. */}
           {paraBaseDaNutri && (
             <View style={styles.blocoBase}>
-              {naBase === 'salvo' || naBase === 'repetido' ? (
+              {naBase === 'salvo' || naBase === 'repetido' || naBase === 'jaNaBase' ? (
                 <View style={styles.baseFeita}>
                   <Ionicons name="checkmark-circle" size={18} color={paleta().cores.verde} />
                   <Text style={styles.textoBaseFeita}>
                     {naBase === 'salvo'
                       ? 'Guardado na sua base de alimentos.'
-                      : 'Este produto já estava na sua base.'}
+                      : naBase === 'repetido'
+                        ? 'Este produto já estava na sua base.'
+                        /* Diz o que fazer, e não só o que aconteceu: sem o "é só
+                           procurar pelo nome", ela fica sabendo que não salvou e
+                           não fica sabendo que já pode usar. */
+                        : 'Este produto já está na base do app' +
+                          (nomeNaBase ? ' como "' + nomeNaBase + '"' : '') +
+                          '. É só procurar pelo nome ao montar o plano.'}
                   </Text>
                 </View>
               ) : (
@@ -396,7 +412,7 @@ export function LerCodigoScreen({
               {/* O aviso vem ANTES de ela tocar, e não depois. Um produto que
                   entra na base dela vai aparecer no plano de quem ela atende, e
                   a hora de conferir o rótulo é com o pacote ainda na mão. */}
-              {naBase !== 'salvo' && naBase !== 'repetido' && (
+              {naBase !== 'salvo' && naBase !== 'repetido' && naBase !== 'jaNaBase' && (
                 <Text style={styles.ajudaBase}>
                   {produto.origem === 'base'
                     ? 'Guarda uma cópia sua deste produto, com o que você corrigiu.'

@@ -34,7 +34,15 @@ import type { ProdutoLido } from './codigoBarras'
 export type ResultadoDaBase =
   | { tipo: 'ok' }
   | { tipo: 'repetido' }
+  /* O código de barras já existe na base do APP, sem dono -- ou seja, o produto
+     já está disponível para ela procurar pelo nome. Não é erro, e não é
+     "repetido na sua base": é uma terceira resposta, e faltava. */
+  | { tipo: 'jaNaBase'; nome: string | null }
   | { tipo: 'erro'; mensagem: string }
+
+/* Chave repetida. É o código do Postgres, e ele é estável -- ao contrário da
+   frase, que muda de versão e de idioma. */
+const CHAVE_REPETIDA = '23505'
 
 export async function mandarParaMinhaBase(
   produto: ProdutoLido,
@@ -51,17 +59,29 @@ export async function mandarParaMinhaBase(
   const id = sessao.session?.user.id
   if (!id) return { tipo: 'erro', mensagem: 'Entre de novo para salvar na sua base.' }
 
-  /* ── JÁ ESTÁ LÁ? ───────────────────────────────────────────────────────
+  /* ── JÁ ESTÁ LÁ? E "LÁ" NÃO É SÓ A BASE DELA ──────────────────────────
    * O código de barras identifica o produto sem ambiguidade, então ele é a
    * pergunta certa — nome bate mal ("Biscoito recheado" existe aos montes).
    *
-   * Sem isto, escanear o mesmo pacote duas vezes criaria duas linhas iguais na
-   * base dela, e no dia de montar o plano ela escolheria entre duas opções
-   * idênticas sem saber qual. */
+   * A pergunta era feita SÓ entre os alimentos dela (`nutricionista_id = id`),
+   * e o índice do banco é GLOBAL:
+   *
+   *     create unique index app_alimentos_codigo_barras_unico
+   *       on app_alimentos (codigo_barras) where codigo_barras is not null
+   *
+   * Ou seja, um produto que já está na base pública do app — que tem milhares
+   * de itens importados do Open Food Facts, todos com código de barras — passa
+   * por esta conferência como se fosse novo e bate no índice na hora de gravar.
+   * O que ela lia era "Não consegui salvar o produto na sua base agora", que
+   * soa como problema de rede: ela tenta de novo, no supermercado, e falha de
+   * novo. Aconteceu com um pão e com uma batata palha.
+   *
+   * E a resposta certa não é nem "salvei" nem "deu erro": é que o produto JÁ
+   * ESTÁ disponível para ela, e é só procurar pelo nome. Por isso a busca
+   * perdeu o filtro de dono e passou a trazer também de quem é a linha. */
   const { data: existe, error: erroBusca } = await supabase
     .from('app_alimentos')
-    .select('id')
-    .eq('nutricionista_id', id)
+    .select('id, nome, nutricionista_id')
     .eq('codigo_barras', produto.codigo)
     .maybeSingle()
 
@@ -69,7 +89,13 @@ export async function mandarParaMinhaBase(
      repetida, e recusar a gravação por causa dela seria perder o produto que a
      pessoa tem na mão agora. */
   if (erroBusca) falha('Não consegui conferir se o produto já estava na sua base.', erroBusca)
-  if (existe) return { tipo: 'repetido' }
+
+  const achado = existe as { id: number; nome: string | null; nutricionista_id: string | null } | null
+  if (achado) {
+    return achado.nutricionista_id === id
+      ? { tipo: 'repetido' }
+      : { tipo: 'jaNaBase', nome: achado.nome?.trim() || null }
+  }
 
   const { error } = await supabase.from('app_alimentos').insert({
     nutricionista_id: id,
@@ -97,6 +123,18 @@ export async function mandarParaMinhaBase(
   })
 
   if (error) {
+    /* O índice global outra vez, agora por corrida: entre a conferência acima e
+       esta gravação, alguém pode ter cadastrado o mesmo código -- a importação
+       do Open Food Facts, por exemplo, que roda sozinha. O desfecho é o MESMO
+       da conferência, e não um erro: o produto está lá.
+
+       Sem este ramo, o caminho de corrida devolveria de novo a frase que soa
+       como falha de rede, e ela ficaria tentando no supermercado. */
+    if ((error as { code?: string }).code === CHAVE_REPETIDA) {
+      falha('Código de barras já cadastrado; virou "já está na base".', error)
+      return { tipo: 'jaNaBase', nome: null }
+    }
+
     return {
       tipo: 'erro',
       mensagem: falha('Não consegui salvar o produto na sua base agora.', error),

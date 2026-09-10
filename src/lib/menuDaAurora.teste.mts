@@ -1,4 +1,10 @@
-import { ehPedidoDeMenu, O_QUE_ELA_FAZ, PERGUNTAS_DE_EXEMPLO, RESPOSTA_DO_MENU } from './menuDaAurora.ts'
+import {
+  ehPedidoDeMenu,
+  semRestos,
+  O_QUE_ELA_FAZ,
+  PERGUNTAS_DE_EXEMPLO,
+  RESPOSTA_DO_MENU,
+} from './menuDaAurora.ts'
 
 let passou = 0
 let falhou = 0
@@ -52,9 +58,39 @@ function ok(nome: string, condicao: boolean, detalhe = '') {
 
 // ── 4. Os textos ─────────────────────────────────────────────────────────────
 {
-  /* A abertura mentia depois que a Aurora ganhou as ferramentas. Se alguém
-     reescrever isto dizendo que ela NÃO agenda, é regressão. */
-  ok('o texto do que ela faz diz que agenda', /agendo consulta/.test(O_QUE_ELA_FAZ))
+  /* Por ASSUNTO, e não por ferramenta -- e o teste mudou junto com a frase.
+     Cobrar "agendo consulta" e "lanço conta a receber" era recriar aqui o
+     acoplamento que a frase acabou de perder: com vinte ferramentas no
+     servidor, cada uma nova exigiria uma linha nova neste arquivo, e a linha só
+     apareceria quando alguém lembrasse -- que é exatamente como a frase mentiu
+     três vezes em dois dias.
+
+     O que continua sendo regressão, e por isso continua cobrado: dizer que ela
+     NÃO cuida da agenda, sumir com o dinheiro ou com os cadastros, ou perder a
+     promessa de que nada grava sem a confirmação dela. */
+  ok('diz que cuida da agenda', /agenda/.test(O_QUE_ELA_FAZ))
+  ok('e que remarca e cancela', /remarcar/.test(O_QUE_ELA_FAZ) && /cancelar/.test(O_QUE_ELA_FAZ))
+  ok('diz que lança o que entra e o que sai', /entra e o que sai/.test(O_QUE_ELA_FAZ))
+  ok('e que faz cadastro', /cadastro/.test(O_QUE_ELA_FAZ))
+  ok('e que marca tags', /tags/.test(O_QUE_ELA_FAZ))
+  ok('e que cria lembrete no telefone', /lembrete/.test(O_QUE_ELA_FAZ))
+
+  /* O outro lado da frase, e ele também mente se ninguém olhar: confirmar
+     consulta NÃO tem ferramenta, e foi pedir isso que fez a nutri receber uma
+     resposta sobre a fila de pedidos, que é outra coisa. No dia em que a
+     ferramenta existir, esta linha cai junto com o texto. */
+  ok('diz o que ainda é no computador', /no computador/.test(O_QUE_ELA_FAZ))
+
+  /* Esta linha cobrava "quantos" por uma hora, e estava certa: a triagem
+     mandava ao modelo só a contagem, e prometer nomes seria mentira. Com a
+     recomposição no ar -- o servidor manda `#412` e troca pelo nome na volta --
+     ela responde QUEM, sem nome nenhum sair do país.
+
+     O caso fica, com o alvo trocado, porque o que ele protege não mudou: esta
+     frase depende de uma decisão que mora no OUTRO repositório, e quem a
+     reescrever sem olhar lá vai errar para um dos dois lados. */
+  ok('fala de quem pede atenção', /quem está pedindo atenção/.test(O_QUE_ELA_FAZ))
+  ok('e não voltou a prometer só a contagem', !/quantos pacientes/.test(O_QUE_ELA_FAZ))
   ok('e diz que a confirmação é dela', /confirmação/.test(O_QUE_ELA_FAZ))
   ok('a resposta do menu carrega esse texto', RESPOSTA_DO_MENU.includes(O_QUE_ELA_FAZ))
 
@@ -62,6 +98,26 @@ function ok(nome: string, condicao: boolean, detalhe = '') {
      não havia caminho de volta nenhum. */
   ok('há exemplos para oferecer', PERGUNTAS_DE_EXEMPLO.length >= 3)
   ok('nenhum exemplo é pedido de menu', PERGUNTAS_DE_EXEMPLO.every(p => !ehPedidoDeMenu(p)))
+}
+
+// ── 5. O que não pode chegar à tela ──────────────────────────────────────────
+{
+  /* O número da consulta existe para a ferramenta, e o prompt manda não
+     escrevê-lo na resposta. Isto aqui é a rede embaixo do prompt: modelo
+     desobedece, e "confirmei a consulta [ID: 57]" é uma frase que a
+     nutricionista não tem como interpretar. */
+  ok('tira o id e o espaço em volta',
+     semRestos('Confirmei a consulta [ID: 57] às 13:00.') === 'Confirmei a consulta às 13:00.')
+  ok('tira mais de um',
+     semRestos('Marina [ID: 12] e Renan [ID: 13] estão hoje') === 'Marina e Renan estão hoje')
+  ok('não encosta em texto normal',
+     semRestos('nada a tirar aqui') === 'nada a tirar aqui')
+  ok('sobra vazio quando era só o id', semRestos('[ID: 9]') === '')
+  /* Não pode comer coisa parecida que não é id: o modelo escreve peso e altura
+     entre colchetes em tabela, e uma regra larga demais apagaria o dado. */
+  ok('não tira colchete que não é id',
+     semRestos('peso [78 kg] hoje') === 'peso [78 kg] hoje')
+  ok('nem a cerquilha do paciente', semRestos('#412 está sem retorno') === '#412 está sem retorno')
 }
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')

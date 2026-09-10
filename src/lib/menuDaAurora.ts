@@ -26,11 +26,59 @@
  * A tela de abertura dizia "Agendar, remarcar e lançar continuam no sistema, no
  * computador" -- verdade quando foi escrita, e mentira desde o dia em que a
  * Aurora ganhou as ferramentas de agendar e lançar. Duas descrições da mesma
- * coisa divergem sempre; esta é a única. */
+ * coisa divergem sempre; esta é a única.
+ *
+ * ──────────────────── E ela envelhece de novo A CADA FERRAMENTA NOVA ────────────────────
+ * Quem manda no que a Aurora faz é o registro do servidor
+ * (`supabase/functions/_shared/ferramentas.ts`, no Nutriviet), e o aplicativo
+ * não tem como importar aquele arquivo -- ele é Deno, e nada aqui alcança.
+ * Então esta frase é uma CÓPIA À MÃO, e a única defesa dela é ser lembrada:
+ * quando uma ferramenta entrar lá, ela entra aqui.
+ *
+ * Já aconteceu no mesmo dia em que este comentário foi escrito: três horas
+ * depois de eu consertar a mentira acima, o servidor ganhou conta a pagar e
+ * esta frase virou a mentira seguinte. */
+/* Três linhas, e não uma frase: com treze ferramentas, enumerar tudo numa
+   frase só é a mesma coisa que não dizer nada. O corte é por NATUREZA -- o que
+   ela lê, o que ela grava, e o que não é com ela --, que é a pergunta que a
+   nutricionista tem na cabeça quando abre a tela.
+
+   Fornecedor, categoria de despesa e forma de pagamento existem e NÃO estão
+   aqui de propósito: são o que completa um lançamento, e não coisa que alguém
+   pede. Frase de abertura que lista ferramenta interna vira lista de sistema, e
+   lista de sistema ninguém lê. */
+/* "quem", e não "quantos" -- e esta linha já foi as duas coisas no mesmo dia.
+ *
+ * Enquanto a triagem mandava só a contagem ao modelo, prometer nomes seria
+ * mentira, e a frase dizia "quantos ... os nomes ficam na tela Hoje". Com a
+ * recomposição no ar (o servidor manda `#412` à IA e troca pelo nome na volta),
+ * ela responde quem -- e nenhum nome sai do país. Ver o commit `deab1fef` do
+ * Nutriviet.
+ *
+ * Fica registrado porque a frase certa depende de uma decisão do servidor que
+ * não se enxerga daqui: quem trocar isto sem olhar lá vai errar para um dos
+ * dois lados. */
+/* ──────────────────── POR ASSUNTO, e nunca mais por item ────────────────────
+ * Esta frase mentiu TRÊS vezes em dois dias, sempre do mesmo jeito: o servidor
+ * ganhava ferramenta e a lista daqui continuava a de ontem. Começou com duas
+ * ferramentas, e hoje são vinte.
+ *
+ * Enquanto ela enumerava, cada ferramenta nova era uma correção aqui -- e a
+ * correção só acontecia quando alguém lembrava. Por ASSUNTO, ferramenta nova
+ * dentro de um assunto que já está escrito não muda nada: "responder pedido de
+ * consulta" já cabe em "cuido da sua agenda".
+ *
+ * Assunto NOVO ainda exige mexer aqui. Mas assunto novo é raro, e a lista de
+ * assuntos é curta o bastante para caber numa tela -- que era o outro problema
+ * de enumerar vinte coisas. */
 export const O_QUE_ELA_FAZ =
-  'Eu respondo sobre a sua agenda, o dinheiro do dia e quem está pedindo atenção — ' +
-  'e agendo consulta e lanço conta a receber, sempre com a sua confirmação. ' +
-  'Remarcar, cancelar e o resto continuam no sistema, no computador.'
+  'Eu leio a sua agenda, o dinheiro do dia, a ficha do paciente (peso, plano e ' +
+  'histórico) e quem está pedindo atenção na sua carteira.\n\n' +
+  'E eu faço, sempre com a sua confirmação antes de gravar: cuido da agenda ' +
+  '(marcar, remarcar, cancelar e responder pedido de consulta), lanço o que ' +
+  'entra e o que sai, cadastro paciente, alimento e fornecedor, marco tags e ' +
+  'crio lembrete no seu telefone.\n\n' +
+  'Gerar relatório continua no sistema, no computador.'
 
 export const RESPOSTA_DO_MENU = 'Voltamos ao começo. ' + O_QUE_ELA_FAZ
 
@@ -47,13 +95,23 @@ export const FECHAMENTO = 'Precisa de mais alguma coisa?'
  * Não é enfeite: uma caixa de texto vazia com "pergunte alguma coisa" não diz o
  * que a Aurora SABE, e a primeira pergunta de quem não sabe costuma ser
  * justamente a que ela não responde -- "remarca a Maria" --, o que ensina em
- * dez segundos que não serve para nada. Quatro exemplos do que ela responde
- * HOJE valem mais que qualquer texto de ajuda. */
+ * dez segundos que não serve para nada. Exemplos do que ela responde HOJE valem
+ * mais que qualquer texto de ajuda.
+ *
+ * Três de leitura e três de ação, nesta ordem: quem chega não desconfia que uma
+ * caixa de conversa GRAVA coisa, e são os últimos que contam isso -- sem eles,
+ * "agenda um retorno" nunca é a primeira coisa que alguém escreve.
+ *
+ * O cadastro de alimento é o que menos se adivinha e o que mais economiza o dia
+ * dela: é a tarefa que hoje exige abrir o computador no meio do consultório. Se
+ * um dia esta lista precisar encolher, esse não é o que sai. */
 export const PERGUNTAS_DE_EXEMPLO = [
   'Quem é o meu próximo paciente?',
   'Quanto eu recebi hoje?',
   'Quem está sem retorno?',
   'Agenda um retorno para amanhã às 15h',
+  'Lança uma despesa de R$ 80 de material',
+  'Cadastra um alimento novo na minha base',
 ]
 
 /* O acento sai por CÓDIGO, e não por uma classe de regex com o intervalo dos
@@ -114,3 +172,20 @@ export function ehPedidoDeMenu(texto: string): boolean {
 
   return PEDIDOS.has(normal)
 }
+
+/* O que NUNCA deveria chegar à tela, e chega quando o modelo desobedece.
+ *
+ * O contexto manda o número de cada consulta como `[ID: 57]`, e o prompt diz
+ * para usar o número dentro da ferramenta e nunca na resposta. Prompt não é
+ * garantia: basta uma volta em que ele resolva "ser útil" e a nutricionista lê
+ * "confirmei a consulta [ID: 57] às 13:00".
+ *
+ * Tirar na hora de desenhar custa uma expressão regular e não depende de o
+ * modelo colaborar. O espaço que sobra em volta some junto, senão fica "às
+ * 13:00  ." com dois espaços e um ponto solto. */
+export const semRestos = (texto: string): string =>
+  texto
+    .replace(/\s*\[ID:\s*\d+\]\s*/g, ' ')
+    .replace(/ +([.,;:!?])/g, '$1')
+    .replace(/ {2,}/g, ' ')
+    .trim()

@@ -14,4 +14,4 @@
  * texto some do pacote. É pouca coisa em bytes; o que vale é a promessa ficar
  * verdadeira. Um "não vai para produção" que é quase verdade é o tipo de frase
  * que ninguém confere de novo. */
-export const MARCA_DO_PACOTE = __DEV__ ? 'b7d8b3b+ 10:44' : ''
+export const MARCA_DO_PACOTE = __DEV__ ? '440ed64+ 13:27' : ''
