@@ -139,11 +139,15 @@ export function PlanoDaPacienteScreen({
     }
 
     let uri = ''
+    /* O PDF também em base64, e é ele que vai para a pasta compartilhável --
+       ver "A CAUSA, segunda parte", logo abaixo. */
+    let base64: string | undefined
     try {
       const html = folhaDoPlano(plano, nome)
       console.log('[cygnos] pdf: montando', html.length, 'caracteres')
-      const feito = await Print.printToFileAsync({ html })
+      const feito = await Print.printToFileAsync({ html, base64: true })
       uri = feito.uri
+      base64 = feito.base64
       console.log('[cygnos] pdf: arquivo pronto em', ((Date.now() - comecou) / 1000).toFixed(1) + 's')
     } catch (e) {
       setGerando(false)
@@ -171,13 +175,45 @@ export function PlanoDaPacienteScreen({
      *
      * Sem a frase separada isto seria "não consegui gerar o PDF" -- e eu teria
      * mexido no `expo-print`, que funcionava. */
+    /* ── A CAUSA, segunda parte: a cópia falhava pelo mesmo motivo ──
+     *
+     * O conserto de cima copiava o arquivo com `new File(uri).copy(...)`. Só que
+     * o `copy` do expo-file-system confere se pode LER a origem, e pergunta ao
+     * MESMO serviço de permissão de arquivo que o compartilhador usa
+     * (`FilePermissionService`, no expo-modules-core). No Expo Go esse serviço
+     * só libera as pastas da experiência, e o `expo-print` grava no cache do
+     * APLICATIVO (`context.cacheDir/Print`), fora delas. A cópia era recusada,
+     * o `catch` só escrevia no console, e o original seguia para a mesma
+     * recusa -- a mesma foto de erro, antes e depois do conserto.
+     *
+     * Por isso o arquivo não é mais LIDO: o `expo-print` devolve o PDF em
+     * base64 junto, e ele é ESCRITO direto em `Paths.cache`, que é a pasta que
+     * o expo-file-system e o compartilhador consideram deste app em qualquer
+     * ambiente -- Expo Go, build de desenvolvimento e o da loja. No build, a
+     * cópia antiga já funcionaria (lá o serviço libera o cache inteiro); o
+     * base64 é o caminho que funciona nos três.
+     *
+     * O que foi LIDO: SharingModule.kt, FileSystemPath.kt (o `copy` confere a
+     * leitura), FilePermissionService.kt e print/FileUtils.kt, no node_modules.
+     * O que é DEDUZIDO: a versão do serviço que o Expo Go usa, que mora dentro
+     * do próprio Expo Go e não está no projeto -- a foto (mesmo erro, mesmo
+     * tempo, antes e depois) é o que aponta para ela. Falta a confirmação no
+     * aparelho: a linha "pdf: na pasta compartilhável, N bytes" no Metro diz que
+     * a escrita passou. */
     try {
       const { File, Paths } = await import('expo-file-system')
       const destino = new File(Paths.cache, nomeDoArquivo(nome))
-      await new File(uri).copy(destino, { overwrite: true })
+      if (base64) {
+        if (destino.exists) destino.delete()
+        destino.write(base64, { encoding: 'base64' })
+      } else {
+        if (destino.exists) destino.delete()
+        new File(uri).copy(destino)
+      }
       uri = destino.uri
+      console.log('[cygnos] pdf: na pasta compartilhável,', destino.size, 'bytes')
     } catch (e) {
-      /* Sem conseguir copiar, tenta compartilhar o original mesmo: pior caso,
+      /* Sem conseguir escrever, tenta compartilhar o original mesmo: pior caso,
          cai no mesmo erro de antes e a frase continua dizendo onde parou. */
       falha('Não consegui mover o PDF para a pasta compartilhável.', e)
     }
