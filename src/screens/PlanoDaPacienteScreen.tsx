@@ -151,6 +151,37 @@ export function PlanoDaPacienteScreen({
       return
     }
 
+    /* ── A CAUSA, achada pela frase separada ──
+     *
+     * O terminal dele, depois de separar as três etapas:
+     *
+     *   pdf: arquivo pronto em 3.1s
+     *   O plano foi montado, mas não consegui abrir para compartilhar.
+     *     Caused by: Not allowed to read file under given URL.
+     *
+     * O PDF nascia. O `expo-print` escreve numa pasta PRÓPRIA dentro do cache,
+     * e o compartilhador do Android só entrega arquivo das pastas que o app
+     * declara como compartilháveis -- aquela não está entre elas. O arquivo
+     * existia e o sistema recusava ler.
+     *
+     * Copiar para o cache do `expo-file-system` põe o arquivo onde o
+     * compartilhador tem permissão. E de brinde ele ganha NOME: antes chegava
+     * no WhatsApp da paciente como um código aleatório, e agora chega como
+     * `plano-Maria-Silva-20260911.pdf`.
+     *
+     * Sem a frase separada isto seria "não consegui gerar o PDF" -- e eu teria
+     * mexido no `expo-print`, que funcionava. */
+    try {
+      const { File, Paths } = await import('expo-file-system')
+      const destino = new File(Paths.cache, nomeDoArquivo(nome))
+      await new File(uri).copy(destino, { overwrite: true })
+      uri = destino.uri
+    } catch (e) {
+      /* Sem conseguir copiar, tenta compartilhar o original mesmo: pior caso,
+         cai no mesmo erro de antes e a frase continua dizendo onde parou. */
+      falha('Não consegui mover o PDF para a pasta compartilhável.', e)
+    }
+
     try {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
