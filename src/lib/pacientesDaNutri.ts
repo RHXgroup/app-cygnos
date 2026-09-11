@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { nomeDoPlano, rotuloDoStatusTerapeutico } from './escaladaDoComer'
 
 /* A carteira dela, lida do banco.
  *
@@ -312,7 +313,12 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
 
     supabase
       .from('planos_terapeuticos')
-      .select('titulo, status, created_at')
+      /* `*`, e não a lista de colunas: `area_trabalhada` é o que dá nome ao plano
+         quando ele não tem título, e não há arquivo de esquema aqui para
+         conferir o nome dela. Coluna errada numa lista derruba a leitura inteira;
+         com `*` o pior caso é o campo vir vazio. Mesma escolha do sistema, que lê
+         esta tabela com `select('*')`. */
+      .select('*')
       .eq('paciente_id', id)
       .order('created_at', { ascending: false })
       .limit(1),
@@ -413,10 +419,19 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
       emAberto,
       quantasEmAberto: pendentes.length,
       medidas,
-      planoTerapeutico:
-        pt && pt.titulo?.trim()
-          ? { titulo: pt.titulo.trim(), status: pt.status?.trim() || 'sem status' }
-          : null,
+      /* Dois defeitos na mesma linha, os dois achados pelo relato "o terapêutico
+         aparece com plano underline":
+         - plano cadastrado SÓ com a área, sem título, aparecia como "Nenhum" --
+           a condição exigia título, e o sistema aceita plano sem ele;
+         - o status ia cru para a tela: `em_andamento`, com o sublinhado.
+         `nomeDoPlano` e `rotuloDoStatusTerapeutico` são a mesma escolha do sistema, e nunca
+         devolvem código cru. */
+      planoTerapeutico: pt
+        ? {
+            titulo: nomeDoPlano(pt.titulo, (pt as { area_trabalhada?: unknown }).area_trabalhada),
+            status: rotuloDoStatusTerapeutico(pt.status) || 'Sem situação',
+          }
+        : null,
       ultimaAnamnese: am?.data_anamnese ?? am?.created_at?.slice(0, 10) ?? null,
       notasDaUltima:
         primeira(passada.data as { notas_atendimento: string | null }[] | null)

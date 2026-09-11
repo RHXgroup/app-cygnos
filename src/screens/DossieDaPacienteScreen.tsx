@@ -18,6 +18,21 @@ import {
   type ConsultaDoHistorico,
   type PlanoTerapeuticoDaPaciente,
 } from '../lib/dossieDaPaciente'
+import {
+  BANDAS,
+  alertaDeReacao,
+  bandaDoPasso,
+  comeSozinho,
+  descricaoDoPasso,
+  melhorPasso,
+  rotuloDaArea,
+  rotuloDoAmbiente,
+  rotuloDoPeriodo,
+  rotuloDoResponsavel,
+  rotuloDoStatusTerapeutico,
+  statusAtual,
+  tendenciaDe,
+} from '../lib/escaladaDoComer'
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
 
@@ -167,39 +182,59 @@ function Terapeutico({
   }
 
   /* Em andamento primeiro. É o que ela precisa ler com a criança na frente; o
-     que já foi vencido é histórico, e histórico se lê depois. */
-  const andando = plano.objetivos.filter(o => o.status === 'em_andamento')
-  const resto = plano.objetivos.filter(o => o.status !== 'em_andamento')
+     que já foi vencido é histórico, e histórico se lê depois. `statusAtual`
+     traduz os legados (`ativo` virou `em_andamento` numa renomeação no
+     sistema, e o banco não tem CHECK na coluna). */
+  const andando = plano.objetivos.filter(o => statusAtual(o.status) === 'em_andamento')
+  const resto = plano.objetivos.filter(o => statusAtual(o.status) !== 'em_andamento')
+
+  /* A área só aparece como linha própria quando o título NÃO é ela -- senão a
+     tela diria "Introdução alimentar" duas vezes seguidas. */
+  const area = plano.area ? rotuloDaArea(plano.area) : ''
+  const detalhes = [
+    area && area !== plano.titulo ? area : '',
+    plano.periodo ? rotuloDoPeriodo(plano.periodo) : '',
+    plano.inicio ? 'desde ' + soData(plano.inicio) : '',
+  ].filter(Boolean)
 
   return (
     <>
       <View style={styles.topo}>
         <Text style={styles.tituloGrande}>{plano.titulo}</Text>
-        <Text style={styles.situacao}>{plano.status}</Text>
+        <View style={styles.linhaDoTopo}>
+          {!!plano.status && (
+            <View style={[styles.selo, seloDoStatus(styles, plano.status)]}>
+              <Text style={styles.textoDoSelo}>{rotuloDoStatusTerapeutico(plano.status)}</Text>
+            </View>
+          )}
+          {!!detalhes.length && <Text style={styles.situacao}>{detalhes.join(' · ')}</Text>}
+        </View>
       </View>
+
+      {/* As anotações dela sobre o caso. É texto que ELA escreveu no sistema
+          para lembrar do que importa -- vai inteiro e selecionável. */}
+      {!!plano.notas && (
+        <View style={styles.notasDoPlano}>
+          <Text style={styles.rotuloDasNotas}>SUAS ANOTAÇÕES</Text>
+          <Text style={styles.notasDoPlanoTexto} selectable>
+            {plano.notas}
+          </Text>
+        </View>
+      )}
 
       {plano.objetivos.length === 0 && (
         <Text style={styles.ondeSeFaz}>Este plano ainda não tem metas.</Text>
       )}
 
       {andando.map(o => (
-        <View key={o.id} style={styles.meta}>
-          <Text style={styles.nomeDaMeta}>{o.alimento ?? 'Meta sem alimento'}</Text>
-          {!!o.frequencia && <Text style={styles.frequencia}>{o.frequencia}</Text>}
-          {!!o.orientacoes && <Text style={styles.orientacoes}>{o.orientacoes}</Text>}
-        </View>
+        <Meta key={o.id} meta={o} />
       ))}
 
       {resto.length > 0 && (
         <>
           <Text style={styles.rotuloDeSecao}>Fora de andamento</Text>
           {resto.map(o => (
-            <View key={o.id} style={[styles.meta, styles.metaApagada]}>
-              <Text style={[styles.nomeDaMeta, styles.apagado]}>
-                {o.alimento ?? 'Meta sem alimento'}
-              </Text>
-              <Text style={styles.frequencia}>{o.status}</Text>
-            </View>
+            <Meta key={o.id} meta={o} apagada />
           ))}
         </>
       )}
@@ -209,6 +244,166 @@ function Terapeutico({
       </Text>
     </>
   )
+}
+
+/* ──────────────────── UMA META ──────────────────── */
+
+function Meta({ meta: o, apagada = false }: { meta: PlanoTerapeuticoDaPaciente['objetivos'][number]; apagada?: boolean }) {
+  const styles = estilos()
+
+  const melhor = melhorPasso(o.exposicoes)
+  const tendencia = tendenciaDe(o.exposicoes)
+  const alerta = alertaDeReacao(o.exposicoes)
+  const sozinho = comeSozinho(o.exposicoes)
+  const ultima = o.exposicoes.length ? o.exposicoes[o.exposicoes.length - 1]!.data : null
+
+  return (
+    <View style={[styles.meta, apagada && styles.metaApagada]}>
+      <View style={styles.topoDaMeta}>
+        <Text style={[styles.nomeDaMeta, apagada && styles.apagado]} numberOfLines={2}>
+          {o.alimento ?? 'Meta sem alimento'}
+        </Text>
+        {!!o.status && (
+          <View style={[styles.selo, seloDoStatus(styles, o.status)]}>
+            <Text style={styles.textoDoSelo}>{rotuloDoStatusTerapeutico(o.status)}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* O QUE ela quer que aconteça. A primeira versão desta tela não lia, e
+          era a frase mais importante de cada meta. */}
+      {!!o.objetivo && <Text style={styles.objetivo}>{o.objetivo}</Text>}
+
+      {/* ── A ESCALADA: "está evoluindo ou não?" ──
+          Seis faixas, de Tolerar a Comer, preenchidas até a mais alta que a
+          criança já alcançou com este alimento. A Escalada é cumulativa: chegar
+          em Tocar quer dizer que Tolerar, Interagir e Cheirar já foram. */}
+      {melhor !== null ? (
+        <View style={styles.escalada}>
+          <View style={styles.faixas}>
+            {BANDAS.slice(1).map(b => (
+              <View
+                key={b.banda}
+                style={[styles.faixa, melhor >= b.primeiro && styles.faixaAlcancada]}
+              />
+            ))}
+          </View>
+          <Text style={styles.ondeEsta}>
+            {melhor === 0
+              ? 'Ainda recusa'
+              : `${bandaDoPasso(melhor).rotulo} · passo ${melhor} de 32`}
+          </Text>
+          {melhor > 0 && !!descricaoDoPasso(melhor) && (
+            <Text style={styles.passo}>{descricaoDoPasso(melhor)}</Text>
+          )}
+        </View>
+      ) : (
+        <Text style={styles.semExposicao}>Nenhuma exposição registrada ainda.</Text>
+      )}
+
+      {/* A TENDÊNCIA, com a régua do sistema: só com 3 exposições ou mais, e 2
+          passos de diferença para dizer que mudou. Abaixo disso a tela não
+          afirma nada -- conta quantas houve. */}
+      {tendencia ? (
+        <Text style={styles.tendencia}>
+          {tendencia.direcao === 'subiu'
+            ? `↑ Subiu de ${tendencia.de} para ${tendencia.para}`
+            : tendencia.direcao === 'desceu'
+              ? `↓ Desceu de ${tendencia.de} para ${tendencia.para}`
+              : `→ Estável em ${tendencia.para}`}
+        </Text>
+      ) : o.exposicoes.length > 0 ? (
+        <Text style={styles.tendencia}>
+          {o.exposicoes.length === 1 ? '1 exposição' : `${o.exposicoes.length} exposições`} até agora
+          {' '}— poucas para dizer se está evoluindo
+        </Text>
+      ) : null}
+
+      {!!ultima && <Text style={styles.ultima}>Última exposição em {soData(ultima)}</Text>}
+
+      {/* "Come sozinho" com a mesma régua do pôster do sistema: 2 das 3 últimas
+          no passo 32. Uma vez só não sustenta uma afirmação sobre o presente. */}
+      {sozinho && (
+        <View style={styles.conquista}>
+          <Ionicons name="star" size={14} color={paleta().cores.verde} />
+          <Text style={styles.textoDaConquista}>Já come sozinho</Text>
+        </View>
+      )}
+
+      {/* O alerta, com o texto do sistema. Âmbar e não vermelho: não é erro de
+          ninguém, é um sinal para ajustar o ritmo. */}
+      {alerta && (
+        <View style={styles.alerta}>
+          <Ionicons name="alert-circle-outline" size={16} color={paleta().cores.ink} />
+          <Text style={styles.textoDoAlerta}>
+            Reações negativas nas últimas exposições. Considere recuar um degrau na
+            Escalada e reduzir a exigência antes de avançar.
+          </Text>
+        </View>
+      )}
+
+      {!!o.criterio && (
+        <Text style={styles.criterio}>
+          <Text style={styles.rotuloInline}>Para avançar: </Text>
+          {o.criterio}
+        </Text>
+      )}
+
+      {/* ── AS ATIVIDADES ──
+          Todas, e não só a de casa. A primeira versão escondia as do
+          consultório -- mas é ELA quem está lendo, e a do consultório é
+          justamente a que ela vai fazer. */}
+      {o.atividades.map((a, i) => (
+        <View key={i} style={styles.atividade}>
+          <Text style={styles.nomeDaAtividade}>{a.nome}</Text>
+          {(a.ambiente || a.frequencia || a.responsavel) && (
+            <Text style={styles.detalheDaAtividade}>
+              {[
+                a.ambiente ? rotuloDoAmbiente(a.ambiente) : '',
+                a.frequencia ?? '',
+                a.responsavel ? 'com ' + rotuloDoResponsavel(a.responsavel).toLowerCase() : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          )}
+          {!!a.orientacoes && <Text style={styles.orientacoes}>{a.orientacoes}</Text>}
+          {/* O que precisa ter em mãos -- "a lista de compra do plano
+              terapêutico", pedida em 09/09. */}
+          {!!a.recursos && (
+            <Text style={styles.recursos}>
+              <Text style={styles.rotuloInline}>Precisa: </Text>
+              {a.recursos}
+            </Text>
+          )}
+        </View>
+      ))}
+    </View>
+  )
+}
+
+/* "12/08/2026", a partir de "2026-08-12" ou de um instante. Data pura NÃO passa
+   por `Date`: interpretada como UTC, ela vira o dia anterior no Brasil. */
+function soData(bruto: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(bruto ?? ''))
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+
+/* A cor do selo sai do status JÁ traduzido do legado. Andamento neutro,
+   atingido verde, parcial âmbar, não atingido acinzentado -- sem vermelho: em
+   terapia alimentar "não atingido" é informação para replanejar, e vermelho na
+   tela da nutricionista com a mãe da criança do lado lê como fracasso. */
+function seloDoStatus(styles: ReturnType<typeof estilos>, status: string) {
+  switch (statusAtual(status)) {
+    case 'atingido':
+      return styles.seloAtingido
+    case 'parcial':
+      return styles.seloParcial
+    case 'nao_atingido':
+      return styles.seloNaoAtingido
+    default:
+      return styles.seloAndamento
+  }
 }
 
 /* ──────────────────── O HISTÓRICO ──────────────────── */
@@ -333,6 +528,67 @@ const estilos = estilosDe(t =>
       gap: 3,
     },
     metaApagada: { backgroundColor: 'transparent' },
+    topoDaMeta: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    objetivo: { fontFamily: FONTE.normal, fontSize: 14, color: t.inkSuave, lineHeight: 20 },
+
+    linhaDoTopo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+    selo: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 },
+    seloAndamento: { backgroundColor: t.cores.trilho },
+    seloAtingido: { backgroundColor: t.cores.verdeMenta },
+    seloParcial: { backgroundColor: t.cores.trilho },
+    seloNaoAtingido: { backgroundColor: t.cores.trilho },
+    textoDoSelo: { fontFamily: FONTE.meia, fontSize: 11.5, color: t.cores.ink },
+
+    notasDoPlano: {
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderLeftWidth: 3,
+      borderLeftColor: t.cores.verde,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      gap: 4,
+    },
+    rotuloDasNotas: { fontFamily: FONTE.forte, fontSize: 10.5, color: t.cores.verde, letterSpacing: 0.8 },
+    notasDoPlanoTexto: { fontFamily: FONTE.normal, fontSize: 14, color: t.inkSuave, lineHeight: 20 },
+
+    escalada: { gap: 4, paddingTop: 6 },
+    faixas: { flexDirection: 'row', gap: 3 },
+    faixa: { flex: 1, height: 7, borderRadius: 4, backgroundColor: t.cores.trilho },
+    faixaAlcancada: { backgroundColor: t.cores.verde },
+    ondeEsta: { fontFamily: FONTE.meia, fontSize: 13, color: t.cores.ink },
+    passo: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco },
+    semExposicao: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco, paddingTop: 4 },
+    tendencia: { fontFamily: FONTE.meia, fontSize: 13, color: t.inkSuave, paddingTop: 2 },
+    ultima: { fontFamily: FONTE.normal, fontSize: 12, color: t.inkFraco },
+
+    conquista: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 2 },
+    textoDaConquista: { fontFamily: FONTE.meia, fontSize: 13, color: t.cores.verde },
+
+    alerta: {
+      flexDirection: 'row',
+      gap: 8,
+      backgroundColor: t.cores.verdeMenta,
+      borderRadius: 10,
+      padding: 10,
+      marginTop: 4,
+    },
+    textoDoAlerta: { flex: 1, fontFamily: FONTE.normal, fontSize: 12.5, color: t.cores.ink, lineHeight: 18 },
+
+    criterio: { fontFamily: FONTE.normal, fontSize: 13, color: t.inkSuave, lineHeight: 19, paddingTop: 4 },
+    rotuloInline: { fontFamily: FONTE.meia, color: t.cores.ink },
+
+    atividade: {
+      marginTop: 8,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: t.cores.borda,
+      gap: 2,
+    },
+    nomeDaAtividade: { fontFamily: FONTE.meia, fontSize: 14, color: t.cores.ink },
+    detalheDaAtividade: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco },
+    recursos: { fontFamily: FONTE.normal, fontSize: 13, color: t.inkSuave, lineHeight: 19, paddingTop: 2 },
     nomeDaMeta: { fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink },
     apagado: { color: t.inkFraco },
     frequencia: { fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco },
