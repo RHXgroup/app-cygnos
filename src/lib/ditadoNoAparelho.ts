@@ -130,6 +130,7 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
     if (typeof m.getSupportedLocales === 'function') {
       const locais = await m.getSupportedLocales({}).catch(() => null)
       const instalados = locais?.installedLocales ?? []
+      console.log('[cygnos] ditado: idiomas no aparelho:', instalados.join(', ') || '(nenhum)')
       if (instalados.length > 0 && !temPortugues(instalados)) {
         return { tipo: 'falta_portugues' }
       }

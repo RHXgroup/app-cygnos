@@ -271,6 +271,15 @@ export function Ditado({
         },
       })
 
+      /* Uma linha que diz qual dos caminhos foi tomado. Sem ela, "caiu no
+         servidor" e "o celular não quis ouvir" dão a mesma foto de tela -- e a
+         medição custa uma rodada de teste dele. */
+      console.log(
+        '[cygnos] ditado no aparelho:',
+        e.tipo,
+        e.tipo === 'indisponivel' ? e.motivo : '',
+      )
+
       if (e.tipo === 'ouvindo') {
         escuta.current = e
         setEstado('ouvindo')

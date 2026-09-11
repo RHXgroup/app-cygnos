@@ -257,7 +257,9 @@ export function AuroraDaNutriScreen({
         /* O texto vem antes do cartão quando existe: é ali que a Aurora
            pergunta "confirma para quinta?". */
         ...(r.texto ? [novaFala('aurora', r.texto)] : []),
-        { ...novaFala('aurora', r.acao.resumo), acao: r.acao },
+        /* Um cartao por acao. Ela pediu duas coisas na mesma fala, entao le e
+            confirma as duas -- e nenhuma delas grava nada antes disso. */
+        ...r.acoes.map(a => ({ ...novaFala('aurora', a.resumo), acao: a })),
       ])
       return
     }

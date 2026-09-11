@@ -69,7 +69,11 @@ export const novaFala = (papel: Papel, texto: string): Fala => ({
 
 export type RespostaDaAurora =
   | { tipo: 'ok'; texto: string }
-  | { tipo: 'confirmar'; texto: string | null; acao: AcaoPendente }
+  /* UMA OU MAIS acoes. Ela pediu duas coisas numa fala so ("um lembrete pras
+     7 com a Suelen e outro com a Olivia"), e o servidor mandava so a primeira
+     -- a segunda sumia sem ninguem ver. Agora vem a lista, e a tela desenha um
+     cartao para cada. Ver a migracao do lado do servidor. */
+  | { tipo: 'confirmar'; texto: string | null; acoes: AcaoPendente[] }
   | { tipo: 'erro'; mensagem: string }
 
 /* "Não posso NUNCA" não é "não posso AGORA".
@@ -124,6 +128,7 @@ export async function perguntarAAurora(
     /* A flag do teste grátis. Ver `recusaDoTesteGratis`. */
     aurora_no_teste?: boolean
     acao?: { ferramenta?: string; argumentos?: Record<string, unknown>; resumo?: string }
+    acoes?: { ferramenta?: string; argumentos?: Record<string, unknown>; resumo?: string }[]
   } | null
   if (error) {
     const ctx = (error as { context?: Response }).context
@@ -140,16 +145,18 @@ export async function perguntarAAurora(
   /* A ação vem ANTES do texto na ordem de leitura, e não depois: quando as duas
      vêm juntas, o texto é a pergunta do modelo ("confirma para quinta?") e o
      cartão é a resposta. Tratar o texto primeiro esconderia o cartão. */
-  if (resposta?.acao?.ferramenta) {
-    return {
-      tipo: 'confirmar',
-      texto: resposta.resposta?.trim() || null,
-      acao: {
-        ferramenta: resposta.acao.ferramenta,
-        argumentos: resposta.acao.argumentos ?? {},
-        resumo: resposta.acao.resumo ?? 'Confirmar esta ação?',
-      },
-    }
+  /* `acoes` quando o servidor manda a lista; `acao` sozinho e o formato antigo,
+     que continua valendo enquanto a funcao no ar for a de antes. */
+  const cruas = resposta?.acoes?.length ? resposta.acoes : resposta?.acao ? [resposta.acao] : []
+  const acoes: AcaoPendente[] = cruas
+    .filter(a => typeof a?.ferramenta === 'string' && a.ferramenta)
+    .map(a => ({
+      ferramenta: a.ferramenta as string,
+      argumentos: a.argumentos ?? {},
+      resumo: a.resumo ?? 'Confirmar esta ação?',
+    }))
+  if (acoes.length) {
+    return { tipo: 'confirmar', texto: resposta?.resposta?.trim() || null, acoes }
   }
 
   if (resposta?.resposta?.trim()) return { tipo: 'ok', texto: resposta.resposta.trim() }
