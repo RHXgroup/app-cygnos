@@ -18,7 +18,7 @@
  * lendo como texto -- é a mesma saída de `deslizarEntreAbas` com a barra de
  * abas, e pelo mesmo motivo: duas listas que precisam concordar e que o
  * compilador não obriga. */
-export const FERRAMENTAS_DO_APARELHO = ['criar_aviso'] as const
+export const FERRAMENTAS_DO_APARELHO = ['criar_aviso', 'apagar_aviso'] as const
 
 export function ehDoAparelho(ferramenta: string): boolean {
   return (FERRAMENTAS_DO_APARELHO as readonly string[]).includes(ferramenta)

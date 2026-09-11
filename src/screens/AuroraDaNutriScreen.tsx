@@ -278,7 +278,7 @@ export function AuroraDaNutriScreen({
     ])
   }
 
-  async function confirmar(fala: Fala, acao: AcaoPendente) {
+  async function confirmar(fala: Fala, acao: AcaoPendente): Promise<boolean> {
     /* ──────────────────── O CARTÃO SÓ DIZ "CONFIRMADO" DEPOIS DE SER ────────────────────
      *
      * Antes ele era marcado ANTES da ida à rede, para um toque duplo não mandar
@@ -295,7 +295,7 @@ export function AuroraDaNutriScreen({
      * Vale para o servidor e para o aparelho igual. `criar_aviso` executa no
      * telefone, então a frase de sucesso vem de nós e não do banco; a única
      * coisa que não podia acontecer era o cartão afirmar o que a frase nega. */
-    if (pensando || emVoo.current) return
+    if (pensando || emVoo.current) return false
     emVoo.current = true
     setPensando(true)
 
@@ -331,6 +331,32 @@ export function AuroraDaNutriScreen({
          procurando o que fazer em seguida. */
       ...(r.tipo === 'ok' ? [novaFala('aurora', FECHAMENTO)] : []),
     ])
+
+    return r.tipo === 'ok'
+  }
+
+  /* ──────────────────── VÁRIAS DE UMA VEZ ────────────────────
+   *
+   * "Ela tem que dar dez comandos, tem que mostrar dez autorizações, ou onde
+   * autorizar todos." Quando ela pede várias coisas numa fala só, cada uma vira
+   * um cartão -- e confirmar dez cartões um por um é o mesmo trabalho que ela
+   * queria evitar falando de uma vez.
+   *
+   * UM DE CADA VEZ, por dentro: são gravações diferentes, e mandar tudo junto
+   * esconderia qual falhou. Na primeira que falhar, PARA: o cartão dela fica
+   * aberto com o motivo, e os seguintes continuam esperando decisão -- ninguém
+   * grava metade de um pedido sem ela saber qual metade. */
+  async function confirmarTodos(pendentes: Fala[]) {
+    for (const f of pendentes) {
+      if (!f.acao) continue
+      const deuCerto = await confirmar(f, f.acao)
+      if (!deuCerto) return
+    }
+  }
+
+  function cancelarTodos(pendentes: Fala[]) {
+    const ids = new Set(pendentes.map(f => f.id))
+    setFalas(atual => atual.map(f => (ids.has(f.id) ? { ...f, decidida: 'cancelada' } : f)))
   }
 
   function cancelar(fala: Fala) {
@@ -359,7 +385,8 @@ export function AuroraDaNutriScreen({
 
   const vazia = falas.length === 0
   /* Cartão esperando decisão. Enquanto houver um, nada mais é oferecido. */
-  const cartaoAberto = falas.some(f => f.acao && f.decidida === undefined)
+  const pendentes = falas.filter(f => f.acao && f.decidida === undefined)
+  const cartaoAberto = pendentes.length > 0
 
   return (
     <View
@@ -509,6 +536,35 @@ export function AuroraDaNutriScreen({
               ) : null}
             </View>
           ),
+        )}
+
+        {/* A barra só existe com DUAS ou mais esperando: com uma, o próprio
+            cartão já tem os botões, e uma segunda linha dizendo a mesma coisa
+            seria ruído. */}
+        {pendentes.length >= 2 && !pensando && (
+          <View style={styles.varias}>
+            <Text style={styles.textoVarias}>
+              {pendentes.length} ações esperando você. Confira cada cartão acima.
+            </Text>
+            <View style={styles.botoesDoCartao}>
+              <Pressable
+                onPress={() => cancelarTodos(pendentes)}
+                style={({ pressed }) => [styles.cancelar, pressed && styles.pressionado]}
+                accessibilityRole="button"
+                accessibilityLabel={'Cancelar as ' + pendentes.length + ' ações'}
+              >
+                <Text style={styles.textoCancelar}>Cancelar todas</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void confirmarTodos(pendentes)}
+                style={({ pressed }) => [styles.confirmar, pressed && styles.pressionado]}
+                accessibilityRole="button"
+                accessibilityLabel={'Confirmar as ' + pendentes.length + ' ações'}
+              >
+                <Text style={styles.textoConfirmar}>Confirmar todas</Text>
+              </Pressable>
+            </View>
+          </View>
         )}
 
         {pensando && (
@@ -767,6 +823,15 @@ const estilos = estilosDe(t =>
 
        `overflow: 'hidden'` porque a faixa vai até as bordas, e sem isso ela
        vaza pelos cantos arredondados no Android. */
+    varias: {
+      gap: 10,
+      padding: 14,
+      borderRadius: 16,
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.gold,
+    },
+    textoVarias: { fontFamily: FONTE.meia, fontSize: 13.5, color: t.cores.ink, lineHeight: 19 },
     cartao: {
       backgroundColor: t.cores.superficie,
       borderWidth: 1,

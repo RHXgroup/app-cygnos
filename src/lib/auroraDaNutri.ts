@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { avisosPendentes } from './avisosDaNutri'
 
 /* Perguntar à Aurora, do lado dela.
  *
@@ -96,6 +97,22 @@ function recusaDoTesteGratis(
   return resposta.error?.trim() || 'A Aurora não está incluída no teste grátis.'
 }
 
+/* Os lembretes vivos, no formato que o servidor espera. Falhou a leitura do
+   disco, vai lista vazia: a Aurora perde os lembretes desta pergunta, e
+   responder sem eles é melhor do que não responder. */
+async function avisosParaAAurora(): Promise<{ quando: string }[]> {
+  try {
+    const lista = await avisosPendentes()
+    return lista.slice(0, 12).map(a => ({
+      /* Escrito como ela lê, e não em milissegundos: é o modelo que vai repetir
+         isto para ela, e "1757646000000" não vira "amanhã às sete". */
+      quando: new Date(a.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+    }))
+  } catch {
+    return []
+  }
+}
+
 export async function perguntarAAurora(
   pergunta: string,
   /* As falas anteriores, para "e a de depois?" fazer sentido. A função corta no
@@ -113,6 +130,12 @@ export async function perguntarAAurora(
       /* As falas LOCAIS ficam de fora: são escritas pelo aplicativo, e uma
          delas carrega o nome do paciente, que não sai daqui. Ver `local`. */
       historico: historico.filter(f => !f.local).map(f => ({ papel: f.papel, texto: f.texto })),
+      /* Os lembretes DELA, SÓ os horários. O que cada um diz é texto escrito à
+         mão, onde nome de paciente aparece, e a cláusula 5 do contrato de dados
+         diz que isso não vai para o provedor de IA. Com os horários a Aurora
+         responde "você tem três hoje, às 7:00, 14:00 e 19:00"; qual apagar,
+         quem resolve é este aparelho. */
+      avisos: await avisosParaAAurora(),
     },
   })
 

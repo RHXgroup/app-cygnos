@@ -1,5 +1,5 @@
 import { confirmarAcao, type AcaoPendente, type RespostaDaAurora } from './auroraDaNutri'
-import { criarAviso } from './avisosDaNutri'
+import { apagarAviso, avisosPendentes, criarAviso } from './avisosDaNutri'
 import { ehDoAparelho } from './ferramentasDoAparelho'
 
 /* O que a Aurora manda fazer e que só o APARELHO consegue fazer.
@@ -50,11 +50,67 @@ export async function executarAcaoConfirmada(acao: AcaoPendente): Promise<Respos
   if (!ehDoAparelho(acao.ferramenta)) return confirmarAcao(acao)
 
   if (acao.ferramenta === 'criar_aviso') return await avisar(acao)
+  if (acao.ferramenta === 'apagar_aviso') return await desmarcar(acao)
 
   /* Está na lista e não tem caminho: é erro de programação, não da pessoa. A
      frase diz que nada aconteceu, porque é o que importa para quem acabou de
      tocar em Confirmar. */
   return { tipo: 'erro', mensagem: 'Não consegui fazer isso aqui. Nada foi criado.' }
+}
+
+/* Tirar um lembrete que ela mesma (ou a Aurora) marcou.
+ *
+ * A ESCOLHA acontece aqui, e não no modelo: o texto dos lembretes não sai do
+ * aparelho (ver `avisosParaAAurora` e a cláusula 5 do contrato de dados), então
+ * a Aurora manda as PALAVRAS que ela usou e quem procura é este código.
+ *
+ * Com mais de um parecido, NÃO apaga nenhum: apagar o lembrete errado é perder
+ * silenciosamente uma coisa que ela pediu para não esquecer, e o certo é
+ * devolver a escolha para ela. */
+async function desmarcar(acao: AcaoPendente): Promise<RespostaDaAurora> {
+  const procura = typeof acao.argumentos.procura === 'string' ? acao.argumentos.procura : ''
+  const alvo = semAcento(procura)
+  if (!alvo) return { tipo: 'erro', mensagem: 'Não entendi qual lembrete apagar. Nada foi apagado.' }
+
+  const lista = await avisosPendentes()
+  const achados = lista.filter(a => {
+    const texto = semAcento(a.texto)
+    /* Por palavra, e não pela frase inteira: ela diz "o da Suelen" e o lembrete
+       diz "Falar com a Suelen amanhã". Palavra de duas letras fica de fora --
+       "de", "da", "o" casariam com tudo. */
+    const palavras = alvo.split(/[^a-z0-9]+/).filter(p => p.length > 2)
+    if (palavras.length === 0) return false
+    return palavras.some(p => texto.includes(p))
+  })
+
+  if (achados.length === 0) {
+    return {
+      tipo: 'erro',
+      mensagem: 'Não achei nenhum lembrete com isso. Nada foi apagado — os seus lembretes estão em Mais.',
+    }
+  }
+  if (achados.length > 1) {
+    return {
+      tipo: 'erro',
+      mensagem:
+        'Tenho ' + achados.length + ' lembretes parecidos e não quis apagar o errado. ' +
+        'Apague pela tela Mais, ou me diga de um jeito mais específico.',
+    }
+  }
+
+  await apagarAviso(achados[0].id)
+  return { tipo: 'ok', texto: 'Lembrete apagado: ' + achados[0].texto }
+}
+
+/* Minúsculas e sem acento, dos dois lados da comparação: ela dita "Suelen" e o
+   lembrete pode ter "suelen"; "laboratório" e "laboratorio" são a mesma
+   palavra para quem procura. */
+function semAcento(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
 }
 
 async function avisar(acao: AcaoPendente): Promise<RespostaDaAurora> {
@@ -75,7 +131,8 @@ async function avisar(acao: AcaoPendente): Promise<RespostaDaAurora> {
     return { tipo: 'erro', mensagem: 'Não entendi a hora do aviso. Nada foi criado.' }
   }
 
-  const r = await criarAviso(texto, quando)
+  /* 'aurora': foi ela quem pediu, e a lista diz isso na linha do aviso. */
+  const r = await criarAviso(texto, quando, 'aurora')
 
   if (r.tipo === 'ok') {
     /* A frase confirma o INSTANTE, e não só "pronto". Ela pediu "me lembra às

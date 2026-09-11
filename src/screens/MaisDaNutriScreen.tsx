@@ -356,7 +356,29 @@ function MeusAvisos() {
           todo dia é ruído. Só aparece quando há o que fazer. */}
       {notificacao !== null && notificacao !== 'ligadas' && (
         <Pressable
-          onPress={async () => setNotificacao(await ligarNotificacoes())}
+          /* O toque NUNCA fica calado.
+           *
+           * Relatado: "notificações desligadas, toque para ligar -- eu clico e
+           * não funciona". O botão fazia a coisa certa e não contava o
+           * desfecho: se o celular já tinha a resposta guardada, ou se ela
+           * recusou a caixa do sistema, a linha continuava igual e o toque
+           * parecia morto. Agora cada desfecho tem uma frase, e ela fica logo
+           * abaixo, no mesmo cartão. */
+          onPress={async () => {
+            const depois = await ligarNotificacoes()
+            setNotificacao(depois)
+            if (depois === 'ligadas') {
+              setRecado('Notificações ligadas. Os avisos já tocam neste telefone.')
+              return
+            }
+            if (depois === 'bloqueadas') {
+              setRecado(
+                'Abri as configurações do telefone. Ligue "Notificações" para o Cygnos e volte — a tela se atualiza sozinha.',
+              )
+              return
+            }
+            setRecado('O telefone não liberou agora. Toque de novo e responda "Permitir" na caixa que aparecer.')
+          }}
           style={({ pressed }) => [styles.notificacao, pressed && styles.pressionado]}
           accessibilityRole="button"
           accessibilityLabel={
@@ -386,6 +408,13 @@ function MeusAvisos() {
           <View style={styles.textosDoAviso}>
             <Text style={styles.textoDoAviso}>{a.texto}</Text>
             <Text style={styles.quandoDoAviso}>{quandoPorExtenso(new Date(a.quando))}</Text>
+            {/* De onde veio. Só quando foi a Aurora: os que ela mesma escreveu
+                nesta tela não precisam de linha dizendo que foi ela. */}
+            {a.origem === 'aurora' && (
+              <Text style={styles.origemDoAviso}>
+                Criado pela Aurora{a.criadoEm ? ' ' + criadoQuando(a.criadoEm) : ''}
+              </Text>
+            )}
           </View>
           <Pressable
             onPress={() => void apagarAviso(a.id).then(reler)}
@@ -451,6 +480,23 @@ function MeusAvisos() {
   )
 }
 
+/* "hoje às 19:12", "ontem às 08:30", "09/09 às 14:00".
+   Escrito à mão, e não pelo Intl: o Hermes sai de fábrica sem a tabela
+   completa e o mesmo texto sairia em inglês em alguns aparelhos. */
+function criadoQuando(instante: number): string {
+  const d = new Date(instante)
+  if (!Number.isFinite(d.getTime())) return ''
+  const dois = (n: number) => String(n).padStart(2, '0')
+  const hora = dois(d.getHours()) + ':' + dois(d.getMinutes())
+  const hoje = new Date()
+  const mesmoDia = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  if (mesmoDia(d, hoje)) return 'hoje às ' + hora
+  const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1)
+  if (mesmoDia(d, ontem)) return 'ontem às ' + hora
+  return 'em ' + dois(d.getDate()) + '/' + dois(d.getMonth() + 1) + ' às ' + hora
+}
+
 const estilos = estilosDe(t =>
   StyleSheet.create({
     tela: { flex: 1, backgroundColor: t.cores.fundo },
@@ -512,6 +558,7 @@ const estilos = estilosDe(t =>
     textosDoAviso: { flex: 1, minWidth: 0 },
     textoDoAviso: { fontFamily: FONTE.meia, fontSize: 14.5, color: t.cores.ink },
     quandoDoAviso: { fontFamily: FONTE.normal, fontSize: 12, color: t.inkFraco, marginTop: 1 },
+    origemDoAviso: { fontFamily: FONTE.normal, fontSize: 11.5, color: t.cores.verde, marginTop: 2 },
     apagarAviso: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
 
     campoDoAviso: {

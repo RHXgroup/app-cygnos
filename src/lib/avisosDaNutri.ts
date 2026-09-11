@@ -38,6 +38,12 @@ const CHAVE = 'avisos.nutri'
    apaga, e a leitura da tela vai ficando lenta sem ninguém saber por quê. */
 const TETO = 50
 
+/* Quem pediu o aviso. Pedido dele, vendo um aviso criado por voz na Aurora:
+   "podia falar que esse aviso foi inserido pela Aurora no dia tal". O motivo
+   não é curiosidade: um aviso que ela não lembra de ter criado, sem dizer de
+   onde veio, é um aviso em que ela para de confiar -- e aí desliga tudo. */
+export type OrigemDoAviso = 'aurora' | 'ela'
+
 export type Aviso = {
   id: string
   texto: string
@@ -45,6 +51,10 @@ export type Aviso = {
   quando: number
   /** O que o sistema devolveu ao agendar. Vazio quando não deu para agendar. */
   idDaNotificacao: string
+  /** Ausente nos avisos criados antes de 11/09/2026. A tela trata como dela. */
+  origem?: OrigemDoAviso
+  /** Instante em que foi criado. Ausente nos de antes. */
+  criadoEm?: number
 }
 
 async function guardados(): Promise<Aviso[]> {
@@ -105,7 +115,11 @@ export type ResultadoDoAviso =
  * notificação antes de a pessoa querer alguma coisa é como se ganha um "não"
  * que depois ninguém sabe desfazer.
  */
-export async function criarAviso(texto: string, quando: Date): Promise<ResultadoDoAviso> {
+export async function criarAviso(
+  texto: string,
+  quando: Date,
+  origem: OrigemDoAviso = 'ela',
+): Promise<ResultadoDoAviso> {
   const limpo = texto.trim()
   if (!limpo) return { tipo: 'erro', mensagem: 'Escreva do que você quer ser lembrada.' }
 
@@ -162,6 +176,8 @@ export async function criarAviso(texto: string, quando: Date): Promise<Resultado
       id: String(instante) + '-' + Math.random().toString(36).slice(2, 8),
       texto: limpo,
       quando: instante,
+      origem,
+      criadoEm: Date.now(),
       idDaNotificacao,
     }
 
