@@ -9,8 +9,9 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { listaDeCompras, type ItemDeCompra, type PlanoCompleto } from '../lib/plano'
-import { milhar } from '../lib/formatar'
+import type { PlanoCompleto } from '../lib/plano'
+import { listaDeCompras, quantoComprar, type ItemDeCompra } from '../lib/listaDeCompras'
+import { gruposDosAlimentos } from '../lib/alimentos'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* A lista de compras do plano.
@@ -34,8 +35,31 @@ export function ListaDeComprasScreen({
   const { top, bottom } = useSafeAreaInsets()
   const [pegos, setPegos] = useState<Set<string>>(new Set())
 
+  /* O corredor de cada alimento. Comeca vazio e chega depois: a lista aparece
+     na hora, e a separacao por secao entra quando a leitura voltar. Lista
+     inteira sem secao e util; espera com tela em branco, nao. */
+  const [grupos, setGrupos] = useState<Map<number, string>>(new Map())
+
+  useEffect(() => {
+    let vivo = true
+    const ids = plano.refeicoes.flatMap(r => [
+      ...r.itens.map(i => i.alimentoId),
+      ...r.itens.flatMap(i => i.variacoes.map(v => v.alimentoId)),
+    ]).filter((n): n is number => n !== null)
+
+    void gruposDosAlimentos(ids).then(m => {
+      if (vivo) setGrupos(m)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [plano])
+
   /* Recalcular a cada render custaria o plano inteiro a cada toque de item. */
-  const itens = useMemo(() => listaDeCompras(plano), [plano])
+  const itens = useMemo(
+    () => listaDeCompras(plano, id => (id === null ? null : grupos.get(id) ?? null)),
+    [plano, grupos],
+  )
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -55,6 +79,15 @@ export function ListaDeComprasScreen({
   }
 
   const principais = itens.filter(i => !i.soAlternativa)
+
+  /* Agrupa preservando a ordem que a lib ja deu: ela vem por corredor, e
+     reordenar aqui criaria uma segunda opiniao sobre a mesma coisa. */
+  const porSecao: { secao: string; itens: ItemDeCompra[] }[] = []
+  for (const item of principais) {
+    const ultima = porSecao[porSecao.length - 1]
+    if (ultima && ultima.secao === item.secao) ultima.itens.push(item)
+    else porSecao.push({ secao: item.secao, itens: [item] })
+  }
   const alternativas = itens.filter(i => i.soAlternativa)
   const faltam = itens.length - pegos.size
 
@@ -99,13 +132,24 @@ export function ListaDeComprasScreen({
               </Text>
             </View>
 
-            {principais.map(item => (
-              <LinhaDeCompra
-                key={item.chave}
-                item={item}
-                pego={pegos.has(item.chave)}
-                onAlternar={() => alternar(item.chave)}
-              />
+            {/* Por SECAO do mercado, e nao numa lista so: a lista ja vem na
+                ordem do corredor, e o titulo e o que faz a pessoa perceber
+                isso -- sem ele, a ordem parece aleatoria e ela le tudo de novo
+                em cada corredor. Alimento sem grupo conhecido cai em "Outros",
+                no fim, e continua na lista: item sem corredor e item que ela
+                precisa comprar do mesmo jeito. */}
+            {porSecao.map(({ secao, itens: daSecao }) => (
+              <View key={secao}>
+                <Text style={styles.tituloDaSecao}>{secao}</Text>
+                {daSecao.map(item => (
+                  <LinhaDeCompra
+                    key={item.chave}
+                    item={item}
+                    pego={pegos.has(item.chave)}
+                    onAlternar={() => alternar(item.chave)}
+                  />
+                ))}
+              </View>
             ))}
 
             {alternativas.length > 0 && (
@@ -152,11 +196,12 @@ function LinhaDeCompra({
 }) {
   const styles = estilos()
   /* Peso quando há; a forma como foi dita quando não há. "2 unidades" é mais
-     útil na prateleira do que um peso que ninguém informou. */
-  const quantidade =
-    item.gramas !== null
-      ? `${milhar(item.gramas)} g`
-      : item.descricoes.join(' + ')
+     útil na prateleira do que um peso que ninguém informou.
+
+     A conta é da SEMANA inteira, e quem a escreve é : 40 g de
+     aveia num plano de cinco dias são 200 g no mercado, e é justamente essa
+     multiplicação que ninguém faz de cabeça no corredor. */
+  const quantidade = quantoComprar(item)
 
   return (
     <Pressable
@@ -244,6 +289,18 @@ const estilos = estilosDe(t =>
      conferir o que já pegou. */
   textoPego: { textDecorationLine: 'line-through', color: t.inkFraco },
 
+  /* O corredor do mercado. Menor e mais fraco que o titulo das alternativas:
+     e uma divisoria de leitura, nao um assunto novo -- se competir com o nome
+     dos itens, a lista vira indice em vez de lista. */
+  tituloDaSecao: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: t.inkFraco,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginTop: 16,
+    marginBottom: 6,
+  },
   tituloSecao: {
     fontSize: 12,
     fontWeight: '700',

@@ -18,6 +18,8 @@ import { carregarGastoMedido } from '../lib/metas'
 import { carregarMedidas, registrarMedida, NOME_DA_PARTE, type Medida, type Parte } from '../lib/medidas'
 import { evolucaoDaMedida, fraseDaVariacao, serieDaMedida } from '../lib/evolucaoDaMedida'
 import { fraseDoGasto, type GastoReal } from '../lib/gastoReal'
+import { direcaoDoObjetivo, metaAdaptativa, type SugestaoDeMeta } from '../lib/metaAdaptativa'
+import { carregarMetas, carregarMetasAtivas, salvarMetas } from '../lib/metas'
 import {
   fraseDaDistancia,
   resumoDaTendencia,
@@ -86,6 +88,52 @@ export function PesoScreen({
    * Nulo com menos de catorze dias registrados ou cobertura baixa — a regra
    * mora em `gastoReal.ts`, e a tela só desenha o que ela devolver. */
   const [gasto, setGasto] = useState<GastoReal | null>(null)
+  /* A meta de caloria que vale hoje, e de quem ela e. As duas coisas juntas:
+     sem saber se veio da nutricionista, propor um numero novo seria o app
+     passando por cima de conduta clinica. Ver . */
+  const [metaKcal, setMetaKcal] = useState<number | null>(null)
+  const [prescrita, setPrescrita] = useState(false)
+  const [aplicando, setAplicando] = useState(false)
+  const [aplicada, setAplicada] = useState<number | null>(null)
+  const [erroDaMeta, setErroDaMeta] = useState('')
+
+  /* A sugestao e derivada, e nao estado: os tres pedacos ja estao na tela, e
+     guardar o resultado criaria um quarto que pode discordar deles. */
+  const direcao = direcaoDoObjetivo(objetivo)
+  const sugestao: SugestaoDeMeta = direcao === null
+    ? { tipo: 'nada' }
+    : metaAdaptativa({ gasto, metaAtual: metaKcal, objetivo: direcao, prescritaPelaNutri: prescrita })
+
+  /* Aplicar mexe no conjunto que JA vale, e nao cria outro.
+     Armadilha 4: conjunto novo nasce ativo e desliga o anterior, entao criar
+     aqui apagaria as outras metas dela (agua, passos, sono) sem avisar. */
+  async function usarASugestao(kcal: number) {
+    if (aplicando) return
+    setAplicando(true)
+    setErroDaMeta('')
+
+    const atual = await carregarMetasAtivas(contaId)
+    if (atual.tipo !== 'ok' || !atual.metas) {
+      setAplicando(false)
+      setErroDaMeta('Nao consegui abrir as suas metas agora. Tente de novo.')
+      return
+    }
+
+    const r = await salvarMetas(contaId, {
+      id: atual.metas.id,
+      nome: atual.metas.nome,
+      metas: { ...atual.metas, calorias: kcal },
+    })
+    setAplicando(false)
+    if (r.tipo === 'erro') {
+      setErroDaMeta(r.mensagem)
+      return
+    }
+    /* Guarda o que foi aplicado e atualiza a meta em memoria: sem isso o cartao
+       continuaria oferecendo o mesmo numero que ela acabou de aceitar. */
+    setMetaKcal(kcal)
+    setAplicada(kcal)
+  }
   /* AS MEDIDAS.
    *
    * A cintura continua se movendo quando a balança para. Quem perde gordura e
@@ -116,6 +164,14 @@ export function PesoScreen({
        nulo lá dentro, e nulo aqui é uma frase que não aparece. */
     carregarGastoMedido(contaId).then(g => {
       if (ativo) setGasto(g)
+    })
+
+    /* Idem: a meta e um bloco a mais nesta tela, e um bloco a mais nao segura
+       a tela do peso. Falha vira silencio -- o cartao simplesmente nao nasce. */
+    carregarMetas(contaId).then(r => {
+      if (!ativo || r.tipo !== 'ok') return
+      setMetaKcal(r.metas.calorias)
+      setPrescrita(r.prescritos.has('calorias'))
     })
 
     /* Sem mexer no `carregando`, pelo mesmo motivo do gasto: é um bloco a mais,
@@ -533,6 +589,38 @@ export function PesoScreen({
                     {gasto.diasRegistrados} dias com comida anotada dentro de {gasto.diasDoPeriodo}.
                     Quanto mais dias, mais firme fica o número.
                   </Text>
+
+                  {/* ──────────────────── E DAÍ, EU COMO QUANTO? ────────────────────
+                      O gasto medido sozinho é curiosidade. A pergunta que ele
+                      responde é essa, e até hoje a tela não respondia.
+
+                      Dentro do MESMO cartão, de propósito: é a continuação da
+                      frase de cima, e não um aviso novo competindo com ela. */}
+                  {aplicada !== null ? (
+                    <Text style={styles.metaAplicada}>
+                      Meta ajustada para {aplicada.toLocaleString('pt-BR')} kcal por dia.
+                    </Text>
+                  ) : sugestao.tipo === 'sugerir' ? (
+                    <>
+                      <Text style={styles.fraseDaMeta}>{sugestao.frase}</Text>
+                      <Pressable
+                        onPress={() => void usarASugestao(sugestao.kcal)}
+                        disabled={aplicando}
+                        style={({ pressed }) => [styles.botaoDaMeta, pressed && { opacity: 0.75 }]}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.textoBotaoDaMeta}>
+                          {aplicando ? 'Ajustando…' : 'Usar essa meta'}
+                        </Text>
+                      </Pressable>
+                    </>
+                  ) : sugestao.tipo === 'contar_para_ela' ? (
+                    /* Meta prescrita: mostra a diferença e NÃO oferece botão. Um
+                       botão aqui seria o app oferecendo desfazer conduta. */
+                    <Text style={styles.fraseDaMeta}>{sugestao.frase}</Text>
+                  ) : null}
+
+                  {!!erroDaMeta && <Text style={styles.erroDaMeta}>{erroDaMeta}</Text>}
                 </View>
               )}
 
@@ -914,6 +1002,22 @@ linhaRitmo: {
   /* Menor e mais apagado: é a nota de rodapé da frase acima, e não uma segunda
      afirmação com o mesmo peso. */
   diasDoGasto: { fontSize: 11, lineHeight: 15.5, color: t.inkFraco },
+
+  /* A frase da meta e a continuacao da do gasto, entao herda o tamanho dela e
+     ganha respiro em cima -- e nao borda, nem fundo: cartao dentro de cartao
+     faria a tela parecer ter dois avisos onde ha um assunto so. */
+  fraseDaMeta: { fontSize: 13, lineHeight: 19, color: t.inkSuave, marginTop: 10 },
+  botaoDaMeta: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: t.cores.verde,
+  },
+  textoBotaoDaMeta: { fontSize: 13.5, fontWeight: '700', color: t.cores.branco },
+  metaAplicada: { fontSize: 13, lineHeight: 19, color: t.cores.verde, fontWeight: '700', marginTop: 10 },
+  erroDaMeta: { fontSize: 12.5, lineHeight: 18, color: t.cores.erroTexto, marginTop: 8 },
 
   explicaTendencia: {
     fontSize: 12.5,

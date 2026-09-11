@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useDesvioDoTeclado } from '../lib/teclado'
 import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import {
@@ -742,6 +743,21 @@ export function PainelDaConsulta({
   onMudou: () => void
 }) {
   const styles = estilos()
+  const { bottom } = useSafeAreaInsets()
+  /* ──────────────────── O TECLADO, e a folha que mora no rodapé ────────────────────
+   *
+   * A folha é `absoluteFill` com `justifyContent: 'flex-end'`: ela vive colada
+   * embaixo. E os campos de Remarcar (data e hora) e de Cancelar (motivo) estão
+   * dentro dela -- ou seja, exatamente onde o teclado sobe.
+   *
+   * No Expo Go a janela NÃO encolhe (armadilha 2), então sem desvio a pessoa
+   * toca em Remarcar, o teclado abre, e os dois campos ficam atrás dele. E
+   * `KeyboardAvoidingView` não resolve aqui: dentro de um `absoluteFill` ele
+   * erra de qualquer jeito. O que funciona é o deslocamento medido, que já soma
+   * teclado + área segura -- as duas SOMAM, e foi isso que custou seis
+   * tentativas na tela de conversa. */
+  const [alturaDaTela, setAlturaDaTela] = useState(0)
+  const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
   const [modo, setModo] = useState<'menu' | 'remarcar' | 'cancelar'>('menu')
   const [data, setData] = useState('')
   const [hora, setHora] = useState('')
@@ -792,7 +808,13 @@ export function PainelDaConsulta({
   }
 
   return (
-    <View style={styles.sobreposta}>
+    <View
+      style={styles.sobreposta}
+      /* A altura vem daqui, e não de `useWindowDimensions`: num build de
+         verdade a janela encolhe com o teclado, e a medida do `onLayout`
+         encolhe junto -- é o que impede a conta de somar duas vezes. */
+      onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}
+    >
       {/* O fundo fecha, como toda folha deste app. Nunca enquanto grava: fechar
           no meio deixaria ela sem saber se cancelou ou não. */}
       <Pressable
@@ -801,7 +823,7 @@ export function PainelDaConsulta({
         accessibilityLabel="Fechar"
       />
 
-      <View style={styles.folha}>
+      <View style={[styles.folha, { paddingBottom: 26 + respiro }]}>
         <View style={styles.puxador} />
 
         <Text style={styles.tituloDaFolha} numberOfLines={1}>

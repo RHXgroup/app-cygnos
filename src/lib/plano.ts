@@ -592,81 +592,16 @@ export async function apagarPlano(id: string): Promise<{ erro: string } | null> 
  * vira as duas coisas na despensa — quem decide na hora precisa ter as duas em
  * casa. Marcá-las como alternativa é papel da tela, não do agrupamento. */
 
-export type ItemDeCompra = {
-  chave: string
-  nome: string
-  marca: string | null
-  /* Soma dos gramas de todas as aparições, quando todas informaram peso. Null
-     quando nenhuma informou — "2 unidades" não vira grama sem tabela. */
-  gramas: number | null
-  /* Em quantas refeições o alimento aparece. É o que a tela usa para dizer
-     "em 3 refeições", que explica a quantidade sem obrigar a somar de cabeça. */
-  refeicoes: number
-  /* As quantidades como foram escritas, para quando não há peso: "2 unidades",
-     "1 fatia". Preserva a forma em que a pessoa disse. */
-  descricoes: string[]
-  /* Verdadeiro quando o alimento só aparece como alternativa de outro. A tela
-     mostra em tom mais fraco: comprar é opcional, depende da escolha do dia. */
-  soAlternativa: boolean
-}
-
-/* Nome e marca identificam o produto na prateleira. Sem acento e sem caixa,
-   porque "Aveia" e "aveia" são o mesmo pacote. */
-const chaveDeCompra = (nome: string, marca: string | null) =>
-  `${nome}|${marca ?? ''}`
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-
-export function listaDeCompras(plano: PlanoCompleto): ItemDeCompra[] {
-  const porChave = new Map<string, ItemDeCompra & { vistoEm: Set<string> }>()
-
-  const juntar = (a: VariacaoSalva, refeicaoId: string, alternativa: boolean) => {
-    const chave = chaveDeCompra(a.nome, a.marca)
-    const atual = porChave.get(chave)
-
-    if (!atual) {
-      porChave.set(chave, {
-        chave,
-        nome: a.nome,
-        marca: a.marca,
-        gramas: a.gramasTotais,
-        refeicoes: 1,
-        descricoes: [a.descricao],
-        soAlternativa: alternativa,
-        vistoEm: new Set([refeicaoId]),
-      })
-      return
-    }
-
-    /* Soma só entre pesos conhecidos. Um item sem peso não zera o total dos
-       outros, mas também não some: a descrição dele entra na lista ao lado. */
-    if (a.gramasTotais !== null) {
-      atual.gramas = (atual.gramas ?? 0) + a.gramasTotais
-    }
-    if (!atual.descricoes.includes(a.descricao)) atual.descricoes.push(a.descricao)
-    /* Basta aparecer uma vez como principal para deixar de ser alternativa: se
-       o arroz é item fixo do almoço, comprá-lo não é opcional, mesmo que ele
-       também seja alternativa de outra coisa no jantar. */
-    if (!alternativa) atual.soAlternativa = false
-    atual.vistoEm.add(refeicaoId)
-    atual.refeicoes = atual.vistoEm.size
-  }
-
-  for (const r of plano.refeicoes) {
-    for (const item of r.itens) {
-      juntar(item, r.id, false)
-      for (const v of item.variacoes) juntar(v, r.id, true)
-    }
-  }
-
-  return [...porChave.values()]
-    .map(({ vistoEm: _vistoEm, ...item }) => item)
-    /* Alternativas por último, e o resto em ordem alfabética. Alfabético e não
-       por refeição: na loja se anda por corredor, não por horário do dia. */
-    .sort((a, b) => {
-      if (a.soAlternativa !== b.soAlternativa) return a.soAlternativa ? 1 : -1
-      return a.nome.localeCompare(b.nome, 'pt-BR')
-    })
-}
+/* A lista de compras saiu daqui.
+ *
+ * Ela nasceu DUAS vezes no mesmo dia, em sessões diferentes -- aqui e em
+ * `listaDeCompras.ts` --, e as duas foram fundidas naquele arquivo: de cá
+ * vieram as alternativas marcadas como opcionais, de lá a quantidade da semana,
+ * as seções do mercado e a contagem de medida caseira.
+ *
+ * O lugar é lá por um motivo prático: este arquivo importa o Supabase, e nada
+ * que importe o Supabase roda no Node. Lá a regra é pura, e por isso tem teste.
+ *
+ * É a armadilha 5 do AGENTS acontecendo entre duas sessões no mesmo dia -- e a
+ * lição é a de sempre: procurar antes de escrever, e apagar a antiga na mesma
+ * alteração. */

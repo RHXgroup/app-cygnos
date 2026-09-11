@@ -1,5 +1,6 @@
 import {
   ehPedidoDeMenu,
+  resumoDoDia,
   semRestos,
   O_QUE_ELA_FAZ,
   PERGUNTAS_DE_EXEMPLO,
@@ -118,6 +119,27 @@ function ok(nome: string, condicao: boolean, detalhe = '') {
   ok('não tira colchete que não é id',
      semRestos('peso [78 kg] hoje') === 'peso [78 kg] hoje')
   ok('nem a cerquilha do paciente', semRestos('#412 está sem retorno') === '#412 está sem retorno')
+}
+
+// ── 6. A primeira linha da abertura ──────────────────────────────────────────
+{
+  const r = (consultas: number, semConfirmar: number, pedidos: number) =>
+    resumoDoDia({ consultas, semConfirmar, pedidos })
+
+  ok('dia cheio com pendente e pedido',
+     r(6, 2, 3) === '6 consultas hoje, 2 sem confirmar, 3 pedidos esperando você.', String(r(6, 2, 3)))
+  ok('singular em tudo',
+     r(1, 1, 1) === '1 consulta hoje, 1 sem confirmar, 1 pedido esperando você.', String(r(1, 1, 1)))
+  ok('sem pendente e sem pedido', r(4, 0, 0) === '4 consultas hoje.', String(r(4, 0, 0)))
+  ok('só pedido, sem consulta', r(0, 0, 2) === '2 pedidos esperando você.', String(r(0, 0, 2)))
+
+  /* Dia calmo não ganha frase: uma linha que só existe para dizer que não há
+     nada vira ruído em todo dia sem consulta -- e dia sem consulta não é dia
+     livre, é dia que o app não enxerga. */
+  ok('dia vazio não diz nada', r(0, 0, 0) === null)
+
+  /* "2 sem confirmar" sozinho não diz sem confirmar o quê. */
+  ok('pendente sem consulta não vaza', r(0, 2, 0) === null, String(r(0, 2, 0)))
 }
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')

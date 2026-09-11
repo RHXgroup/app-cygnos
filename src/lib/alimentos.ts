@@ -186,3 +186,33 @@ export function porcao(por100g: number | null, gramas: number): number | null {
   if (por100g === null || por100g === undefined) return null
   return (por100g * gramas) / 100
 }
+
+/* O grupo de cada alimento, para a lista de compras saber o corredor.
+ *
+ * Uma leitura só, com os ids que o plano já tem em mãos -- e não um `grupo`
+ * copiado dentro do plano no dia em que ele foi salvo. Se a base corrigir o
+ * grupo de um alimento, a lista de compras acompanha; um campo copiado ficaria
+ * com o corredor de ontem para sempre.
+ *
+ * Falha vira mapa vazio, e não erro: sem grupo a lista continua inteira, só
+ * sem separação por seção. Item 11 -- função de apoio de UI não rejeita. */
+export async function gruposDosAlimentos(ids: number[]): Promise<Map<number, string>> {
+  const limpos = [...new Set(ids.filter(n => Number.isFinite(n) && n > 0))]
+  if (limpos.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('app_alimentos')
+    .select('id, grupo')
+    .in('id', limpos)
+
+  if (error) {
+    falha('Não consegui separar a lista por seção do mercado.', error)
+    return new Map()
+  }
+
+  const mapa = new Map<number, string>()
+  for (const l of (data ?? []) as { id: number; grupo: string | null }[]) {
+    if (l.grupo?.trim()) mapa.set(l.id, l.grupo.trim())
+  }
+  return mapa
+}

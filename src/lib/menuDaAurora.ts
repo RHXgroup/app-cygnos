@@ -189,3 +189,44 @@ export const semRestos = (texto: string): string =>
     .replace(/ +([.,;:!?])/g, '$1')
     .replace(/ {2,}/g, ' ')
     .trim()
+
+/* ──────────────────── A PRIMEIRA LINHA, ANTES DE ELA PERGUNTAR ────────────────────
+ *
+ * A tela abria com "O que você quer saber?" -- uma pergunta feita a quem abriu a
+ * tela justamente por não saber. A Aurora já tinha os números do dia em mãos
+ * (são os mesmos que montam os chips) e não dizia nenhum.
+ *
+ * Uma frase só, e de fatos: quantas consultas, quantas sem confirmar, quantos
+ * pedidos esperando. É o que ela responderia se fosse perguntada, dito antes de
+ * ser perguntada -- e é o que explica por que os chips embaixo oferecem
+ * justamente aquilo.
+ *
+ * NÃO vira painel: o painel é a tela do lado, com a agenda inteira. Aqui é a
+ * frase que justifica a conversa começar. Se um dia isto crescer para três
+ * linhas, cresceu para o lugar errado. */
+export function resumoDoDia(dia: {
+  consultas: number
+  semConfirmar: number
+  pedidos: number
+}): string | null {
+  const partes: string[] = []
+
+  /* Dia sem consulta NÃO é dia livre -- ela pode ter mil coisas que o app não
+     enxerga. A frase diz o que o app sabe, e nada além. */
+  if (dia.consultas > 0) {
+    partes.push(dia.consultas === 1 ? '1 consulta hoje' : dia.consultas + ' consultas hoje')
+    if (dia.semConfirmar > 0) {
+      partes.push(dia.semConfirmar === 1 ? '1 sem confirmar' : dia.semConfirmar + ' sem confirmar')
+    }
+  }
+
+  if (dia.pedidos > 0) {
+    partes.push(dia.pedidos === 1 ? '1 pedido esperando você' : dia.pedidos + ' pedidos esperando você')
+  }
+
+  /* Nada a dizer é melhor do que "nenhuma consulta e nenhum pedido": uma frase
+     que só existe para dizer que não há nada vira ruído em todo dia calmo. */
+  if (partes.length === 0) return null
+
+  return partes.join(', ') + '.'
+}

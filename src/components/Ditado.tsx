@@ -230,7 +230,17 @@ export function Ditado({
       return
     }
     if (r.tipo === 'curto_demais') {
-      onErro('Foi rápido demais. Segure o botão e fale o que você comeu.')
+      /* A frase muda com o ASSUNTO. "Fale o que você comeu" para uma
+         nutricionista que estava ditando "remarca a consulta da Juliana" é o
+         app falando de outra coisa -- e quem lê isso conclui que apertou o
+         botão errado, não que falou pouco. */
+      onErro(
+        assunto === 'nutri'
+          ? 'Foi rápido demais. Segure o botão e fale o que você quer.'
+          : assunto === 'treino'
+            ? 'Foi rápido demais. Segure o botão e diga o que você fez.'
+            : 'Foi rápido demais. Segure o botão e fale o que você comeu.',
+      )
       return
     }
     if (r.tipo === 'nada_ouvido') {

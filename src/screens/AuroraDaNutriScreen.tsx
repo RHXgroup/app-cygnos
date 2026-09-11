@@ -27,6 +27,7 @@ import {
   O_QUE_ELA_FAZ,
   PERGUNTAS_DE_EXEMPLO,
   RESPOSTA_DO_MENU,
+  resumoDoDia,
   semRestos,
   ehPedidoDeMenu,
 } from '../lib/menuDaAurora'
@@ -117,6 +118,7 @@ export function AuroraDaNutriScreen({
    * Uma leitura pequena, e SÓ ela: a tela de conversa não vira painel. Se
    * falhar, o chip não aparece e o resto da tela nem fica sabendo (item 11). */
   const [pedidos, setPedidos] = useState(0)
+  const [consultasHoje, setConsultasHoje] = useState(0)
   /* As de HOJE que ainda estão como pendente -- "agendada e não confirmada",
      que é outra coisa que pedido (item que já custou uma conversa inteira). */
   const [aConfirmar, setAConfirmar] = useState(0)
@@ -127,7 +129,12 @@ export function AuroraDaNutriScreen({
     const [p, d] = await Promise.all([pedidosDeConsulta(), consultasDoDia(new Date())])
     if (p.tipo === 'ok') setPedidos(p.consultas.length)
     if (d.tipo === 'ok') {
-      setAConfirmar(d.consultas.filter(c => c.status === 'pendente').length)
+      /* Canceladas fora da conta: "6 consultas hoje" contando duas desmarcadas
+         e um numero que nao bate com o dia dela -- e numero que nao bate faz ela
+         parar de acreditar no resto da frase. */
+      const valem = d.consultas.filter(c => c.status !== 'cancelada')
+      setConsultasHoje(valem.length)
+      setAConfirmar(valem.filter(c => c.status === 'pendente').length)
     }
   }, [])
 
@@ -327,6 +334,8 @@ export function AuroraDaNutriScreen({
     ...PERGUNTAS_DE_EXEMPLO,
   ]
 
+  const oResumo = resumoDoDia({ consultas: consultasHoje, semConfirmar: aConfirmar, pedidos })
+
   const vazia = falas.length === 0
   /* Cartão esperando decisão. Enquanto houver um, nada mais é oferecido. */
   const cartaoAberto = falas.some(f => f.acao && f.decidida === undefined)
@@ -386,6 +395,9 @@ export function AuroraDaNutriScreen({
               <Ionicons name="sparkles" size={21} color={paleta().cores.limao} />
             </View>
             <Text style={styles.tituloAbertura}>O que você quer resolver agora?</Text>
+            {/* O que ela responderia se fosse perguntada, dito antes de ser
+                perguntada -- e é o que explica os chips logo abaixo. */}
+            {oResumo ? <Text style={styles.resumoDoDia}>{oResumo}</Text> : null}
             {/* Dito por escrito, e antes da primeira pergunta. Sem isto a
                 primeira coisa que se pede é justamente o que ela não faz --
                 "remarca a Maria" --, e uma recusa de saída ensina em dez
@@ -498,6 +510,16 @@ export function AuroraDaNutriScreen({
           horizontal
           showsHorizontalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          /* ──────────────────── A FAIXA PRECISA DE ALTURA PRÓPRIA ────────────────────
+             Sem `style` própria, esta faixa ficava com o que SOBRASSE da
+             coluna -- e o que sobrava, entre a conversa e a barra de escrever,
+             era uma tira de uns oito pixels. Na tela apareciam dois retângulos
+             cortados pela borda de baixo, sem texto legível, que se leem como
+             ação pendente: "uns risquinho embaixo", nas palavras dela.
+
+             `flexShrink: 0` é o que impede a coluna de espremer, e a altura
+             fixa é o que faz a faixa ser sempre do mesmo tamanho. */
+          style={styles.faixaDeSugestoes}
           contentContainerStyle={styles.tira}
         >
           {sugestoes.map(p => (
@@ -600,6 +622,12 @@ export function AuroraDaNutriScreen({
   )
 }
 
+/* A altura do chip de sugestao, num lugar so.
+   Ela aparece em dois estilos -- o chip e a faixa que o carrega -- e os dois
+   precisam concordar: faixa menor que o chip corta o chip, e foi assim que
+   apareceram os retangulos cortados na borda de baixo. */
+const ALTURA_DA_SUGESTAO = 36
+
 const estilos = estilosDe(t =>
   StyleSheet.create({
     tela: { flex: 1, backgroundColor: t.cores.fundo },
@@ -628,6 +656,9 @@ const estilos = estilosDe(t =>
     /* 25 e não 20. É a pergunta que dá nome à tela, e a tela inteira existe
        para respondê-la -- ela tem de ser a maior coisa aqui, e não um título
        de parágrafo. */
+    /* Em negrito e no acento: é a única linha da abertura que muda todo dia, e
+       precisa se distinguir do texto explicativo, que é sempre o mesmo. */
+    resumoDoDia: { fontSize: 14.5, fontWeight: '700', color: t.cores.verde, marginTop: 2 },
     tituloAbertura: {
       fontFamily: FONTE.forte,
       fontSize: 25,
@@ -758,11 +789,15 @@ const estilos = estilosDe(t =>
     /* Chips baixos e em linha, para caberem sem empurrar a conversa. A tira
        rola: quatro perguntas não cabem na largura de um celular, e cortar a
        quarta seria esconder justamente a que ensina que a Aurora agenda. */
-    tira: { gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
+    faixaDeSugestoes: { flexGrow: 0, flexShrink: 0, height: ALTURA_DA_SUGESTAO + 8 },
+    tira: { gap: 8, paddingHorizontal: 12, alignItems: 'center' },
+    /* Altura FIXA, e não derivada do texto: dois chips lado a lado com alturas
+       diferentes leem-se como dois tipos de coisa. */
     sugestao: {
+      height: ALTURA_DA_SUGESTAO,
+      justifyContent: 'center',
       backgroundColor: t.cores.cartao,
       borderRadius: 16,
-      paddingVertical: 9,
       paddingHorizontal: 14,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: t.cores.borda,
