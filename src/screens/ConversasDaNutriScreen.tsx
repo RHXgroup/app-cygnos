@@ -379,6 +379,21 @@ export function ConversasDaNutriScreen({
           contentContainerStyle={styles.fio}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          /* A MENSAGEM PARAVA NO MEIO, e ele disse duas vezes:
+
+               "a parte de mensagem ainda aparece no meio... não está
+                aparecendo no final igual a gente falou"
+
+             O efeito que rolava até o fim rodava quando o `fio` mudava -- e
+             nesse instante as mensagens novas ainda não tinham tamanho na
+             tela. `scrollToEnd` media a altura ANTIGA e parava onde o fim
+             estava antes: no meio da conversa.
+
+             `onContentSizeChange` dispara DEPOIS que o conteudo cresceu, que é
+             o único momento em que "o fim" já existe. A tela da Aurora já
+             fazia assim; esta, que eu escrevi depois, não copiou -- e é
+             exatamente o tipo de lição que se perde entre duas telas iguais. */
+          onContentSizeChange={() => rolagem.current?.scrollToEnd({ animated: false })}
         >
           {abrindo && <ActivityIndicator color={paleta().cores.verde} style={styles.girando} />}
 
