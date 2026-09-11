@@ -32,7 +32,7 @@ const CREDENCIAL_INVALIDA =
    "e-mail ou usuário" para quem digitou MT manda ela procurar erro num campo
    que nem está na tela. E vale a mesma regra -- par inexistente e senha errada
    caem juntos, porque separar devolveria o verificador de contas. */
-const CREDENCIAL_INVALIDA_NUTRI = 'Código MT, usuário ou senha incorretos.'
+const CREDENCIAL_INVALIDA_NUTRI = 'Código Cygnos, usuário ou senha incorretos.'
 
 /* Resposta própria, e não "credenciais incorretas": quem está trancado por ter
    errado quatro vezes precisa saber que é para ESPERAR. Sem isto ela ficaria
@@ -254,7 +254,7 @@ export function LoginScreen({
     } else if (resposta?.error === 'teste_expirado') {
       setErro('O período de teste terminou. Continue no sistema, no computador.')
     } else if (resposta?.error === 'campos_obrigatorios') {
-      setErro('Preencha o código MT, o usuário e a senha.')
+      setErro('Preencha o código Cygnos, o usuário e a senha.')
     } else if (semResposta) {
       setErro('Não consegui entrar agora. Tente de novo em instantes.')
     } else {
@@ -360,9 +360,9 @@ export function LoginScreen({
               "MT" por extenso faria a mesma credencial parecer outra. */}
           {modo === 'nutri' && (
             <View onLayout={medir('mt')}>
-              <Text style={styles.rotulo}>Código MT</Text>
+              <Text style={styles.rotulo}>Código Cygnos</Text>
               <View style={styles.campoComPrefixo}>
-                <Text style={styles.prefixoMT}>MT</Text>
+                <Text style={styles.prefixoMT}>CY</Text>
                 <TextInput
                   value={mt}
                   /* Só dígitos, e teclado numérico: o "MT" já está escrito ao
@@ -380,7 +380,7 @@ export function LoginScreen({
                   returnKeyType="next"
                   onFocus={() => setEmFoco('mt')}
                   style={[styles.campo, styles.campoDoMT]}
-                  accessibilityLabel="Código MT, só os números"
+                  accessibilityLabel="Código Cygnos, só os números"
                 />
               </View>
             </View>
