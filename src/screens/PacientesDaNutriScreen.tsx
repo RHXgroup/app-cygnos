@@ -31,6 +31,7 @@ import { situacaoDoPaciente, type Selo } from '../lib/situacaoDoPaciente'
 import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { PlanoDaPacienteScreen } from './PlanoDaPacienteScreen'
 import { DossieDaPacienteScreen, type SecaoDoDossie } from './DossieDaPacienteScreen'
+import { ConstanciaDoPaciente } from '../components/ConstanciaDoPaciente'
 
 /* A carteira dela, no bolso.
  *
@@ -535,6 +536,15 @@ export function FichaDoPacienteScreen({
                   onAbrir={() => setDossie('consultas')}
                 />
                 <Item rotulo="Usa o aplicativo" valor={ficha.usaOApp ? 'Sim' : 'Não'} />
+                {/* A constância logo abaixo do "Sim": é a pergunta seguinte --
+                    usa, mas está registrando? Só para quem usa: para quem não
+                    usa, o "Não" de cima já diz tudo, e a linha repetiria.
+                    Carregando ou falhou, ela não desenha nada (ver o componente). */}
+                {ficha.usaOApp && (
+                  <View style={styles.constancia}>
+                    <ConstanciaDoPaciente pacienteId={id} />
+                  </View>
+                )}
               </View>
 
               {/* ──────────────────── O PRONTUÁRIO ────────────────────
@@ -944,6 +954,7 @@ const estilos = estilosDe(t =>
     },
     textoPerguntar: { fontFamily: FONTE.forte, fontSize: 14.5, color: t.cores.sobreLimao },
 
+    constancia: { paddingTop: 2, paddingBottom: 4 },
     rodape: { fontSize: 12, color: t.inkFraco, lineHeight: 18, paddingHorizontal: 4, paddingTop: 4 },
     pressionado: { opacity: 0.7 },
   }),
