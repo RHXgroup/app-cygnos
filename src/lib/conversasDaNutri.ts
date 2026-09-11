@@ -171,10 +171,22 @@ export type ResultadoDoEnvio = { tipo: 'ok' } | { tipo: 'erro'; mensagem: string
  * escolheria em nome de quem a linha nasce. A função confere o vínculo, confere
  * a permissão, e escreve `'nutricionista'` de dentro.
  */
-export async function responder(contaId: string, texto: string): Promise<ResultadoDoEnvio> {
+export async function responder(
+  contaId: string,
+  texto: string,
+  /* O anexo JÁ SUBIDO: o caminho no balde, na pasta do paciente. A função do
+     banco confere que ele está na pasta DESTE paciente e que existe. */
+  anexo?: { path: string; tipo: 'foto' | 'audio' } | null,
+): Promise<ResultadoDoEnvio> {
   const { error } = await supabase.rpc('nutri_enviar_mensagem', {
     p_conta_id: contaId,
     p_texto: texto,
+    /* Os dois só viajam QUANDO HÁ anexo. O PostgREST escolhe a função pelos
+       nomes dos argumentos: mandados sempre, até como nulo, a mensagem de
+       TEXTO pararia de funcionar no banco que ainda tem a assinatura de dois
+       -- e o texto é o que ela usa o dia inteiro. Assim a ordem de subir
+       (app antes do SQL ou depois) não quebra nada. */
+    ...(anexo ? { p_anexo_path: anexo.path, p_anexo_tipo: anexo.tipo } : {}),
   })
 
   if (error) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AudioDoBalao } from '../components/AudioDoBalao'
 import { Ditado } from '../components/Ditado'
+import { GravadorDoRecado } from '../components/GravadorDoRecado'
+import { guardarAudioDaConversa } from '../lib/audioDaConversa'
 import {
   conversaCom,
   conversasDaNutri,
@@ -26,7 +28,7 @@ import {
   type MensagemDaConversa,
   type MensagemQueChegou,
 } from '../lib/conversasDaNutri'
-import { enderecoNoDiario } from '../lib/fotoDoDiario'
+import { enderecoNoDiario, escolherFoto, guardarFotoDoDiario } from '../lib/fotoDoDiario'
 import { FONTE } from '../lib/fontes'
 import {
   desdeQuando,
@@ -36,6 +38,7 @@ import {
 } from '../lib/previaDaConversa'
 import { estilosDe, paleta } from '../lib/tema'
 import { useDesvioDoTeclado } from '../lib/teclado'
+import { mmss } from '../lib/voz'
 
 /* As conversas com os pacientes.
  *
@@ -50,13 +53,20 @@ import { useDesvioDoTeclado } from '../lib/teclado'
  * O degrau do voltar mora aqui pelo mesmo motivo: a conversa fecha para a
  * lista, e a lista fecha para a aba. Armadilha 1.
  *
- * ──────────────────── O que ela NÃO manda por aqui ────────────────────
- * Foto e áudio. `nutri_enviar_mensagem` recebe só texto -- é assim desde 31/08,
- * e é o que o site também faz. Podia-se estender a função, e não foi feito
- * agora de propósito: o anexo dela exige pasta no balde, conferência do caminho
- * no mesmo instante em que a linha nasce, e assinatura de endereço na volta.
- * Prometer o botão e entregar meio caminho é pior do que a barra dizer só o que
- * faz.
+ * ──────────────────── Foto e áudio, desde 11/09 ────────────────────
+ * "Melhora também a opção de enviar vídeo, áudio e foto, na parte de mensagem."
+ * O `+` da barra abre câmera, galeria ou gravação. O arquivo vai para a pasta
+ * do PACIENTE no balde -- é a única que ele consegue abrir, e é a que a
+ * exclusão de conta dele limpa -- e a função do banco recusa anexo de outra
+ * pasta, para a foto de uma paciente nunca cair na conversa de outra. Ver a
+ * migração 20260911180000 do sistema.
+ *
+ * O arquivo sobe no ENVIO, e não na escolha (como no app do paciente): ela não
+ * tem permissão de apagar na pasta dele, então escolher e desistir não pode
+ * deixar arquivo para trás. A prévia usa o arquivo do próprio aparelho.
+ *
+ * Vídeo fica para o próximo build: o tocador é módulo nativo, e o balde ainda
+ * não aceita vídeo.
  *
  * O microfone da barra é DITADO, não gravação: vira texto no campo, ela lê antes
  * de mandar. É o mesmo `<Ditado>` da Aurora, com `assunto="recado"`.
@@ -117,6 +127,13 @@ export function ConversasDaNutriScreen({
      do toque. */
   const enviandoAgora = useRef(false)
 
+  /* O anexo esperando o envio. `caminho` nulo até subir: se o envio falhar
+     DEPOIS de subir, tentar de novo reaproveita o arquivo em vez de mandar
+     outra cópia para a pasta da paciente. */
+  const [anexo, setAnexo] = useState<AnexoPendente | null>(null)
+  const [menuDeAnexo, setMenuDeAnexo] = useState(false)
+  const [gravando, setGravando] = useState(false)
+
   /* Falso até a primeira leitura voltar. Ver o efeito que avisa o pai. */
   const jaCarregou = useRef(false)
 
@@ -130,6 +147,16 @@ export function ConversasDaNutriScreen({
   /* O que a barra mostra: seta quando há texto, microfone quando não há.
      Derivado do campo, e não um estado paralelo que pode divergir dele. */
   const temTexto = texto.trim().length > 0
+  /* Foto sem legenda é mensagem inteira: exigir texto obrigaria a escrever
+     "olha" para mandar a foto. */
+  const podeMandar = temTexto || !!anexo
+
+  /* Um objeto só por foto: `source={{ uri }}` novo a cada letra digitada o
+     React Native lê como imagem nova, e a miniatura piscaria. */
+  const fonteDaMiniatura = useMemo(
+    () => (anexo?.tipo === 'foto' ? { uri: anexo.uri } : null),
+    [anexo],
+  )
 
   /* Quando foi a última mensagem da conversa ABERTA. Sai do fio enquanto ele
      tiver algo, e só cai para o que a lista trouxe enquanto o fio carrega. */
@@ -188,6 +215,17 @@ export function ConversasDaNutriScreen({
      desta tela só sabe fechar tudo. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      /* A gravação e o menu são o degrau mais de dentro. O anexo esperando
+         NÃO sai com o voltar: é trabalho dela -- para tirar, há o X da
+         prévia. */
+      if (gravando) {
+        setGravando(false)
+        return true
+      }
+      if (menuDeAnexo) {
+        setMenuDeAnexo(false)
+        return true
+      }
       if (aberta) {
         fechar()
         return true
@@ -202,6 +240,9 @@ export function ConversasDaNutriScreen({
     setAberta(c)
     setFio([])
     setTexto('')
+    setAnexo(null)
+    setMenuDeAnexo(false)
+    setGravando(false)
     setAbrindo(true)
     setErro('')
 
@@ -229,16 +270,62 @@ export function ConversasDaNutriScreen({
     setFio([])
     setTexto('')
     setErro('')
+    setAnexo(null)
+    setMenuDeAnexo(false)
+    setGravando(false)
+  }
+
+  async function anexarFoto(origem: 'camera' | 'galeria') {
+    setMenuDeAnexo(false)
+    const escolha = await escolherFoto(origem)
+    if (escolha.tipo === 'cancelado') return
+    if (escolha.tipo === 'erro') {
+      setErro(escolha.mensagem)
+      return
+    }
+    setErro('')
+    setAnexo({ tipo: 'foto', uri: escolha.uri, base64: escolha.base64, caminho: null })
+  }
+
+  /* Sobe o anexo para a pasta da paciente, ou devolve a frase do que falhou. */
+  async function subir(
+    a: AnexoPendente,
+    contaId: string,
+  ): Promise<{ tipo: 'ok'; caminho: string } | { tipo: 'erro'; mensagem: string }> {
+    if (a.caminho) return { tipo: 'ok', caminho: a.caminho }
+    if (a.tipo === 'foto') {
+      const caminho = await guardarFotoDoDiario(contaId, a.base64)
+      return caminho
+        ? { tipo: 'ok', caminho }
+        : { tipo: 'erro', mensagem: 'Não consegui subir a foto agora. Tente enviar de novo.' }
+    }
+    return guardarAudioDaConversa(contaId, a.uri)
   }
 
   async function enviar() {
     const limpo = texto.trim()
-    if (!limpo || !aberta || enviando || enviandoAgora.current) return
+    if ((!limpo && !anexo) || !aberta || enviando || enviandoAgora.current) return
     enviandoAgora.current = true
     setEnviando(true)
     setErro('')
 
-    const r = await responder(aberta.contaId, limpo)
+    let subido: { path: string; tipo: 'foto' | 'audio' } | null = null
+    if (anexo) {
+      const s = await subir(anexo, aberta.contaId)
+      if (s.tipo === 'erro') {
+        enviandoAgora.current = false
+        setEnviando(false)
+        setErro(s.mensagem)
+        return
+      }
+      subido = { path: s.caminho, tipo: anexo.tipo }
+      /* Guardado já: se o envio abaixo falhar, o próximo toque não sobe o
+         arquivo de novo. */
+      const esse = anexo
+      setAnexo(atual => (atual === esse ? { ...esse, caminho: s.caminho } : atual))
+    }
+
+    const r = await responder(aberta.contaId, limpo, subido)
     enviandoAgora.current = false
     setEnviando(false)
     if (r.tipo === 'erro') {
@@ -247,6 +334,7 @@ export function ConversasDaNutriScreen({
     }
 
     setTexto('')
+    setAnexo(null)
     /* Relê a conversa em vez de acrescentar à mão: o id e o instante são do
        banco, e inventá-los aqui faria o balão pular de lugar quando a leitura
        seguinte trouxesse os de verdade. */
@@ -263,7 +351,7 @@ export function ConversasDaNutriScreen({
                 ultima: limpo,
                 ultimaDe: 'nutricionista',
                 ultimaEm: new Date().toISOString(),
-                ultimaAnexoTipo: null,
+                ultimaAnexoTipo: subido?.tipo ?? null,
               }
             : x,
         )
@@ -423,12 +511,91 @@ export function ConversasDaNutriScreen({
             O polegar de quem segura o telefone com uma mão alcança o canto
             direito de baixo, e é lá que fica a única ação que a barra tem em
             cada momento. Mesma decisão da Aurora, e pelo mesmo motivo. */}
+        {/* O que vai junto, antes de ir: a foto em miniatura ou o áudio com a
+            duração, e o X para desistir. */}
+        {!!anexo && !gravando && (
+          <View style={styles.pendente}>
+            {fonteDaMiniatura ? (
+              <Image source={fonteDaMiniatura} style={styles.miniatura} />
+            ) : (
+              <View style={styles.audioPendente}>
+                <Ionicons name="mic" size={16} color={paleta().cores.verde} />
+                <Text style={styles.textoPendente}>
+                  {anexo.tipo === 'audio' ? mmss(anexo.segundos) : ''}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.dicaPendente} numberOfLines={2}>
+              {enviando
+                ? 'Enviando…'
+                : anexo.tipo === 'foto'
+                  ? 'Foto pronta. Escreva uma legenda, se quiser, e envie.'
+                  : 'Áudio pronto. Escreva uma legenda, se quiser, e envie.'}
+            </Text>
+            {!enviando && (
+              <Pressable
+                onPress={() => setAnexo(null)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={anexo.tipo === 'foto' ? 'Tirar a foto' : 'Tirar o áudio'}
+              >
+                <Ionicons name="close-circle" size={22} color={paleta().inkFraco} />
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {/* O menu do `+`: as três saídas escritas, e não escondidas num toque
+            longo. Quem tem a foto já tirada precisa ver "Galeria" para saber
+            que pode -- a lição do app do paciente. */}
+        {menuDeAnexo && !gravando && (
+          <View style={styles.menuDeAnexo}>
+            <OpcaoDeAnexo icone="camera-outline" rotulo="Câmera" onPress={() => void anexarFoto('camera')} />
+            <OpcaoDeAnexo icone="images-outline" rotulo="Galeria" onPress={() => void anexarFoto('galeria')} />
+            <OpcaoDeAnexo
+              icone="mic-outline"
+              rotulo="Gravar áudio"
+              onPress={() => {
+                setMenuDeAnexo(false)
+                setErro('')
+                setGravando(true)
+              }}
+            />
+          </View>
+        )}
+
         <View style={[styles.barra, { paddingBottom: 10 + respiro }]}>
+          {gravando ? (
+            <GravadorDoRecado
+              onPronto={(uri, segundos) => {
+                setGravando(false)
+                setAnexo({ tipo: 'audio', uri, segundos, caminho: null })
+              }}
+              onCancelar={() => setGravando(false)}
+              onErro={mensagem => {
+                setGravando(false)
+                setErro(mensagem)
+              }}
+            />
+          ) : (
+          <>
+          <Pressable
+            onPress={() => setMenuDeAnexo(m => !m)}
+            disabled={enviando}
+            hitSlop={6}
+            style={({ pressed }) => [styles.botaoMais, pressed && styles.pressionado]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: menuDeAnexo }}
+            accessibilityLabel={menuDeAnexo ? 'Fechar o menu de anexos' : 'Anexar foto ou áudio'}
+          >
+            <Ionicons name={menuDeAnexo ? 'close' : 'add'} size={24} color={paleta().inkSuave} />
+          </Pressable>
+
           <View style={styles.campoRedondo}>
             <TextInput
               value={texto}
               onChangeText={setTexto}
-              placeholder="Escreva para a paciente"
+              placeholder={anexo ? 'Legenda (opcional)' : 'Escreva para a paciente'}
               placeholderTextColor={paleta().inkFraco}
               multiline
               maxLength={2000}
@@ -437,7 +604,7 @@ export function ConversasDaNutriScreen({
             />
           </View>
 
-          {temTexto ? (
+          {podeMandar ? (
             <Pressable
               onPress={() => void enviar()}
               disabled={enviando}
@@ -498,6 +665,8 @@ export function ConversasDaNutriScreen({
                 setErro(mensagem)
               }}
             />
+          )}
+          </>
           )}
         </View>
       </View>
@@ -609,6 +778,36 @@ export function ConversasDaNutriScreen({
         )}
       </ScrollView>
     </View>
+  )
+}
+
+/* O anexo esperando o envio. A foto guarda o texto da imagem pronto -- feito
+   com a câmera já fechada, que é o que impede o Android de matar o app no
+   pior momento (ver `escolherFoto`). */
+type AnexoPendente =
+  | { tipo: 'foto'; uri: string; base64: string; caminho: string | null }
+  | { tipo: 'audio'; uri: string; segundos: number; caminho: string | null }
+
+function OpcaoDeAnexo({
+  icone,
+  rotulo,
+  onPress,
+}: {
+  icone: React.ComponentProps<typeof Ionicons>['name']
+  rotulo: string
+  onPress: () => void
+}) {
+  const styles = estilos()
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.opcaoDeAnexo, pressed && styles.pressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+    >
+      <Ionicons name={icone} size={22} color={paleta().cores.verde} />
+      <Text style={styles.rotuloDaOpcao}>{rotulo}</Text>
+    </Pressable>
   )
 }
 
@@ -864,6 +1063,50 @@ const estilos = estilosDe(t =>
     },
     /* Cor, e não opacidade: o tema tem um `desligado` medido para isto. */
     botaoDesligado: { backgroundColor: t.cores.desligado },
+    botaoMais: { width: 36, height: 42, alignItems: 'center', justifyContent: 'center' },
+
+    pendente: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginHorizontal: 12,
+      marginBottom: 6,
+      padding: 8,
+      borderRadius: 14,
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+    },
+    miniatura: { width: 52, height: 52, borderRadius: 10, backgroundColor: t.cores.trilho },
+    audioPendente: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: t.cores.verdeMenta,
+    },
+    textoPendente: { fontFamily: FONTE.meia, fontSize: 13, color: t.cores.ink, fontVariant: ['tabular-nums'] },
+    dicaPendente: { flex: 1, fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco, lineHeight: 17 },
+
+    menuDeAnexo: {
+      flexDirection: 'row',
+      gap: 8,
+      marginHorizontal: 12,
+      marginBottom: 6,
+    },
+    opcaoDeAnexo: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 12,
+      borderRadius: 14,
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+    },
+    rotuloDaOpcao: { fontFamily: FONTE.meia, fontSize: 12.5, color: t.cores.ink },
     pressionado: { opacity: 0.75 },
   }),
 )
