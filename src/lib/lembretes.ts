@@ -392,7 +392,7 @@ export async function precisaExplicarNotificacao(): Promise<boolean> {
   return !p.granted && p.canAskAgain !== false
 }
 
-/* ———————— AS TR~EA~S SITUAÇ~OT~ES, e o que fazer em cada uma ————————
+/* ———————— AS TRÊS SITUAÇÕES, e o que fazer em cada uma ————————
  *
  * Relatado pela nutricionista, depois de confirmar um lembrete na Aurora e
  * receber "o aparelho não deixou avisar, ligue nas configurações do

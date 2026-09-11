@@ -111,6 +111,11 @@ export function ConversasDaNutriScreen({
   const [abrindo, setAbrindo] = useState(false)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
+  /* A trava do toque duplo. `enviando` só vale na renderização seguinte, e o
+     campo só esvazia depois da resposta: dois toques rápidos liam o mesmo texto
+     e o paciente recebia a resposta duas vezes. Um `ref` muda no mesmo instante
+     do toque. */
+  const enviandoAgora = useRef(false)
 
   /* Falso até a primeira leitura voltar. Ver o efeito que avisa o pai. */
   const jaCarregou = useRef(false)
@@ -228,11 +233,13 @@ export function ConversasDaNutriScreen({
 
   async function enviar() {
     const limpo = texto.trim()
-    if (!limpo || !aberta || enviando) return
+    if (!limpo || !aberta || enviando || enviandoAgora.current) return
+    enviandoAgora.current = true
     setEnviando(true)
     setErro('')
 
     const r = await responder(aberta.contaId, limpo)
+    enviandoAgora.current = false
     setEnviando(false)
     if (r.tipo === 'erro') {
       setErro(r.mensagem)

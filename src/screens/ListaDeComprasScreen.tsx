@@ -89,7 +89,12 @@ export function ListaDeComprasScreen({
     else porSecao.push({ secao: item.secao, itens: [item] })
   }
   const alternativas = itens.filter(i => i.soAlternativa)
-  const faltam = itens.length - pegos.size
+  /* Só o que é CERTO conta no que falta. Contando as alternativas, quem pegou
+     tudo do plano continuava lendo "6 itens para pegar" -- os opcionais que
+     ela decidiu não levar --, e o placar nunca chegava a zero. */
+  const faltam = principais.filter(i => !pegos.has(i.chave)).length
+  /* A mesma leitura que a lib faz do campo: sem dia marcado, a semana toda. */
+  const diasDoPlano = plano.diasSemana.length > 0 ? plano.diasSemana.length : 7
 
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
@@ -174,9 +179,17 @@ export function ListaDeComprasScreen({
               </>
             )}
 
+            {/* O rodapé dizia "somam um dia, multiplique pelos dias" -- e a lib
+                já multiplica desde que as duas listas viraram uma. Quem seguisse
+                o conselho levava cinco, sete vezes o que precisava. Achado na
+                segunda rodada de testes, lendo a tela contra a lib: a conta
+                mudou num arquivo e a frase que a explica ficou no outro. */}
             <Text style={styles.rodape}>
-              As quantidades somam o que o plano pede em um dia. Para a semana, multiplique
-              pelos dias em que ele se repete.
+              {diasDoPlano === 7
+                ? 'As quantidades já são da semana inteira: o que o plano pede nos 7 dias.'
+                : diasDoPlano === 1
+                  ? 'As quantidades já são da semana: o plano vale em 1 dia, e é isso que ele pede.'
+                  : `As quantidades já são da semana: o que o plano pede nos ${diasDoPlano} dias em que ele vale.`}
             </Text>
           </>
         )}
@@ -198,7 +211,7 @@ function LinhaDeCompra({
   /* Peso quando há; a forma como foi dita quando não há. "2 unidades" é mais
      útil na prateleira do que um peso que ninguém informou.
 
-     A conta é da SEMANA inteira, e quem a escreve é : 40 g de
+     A conta é da SEMANA inteira, e quem a escreve é `listaDeCompras`: 40 g de
      aveia num plano de cinco dias são 200 g no mercado, e é justamente essa
      multiplicação que ninguém faz de cabeça no corredor. */
   const quantidade = quantoComprar(item)

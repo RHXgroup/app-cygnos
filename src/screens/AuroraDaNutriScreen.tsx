@@ -202,7 +202,12 @@ export function AuroraDaNutriScreen({
 
   async function mandar(pergunta: string) {
     const limpa = pergunta.trim()
-    if (!limpa || pensando) return
+    /* O `ref` também aqui, e não só no confirmar. `pensando` só vale na
+       renderização seguinte, e o campo só esvazia nela: dois toques rápidos na
+       seta -- ou num chip -- liam o mesmo texto no mesmo instante e mandavam a
+       pergunta duas vezes. Achado na segunda rodada de testes, lendo a trava do
+       confirmar e perguntando por que o mandar não tinha a mesma. */
+    if (!limpa || pensando || emVoo.current) return
 
     /* "Menu principal" não vai ao modelo.
      *
@@ -233,6 +238,7 @@ export function AuroraDaNutriScreen({
     const anteriores = falas
     setFalas(atual => [...atual, minha])
     setTexto('')
+    emVoo.current = true
     setPensando(true)
 
     /* Na tela ela lê o que escreveu; o servidor recebe de quem se trata, por
@@ -242,6 +248,7 @@ export function AuroraDaNutriScreen({
       sobre ? 'Sobre o paciente #' + sobre.pacienteId + ': ' + limpa : limpa,
       anteriores,
     )
+    emVoo.current = false
     setPensando(false)
 
     if (r.tipo === 'confirmar') {

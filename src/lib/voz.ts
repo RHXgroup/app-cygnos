@@ -304,7 +304,7 @@ export async function transcrever(
 
   if (!arquivo.exists) {
     console.log('[cygnos] ditado: o arquivo nao existe', uri)
-    return { tipo: 'erro', mensagem: 'Nao consegui achar a gravacao no aparelho. Tente de novo.' }
+    return { tipo: 'erro', mensagem: 'Não consegui achar a gravação no aparelho. Tente de novo.' }
   }
 
   /* Quanto o arquivo realmente tem. Sem este numero, "nao ouvi nada" pode ser

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -270,6 +270,10 @@ function MeusAvisos() {
   const [texto, setTexto] = useState('')
   const [quando, setQuando] = useState('')
   const [salvando, setSalvando] = useState(false)
+  /* A trava do toque duplo: `salvando` só vale na renderização seguinte, e
+     dois toques rápidos em "Criar" agendavam o MESMO aviso duas vezes -- o
+     celular tocava dobrado na hora marcada. Um `ref` muda no instante do toque. */
+  const salvandoAgora = useRef(false)
   const [recado, setRecado] = useState('')
   /* Nulo até a primeira leitura: sem ele, a linha nasceria dizendo
      "desligadas" por um instante e piscaria para "ligadas" -- e quem vê o
@@ -297,15 +301,17 @@ function MeusAvisos() {
   }, [reler])
 
   async function criar() {
-    if (salvando) return
+    if (salvando || salvandoAgora.current) return
     const lido = quandoDoAviso(quando)
     if (lido.tipo === 'erro') {
       setRecado(lido.mensagem)
       return
     }
+    salvandoAgora.current = true
     setSalvando(true)
     setRecado('')
     const r = await criarAviso(texto, lido.quando)
+    salvandoAgora.current = false
     setSalvando(false)
 
     if (r.tipo === 'ok') {
@@ -332,7 +338,7 @@ function MeusAvisos() {
     <View style={styles.cartao}>
       <Text style={styles.rotuloDoBloco}>MEUS AVISOS</Text>
 
-      {/* —— AS NOTIFICAÇ~OT~ES, no mesmo cartão dos avisos ——
+      {/* —— AS NOTIFICAÇÕES, no mesmo cartão dos avisos ——
           Pedido dele: "igual o do paciente, que você vai lá na parte do mais e
           coloca que você permite as notificações".
 

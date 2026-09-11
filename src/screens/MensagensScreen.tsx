@@ -193,6 +193,11 @@ export function MensagensScreen({
 
   const segundosGravados = Math.floor((estadoDoGravador.durationMillis ?? 0) / 1000)
   const [enviando, setEnviando] = useState(false)
+  /* A trava do toque duplo no enviar. `enviando` só vale na renderização
+     seguinte, e o campo só esvazia depois da resposta: dois toques rápidos na
+     seta liam o mesmo texto e a nutricionista recebia a mensagem duas vezes.
+     Um `ref` muda no mesmo instante do toque. */
+  const enviandoAgora = useRef(false)
   const [erro, setErro] = useState('')
   /* Separado do erro de enviar: um é sobre a mensagem que não saiu, o outro
      sobre a conversa que não veio, e trocar um pelo outro confunde. */
@@ -542,15 +547,17 @@ export function MensagensScreen({
     const limpo = texto.trim()
     /* Foto sem legenda é mensagem inteira: exigir texto obrigaria a pessoa a
        escrever "olha" para poder mandar o prato. */
-    if ((!limpo && !anexo) || enviando) return
+    if ((!limpo && !anexo) || enviando || enviandoAgora.current) return
 
     /* Mandar é dizer "quero ver o que eu mandei". Mesmo tendo subido para
        reler algo antigo, a própria mensagem traz a conversa de volta para o
        fim. */
     grudadoNoFim.current = true
+    enviandoAgora.current = true
     setEnviando(true)
     setErro('')
     const r = await enviarMensagem(limpo, anexo)
+    enviandoAgora.current = false
     setEnviando(false)
 
     if (r.tipo === 'erro') {

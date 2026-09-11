@@ -255,3 +255,23 @@ export const esquecerConversa = (): void => {
   conversaGuardada = []
   pacienteDaConversa = null
 }
+
+/* ── "Dura a sessão do app" não é "dura a sessão DELA" ─────────────────────
+ *
+ * O comentário acima escolheu a vida certa para o caso de uma pessoa só, e
+ * esqueceu o outro: sair da conta NÃO mata o app. A variável de módulo passava
+ * inteira pelo `signOut`, e quem entrasse em seguida no mesmo celular -- a
+ * colega de consultório, a secretária com a conta dela -- abria a Aurora e
+ * encontrava a conversa anterior: nome de paciente, peso, consulta, dinheiro.
+ * Achado na segunda rodada de testes, perguntando o que sobrevive a um logout.
+ *
+ * A regra é pelo DONO, e não pelo evento de sair: `TOKEN_REFRESHED` chega de
+ * hora em hora com a mesma pessoa e não pode apagar nada, e uma troca de
+ * conta sem passar por `SIGNED_OUT` (sessão trocada por outro caminho) tem de
+ * apagar igual. Vale para qualquer coisa que se guarde aqui no futuro. */
+let donoDaConversa: string | null | undefined
+supabase.auth.onAuthStateChange((_evento, sessao) => {
+  const dono = sessao?.user.id ?? null
+  if (donoDaConversa !== undefined && dono !== donoDaConversa) esquecerConversa()
+  donoDaConversa = dono
+})

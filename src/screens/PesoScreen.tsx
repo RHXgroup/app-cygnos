@@ -115,7 +115,7 @@ export function PesoScreen({
     const atual = await carregarMetasAtivas(contaId)
     if (atual.tipo !== 'ok' || !atual.metas) {
       setAplicando(false)
-      setErroDaMeta('Nao consegui abrir as suas metas agora. Tente de novo.')
+      setErroDaMeta('Não consegui abrir as suas metas agora. Tente de novo.')
       return
     }
 
