@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/cygnos-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F4EFE4"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.cygnosnutri.app"
@@ -60,7 +55,18 @@
         {
           "microphonePermission": "O Cygnos usa o microfone para você falar o que comeu em vez de digitar, e para gravar um áudio para a sua nutricionista.",
           "speechRecognitionPermission": "O Cygnos transforma a sua voz em texto no próprio celular, enquanto você fala. O áudio não sai do aparelho.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/cygnos-icon.png",
+          "backgroundColor": "#F4EFE4",
+          "resizeMode": "contain",
+          "imageWidth": 200
         }
       ]
     ],
