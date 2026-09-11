@@ -247,7 +247,7 @@ export function ContadorCaloriasScreen({
 
     /* Tenta subir o que ficou esperando antes de ler o dia: assim o que subiu
        agora já aparece na lista, em vez de só na próxima abertura. */
-    enviarPendentes()
+    enviarPendentes(contaId)
       .then(r => {
         if (!ativo) return
         setPendentes(r.restantes)
@@ -371,7 +371,7 @@ export function ContadorCaloriasScreen({
          guardado, e uma lista vazia diz que não está. Eles não são editáveis
          até subirem — ver `abrirAcoes`. */
       await guardarPendentes(contaId, novos)
-      setPendentes(await quantosPendentes())
+      setPendentes(await quantosPendentes(contaId))
       setErro(
         novos.length === 1
           ? 'Sem conexão agora. O registro está guardado e sobe sozinho quando a internet voltar.'
@@ -996,7 +996,7 @@ export function ContadorCaloriasScreen({
           {pendentes > 0 && (
             <Pressable
               onPress={async () => {
-                const r = await enviarPendentes()
+                const r = await enviarPendentes(contaId)
                 setPendentes(r.restantes)
                 if (r.enviados > 0) {
                   const novo = await carregarConsumo(contaId)

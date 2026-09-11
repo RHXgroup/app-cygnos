@@ -69,8 +69,21 @@ export async function guardarPendentes(
   await gravar([...fila, ...itens.map(item => ({ contaId, item, em: em.toISOString() }))])
 }
 
-export async function quantosPendentes(): Promise<number> {
-  return (await ler()).length
+/* ── A fila é do APARELHO, e cada item é de uma CONTA ────────────────────
+ *
+ * Contar e enviar só o que é de quem está logado. Antes a fila inteira ia para
+ * a rede em ordem, parando no primeiro erro -- e o item de OUTRA conta é
+ * sempre erro (a RLS recusa gravar no diário de outra pessoa). Bastava sair de
+ * uma conta com um item pendurado e entrar noutra: o item alheio ficava na
+ * frente, recusado a cada tentativa, e travava para sempre a fila da conta nova,
+ * que via "1 esperando para enviar" sem nunca conseguir. Acontece com
+ * quem testa, que alterna contas no mesmo celular, e com o celular emprestado.
+ *
+ * O item alheio fica guardado, e não é jogado fora: é o almoço de alguém, e
+ * ele sobe quando essa pessoa entrar de novo. Achado na terceira rodada de
+ * testes, perguntando o que sobrevive a trocar de conta. */
+export async function quantosPendentes(contaId: string): Promise<number> {
+  return (await ler()).filter(p => p.contaId === contaId).length
 }
 
 export type ResultadoEnvio = {
@@ -83,23 +96,30 @@ export type ResultadoEnvio = {
  * Um por vez, e parando no primeiro erro: se a rede caiu, ela caiu para todos,
  * e insistir nos duzentos só gasta bateria. O que já subiu sai da fila na hora,
  * então uma falha no meio não faz os anteriores voltarem. */
-export async function enviarPendentes(): Promise<ResultadoEnvio> {
-  const fila = await ler()
-  if (fila.length === 0) return { enviados: 0, restantes: 0 }
+export async function enviarPendentes(contaId: string): Promise<ResultadoEnvio> {
+  const minha = (await ler()).filter(p => p.contaId === contaId)
+  if (minha.length === 0) return { enviados: 0, restantes: 0 }
 
-  let enviados = 0
+  const subiram = new Set<string>()
 
-  for (const p of fila) {
+  for (const p of minha) {
     const r = await registrarConsumo(p.contaId, [p.item], new Date(p.em))
     if (r.tipo === 'erro') break
-    enviados++
+    subiram.add(chaveDo(p))
   }
 
-  const restantes = fila.slice(enviados)
-  await gravar(restantes)
+  /* Relê antes de gravar, e tira só o que subiu. Gravar a cópia lida no
+     começo (era `fila.slice(enviados)`) apagava o item que a tela guardou
+     enquanto o envio andava -- justamente o registro feito sem sinal, que é o
+     que esta fila existe para não perder. */
+  await gravar((await ler()).filter(p => !subiram.has(chaveDo(p))))
 
-  return { enviados, restantes: restantes.length }
+  return { enviados: subiram.size, restantes: minha.length - subiram.size }
 }
+
+/* Dois registros idênticos no mesmo milissegundo, da mesma conta, são o mesmo
+   registro -- não existe outro jeito de a pessoa produzi-los. */
+const chaveDo = (p: Pendente): string => p.contaId + '|' + p.em + '|' + JSON.stringify(p.item)
 
 export async function limparPendentes(): Promise<void> {
   await gravar([])
