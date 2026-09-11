@@ -35,6 +35,11 @@ const BUCKET = 'fotos-diario'
  * atendimentos: áudio de cinco minutos não é respondido, fica para depois, e
  * "depois" é quando a pessoa já desistiu de esperar.
  *
+ * Era um minuto, e ele pediu três em 11/09/2026, usando o envio de áudio pela
+ * primeira vez: "3 minutos no máximo". Três minutos a 32 kbps dão uns 720 kB,
+ * bem abaixo do teto de 3 MB do balde -- o limite aqui é de ATENÇÃO, e não de
+ * espaço, e por isso quem decide é quem vai ouvir.
+ *
  * Por isso são duas constantes e não uma importada da outra: no dia em que o
  * ditado aceitar dois minutos, o recado não deve mudar junto sem que alguém
  * tenha decidido isso.
@@ -44,7 +49,7 @@ const BUCKET = 'fotos-diario'
  * pelo outro compilaria — que foi exatamente o defeito dos dois `relogio`
  * (armadilha 5). Nome igual para decisões diferentes é a mesma armadilha pelo
  * outro lado. */
-export const LIMITE_DO_RECADO = 60
+export const LIMITE_DO_RECADO = 180
 
 /* Abaixo disso é toque sem querer, e não recado. Mandar meio segundo de
    silêncio gasta a atenção dela à toa. */

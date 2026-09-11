@@ -180,6 +180,27 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
      em `end`, e o `end` entregava o texto como se ela tivesse tocado em
      "pronto". */
   let cancelada = false
+  /* ──────────────────── A ESCUTA QUE RECOMEÇA ────────────────────
+   *
+   * Relatado no primeiro teste no aparelho dele: "ele grava só o 'oi' e já
+   * para". O reconhecimento DO APARELHO encerra sozinho na primeira pausa --
+   * `continuous` é implementado pelo Android como "sessão segmentada", e a
+   * própria documentação do módulo diz que, dependendo do reconhecedor, ela
+   * pode não ter efeito nenhum. O de dentro do celular é justamente um desses.
+   *
+   * Então quem segura a escuta somos nós: no `end`, se ela NÃO mandou parar,
+   * a escuta recomeça e o que já foi ouvido continua na lista (`fechados`).
+   * Para ela, é uma frase só; por baixo, são várias sessões emendadas.
+   *
+   * Dois freios, para o microfone nunca ficar aberto sozinho:
+   *   - um TETO de tempo desde o toque no microfone;
+   *   - um teto de recomeços, para o caso de o reconhecedor encerrar na hora,
+   *     em laço, e o app ficar reabrindo para sempre. */
+  const COMECOU_EM = Date.now()
+  const TETO_DA_ESCUTA_MS = 90_000
+  const TETO_DE_RECOMECOS = 20
+  let recomecos = 0
+  let pediuParar = false
 
   const inscricoes: { remove: () => void }[] = []
   const desligar = () => {
@@ -226,9 +247,62 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
     }),
   )
 
+  /* As opções de início ficam aqui em cima porque o recomeço usa as MESMAS:
+     duas listas iguais escritas em dois lugares divergiriam no primeiro ajuste,
+     e o recomeço passaria a ouvir diferente do começo. Armadilha 5. */
+  const comoOuvir = {
+    lang: 'pt-BR',
+    interimResults: true,
+    /* Contínua: ela fala com pausas ("marca um lembrete... pras oito...").
+       Onde o aparelho respeita, é ela que segura; onde não respeita, quem
+       segura é o recomeço do `end`. */
+    continuous: true,
+    requiresOnDeviceRecognition: true,
+    addsPunctuation: true,
+    contextualStrings: op.palavras ?? PALAVRAS_DA_NUTRI,
+    /* O tempo de silêncio que o Android espera antes de decidir que a frase
+       acabou. O padrão é de busca por voz -- perto de um segundo --, e quem
+       está pensando no que dizer para a paciente passa disso sem esforço.
+       Três segundos é a pausa de quem está formulando; acima disso, o recomeço
+       assume. */
+    androidIntentOptions: {
+      EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
+      EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
+      EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 8000,
+    },
+  }
+
   inscricoes.push(
     m.addListener('end', () => {
       if (terminou) return
+
+      /* Ela não mandou parar, ainda cabe tempo: recomeça, e o que já foi ouvido
+         fica. É isto que transforma várias sessões do Android numa frase só. */
+      if (
+        !pediuParar &&
+        !cancelada &&
+        recomecos < TETO_DE_RECOMECOS &&
+        Date.now() - COMECOU_EM < TETO_DA_ESCUTA_MS
+      ) {
+        recomecos++
+        /* O parcial da sessão que acabou entra como trecho fechado antes de
+           recomeçar: a sessão nova nasce sem memória, e sem isto a última
+           palavra dita antes da pausa se perderia. */
+        if (parcial.trim()) {
+          const juntado = juntarFalas(fechados, parcial)
+          fechados.splice(0, fechados.length, juntado)
+          parcial = ''
+        }
+        try {
+          m.start(comoOuvir)
+          return
+        } catch (e) {
+          /* Não conseguiu reabrir: entrega o que tem, que é melhor do que
+             perder a frase. */
+          falha('A escuta não recomeçou.', e)
+        }
+      }
+
       terminou = true
       desligar()
       if (cancelada) return
@@ -237,17 +311,7 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
   )
 
   try {
-    m.start({
-      lang: 'pt-BR',
-      interimResults: true,
-      /* Contínua: ela fala com pausas ("marca um lembrete... pras oito...").
-         Sem isto o reconhecedor encerra na primeira respirada e corta a
-         frase ao meio. Quem encerra é o botão, ou o `parar`. */
-      continuous: true,
-      requiresOnDeviceRecognition: true,
-      addsPunctuation: true,
-      contextualStrings: op.palavras ?? PALAVRAS_DA_NUTRI,
-    })
+    m.start(comoOuvir)
   } catch (e) {
     desligar()
     falha('O reconhecimento no aparelho recusou começar.', e)
@@ -260,6 +324,8 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
        fora. Os dois existem porque a barra tem os dois gestos: "pronto" e
        "cancelar". */
     parar: () => {
+      /* ANTES do `stop`: é o que impede o `end` de recomeçar a escuta. */
+      pediuParar = true
       try {
         m.stop()
       } catch (e) {
@@ -268,6 +334,7 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
     },
     cancelar: () => {
       cancelada = true
+      pediuParar = true
       try {
         m.abort()
       } catch (e) {

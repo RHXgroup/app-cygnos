@@ -178,6 +178,25 @@ export function Ditado({
    * tempo: sem o esmaecimento, o desenho vira um gráfico parado que se
    * reorganiza sozinho. */
   const [ondas, setOndas] = useState<number[]>([])
+
+  /* Quantos segundos a escuta do APARELHO já dura. Contado aqui, e não pedido
+     ao gravador: neste caminho não existe gravador -- quem ouve é o
+     reconhecedor do celular, e ele não conta tempo.
+
+     Um `setInterval` de um segundo só enquanto está ouvindo: fora disso ele é
+     desligado, para não re-renderizar a tela da Aurora de graça (foi assim que
+     a conversa do paciente ganhou o pisca-pisca das fotos). */
+  const [segundosOuvindo, setSegundosOuvindo] = useState(0)
+  useEffect(() => {
+    if (estado !== 'ouvindo') {
+      setSegundosOuvindo(0)
+      return
+    }
+    const comecou = Date.now()
+    setSegundosOuvindo(0)
+    const id = setInterval(() => setSegundosOuvindo(Math.floor((Date.now() - comecou) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [estado])
   /* Quantas barras cabem. Medido, e não fixo: o mesmo componente aparece na
      tela de escrever refeição e na de contar o plano, com larguras diferentes,
      e sobra de barra sairia pela direita. */
@@ -403,17 +422,19 @@ export function Ditado({
   }
 
   if (estado === 'ouvindo' && compacto) {
-    /* Sem cronômetro: não há gravador ligado para medir. O que diz que ele
-       está ouvindo é o texto aparecendo no campo ao lado -- que é justamente o
-       que este caminho existe para fazer. */
+    /* O TEMPO CORRENDO, como no gravador de mensagem.
+       "Deixa o gravador dela igual o de mensagem: ali ele começa a carregar os
+       minutinhos. Aqui fica só uma bolinha e mais nada."
+       Aqui não há gravador para perguntar a duração -- quem ouve é o
+       reconhecedor do aparelho --, então o relógio conta desde o toque. */
     return (
       <Pressable
         onPress={parar}
         style={({ pressed }) => [styles.redondo, styles.redondoGravando, pressed && styles.pressionado]}
         accessibilityRole="button"
-        accessibilityLabel="Parar de ouvir"
+        accessibilityLabel={'Parar de ouvir. ' + mmss(segundosOuvindo)}
       >
-        <Ionicons name="stop" size={16} color={paleta().cores.erroTexto} />
+        <Text style={styles.relogioCompacto}>{mmss(segundosOuvindo)}</Text>
       </Pressable>
     )
   }
@@ -428,7 +449,8 @@ export function Ditado({
       >
         <View style={styles.linhaGravando}>
           <View style={styles.ponto} />
-          <Text style={styles.textoGravando}>Ouvindo -- o texto aparece enquanto você fala</Text>
+          <Text style={styles.relogio}>{mmss(segundosOuvindo)}</Text>
+          <Text style={styles.textoGravando}>o texto aparece enquanto você fala</Text>
         </View>
         <View style={styles.pararLinha}>
           <Ionicons name="stop-circle" size={18} color={paleta().cores.erroTexto} />

@@ -133,6 +133,10 @@ export function ConversasDaNutriScreen({
   const [anexo, setAnexo] = useState<AnexoPendente | null>(null)
   const [menuDeAnexo, setMenuDeAnexo] = useState(false)
   const [gravando, setGravando] = useState(false)
+  /* A foto aberta em tela cheia, ou nula. Guarda o ENDEREÇO já assinado que o
+     balão conseguiu -- assinar de novo aqui seria uma segunda ida à rede para
+     ver o que já está na tela. */
+  const [fotoGrande, setFotoGrande] = useState<string | null>(null)
 
   /* Falso até a primeira leitura voltar. Ver o efeito que avisa o pai. */
   const jaCarregou = useRef(false)
@@ -218,6 +222,10 @@ export function ConversasDaNutriScreen({
       /* A gravação e o menu são o degrau mais de dentro. O anexo esperando
          NÃO sai com o voltar: é trabalho dela -- para tirar, há o X da
          prévia. */
+      if (fotoGrande) {
+        setFotoGrande(null)
+        return true
+      }
       if (gravando) {
         setGravando(false)
         return true
@@ -503,7 +511,7 @@ export function ConversasDaNutriScreen({
           )}
 
           {fio.map(m => (
-            <Balao key={m.id} mensagem={m} autor={aberta.nome} />
+            <Balao key={m.id} mensagem={m} autor={aberta.nome} onAmpliar={setFotoGrande} />
           ))}
         </ScrollView>
 
@@ -669,6 +677,25 @@ export function ConversasDaNutriScreen({
           </>
           )}
         </View>
+
+        {/* ──────────────────── A FOTO EM TELA CHEIA ────────────────────
+            "Quando eu clico na foto não consigo aumentar ela, fica
+            pequenininha." O balão mostra 200 por 200: serve para saber que
+            chegou uma foto, e não para ler o rótulo de um produto ou olhar a
+            marmita. Toque abre aqui, e qualquer toque fecha. */}
+        {!!fotoGrande && (
+          <Pressable
+            style={styles.fotoCheia}
+            onPress={() => setFotoGrande(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Fechar a foto"
+          >
+            <Image source={{ uri: fotoGrande }} style={styles.imagemCheia} resizeMode="contain" />
+            <View style={[styles.fecharFoto, { top: top + 8 }]}>
+              <Ionicons name="close" size={26} color={paleta().cores.branco} />
+            </View>
+          </Pressable>
+        )}
       </View>
     )
   }
@@ -813,7 +840,15 @@ function OpcaoDeAnexo({
 
 /* ──────────────────── UM BALÃO ──────────────────── */
 
-function Balao({ mensagem, autor }: { mensagem: MensagemDaConversa; autor: string }) {
+function Balao({
+  mensagem,
+  autor,
+  onAmpliar,
+}: {
+  mensagem: MensagemDaConversa
+  autor: string
+  onAmpliar: (endereco: string) => void
+}) {
   const styles = estilos()
   /* "Minha" é a mensagem DELA: esta tela é a dela. No app do paciente a mesma
      palavra quer dizer o contrário -- e é por isso que a comparação fica aqui,
@@ -841,14 +876,20 @@ function Balao({ mensagem, autor }: { mensagem: MensagemDaConversa; autor: strin
     <View style={[styles.balao, minha ? styles.balaoMeu : styles.balaoDela]}>
       {mensagem.anexoTipo === 'foto' &&
         (foto && foto !== fotoFalhou ? (
-          <Image
-            source={{ uri: foto }}
-            style={styles.fotoDoBalao}
-            resizeMode="cover"
-            /* Guarda QUAL endereço falhou, e não um booleano: um endereço novo
-               -- reassinado depois de vencer -- entra tentando de novo. */
-            onError={() => setFotoFalhou(foto)}
-          />
+          <Pressable
+            onPress={() => onAmpliar(foto)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Abrir a foto em tela cheia"
+          >
+            <Image
+              source={{ uri: foto }}
+              style={styles.fotoDoBalao}
+              resizeMode="cover"
+              /* Guarda QUAL endereço falhou, e não um booleano: um endereço novo
+                 -- reassinado depois de vencer -- entra tentando de novo. */
+              onError={() => setFotoFalhou(foto)}
+            />
+          </Pressable>
         ) : (
           <View style={styles.fotoQuebrada}>
             <Ionicons name="image-outline" size={18} color={paleta().inkFraco} />
@@ -1013,6 +1054,20 @@ const estilos = estilosDe(t =>
     horaDoBalaoMeu: { color: t.cores.branco, opacity: 0.75 },
 
     fotoDoBalao: { width: 200, height: 200, borderRadius: 10, backgroundColor: t.cores.trilho },
+    fotoCheia: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      /* Preto, e não o fundo do tema: a foto é o assunto, e qualquer cor em
+         volta muda como a gente lê a cor da comida. */
+      backgroundColor: '#000000',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    imagemCheia: { width: '100%', height: '100%' },
+    fecharFoto: { position: 'absolute', right: 14 },
     fotoQuebrada: {
       width: 200,
       height: 90,
