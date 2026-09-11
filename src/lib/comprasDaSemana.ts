@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import { dataISO } from './formatar'
 import { somar, type ItemDeCompra } from './somaDasCompras'
 
 export type { ItemDeCompra }
@@ -55,7 +56,11 @@ export async function comprasDaSemana(agora: Date = new Date()): Promise<Resulta
   const ate = new Date(de)
   ate.setDate(ate.getDate() + DIAS)
 
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  /* O dia DO APARELHO, e não o de Greenwich. `toISOString` acertava por sorte:
+     meia-noite de Brasília é 03h em UTC, ainda o mesmo dia. Um fuso a leste
+     de Greenwich -- ou a meia-noite trocada por "agora", numa edição futura --
+     e a semana começaria um dia antes, sem erro nenhum na tela. */
+  const iso = dataISO
 
   const { data: atividades, error } = await supabase
     .from('atividades_terapeuticas')
