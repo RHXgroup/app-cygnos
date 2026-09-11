@@ -198,16 +198,50 @@ const DA_AURORA = [
      42501 -- e é bom lembrar que "existe e está barrada" continua não sendo o
      mesmo que "responde". */
   ['app_dados_do_paciente', ['p_paciente_id']],
+  /* As sete de baixo faltavam, e a lista dizia cobrir "as funções que a Aurora
+     chama". Quatro ferramentas entraram lá (responder pedido, remarcar,
+     cancelar, mandar recado) sem ninguém lembrar daqui -- que é exatamente o
+     custo da lista à mão que o comentário acima aceita pagar. E três nem são
+     ferramenta: o `index.ts` da função as chama direto, para saber quem é,
+     montar o painel do dia e medir a própria resposta. Achado na terceira
+     rodada de testes, comparando esta lista com todo `rpc(` e todo `nome:
+     'app_` dos dois arquivos do servidor.
+
+     Cinco delas o app TAMBÉM chama, e por isso já eram conferidas -- o buraco
+     de verdade era `app_aurora_mandar_recado` e `aurora_medir`. Ficam as sete
+     assim mesmo: no dia em que o app parar de chamar uma, a Aurora continua
+     chamando, e a conferência não pode ir embora junto. A saída tira a
+     repetição (ver `chamadas`).
+
+     Para a próxima: `grep -oE "nome: 'app_\w+|rpc\('\w+"` em
+     `_shared/ferramentas.ts` e `app-aurora-nutri/index.ts`, e conferir que
+     cada nome está aqui. */
+  ['app_responder_pedido', ['p_consulta_id', 'p_aceitar', 'p_motivo']],
+  ['app_remarcar_consulta', ['p_consulta_id', 'p_nova_data_hora', 'p_duracao']],
+  ['app_cancelar_consulta', ['p_consulta_id', 'p_motivo']],
+  ['app_aurora_mandar_recado', ['p_paciente_id', 'p_texto']],
+  ['app_quem_sou', []],
+  ['aurora_carteira_triagem', []],
+  ['aurora_medir',
+    ['p_onde', 'p_ferramenta', 'p_desfecho', 'p_voltas', 'p_mandou_pro_computador']],
 ]
 
+/* Uma linha por função: a mesma chamada pelo app e pela Aurora aparecia duas
+   vezes, e uma lista com repetição é lida por cima -- que é quando o "EXECUTA
+   SEM LOGIN" de uma delas passa sem ser visto. Fica a do app, que traz o
+   arquivo de onde a chamada sai. */
+const doApp = chamadasDoApp()
+const jaNoApp = new Set(doApp.map(([nome]) => nome))
 const chamadas = [
-  ...chamadasDoApp(),
-  ...DA_AURORA.map(([nome, args]) => [nome, { args, arquivo: 'app-aurora-nutri (servidor)' }]),
+  ...doApp,
+  ...DA_AURORA
+    .filter(([nome]) => !jaNoApp.has(nome))
+    .map(([nome, args]) => [nome, { args, arquivo: 'app-aurora-nutri (servidor)' }]),
 ].sort(([a], [b]) => a.localeCompare(b))
 
 console.log(
   `\n${chamadas.length} chamadas de RPC` +
-  ` (${chamadas.length - DA_AURORA.length} no src/lib, ${DA_AURORA.length} pela Aurora, no servidor)\n`,
+  ` (${doApp.length} no src/lib, ${chamadas.length - doApp.length} só pela Aurora, no servidor)\n`,
 )
 
 let ausentes = 0

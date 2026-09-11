@@ -38,7 +38,9 @@ export function somar(linhas: Record<string, unknown>[]): ItemDeCompra[] {
     const chave = nome.toLowerCase() + '|' + (unidade ?? '').toLowerCase()
 
     const qtd = Number(l.quantidade)
-    const atv = Number(l.atividade_id)
+    /* `Number(null)` é 0, e zero é finito: uma linha sem sessão contava como a
+       sessão "0". Achado por força bruta. */
+    const atv = l.atividade_id == null ? NaN : Number(l.atividade_id)
 
     const atual = mapa.get(chave)
     if (!atual) {
