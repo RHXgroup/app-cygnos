@@ -18,6 +18,11 @@ import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
 import { apagarAviso, avisosPendentes, criarAviso, type Aviso } from '../lib/avisosDaNutri'
 import { quandoDoAviso, quandoPorExtenso } from '../lib/quandoDoAviso'
+import {
+  estadoDasNotificacoes,
+  ligarNotificacoes,
+  type EstadoDasNotificacoes,
+} from '../lib/lembretes'
 
 /* O resto: o dinheiro do dia inteiro, as ferramentas, e a saída.
  *
@@ -266,9 +271,17 @@ function MeusAvisos() {
   const [quando, setQuando] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [recado, setRecado] = useState('')
+  /* Nulo até a primeira leitura: sem ele, a linha nasceria dizendo
+     "desligadas" por um instante e piscaria para "ligadas" -- e quem vê o
+     vermelho piscar acha que desligou alguma coisa. */
+  const [notificacao, setNotificacao] = useState<EstadoDasNotificacoes | null>(null)
 
   const reler = useCallback(() => {
     void avisosPendentes().then(setAvisos)
+    /* Relê o estado junto. É o caminho de volta de 'bloqueadas': o botão abre
+       a configuração do telefone, ela liga lá e volta -- e sem reler aqui a
+       linha continuaria dizendo que está bloqueado. */
+    void estadoDasNotificacoes().then(setNotificacao)
   }, [])
 
   useEffect(reler, [reler])
@@ -318,6 +331,44 @@ function MeusAvisos() {
   return (
     <View style={styles.cartao}>
       <Text style={styles.rotuloDoBloco}>MEUS AVISOS</Text>
+
+      {/* —— AS NOTIFICAÇ~OT~ES, no mesmo cartão dos avisos ——
+          Pedido dele: "igual o do paciente, que você vai lá na parte do mais e
+          coloca que você permite as notificações".
+
+          AQUI, e não numa seção própria: sem notificação nenhum aviso deste
+          cartão toca, então é o primeiro lugar em que ela precisa ver que está
+          desligado. Uma linha de "Notificações" longe dos avisos seria
+          descoberta depois de o primeiro lembrete não tocar.
+
+          E some quando está tudo certo -- uma linha verde dizendo "ligadas"
+          todo dia é ruído. Só aparece quando há o que fazer. */}
+      {notificacao !== null && notificacao !== 'ligadas' && (
+        <Pressable
+          onPress={async () => setNotificacao(await ligarNotificacoes())}
+          style={({ pressed }) => [styles.notificacao, pressed && styles.pressionado]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            notificacao === 'bloqueadas'
+              ? 'Abrir as configurações do telefone para ligar as notificações'
+              : 'Ligar as notificações'
+          }
+        >
+          <Ionicons name="notifications-off-outline" size={20} color={paleta().cores.ink} />
+          <View style={styles.textosDaOpcao}>
+            <Text style={styles.tituloDaOpcao}>Notificações desligadas</Text>
+            <Text style={styles.textoDaOpcao}>
+              {notificacao === 'bloqueadas'
+                /* Diz o que VAI acontecer ao tocar, e não o que ela tem de
+                   fazer. "Abre as configurações" é o botão fazendo; "vá nas
+                   configurações" era a frase que ele achou difícil. */
+                ? 'Toque para abrir as configurações e ligar. Sem isso, nenhum aviso toca.'
+                : 'Toque para ligar. Sem isso, nenhum aviso toca.'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={paleta().inkFraco} />
+        </Pressable>
+      )}
 
       {avisos.map(a => (
         <View key={a.id} style={styles.aviso}>
@@ -493,6 +544,19 @@ const estilos = estilosDe(t =>
     },
 
     opcao: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
+    /* O mesmo desenho de `opcao`, com fundo: é a única linha deste cartão que
+       pede ação, e precisa se distinguir dos avisos que só se leem. Menta, e
+       não vermelho -- não é erro dela, e vermelho ensinaria que é. */
+    notificacao: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      marginBottom: 8,
+      borderRadius: 12,
+      backgroundColor: t.cores.verdeMenta,
+    },
     textosDaOpcao: { flex: 1 },
     tituloDaOpcao: { fontSize: 15, color: t.cores.ink },
     textoDaOpcao: { fontSize: 12.5, color: t.inkFraco, marginTop: 1 },

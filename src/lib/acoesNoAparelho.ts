@@ -100,8 +100,13 @@ async function avisar(acao: AcaoPendente): Promise<RespostaDaAurora> {
     return {
       tipo: 'erro',
       mensagem:
-        'O aparelho não deixou avisar, então não criei nada. Ligue as ' +
-        'notificações do Cygnos nas configurações do telefone e me peça de novo.',
+        /* Aponta para Mais, e não para "as configurações do telefone".
+           Em Mais o botão LEVA até a página certa -- e "vá nas
+           configurações" era a frase que ele achou difícil demais, com
+           razão: são cinco toques numa árvore que cada fabricante organiza de
+           um jeito. */
+        'As notificações estão desligadas, então não criei nada. Toque em ' +
+        'Mais › Notificações para ligar, e me peça de novo.',
     }
   }
 

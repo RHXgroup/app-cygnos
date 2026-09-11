@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { LogBox, Platform } from 'react-native'
+import { Linking, LogBox, Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 import { falha } from './erros'
 import { moduloProtegido } from './moduloProtegido'
@@ -390,6 +390,80 @@ export async function precisaExplicarNotificacao(): Promise<boolean> {
   const Notifications = await notificacoes()
   const p = await Notifications.getPermissionsAsync()
   return !p.granted && p.canAskAgain !== false
+}
+
+/* ———————— AS TR~EA~S SITUAÇ~OT~ES, e o que fazer em cada uma ————————
+ *
+ * Relatado pela nutricionista, depois de confirmar um lembrete na Aurora e
+ * receber "o aparelho não deixou avisar, ligue nas configurações do
+ * telefone":
+ *
+ *   "não é igual o do paciente que você vai lá na parte do mais e coloca
+ *    que você permite as notificações, tem que ser assim. É bem mais fácil."
+ *
+ * E ele tem razão pela metade: o do paciente TEM o interruptor, mas quando o
+ * telefone já bloqueou de vez ele também só manda caçar a configuração. Aqui
+ * as três situações são separadas porque cada uma pede um gesto diferente:
+ *
+ *   'ligadas'    -- nada a fazer, e a tela diz isso.
+ *   'perguntar'  -- o sistema ainda mostra a caixa dele. Um toque basta.
+ *   'bloqueadas' -- o sistema NÃO pergunta mais (`canAskAgain` falso), e
+ *                   pedir de novo volta "negado" na hora, sem caixa nenhuma.
+ *                   O único caminho é a configuração do telefone -- e em vez de
+ *                   dizer "vá lá", o botão LEVA lá, na página do aplicativo.
+ *
+ * No Expo Go a permissão é do EXPO GO, dividida entre todos os projetos (ver
+ * a seção do build no AGENTS). Recusar uma vez em qualquer projeto bloqueia
+ * aqui também -- e é por isso que 'bloqueadas' aparece sem ela lembrar de ter
+ * recusado nada. */
+export type EstadoDasNotificacoes = 'ligadas' | 'perguntar' | 'bloqueadas'
+
+export async function estadoDasNotificacoes(): Promise<EstadoDasNotificacoes> {
+  try {
+    const p = await (await notificacoes()).getPermissionsAsync()
+    /* `?.` porque o embrulho protegido devolve `undefined` para o que o módulo
+       não tiver no Expo Go -- e ler `.granted` de nada derrubaria a tela Mais
+       inteira por causa de uma linha de status. */
+    if (p?.granted) return 'ligadas'
+    return p?.canAskAgain === false ? 'bloqueadas' : 'perguntar'
+  } catch {
+    /* Sem conseguir perguntar, 'perguntar' é o estado honesto: o botão tenta,
+       e o resultado diz o resto. 'bloqueadas' mandaria para a configuração
+       sem motivo. */
+    return 'perguntar'
+  }
+}
+
+/**
+ * Faz o que a situação pede: pergunta, ou abre a configuração do telefone.
+ * Devolve o estado DEPOIS, para a tela não precisar adivinhar.
+ */
+export async function ligarNotificacoes(): Promise<EstadoDasNotificacoes> {
+  const antes = await estadoDasNotificacoes()
+  if (antes === 'ligadas') return 'ligadas'
+
+  if (antes === 'bloqueadas') {
+    /* Direto na página do aplicativo nas configurações, e não na tela
+       inicial delas. A diferença é o que ele pediu: "vai lá" é cinco toques
+       numa árvore que cada fabricante organiza de um jeito. Na volta, a tela
+       relê o estado sozinha (AppState). */
+    try {
+      await Linking.openSettings()
+    } catch (e) {
+      falha('Não consegui abrir as configurações do telefone.', e)
+    }
+    return 'bloqueadas'
+  }
+
+  try {
+    const N = await notificacoes()
+    const r = await N.requestPermissionsAsync()
+    if (r?.granted) return 'ligadas'
+    return r?.canAskAgain === false ? 'bloqueadas' : 'perguntar'
+  } catch (e) {
+    falha('Não consegui pedir a permissão de notificação.', e)
+    return 'perguntar'
+  }
 }
 
 async function temPermissao(): Promise<boolean> {
