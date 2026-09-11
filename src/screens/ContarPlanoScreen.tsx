@@ -17,6 +17,7 @@ import { carregarIntencoes, lerIntencao, marcarCumprida, salvarIntencoes, apagar
 import type { Convertida, Intencao, TipoIntencao } from '../lib/intencaoDaIA'
 import { estilosDe, paleta } from '../lib/tema'
 import { Botao } from '../components/Botao'
+import { dataISO } from '../lib/formatar'
 import { TelaComTeclado } from '../components/TelaComTeclado'
 
 /* Contar um plano: o que vai acontecer, e não o que aconteceu.
@@ -93,7 +94,14 @@ export function ContarPlanoScreen({
      arrastaria estado por três componentes que não usam. */
   const [nomesDasRefeicoes, setNomesDasRefeicoes] = useState<string[]>([])
 
-  const hoje = new Date().toISOString().slice(0, 10)
+  /* O dia do APARELHO, e nao o de Greenwich.
+     Era `new Date().toISOString().slice(0, 10)`, que converte para UTC antes de
+     cortar: a partir das 21h de Brasilia ele ja devolve AMANHA. E esta e a tela
+     em que a pessoa conta o dia dela -- "hoje almocei fora", dito as 21h30, ia
+     parar no plano de amanha, e o rotulo "hoje" da propria tela apontaria para o
+     dia seguinte. `dataISO` monta campo a campo pelo relogio do celular, que e
+     o que o comentario dela em `formatar.ts` explica. */
+  const hoje = dataISO(new Date())
 
   useEffect(() => {
     let vivo = true

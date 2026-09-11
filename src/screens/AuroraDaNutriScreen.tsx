@@ -27,7 +27,7 @@ import {
   O_QUE_ELA_FAZ,
   PERGUNTAS_DE_EXEMPLO,
   RESPOSTA_DO_MENU,
-  resumoDoDia,
+  fraseDeAberturaDaAurora,
   semRestos,
   ehPedidoDeMenu,
 } from '../lib/menuDaAurora'
@@ -346,7 +346,7 @@ export function AuroraDaNutriScreen({
     ...PERGUNTAS_DE_EXEMPLO,
   ]
 
-  const oResumo = resumoDoDia({ consultas: consultasHoje, semConfirmar: aConfirmar, pedidos })
+  const oResumo = fraseDeAberturaDaAurora({ consultas: consultasHoje, semConfirmar: aConfirmar, pedidos })
 
   const vazia = falas.length === 0
   /* Cartão esperando decisão. Enquanto houver um, nada mais é oferecido. */
@@ -409,7 +409,7 @@ export function AuroraDaNutriScreen({
             <Text style={styles.tituloAbertura}>O que você quer resolver agora?</Text>
             {/* O que ela responderia se fosse perguntada, dito antes de ser
                 perguntada -- e é o que explica os chips logo abaixo. */}
-            {oResumo ? <Text style={styles.resumoDoDia}>{oResumo}</Text> : null}
+            {oResumo ? <Text style={styles.fraseDeAberturaDaAurora}>{oResumo}</Text> : null}
             {/* Dito por escrito, e antes da primeira pergunta. Sem isto a
                 primeira coisa que se pede é justamente o que ela não faz --
                 "remarca a Maria" --, e uma recusa de saída ensina em dez
@@ -692,7 +692,7 @@ const estilos = estilosDe(t =>
        de parágrafo. */
     /* Em negrito e no acento: é a única linha da abertura que muda todo dia, e
        precisa se distinguir do texto explicativo, que é sempre o mesmo. */
-    resumoDoDia: { fontSize: 14.5, fontWeight: '700', color: t.cores.verde, marginTop: 2 },
+    fraseDeAberturaDaAurora: { fontSize: 14.5, fontWeight: '700', color: t.cores.verde, marginTop: 2 },
     tituloAbertura: {
       fontFamily: FONTE.forte,
       fontSize: 25,

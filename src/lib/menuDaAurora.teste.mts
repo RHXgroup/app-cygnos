@@ -1,6 +1,6 @@
 import {
   ehPedidoDeMenu,
-  resumoDoDia,
+  fraseDeAberturaDaAurora,
   semRestos,
   O_QUE_ELA_FAZ,
   PERGUNTAS_DE_EXEMPLO,
@@ -76,11 +76,13 @@ function ok(nome: string, condicao: boolean, detalhe = '') {
   ok('e que marca tags', /tags/.test(O_QUE_ELA_FAZ))
   ok('e que cria lembrete no telefone', /lembrete/.test(O_QUE_ELA_FAZ))
 
-  /* O outro lado da frase, e ele também mente se ninguém olhar: confirmar
-     consulta NÃO tem ferramenta, e foi pedir isso que fez a nutri receber uma
-     resposta sobre a fila de pedidos, que é outra coisa. No dia em que a
-     ferramenta existir, esta linha cai junto com o texto. */
+  /* O outro lado da frase, e ele também mente se ninguém olhar. Este
+     comentário mesmo já mentiu: dizia que CONFIRMAR consulta era o que faltava,
+     e continuou dizendo depois que `confirmar_consultas` entrou no ar. Hoje o
+     que resta no computador é o relatório -- e quando ele sair de lá, esta
+     linha cai junto com o texto. */
   ok('diz o que ainda é no computador', /no computador/.test(O_QUE_ELA_FAZ))
+  ok('e não promete mais que confirmar é no computador', !/[Cc]onfirmar consulta/.test(O_QUE_ELA_FAZ))
 
   /* Esta linha cobrava "quantos" por uma hora, e estava certa: a triagem
      mandava ao modelo só a contagem, e prometer nomes seria mentira. Com a
@@ -124,7 +126,7 @@ function ok(nome: string, condicao: boolean, detalhe = '') {
 // ── 6. A primeira linha da abertura ──────────────────────────────────────────
 {
   const r = (consultas: number, semConfirmar: number, pedidos: number) =>
-    resumoDoDia({ consultas, semConfirmar, pedidos })
+    fraseDeAberturaDaAurora({ consultas, semConfirmar, pedidos })
 
   ok('dia cheio com pendente e pedido',
      r(6, 2, 3) === '6 consultas hoje, 2 sem confirmar, 3 pedidos esperando você.', String(r(6, 2, 3)))

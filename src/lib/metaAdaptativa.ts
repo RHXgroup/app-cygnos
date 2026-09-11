@@ -169,5 +169,10 @@ const DIRECAO: Record<string, ObjetivoDePeso> = {
   ganho_peso: 'ganhar',
 }
 
+/* `Object.hasOwn`, e não o índice cru: o mapa é um objeto comum, e objeto comum
+   HERDA. `DIRECAO['constructor']` devolve a função Object, que não é nula --
+   achado por força bruta, com cinco mil entradas sorteadas. Nenhum objetivo do
+   banco se chama "constructor" hoje; a armadilha 10 existe justamente para o
+   dia em que um valor novo aparece na coluna. */
 export const direcaoDoObjetivo = (chave: string | null | undefined): ObjetivoDePeso | null =>
-  chave ? DIRECAO[chave] ?? null : null
+  chave && Object.hasOwn(DIRECAO, chave) ? DIRECAO[chave] : null

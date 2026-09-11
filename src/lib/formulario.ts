@@ -34,7 +34,16 @@ export function mascaraData(v: string): string {
 /* Quantidade com vírgula: "1,5 xícara". Uma vírgula só, e no máximo uma casa —
    meia colher existe, um terço de colher não é como ninguém mede na cozinha. */
 export function mascaraQuantidade(v: string): string {
-  const limpo = v.replace(/[^0-9,]/g, '')
+  /* O PONTO vira vírgula antes do filtro, e não é descartado com ele.
+   *
+   * O campo usa `decimal-pad`, e a tecla de separador desse teclado segue o
+   * idioma do CELULAR, não o do app: em aparelho configurado em inglês -- e em
+   * vários teclados de fábrica mesmo em português -- ela é um ponto. O filtro
+   * antigo aceitava só vírgula, então "1.5" perdia o ponto calado e virava 15:
+   * dez vezes a porção, sem erro nenhum na tela. É a armadilha 3 do AGENTS com o
+   * sinal trocado -- oferecer um teclado com separador para um campo que
+   * descarta o separador. */
+  const limpo = v.replace(/\./g, ',').replace(/[^0-9,]/g, '')
   const [inteiro, ...resto] = limpo.split(',')
   const cortado = inteiro.slice(0, 4)
   if (resto.length === 0) return cortado

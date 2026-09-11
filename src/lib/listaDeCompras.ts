@@ -107,8 +107,10 @@ const SECAO_DO_GRUPO: Record<string, string> = {
   'Bebidas (alcoólicas e não alcoólicas)': 'Bebidas',
 }
 
+/* `Object.hasOwn`: um grupo chamado "constructor" devolveria a função Object
+   pelo índice cru, e a tela desenharia o código-fonte dela como nome de corredor. */
 export const secaoDoGrupo = (grupo: string | null | undefined): string =>
-  (grupo && SECAO_DO_GRUPO[grupo]) || SEM_SECAO
+  grupo && Object.hasOwn(SECAO_DO_GRUPO, grupo) ? SECAO_DO_GRUPO[grupo] : SEM_SECAO
 
 /* Nome e marca identificam o produto na prateleira. Sem acento e sem caixa,
    porque "Aveia" e "aveia" são o mesmo pacote. */
@@ -142,6 +144,14 @@ export function listaDeCompras(
   const porChave = new Map<string, ItemDeCompra & { vistoEm: Set<string> }>()
 
   const juntar = (a: VariacaoSalva, refeicaoId: string, alternativa: boolean) => {
+    /* Item sem nome não entra. Achado por força bruta: um item do plano com nome
+       vazio virava uma linha em branco com "300 g" do lado -- trezentos gramas
+       de quê? Uma linha dessas não se compra, e ainda juntaria TODOS os itens
+       sem nome numa só, porque a chave deles é igual. O defeito está no plano,
+       e o lugar de consertar é lá; aqui, o que não dá para comprar não ocupa a
+       lista. */
+    if (!a.nome.trim()) return
+
     const chave = chaveDeCompra(a.nome, a.marca)
     const atual = porChave.get(chave)
 

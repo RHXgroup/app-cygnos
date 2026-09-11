@@ -204,7 +204,7 @@ export const semRestos = (texto: string): string =>
  * NÃO vira painel: o painel é a tela do lado, com a agenda inteira. Aqui é a
  * frase que justifica a conversa começar. Se um dia isto crescer para três
  * linhas, cresceu para o lugar errado. */
-export function resumoDoDia(dia: {
+export function fraseDeAberturaDaAurora(dia: {
   consultas: number
   semConfirmar: number
   pedidos: number
