@@ -13,6 +13,7 @@ import {
   transcrever,
   type AssuntoDoAudio,
 } from '../lib/voz'
+import { baixarPortugues, ouvirNoAparelho, type Escuta } from '../lib/ditadoNoAparelho'
 import { estilosDe, paleta } from '../lib/tema'
 import { Confirmacao } from './Confirmacao'
 import { BotaoDeVoz } from './BotaoDeVoz'
@@ -31,7 +32,34 @@ import { BotaoDeVoz } from './BotaoDeVoz'
  * que está pensando — a transcrição leva alguns segundos, e sem aviso a pessoa
  * aperta de novo e grava por cima. */
 
-type Estado = 'parado' | 'gravando' | 'enviando'
+/* `ouvindo` é o quarto, e ele não é "gravando": no reconhecimento do próprio
+   celular não há arquivo, cronômetro nem onda -- o gravador nem está ligado. Se
+   ele reaproveitasse a tela de `gravando`, a onda ficaria reta e o relógio em
+   0:00 com a pessoa falando, e a própria tela diz que onda reta quer dizer
+   "o áudio não está entrando". A tela mentiria sobre o que ela mesma mede. */
+type Estado = 'parado' | 'gravando' | 'ouvindo' | 'enviando'
+
+/* ──────────────────── QUEM OUVE PELO PRÓPRIO CELULAR ────────────────────
+ *
+ * Só o lado da nutricionista, por enquanto: a Aurora e o recado. Foi dali que
+ * veio o pedido ("escrever enquanto eu falo") e foi ali que a lentidão foi
+ * medida -- o Whisper levando de 5 a 19,5 s para 6 a 9 s de fala.
+ *
+ * O paciente continua no servidor, e é decisão, não esquecimento. A lista de
+ * palavras que o reconhecedor recebe é a da NUTRICIONISTA (verbos de agenda,
+ * "Cygnos", "Aurora"); sem uma lista de comida no lugar, quem dita o almoço
+ * receberia um reconhecedor enviesado para comando. O servidor, ao contrário,
+ * já tem o contexto de refeição afinado. Muda quando houver a lista certa. */
+const OUVE_NO_APARELHO: ReadonlySet<AssuntoDoAudio> = new Set(['nutri', 'recado'])
+
+/* Este celular já mostrou que não ouve sozinho, nesta sessão. Guardado fora do
+   componente porque a tela da Aurora monta e desmonta -- e tentar de novo a cada
+   toque seria pagar a mesma recusa toda vez antes de cair no servidor. */
+let semEscutaNoAparelho = false
+
+/* Oferecer o download do português UMA vez por sessão. Oferta que volta a cada
+   toque vira atrito, e atrito vira "desligo isso". */
+let jaOfereceuPortugues = false
 
 /* A onda. Barra fina e espaçada porque o que importa é o RELEVO — barra grossa
    colada vira um bloco cheio, e um bloco cheio não mostra sílaba. */
@@ -43,6 +71,7 @@ const ALTURA_MAX = 26
 export function Ditado({
   onTexto,
   onErro,
+  onParcial,
   assunto = 'refeicao',
   compacto = false,
 }: {
@@ -50,6 +79,14 @@ export function Ditado({
      já tem coisa escrita. */
   onTexto: (texto: string) => void
   onErro: (mensagem: string) => void
+  /* O texto até agora, a cada pedaço, quando o celular ouve sozinho. É o que
+     faz escrever ENQUANTO ela fala.
+
+     Vem a frase INTEIRA a cada vez, e não o pedaço novo: "remarca", depois
+     "remarca a", depois "remarca a consulta". A tela SUBSTITUI o que estava,
+     nunca acrescenta -- senão o campo vira "remarca remarca a remarca a
+     consulta". No fim chega `onTexto` com a frase final, como sempre. */
+  onParcial?: (texto: string) => void
   /* Qual vocabulário o servidor deve esperar. Padrão 'refeicao' porque é o que
      as duas telas que já usam este componente pedem — acrescentar o parâmetro
      não pode mudar o que elas fazem hoje. */
@@ -81,6 +118,18 @@ export function Ditado({
    * "não ouviu": apertar o play. */
   const [gravacaoMuda, setGravacaoMuda] = useState<string | null>(null)
 
+  /* A escuta do próprio celular, quando ela está aberta. Referência e não
+     estado: `parar` precisa dela no mesmo instante do toque. */
+  const escuta = useRef<Extract<Escuta, { tipo: 'ouvindo' }> | null>(null)
+  /* Já chegou algum pedaço? Decide o que fazer quando o reconhecedor desiste:
+     antes de ela falar, cai no servidor sem ela perceber; depois, as palavras
+     dela se perderam, e aí ela precisa saber. */
+  const recebeuParcial = useRef(false)
+  /* A oferta do português fica para DEPOIS desta frase: aparecer com a pessoa
+     no meio da fala seria uma caixa por cima do que ela está fazendo. */
+  const ofertaPendente = useRef(false)
+  const [oferecendoPortugues, setOferecendoPortugues] = useState(false)
+
   /* O `estado` de dentro do efeito de limpeza seria o da primeira renderização,
      e a limpeza só roda no fim. Sem a referência, sair da tela gravando deixaria
      o microfone aberto. */
@@ -90,6 +139,11 @@ export function Ditado({
   useEffect(
     () => () => {
       if (gravandoAgora.current) gravador.stop().catch(() => {})
+      /* Sair da tela ouvindo não pode deixar o microfone do sistema aberto --
+         e cancelar, e não parar: parar entregaria a frase a uma tela que já
+         não existe. */
+      escuta.current?.cancelar()
+      escuta.current = null
     },
     [gravador],
   )
@@ -183,6 +237,59 @@ export function Ditado({
       return
     }
 
+    if (OUVE_NO_APARELHO.has(assunto) && !semEscutaNoAparelho) {
+      recebeuParcial.current = false
+      const e = await ouvirNoAparelho({
+        aoParcial: texto => {
+          recebeuParcial.current = true
+          onParcial?.(texto)
+        },
+        aoFinal: texto => {
+          escuta.current = null
+          setEstado('parado')
+          const limpo = texto.trim()
+          if (limpo) onTexto(limpo)
+          /* Sem "ouvir a gravação": aqui não há gravação para ouvir. A frase do
+             servidor manda tocar um áudio que não existe neste caminho. */
+          else onErro('Não ouvi nada. Fale perto do celular e tente de novo.')
+        },
+        aoErro: ({ reserva, mensagem }) => {
+          escuta.current = null
+          setEstado('parado')
+          if (reserva) {
+            /* Este celular não ouve sozinho. Lembra, para não pagar a recusa a
+               cada toque, e segue pelo servidor. */
+            semEscutaNoAparelho = true
+            if (!recebeuParcial.current) {
+              void gravarNoServidor()
+              return
+            }
+            onErro('Perdi o áudio no meio da frase. Toque no microfone de novo.')
+            return
+          }
+          onErro(mensagem)
+        },
+      })
+
+      if (e.tipo === 'ouvindo') {
+        escuta.current = e
+        setEstado('ouvindo')
+        return
+      }
+
+      /* Falta o português: ESTA frase vai pelo servidor, e a oferta de baixar
+         vem depois dela. Cair calado no servidor faria ele testar o build,
+         achar lento de novo e concluir que "escrever enquanto fala" não
+         funciona -- quando o que falta é um download de uma vez só. */
+      if (e.tipo === 'falta_portugues' && !jaOfereceuPortugues) ofertaPendente.current = true
+      /* `indisponivel` (Expo Go, celular sem reconhecedor): segue como sempre. */
+    }
+
+    await gravarNoServidor()
+  }
+
+  /* O caminho de sempre: grava o arquivo, e o servidor transcreve. */
+  async function gravarNoServidor() {
     setGravacaoMuda(null)
     setOndas([])
     pico.current = -160
@@ -197,6 +304,16 @@ export function Ditado({
   }
 
   async function parar() {
+    /* Ouvindo pelo celular: parar ENTREGA o que foi ouvido -- chega pelo
+       `aoFinal`. A referência sai antes de chamar, para um segundo toque não
+       parar a mesma escuta duas vezes. */
+    const aberta = escuta.current
+    if (aberta) {
+      escuta.current = null
+      aberta.parar()
+      return
+    }
+
     /* Marca antes de esperar: o `stop` demora o suficiente para caber um
        segundo toque, e dois `stop` seguidos derrubam o gravador. */
     setEstado('enviando')
@@ -224,6 +341,12 @@ export function Ditado({
 
     const r = await transcrever(uri, mmss, assunto)
     setEstado('parado')
+
+    if (ofertaPendente.current) {
+      ofertaPendente.current = false
+      jaOfereceuPortugues = true
+      setOferecendoPortugues(true)
+    }
 
     if (r.tipo === 'ok') {
       onTexto(r.texto)
@@ -267,6 +390,42 @@ export function Ditado({
         <ActivityIndicator size="small" color={paleta().cores.verde} />
         <Text style={styles.textoPensando}>Entendendo o que você falou…</Text>
       </View>
+    )
+  }
+
+  if (estado === 'ouvindo' && compacto) {
+    /* Sem cronômetro: não há gravador ligado para medir. O que diz que ele
+       está ouvindo é o texto aparecendo no campo ao lado -- que é justamente o
+       que este caminho existe para fazer. */
+    return (
+      <Pressable
+        onPress={parar}
+        style={({ pressed }) => [styles.redondo, styles.redondoGravando, pressed && styles.pressionado]}
+        accessibilityRole="button"
+        accessibilityLabel="Parar de ouvir"
+      >
+        <Ionicons name="stop" size={16} color={paleta().cores.erroTexto} />
+      </Pressable>
+    )
+  }
+
+  if (estado === 'ouvindo') {
+    return (
+      <Pressable
+        onPress={parar}
+        style={({ pressed }) => [styles.botao, styles.gravando, pressed && styles.pressionado]}
+        accessibilityRole="button"
+        accessibilityLabel="Parar de ouvir"
+      >
+        <View style={styles.linhaGravando}>
+          <View style={styles.ponto} />
+          <Text style={styles.textoGravando}>Ouvindo -- o texto aparece enquanto você fala</Text>
+        </View>
+        <View style={styles.pararLinha}>
+          <Ionicons name="stop-circle" size={18} color={paleta().cores.erroTexto} />
+          <Text style={styles.toqueParaParar}>Toque para parar</Text>
+        </View>
+      </Pressable>
     )
   }
 
@@ -379,6 +538,36 @@ export function Ditado({
           <Text style={styles.textoOuvir}>Ouvir a gravação</Text>
         </Pressable>
       )}
+
+      {/* ──────────────────── O PORTUGUÊS PARA OUVIR SEM INTERNET ────────────────────
+          Depois da frase, e não no meio dela. E uma vez por sessão.
+
+          O argumento é o que ela ganha, e não o que falta: o texto aparecendo
+          enquanto fala, e o áudio sem sair do celular. "Falta um pacote de
+          idioma" é a frase do sistema; ninguém baixa nada por causa dela. */}
+      <Confirmacao
+        visivel={oferecendoPortugues}
+        titulo="Escrever enquanto você fala"
+        mensagem={
+          'O seu celular pode ouvir sozinho, sem mandar o áudio para lugar nenhum -- e aí o ' +
+          'texto aparece enquanto você fala. Para isso ele precisa do português, que se baixa ' +
+          'uma vez só. Esta frase já foi pelo jeito de sempre.'
+        }
+        rotuloConfirmar="Baixar"
+        rotuloCancelar="Agora não"
+        onCancelar={() => setOferecendoPortugues(false)}
+        onConfirmar={() => {
+          setOferecendoPortugues(false)
+          void baixarPortugues().then(r => {
+            /* A caixa do sistema fala por si; as outras três precisam de frase.
+               "Agendado" não promete agora: no Android 14 o download espera
+               o Wi-Fi, e prometer "pronto" seria mentir sobre o próximo toque. */
+            if (r === 'pronto') onErro('Pronto. Da próxima vez eu já escrevo enquanto você fala.')
+            else if (r === 'agendado') onErro('O português vai ficar pronto quando o celular estiver no Wi-Fi.')
+            else if (r === 'nao_deu') onErro('Não consegui baixar o português agora. Continua funcionando do jeito de sempre.')
+          })
+        }}
+      />
 
       {/* A explicação ANTES da caixa do sistema, com a cara do app.
           A do Android não se estiliza e nem o texto dela é nosso — o que dá

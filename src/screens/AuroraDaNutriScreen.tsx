@@ -108,6 +108,18 @@ export function AuroraDaNutriScreen({
      nessa janela que o segundo toque passava. */
   const emVoo = useRef(false)
 
+  /* O que estava no campo quando ela começou a falar.
+   *
+   * O ditado do próprio celular manda a frase INTEIRA a cada pedaço, e não o
+   * pedaço novo. Juntar cada um ao campo daria "remarca remarca a remarca a
+   * consulta"; SUBSTITUIR o campo inteiro apagaria a meia frase que ela tinha
+   * digitado antes de resolver falar. O certo é guardar o começo uma vez e
+   * mostrar começo + o que está sendo ouvido, trocando só a segunda metade.
+   *
+   * Nulo fora de um ditado. Voltar a nulo no fim -- e no erro -- é o que
+   * impede o próximo ditado de herdar o começo do anterior. */
+  const baseDoDitado = useRef<string | null>(null)
+
   /* ──────────────────── O QUE O DIA PEDE, na frente dos exemplos ────────────────────
    *
    * Os quatro exemplos ensinam o que ela PODE perguntar, e continuam. O que
@@ -604,17 +616,39 @@ export function AuroraDaNutriScreen({
           <Ditado
             compacto
             assunto="nutri"
+            onParcial={parcial => {
+              setTexto(atual => {
+                if (baseDoDitado.current === null) baseDoDitado.current = atual.trim()
+                const base = baseDoDitado.current
+                return base ? base + ' ' + parcial : parcial
+              })
+            }}
             onTexto={ouvido => {
               /* Junta ao que já estiver escrito, e não substitui: quem digitou
                  meia frase e resolveu falar o resto perderia a metade
-                 digitada. */
-              setTexto(antes => (antes.trim() ? antes.trim() + ' ' + ouvido : ouvido))
+                 digitada.
+
+                 Se houve texto parcial, o começo certo é o que foi guardado
+                 ANTES do primeiro pedaço -- o campo agora contém a frase
+                 parcial, e juntar a final nele duplicaria a fala. */
+              const base = baseDoDitado.current
+              baseDoDitado.current = null
+              setTexto(antes => {
+                const inicio = base !== null ? base : antes.trim()
+                return inicio ? inicio + ' ' + ouvido : ouvido
+              })
             }}
             /* A falha da transcrição entra como fala da Aurora, e não como
                faixa no alto -- a mesma decisão que o resto desta tela já tomou:
                numa conversa, erro fora do fluxo fica acima da rolagem e ninguém
                lê. */
-            onErro={mensagem => setFalas(atual => [...atual, novaFala('aurora', mensagem)])}
+            onErro={mensagem => {
+              /* O que foi ouvido até a falha fica no campo -- é dela, e ela pode
+                 terminar à mão --, mas o começo guardado sai, senão o próximo
+                 ditado recomeçaria em cima dele. */
+              baseDoDitado.current = null
+              setFalas(atual => [...atual, novaFala('aurora', mensagem)])
+            }}
           />
         )}
       </View>
