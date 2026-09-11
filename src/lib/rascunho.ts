@@ -85,6 +85,21 @@ export async function apagarRascunho(nome: string): Promise<void> {
    apareceria como dado aparecendo onde não devia. */
 export const RASCUNHO = {
   treino: 'modo-treino',
+  /* Só o prefixo, e o nome LEGADO: o rascunho de verdade é
+     `rascunhoDoQuestionario(token)`, logo abaixo. */
   questionario: 'questionario',
   rotinaIA: 'rotina-ia',
 } as const
+
+/* O rascunho do questionário é de UM questionário, e não do aparelho.
+ *
+ * Com o nome fixo, as respostas pela metade de uma conta -- remédios, doenças,
+ * cirurgias -- apareciam por cima do questionário da próxima conta que entrasse
+ * no mesmo celular, e iam no envio dela como se fossem dela. E também entre
+ * dois questionários da mesma pessoa, com menos de 7 dias de diferença: as
+ * respostas da consulta passada cobriam as que a nova já tinha no servidor.
+ *
+ * O token é único por questionário e só a dona dele o recebe, então separa as
+ * duas coisas de uma vez. Achado na terceira rodada de testes, perguntando o
+ * que sobrevive a trocar de conta. */
+export const rascunhoDoQuestionario = (token: string) => `${RASCUNHO.questionario}:${token}`

@@ -13,7 +13,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho } from '../lib/rascunho'
+import { RASCUNHO, apagarRascunho, guardarRascunho, lerRascunho, rascunhoDoQuestionario } from '../lib/rascunho'
 import { carregarQuestionario, responderQuestionario, type Questionario } from '../lib/questionario'
 import {
   ALERGENOS,
@@ -95,7 +95,13 @@ export function QuestionarioScreen({
            O rascunho vem por último porque é o mais novo: se ela respondeu
            quinze perguntas e o app morreu, é isso que ela espera encontrar. */
         const base = { ...vazioDoModelo(res.questionario.modelo), ...res.questionario.respostas }
-        const rascunho = await lerRascunho<Respostas>(RASCUNHO.questionario, DIAS_DE_RASCUNHO * 24)
+        /* O do nome antigo, fixo, sai daqui sem ser lido: pode ser de outra
+           conta, e ler já seria mostrar. Ver `rascunhoDoQuestionario`. */
+        void apagarRascunho(RASCUNHO.questionario)
+        const rascunho = await lerRascunho<Respostas>(
+          rascunhoDoQuestionario(res.questionario.token),
+          DIAS_DE_RASCUNHO * 24,
+        )
         if (!vivo) return
         setR(rascunho ? { ...base, ...rascunho } : base)
         setEstado('pronto')
@@ -147,7 +153,7 @@ export function QuestionarioScreen({
       const novo = { ...atual, [chave]: valor }
       /* A cada resposta, e não ao trocar de seção: o app pode morrer no meio de
          uma seção tanto quanto entre duas. */
-      void guardarRascunho(RASCUNHO.questionario, novo)
+      if (q) void guardarRascunho(rascunhoDoQuestionario(q.token), novo)
       return novo
     })
   }
@@ -165,7 +171,7 @@ export function QuestionarioScreen({
     setErro('')
     /* Só depois de o servidor confirmar. Apagar antes deixaria a pessoa sem o
        rascunho E sem o envio se a rede caísse no meio. */
-    void apagarRascunho(RASCUNHO.questionario)
+    void apagarRascunho(rascunhoDoQuestionario(q.token))
     setEnviado(true)
     onRespondido()
   }
