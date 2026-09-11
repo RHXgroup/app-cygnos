@@ -36,6 +36,7 @@ import { OBJETIVOS, objetivoDe } from '../lib/objetivos'
 import { falha } from '../lib/erros'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { ASuaNutri, a, suaNutri } from '../lib/tratamentoDaNutri'
+import { sairDaConta } from '../lib/sairDaConta'
 
 type Conta = {
   nome_completo: string
@@ -737,7 +738,7 @@ export function PerfilScreen({
           <Pressable
             onPress={() => {
               onFechar()
-              supabase.auth.signOut()
+              void sairDaConta()
             }}
             style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
             accessibilityRole="button"

@@ -53,6 +53,7 @@ import { ritmoDeAgua } from '../lib/ritmoDeAgua'
 import { Confirmacao } from '../components/Confirmacao'
 import { EXPLICACAO_DA_NOTIFICACAO, SEM_NOTIFICACAO } from '../lib/permissoes'
 import { ASuaNutri, Minha, SuaNutri, elaPronome, uma } from '../lib/tratamentoDaNutri'
+import { sairDaConta } from '../lib/sairDaConta'
 
 const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'sunny-outline' }[] = [
   { chave: 'escuro', rotulo: 'Escuro', icone: 'moon-outline' },
@@ -894,7 +895,7 @@ export function MaisScreen({
             dois. */}
 
         <Pressable
-          onPress={() => supabase.auth.signOut()}
+          onPress={() => void sairDaConta()}
           style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
           accessibilityRole="button"
           accessibilityLabel="Sair da conta"

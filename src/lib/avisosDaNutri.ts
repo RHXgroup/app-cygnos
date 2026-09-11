@@ -174,6 +174,44 @@ export async function criarAviso(texto: string, quando: Date): Promise<Resultado
   }
 }
 
+/**
+ * Apaga TODOS os avisos, e cancela o que estava agendado. Para quando a conta
+ * sai do aparelho -- ver `sairDaConta.ts`.
+ *
+ * Cancela pela lista E pelo que o sistema tiver marcado `tipo: 'nutri'`, pelo
+ * mesmo motivo de `cancelarDoTipo` nos lembretes: a lista mora no disco e pode
+ * ter sumido, e o aviso agendado continuaria tocando -- com o texto dela, que
+ * pode ter nome de paciente, no celular de outra pessoa.
+ */
+export async function apagarTodosOsAvisos(): Promise<void> {
+  const todos = await guardados()
+  const ids = new Set(todos.map(a => a.idDaNotificacao).filter(Boolean))
+  try {
+    const N = await notificacoes()
+    try {
+      for (const a of await N.getAllScheduledNotificationsAsync()) {
+        if ((a.content?.data as { tipo?: string } | undefined)?.tipo === 'nutri') ids.add(a.identifier)
+      }
+    } catch {
+      /* Sem a lista do sistema, sobra a guardada. */
+    }
+    for (const id of ids) {
+      try {
+        await N.cancelScheduledNotificationAsync(id)
+      } catch {
+        /* Já não existia. */
+      }
+    }
+  } catch (e) {
+    falha('Não consegui cancelar os avisos no sistema.', e)
+  }
+  try {
+    await AsyncStorage.removeItem(CHAVE)
+  } catch (e) {
+    falha('Não consegui apagar os avisos guardados.', e)
+  }
+}
+
 /** Apaga o aviso e cancela a notificação dele. */
 export async function apagarAviso(id: string): Promise<void> {
   const todos = await guardados()

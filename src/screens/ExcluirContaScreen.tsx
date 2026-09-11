@@ -11,10 +11,10 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PALAVRA_CONFIRMACAO, excluirConta } from '../lib/conta'
-import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
 import { TelaComTeclado } from '../components/TelaComTeclado'
 import { aSuaNutri, uma } from '../lib/tratamentoDaNutri'
+import { sairDaConta } from '../lib/sairDaConta'
 
 /* Exclusão da conta, exigida pela Play Store para todo app que deixa criar uma.
  *
@@ -62,7 +62,7 @@ export function ExcluirContaScreen({ email, onFechar }: { email: string; onFecha
        Nada de setExcluindo(false) aqui: o signOut derruba esta tela junto com a
        área logada, e mexer no estado de um componente que está saindo é aviso
        de vazamento à toa. */
-    await supabase.auth.signOut()
+    await sairDaConta()
   }
 
   return (

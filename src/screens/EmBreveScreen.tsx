@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
+import { sairDaConta } from '../lib/sairDaConta'
 
 /* Abas que ainda não têm conteúdo. Existir em branco é melhor que a aba não
    responder ao toque: o app fica coerente e fica claro que a parte que falta é
@@ -30,7 +30,7 @@ export function EmBreveScreen({
         <>
           {!!email && <Text style={styles.email}>{email}</Text>}
           <Pressable
-            onPress={() => supabase.auth.signOut()}
+            onPress={() => void sairDaConta()}
             style={({ pressed }) => [styles.botaoSair, pressed && styles.botaoSairPressionado]}
           >
             <Ionicons name="log-out-outline" size={17} color={paleta().cores.verde} />

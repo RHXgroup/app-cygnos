@@ -61,6 +61,7 @@ import { estilosDe, carregarTema, escutarTema, tema, paleta } from './src/lib/te
 import { useFonts } from 'expo-font'
 import { FONTES_PARA_CARREGAR } from './src/lib/fontes'
 import { carregarTratamento } from './src/lib/tratamentoGuardado'
+import { sairDaConta } from './src/lib/sairDaConta'
 
 /* UM provider só, na raiz, e que nunca desmonta.
  *
@@ -261,7 +262,7 @@ function Raiz() {
        nenhuma tela do paciente, então não existe caminho — nem por
        engano — de uma para a outra. */
     if (acesso === 'nutricionista') {
-      return <AreaDaNutri onSair={() => void supabase.auth.signOut()} />
+      return <AreaDaNutri onSair={() => void sairDaConta()} />
     }
     return <AreaLogada sessao={sessao} />
   }
