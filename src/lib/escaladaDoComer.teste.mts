@@ -59,6 +59,10 @@ ok('área nova também', !rotuloDaArea('nova_area_qualquer').includes('_'))
     'rotina_alimentar', 'aceitacao_textura', 'repertorio_alimentar', 'outro']
   ok('nenhuma área conhecida tem sublinhado', areas.every(a => !rotuloDaArea(a).includes('_')))
 }
+/* Mapa comum herda do protótipo: `STATUS['constructor']` seria a função Object. */
+ok('constructor não vira código', rotuloDoStatusTerapeutico('constructor') === 'Constructor')
+ok('__proto__ não vira objeto', rotuloDaArea('__proto__') === 'Proto')
+ok('toString no legado não quebra a banda', nivelDe(ex('2026-09-01', { aceitacao: 'toString' })) === null)
 ok('nulo vira vazio, não "null"', rotuloDoStatusTerapeutico(null) === '' && rotuloDaArea(undefined) === '')
 ok('período', rotuloDoPeriodo('quinzenal') === 'Quinzenal')
 ok('ambiente', rotuloDoAmbiente('consultorio') === 'No consultório')

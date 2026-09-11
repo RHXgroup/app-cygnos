@@ -142,11 +142,12 @@ export function PainelDaNutriScreen({
    * sair -- e o relato foi exatamente esse: "ele volta tudo, ele fecha o
    * aplicativo".
    *
-   * SEM lista de dependências, de propósito. O `AreaDaNutri` registra o dele no
-   * PAI, e o React roda os efeitos do FILHO antes dos do pai: na primeira
-   * renderização o pai fica por último e ganha. Re-registrar a cada
-   * renderização põe este na frente a partir da segunda, que sempre acontece --
-   * nem que seja na carga dos dados. Não é código morto, e não é desleixo. */
+   * COM lista de dependências. Esta tela hospeda a ficha, que hospeda o dossiê
+   * e o plano: sem a lista, qualquer renderização daqui -- inclusive a que vem
+   * da área quando chega uma mensagem -- punha este tratador na frente dos de
+   * dentro, e o voltar fechava a ficha inteira em vez da seção aberta nela.
+   * Com a lista, ele só se re-registra quando a ficha ou a folha abrem e
+   * fecham, que é quando ele deve ficar na frente. Armadilha 1. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (agindoEm) {
@@ -160,7 +161,7 @@ export function PainelDaNutriScreen({
       return false
     })
     return () => sub.remove()
-  })
+  }, [agindoEm, fichaAberta])
   /* Qual pedido está sendo respondido agora, e o que o banco disse do último.
      Um id, e não um booleano: com dois pedidos na tela, um booleano faria os
      dois cartões piscarem quando ela toca em um. */

@@ -108,7 +108,16 @@ function bandaDe(aceitacao: string | null): Banda | null {
   if (!aceitacao) return null
   const b = BANDAS.find(x => x.banda === aceitacao)
   if (b) return b.banda
-  return LEGADO[aceitacao] ?? null
+  return doMapa(LEGADO, aceitacao) ?? null
+}
+
+/* Só as chaves que ESTE mapa escreveu. Um objeto comum herda do protótipo:
+   `MAPA['constructor']` devolve a função Object, e não `undefined` -- um valor
+   estranho numa coluna sem CHECK viraria código-fonte na tela. Apontado pela
+   sessão APP 2 no mesmo padrão dentro do prompt da Aurora. `hasOwnProperty`, e
+   não `Object.hasOwn`, para não depender da versão do Hermes. */
+function doMapa<T>(mapa: Record<string, T>, chave: string): T | undefined {
+  return Object.prototype.hasOwnProperty.call(mapa, chave) ? mapa[chave] : undefined
 }
 
 /**
@@ -200,14 +209,16 @@ export function melhorPasso(exposicoes: Exposicao[]): number | null {
    "Em andamento" mesmo que ninguém tenha escrito o rótulo -- é o que impede o
    "plano underline" de voltar com o próximo valor que o banco inventar. */
 export function humanizar(codigo: unknown): string {
-  const s = String(codigo ?? '').trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ')
+  /* O `trim` DEPOIS de trocar o sublinhado: `_interno` virava " interno", com
+     o espaço na frente, e a maiúscula caía nele. */
+  const s = String(codigo ?? '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
   if (!s) return ''
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 
 function rotulo(tabela: Record<string, string>, codigo: unknown): string {
   const k = String(codigo ?? '').trim()
-  return tabela[k] ?? humanizar(k)
+  return doMapa(tabela, k) ?? humanizar(k)
 }
 
 /* Status do plano E do objetivo. Os legados (`ativo`, `concluido`, `pausado`)
@@ -227,7 +238,7 @@ export const rotuloDoStatusTerapeutico = (s: unknown) => rotulo(STATUS, s)
 export function statusAtual(s: unknown): 'em_andamento' | 'atingido' | 'parcial' | 'nao_atingido' | 'outro' {
   const k = String(s ?? '').trim()
   const leg: Record<string, string> = { ativo: 'em_andamento', concluido: 'atingido', pausado: 'parcial' }
-  const v = leg[k] ?? k
+  const v = doMapa(leg, k) ?? k
   return v === 'em_andamento' || v === 'atingido' || v === 'parcial' || v === 'nao_atingido' ? v : 'outro'
 }
 

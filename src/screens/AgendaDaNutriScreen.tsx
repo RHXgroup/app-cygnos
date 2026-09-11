@@ -107,11 +107,12 @@ export function AgendaDaNutriScreen({
      encontra pilha nenhuma e faz a única coisa que sabe -- e aqui isso jogava
      ela para fora da agenda inteira com a ficha aberta.
 
-     SEM lista de dependências, de propósito: o `AreaDaNutri` registra o dele no
-     PAI, e o React roda os efeitos do filho ANTES dos do pai -- então na
-     primeira renderização o pai fica por último e ganha. Re-registrar a cada
-     renderização põe este na frente a partir da segunda, que sempre acontece
-     (nem que seja na carga dos dados). Não é código morto, e não é desleixo. */
+     COM lista de dependências. Esta tela hospeda a ficha, que hospeda o dossiê
+     e o plano: sem a lista, qualquer renderização daqui -- inclusive a que vem
+     da área quando chega uma mensagem -- punha este tratador na frente dos de
+     dentro, e o voltar fechava a ficha inteira em vez da seção aberta nela.
+     Com a lista, ele só se re-registra quando a ficha ou a folha abrem e
+     fecham, que é quando ele deve ficar na frente. Armadilha 1. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (agindoEm) {
@@ -125,7 +126,7 @@ export function AgendaDaNutriScreen({
       return false
     })
     return () => sub.remove()
-  })
+  }, [agindoEm, fichaAberta])
 
   /* Que pedaço do calendário está na tela. O mês pede a grade INTEIRA, sobras
      inclusive: as células de 31 de agosto e 4 de outubro também mostram

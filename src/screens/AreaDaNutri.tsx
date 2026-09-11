@@ -220,6 +220,21 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
        esta lista poder ficar vazia. */
   }, [])
 
+  /* ──── O voltar central, COM lista de dependências ────
+   *
+   * Esta lista é a correção de um defeito, e não enfeite. Sem ela, o tratador
+   * se re-registrava a cada renderização da área -- e a área re-renderiza a
+   * cada mensagem que chega (`naoLidas`). Numa re-renderização o React roda os
+   * efeitos do filho ANTES dos do pai, então o pai registrava por último e
+   * passava na frente de TODOS os tratadores de dentro: com uma ficha aberta,
+   * chegava uma mensagem, ela apertava voltar e caía na aba Hoje em vez de
+   * fechar a ficha. Achado pela sessão APP 2 lendo o código, sem aparelho.
+   *
+   * Com a lista, ele só se re-registra quando muda o que ele lê -- abrir ou
+   * fechar uma sobreposição, trocar de aba --, que é justamente quando ele deve
+   * ficar na frente. Os de dentro (folhas sem lista) passam na frente dele de
+   * novo na primeira renderização deles. Armadilha 1: quem HOSPEDA outra tela
+   * com voltar próprio precisa de lista; só as folhas ficam sem. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (conversando) {
@@ -252,7 +267,7 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
       return false
     })
     return () => sub.remove()
-  })
+  }, [conversando, fotografando, lendoCodigo, auroraAberta, aba])
 
   /* As sobreposições vêm ANTES das abas e substituem a tela inteira: as duas
      são gestos de um minuto, e a barra de abas embaixo delas só ofereceria uma

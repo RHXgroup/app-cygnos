@@ -303,7 +303,8 @@ const FORMULAS: Record<string, string> = {
 export function rotuloDaFormula(codigo: unknown): string {
   const c = texto(codigo)
   if (!c) return 'Fórmula não informada'
-  if (FORMULAS[c]) return FORMULAS[c]
+  const conhecida = doMapa(FORMULAS, c)
+  if (conhecida) return conhecida
   const legivel = c.replace(/[_-]+/g, ' ').trim()
   return legivel.charAt(0).toUpperCase() + legivel.slice(1)
 }
@@ -422,6 +423,15 @@ export function pedidoDoResumo(json: unknown): PedidoDoResumo {
 }
 
 // ════════════════════════════ miúdos ════════════════════════════
+
+/* Só as chaves que ESTE mapa escreveu. Um objeto comum herda do protótipo:
+   `MAPA['constructor']` devolve a função Object, e não `undefined` -- um valor
+   estranho numa coluna sem CHECK viraria código-fonte na tela. Apontado pela
+   sessão APP 2 no mesmo padrão dentro do prompt da Aurora. `hasOwnProperty`, e
+   não `Object.hasOwn`, para não depender da versão do Hermes. */
+function doMapa<T>(mapa: Record<string, T>, chave: string): T | undefined {
+  return Object.prototype.hasOwnProperty.call(mapa, chave) ? mapa[chave] : undefined
+}
 
 type Obj = Record<string, unknown>
 

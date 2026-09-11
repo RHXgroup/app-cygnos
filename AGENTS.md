@@ -77,6 +77,23 @@ Quatro regras que vieram de erro real:
 
   Descoberto em `MeusCadastrosScreen`: quem entrava em "Metas" para conferir uma
   linha era jogado para fora da tela inteira, porque o central só sabia fechar.
+- **"Sem lista de dependências" vale para a FOLHA, nunca para quem hospeda outra
+  tela com voltar próprio.** Numa re-renderização o React roda os efeitos do
+  filho antes dos do pai — então, quando um PAI sem lista re-renderiza, todos
+  os de dentro se re-registram primeiro e ele por último, e passa na frente de
+  todos. Na área da nutricionista isso acontecia a cada mensagem que chegava
+  (`naoLidas` re-renderiza a área inteira): ficha aberta, chega mensagem, ela
+  aperta voltar e cai na aba Hoje; ou o dossiê aberto dentro da ficha perdia
+  para a lista de pacientes, e o voltar fechava a ficha inteira. Nada disso
+  aparece testando com calma — só com uma mensagem chegando no meio.
+
+  A regra, então: quem hospeda (área, lista → ficha, agenda → ficha, plano →
+  folha de trocar) usa **lista com exatamente o que o tratador lê**, e assim só
+  se re-registra quando abre ou fecha alguma coisa — que é quando deve ficar na
+  frente. Se o tratador lê uma função que vem do pai (`onFechar`), ela muda a
+  cada renderização e a lista não adianta: ponha num `useRef` e registre com
+  `[]` (ver `PlanoDaPacienteScreen`). Achado em 11/09/2026 pela sessão APP 2
+  lendo o código, antes de alguém tropeçar.
 
 ## 2. O teclado, e a pergunta que vem ANTES de mexer no componente
 

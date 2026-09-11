@@ -141,6 +141,8 @@ ok('da criança', rotuloDaFormula('eer_2023_crianca') === 'EER 2023 (criança)')
 ok('desconhecida NÃO vira Harris-Benedict', !rotuloDaFormula('henry_2005_nova').includes('Harris'))
 ok('desconhecida fica legível', rotuloDaFormula('henry_2005_nova') === 'Henry 2005 nova')
 ok('vazia diz que não sabe', rotuloDaFormula('') === 'Fórmula não informada')
+/* Sem o filtro de chave própria, isto devolvia a FUNÇÃO Object -- e a tela morria. */
+ok('constructor é texto, e não função', rotuloDaFormula('constructor') === 'Constructor')
 
 // ──── O RESUMO DA AURORA ────
 {

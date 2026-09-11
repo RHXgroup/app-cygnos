@@ -203,15 +203,23 @@ export function PlanoDaPacienteScreen({
     }
   }
 
-  /* Sem lista de dependências: é o que põe este tratador na frente do da ficha
-     e do da área a partir da segunda renderização. Armadilha 1. */
+  /* Registrado UMA vez, na abertura, com o `onFechar` num ref.
+     Esta tela hospeda a folha de trocar alimento, que tem voltar próprio. Sem
+     lista de dependências, toda renderização daqui (gerar o PDF, reler o plano)
+     a punha na frente da folha, e o voltar fechava o plano inteiro com a folha
+     aberta. E a lista não podia ser `[onFechar]`: ele vem da ficha como função
+     nova a cada renderização dela, e isso re-registraria do mesmo jeito.
+     Registrado na abertura, ele fica atrás de tudo o que abre depois dele --
+     que é a ordem certa. Armadilha 1. */
+  const fechar = useRef(onFechar)
+  fechar.current = onFechar
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onFechar()
+      fechar.current()
       return true
     })
     return () => sub.remove()
-  })
+  }, [])
 
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>

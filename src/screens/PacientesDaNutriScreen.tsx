@@ -76,8 +76,12 @@ export function PacientesDaNutriScreen({
   /* O voltar do aparelho fecha a FICHA antes de sair da aba. Armadilha 1: sem
      isto o botão caía no `AreaDaNutri`, que só sabe voltar para a inicial ou
      sair do app -- e quem estava lendo uma ficha era jogado para fora de tudo.
-     Sem lista de dependências: é o que põe este na frente do tratador do pai a
-     partir da segunda renderização. */
+     COM lista de dependências, porque este HOSPEDA a ficha, e a ficha hospeda o
+     dossiê e o plano, que têm voltar próprio. Sem a lista, qualquer
+     renderização desta tela (uma mensagem chegando re-renderiza a área, e ela
+     re-renderiza esta) o punha na frente do dossiê -- e o voltar fechava a
+     ficha inteira em vez de só a seção. Com a lista ele só se re-registra
+     quando a ficha abre ou fecha. Armadilha 1. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (aberto !== null) {
@@ -87,7 +91,7 @@ export function PacientesDaNutriScreen({
       return false
     })
     return () => sub.remove()
-  })
+  }, [aberto])
 
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
