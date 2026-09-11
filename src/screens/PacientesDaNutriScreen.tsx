@@ -530,16 +530,38 @@ export function FichaDoPacienteScreen({
                   onAbrir={() => setDossie('terapeutico')}
                 />
                 <Item
-                  rotulo="Última anamnese"
-                  valor={ficha.ultimaAnamnese ? rotuloDaData(ficha.ultimaAnamnese) : 'Nenhuma'}
-                  aviso={!ficha.ultimaAnamnese}
-                />
-                <Item
                   rotulo="Consultas realizadas"
                   valor={String(ficha.quantasConsultas)}
                   onAbrir={() => setDossie('consultas')}
                 />
                 <Item rotulo="Usa o aplicativo" valor={ficha.usaOApp ? 'Sim' : 'Não'} />
+              </View>
+
+              {/* ──────────────────── O PRONTUÁRIO ────────────────────
+                  "A ficha completa: anamnese, exames, energético, medidas." Tudo
+                  para LER -- digitar continua no computador. Cada linha abre a
+                  seção por cima da ficha, e o voltar devolve para cá.
+
+                  O resumo da Aurora vem primeiro: é a leitura da ficha INTEIRA, e
+                  quem tem dois minutos antes da consulta começa por ele. É o
+                  mesmo resumo da aba Aurora do sistema. */}
+              <View style={styles.cartao}>
+                <Text style={styles.rotuloDoBloco}>PRONTUÁRIO</Text>
+                <Item rotulo="Resumo da Aurora" valor="Abrir" onAbrir={() => setDossie('resumo')} />
+                <Item
+                  rotulo="Anamnese"
+                  valor={ficha.ultimaAnamnese ? rotuloDaData(ficha.ultimaAnamnese) : 'Nenhuma'}
+                  aviso={!ficha.ultimaAnamnese}
+                  onAbrir={() => setDossie('anamnese')}
+                />
+                <Item rotulo="Exames" valor="Abrir" onAbrir={() => setDossie('exames')} />
+                <Item rotulo="Gasto energético" valor="Abrir" onAbrir={() => setDossie('energetico')} />
+                <Item
+                  rotulo="Evolução das medidas"
+                  valor={ficha.medidas.length ? 'Abrir' : 'Sem avaliação'}
+                  aviso={!ficha.medidas.length}
+                  onAbrir={() => setDossie('evolucao')}
+                />
               </View>
 
               {/* ──────────────────── ONDE A GENTE PAROU ────────────────────
@@ -597,11 +619,11 @@ export function FichaDoPacienteScreen({
                 </Pressable>
               )}
 
-              {/* Dito por escrito porque a ausência do prontuário é decisão, e
+              {/* Dito por escrito porque não poder editar daqui é decisão, e
                   não tela pela metade. */}
               <Text style={styles.rodape}>
-                Exames, antropometria e anamnese continuam no sistema, no
-                computador · são muitos números para digitar numa tela estreita,
+                Anamnese, exames e medidas se leem aqui e se preenchem no sistema,
+                no computador: são muitos números para digitar numa tela estreita,
                 e um dígito errado ali muda a conduta.
               </Text>
             </>

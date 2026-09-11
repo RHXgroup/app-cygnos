@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
 import { nomeDoPlano, rotuloDoStatusTerapeutico } from './escaladaDoComer'
+import { dataDaAnamnese } from './leituraDoProntuario'
 
 /* A carteira dela, lida do banco.
  *
@@ -191,6 +192,10 @@ export type Medida = {
   imc: number | null
   gordura: number | null
   cintura: number | null
+  /* Só a evolução mostra. Adulto; na criança vem nulo quase sempre. */
+  massaMagra: number | null
+  /* Só criança. Nulo no adulto. */
+  zImcIdade: number | null
 }
 
 export type FichaDoPaciente = {
@@ -225,6 +230,126 @@ export type FichaDoPaciente = {
   /* Quantas consultas realizadas desde sempre. Um número, e não a lista: diz o
      tamanho da relação sem ocupar a tela. */
   quantasConsultas: number
+}
+
+/* As medidas de uma paciente, da mais nova para a mais antiga.
+ *
+ * Uma função só para a ficha (que quer as últimas três) e para a evolução (que
+ * quer a série): as duas precisam separar adulto de criança, e duas cópias
+ * dessa separação divergiriam no primeiro campo novo -- armadilha 5. A ficha já
+ * perdeu a criança uma vez por ler só a tabela do adulto.
+ *
+ * NUNCA rejeita: a ficha a chama dentro de um `Promise.all`, e uma rejeição ali
+ * derrubaria o nome e o telefone junto com a medida. Falhou, devolve lista
+ * vazia e o console fica com o motivo. Armadilha 11. */
+export async function medidasDaPaciente(pacienteId: number, quantas: number): Promise<Medida[]> {
+  try {
+    /* ──────────────────── AS MEDIDAS ────────────────────
+     * A leitura é aninhada (`antropometria_adulto` é tabela filha), e é a única
+     * aqui que é -- porque a avaliação sem as medidas não serve para nada, e duas
+     * leituras casadas por id dariam o mesmo resultado por mais código. Se o
+     * PostgREST não enxergar a relação, o bloco inteiro some da tela; o resto da
+     * ficha continua. */
+    const numeroOuNulo = (v: unknown): number | null => {
+      const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v)
+      return Number.isFinite(n) ? n : null
+    }
+
+    /* ── A CRIANÇA, que ficava sem medida nenhuma ──
+     *
+     * Relatado: "preciso de medidas aqui", abrindo a ficha de uma paciente em
+     * plano terapêutico. A leitura acima pedia só `antropometria_adulto` -- e o
+     * sistema grava as medidas de criança em OUTRA tabela, `antropometria_crianca`,
+     * com colunas de outros nomes. O comentário de `EvolucaoPaciente.tsx`, no
+     * sistema, avisa exatamente isso. Resultado: toda criança aparecia sem medida,
+     * e a terapia alimentar é justamente o atendimento de criança.
+     *
+     * Uma segunda leitura, separada, e não outro `embed` na de cima: se o
+     * PostgREST não enxergar a relação com a tabela da criança, o embed derruba
+     * a leitura INTEIRA -- e os adultos, que funcionam hoje, perderiam as medidas
+     * junto. Separada, o pior caso é a criança continuar sem.
+     *
+     * `select('*')` na tabela da criança: se um dia uma coluna mudar de nome, o
+     * campo vem vazio em vez de derrubar a ficha. Os nomes usados abaixo foram
+     * conferidos no esquema do sistema em 11/09. */
+    const { data, error } = await supabase
+      .from('antropometria_avaliacoes')
+      /* `id` e `tipo` entraram em 11/09: sem eles não dava para saber que a
+         avaliação era de CRIANÇA -- e as medidas dela moram em outra tabela. */
+      .select('id, tipo, data_avaliacao, antropometria_adulto(peso, altura, imc, percentual_gordura, circ_cintura, massa_magra)')
+      .eq('paciente_id', pacienteId)
+      .order('data_avaliacao', { ascending: false })
+      .limit(quantas)
+    if (error) {
+      falha('Não consegui ler as medidas.', error)
+      return []
+    }
+    const avaliacoes = (data ?? []) as Record<string, unknown>[]
+    const idsDeCrianca = avaliacoes
+      .filter(a => a.tipo === 'crianca_adolescente')
+      .map(a => Number(a.id))
+      .filter(Number.isFinite)
+
+    const daCrianca = new Map<number, Record<string, unknown>>()
+    if (idsDeCrianca.length) {
+      const { data: filhas, error: erroC } = await supabase
+        .from('antropometria_crianca')
+        .select('*')
+        .in('avaliacao_id', idsDeCrianca)
+      if (erroC) falha('Não consegui ler as medidas de criança.', erroC)
+      for (const f of (filhas ?? []) as Record<string, unknown>[]) {
+        const aid = Number(f.avaliacao_id)
+        if (Number.isFinite(aid) && !daCrianca.has(aid)) daCrianca.set(aid, f)
+      }
+    }
+
+    return avaliacoes
+      .map(a => {
+        const crianca = daCrianca.get(Number(a.id))
+        if (crianca) {
+          return {
+            quando: String(a.data_avaliacao ?? ''),
+            peso: numeroOuNulo(crianca.peso),
+            /* `comprimento_altura`, conferido em `supabase/esquema/estrutura.sql`
+               do sistema. A primeira versão chutava `estatura ?? altura` -- as
+               duas inexistentes --, e toda criança saía sem altura. Com `*` o
+               chute errado não quebra nada, e por isso mesmo passa calado:
+               `select('*')` protege a leitura, não o nome do campo. */
+            altura: numeroOuNulo(crianca.comprimento_altura),
+            /* IMC SÓ se a tabela trouxer. Calcular aqui daria um número de adulto
+               para uma criança, que se lê por percentil, e não por faixa -- o
+               sistema tem uma tela inteira de curva de crescimento por isso. */
+            imc: numeroOuNulo(crianca.imc),
+            gordura: numeroOuNulo(crianca.percentual_gordura),
+            cintura: numeroOuNulo(crianca.circ_cintura),
+            /* A tabela da criança não tem massa magra. */
+            massaMagra: null,
+            /* O escore z do IMC para a idade: é assim que se lê o peso de uma
+               criança, e não pela faixa de adulto. */
+            zImcIdade: numeroOuNulo(crianca.z_imc_idade),
+          }
+        }
+        const filha = Array.isArray(a.antropometria_adulto)
+          ? (a.antropometria_adulto[0] as Record<string, unknown> | undefined)
+          : (a.antropometria_adulto as Record<string, unknown> | undefined)
+        return {
+          quando: String(a.data_avaliacao ?? ''),
+          peso: numeroOuNulo(filha?.peso),
+          altura: numeroOuNulo(filha?.altura),
+          imc: numeroOuNulo(filha?.imc),
+          gordura: numeroOuNulo(filha?.percentual_gordura),
+          cintura: numeroOuNulo(filha?.circ_cintura),
+          massaMagra: numeroOuNulo(filha?.massa_magra),
+          zImcIdade: null,
+        }
+      })
+      /* Avaliação sem nenhum número não entra: seria uma coluna de traços, que se
+         lê como app quebrado em vez de "não foi medido". */
+      .filter(m => m.peso !== null || m.imc !== null || m.cintura !== null || m.gordura !== null)
+  } catch (e) {
+    falha('Não consegui ler as medidas.', e)
+    return []
+  }
 }
 
 export type ResultadoFicha =
@@ -304,15 +429,7 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
     /* As duas últimas medidas, e não só a mais nova: um peso sozinho não diz
        nada. "78,4 kg" é um número; "78,4, era 81,0" é a conversa que ela vai
        ter. Três para a segunda sobreviver a uma avaliação sem peso. */
-    supabase
-      .from('antropometria_avaliacoes')
-      /* `id` e `tipo` entraram em 11/09: sem eles não dava para saber que a
-         avaliação era de CRIANÇA -- e as medidas dela moram em outra tabela.
-         Ver o bloco das medidas, mais abaixo. */
-      .select('id, tipo, data_avaliacao, antropometria_adulto(peso, altura, imc, percentual_gordura, circ_cintura)')
-      .eq('paciente_id', id)
-      .order('data_avaliacao', { ascending: false })
-      .limit(3),
+    medidasDaPaciente(id, 3),
 
     supabase
       .from('planos_terapeuticos')
@@ -372,86 +489,6 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
 
   const primeira = <T,>(v: T[] | null | undefined): T | null => (v && v.length > 0 ? v[0] : null)
 
-  /* ──────────────────── AS MEDIDAS ────────────────────
-   * A leitura é aninhada (`antropometria_adulto` é tabela filha), e é a única
-   * aqui que é -- porque a avaliação sem as medidas não serve para nada, e duas
-   * leituras casadas por id dariam o mesmo resultado por mais código. Se o
-   * PostgREST não enxergar a relação, o bloco inteiro some da tela; o resto da
-   * ficha continua. */
-  const numeroOuNulo = (v: unknown): number | null => {
-    const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v)
-    return Number.isFinite(n) ? n : null
-  }
-
-  /* ── A CRIANÇA, que ficava sem medida nenhuma ──
-   *
-   * Relatado: "preciso de medidas aqui", abrindo a ficha de uma paciente em
-   * plano terapêutico. A leitura acima pedia só `antropometria_adulto` -- e o
-   * sistema grava as medidas de criança em OUTRA tabela, `antropometria_crianca`,
-   * com colunas de outros nomes. O comentário de `EvolucaoPaciente.tsx`, no
-   * sistema, avisa exatamente isso. Resultado: toda criança aparecia sem medida,
-   * e a terapia alimentar é justamente o atendimento de criança.
-   *
-   * Uma segunda leitura, separada, e não outro `embed` na de cima: se o
-   * PostgREST não enxergar a relação com a tabela da criança, o embed derruba
-   * a leitura INTEIRA -- e os adultos, que funcionam hoje, perderiam as medidas
-   * junto. Separada, o pior caso é a criança continuar sem.
-   *
-   * `select('*')` porque dos nomes de coluna dela só dois são certos, os que o
-   * sistema lê (`peso`, `percentual_gordura`). Os outros são tentados pelos nomes
-   * prováveis e, se não existirem, vêm vazios -- em vez de derrubar a ficha. */
-  const avaliacoes = (antropometria.data ?? []) as Record<string, unknown>[]
-  const idsDeCrianca = avaliacoes
-    .filter(a => a.tipo === 'crianca_adolescente')
-    .map(a => Number(a.id))
-    .filter(Number.isFinite)
-
-  const daCrianca = new Map<number, Record<string, unknown>>()
-  if (idsDeCrianca.length) {
-    const { data: filhas, error: erroC } = await supabase
-      .from('antropometria_crianca')
-      .select('*')
-      .in('avaliacao_id', idsDeCrianca)
-    if (erroC) falha('Não consegui ler as medidas de criança.', erroC)
-    for (const f of (filhas ?? []) as Record<string, unknown>[]) {
-      const aid = Number(f.avaliacao_id)
-      if (Number.isFinite(aid) && !daCrianca.has(aid)) daCrianca.set(aid, f)
-    }
-  }
-
-  const medidas: Medida[] = avaliacoes
-    .map(a => {
-      const crianca = daCrianca.get(Number(a.id))
-      if (crianca) {
-        return {
-          quando: String(a.data_avaliacao ?? ''),
-          peso: numeroOuNulo(crianca.peso),
-          /* Os dois nomes prováveis para a altura de criança. Ausente, vem nulo e a
-             tela mostra traço -- nunca um número calculado sem base. */
-          altura: numeroOuNulo(crianca.estatura ?? crianca.altura),
-          /* IMC SÓ se a tabela trouxer. Calcular aqui daria um número de adulto
-             para uma criança, que se lê por percentil, e não por faixa -- o
-             sistema tem uma tela inteira de curva de crescimento por isso. */
-          imc: numeroOuNulo(crianca.imc),
-          gordura: numeroOuNulo(crianca.percentual_gordura),
-          cintura: numeroOuNulo(crianca.circ_cintura ?? crianca.circunferencia_cintura),
-        }
-      }
-      const filha = Array.isArray(a.antropometria_adulto)
-        ? (a.antropometria_adulto[0] as Record<string, unknown> | undefined)
-        : (a.antropometria_adulto as Record<string, unknown> | undefined)
-      return {
-        quando: String(a.data_avaliacao ?? ''),
-        peso: numeroOuNulo(filha?.peso),
-        altura: numeroOuNulo(filha?.altura),
-        imc: numeroOuNulo(filha?.imc),
-        gordura: numeroOuNulo(filha?.percentual_gordura),
-        cintura: numeroOuNulo(filha?.circ_cintura),
-      }
-    })
-    /* Avaliação sem nenhum número não entra: seria uma coluna de traços, que se
-       lê como app quebrado em vez de "não foi medido". */
-    .filter(m => m.peso !== null || m.imc !== null || m.cintura !== null || m.gordura !== null)
 
   const pt = primeira(terapeutico.data as { titulo: string | null; status: string | null }[] | null)
   const am = primeira(anamnese.data as { data_anamnese: string | null; created_at: string }[] | null)
@@ -473,7 +510,7 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
         primeira(plano.data as { titulo: string | null }[] | null)?.titulo?.trim() || null,
       emAberto,
       quantasEmAberto: pendentes.length,
-      medidas,
+      medidas: antropometria,
       /* Dois defeitos na mesma linha, os dois achados pelo relato "o terapêutico
          aparece com plano underline":
          - plano cadastrado SÓ com a área, sem título, aparecia como "Nenhum" --
@@ -487,7 +524,10 @@ export async function fichaDoPaciente(id: number): Promise<ResultadoFicha> {
             status: rotuloDoStatusTerapeutico(pt.status) || 'Sem situação',
           }
         : null,
-      ultimaAnamnese: am?.data_anamnese ?? am?.created_at?.slice(0, 10) ?? null,
+      /* `dataDaAnamnese`, e não `data_anamnese ?? created_at`: em 54 de 66
+         fichas a data é '' -- vazia, e não nula --, o `??` não caía para a
+         gravação, e a ficha dizia "Última anamnese: Nenhuma" para quem tinha. */
+      ultimaAnamnese: am ? dataDaAnamnese(am.data_anamnese, am.created_at) : null,
       notasDaUltima:
         primeira(passada.data as { notas_atendimento: string | null }[] | null)
           ?.notas_atendimento?.trim() || null,

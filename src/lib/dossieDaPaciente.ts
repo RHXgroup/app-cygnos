@@ -1,6 +1,18 @@
 import { supabase } from './supabase'
-import { falha } from './erros'
+import { falha, mensagemDoBanco } from './erros'
 import { nomeDoPlano, type Exposicao } from './escaladaDoComer'
+import {
+  anamneseLida,
+  dataDaAnamnese,
+  estadoDoResumo,
+  exameLido,
+  pedidoDoResumo,
+  rotuloDaFormula,
+  type EstadoDoResumo,
+  type ExameLido,
+  type PedidoDoResumo,
+  type SecaoLida,
+} from './leituraDoProntuario'
 
 /* O que a ficha abre: plano terapêutico e histórico de consultas.
  *
@@ -294,3 +306,224 @@ export async function consultasDaPaciente(pacienteId: number): Promise<Resultado
 }
 
 export const TETO_DO_HISTORICO = TETO
+
+/* ════════════════════════ O PRONTUÁRIO, SÓ PARA LER ════════════════════════
+ *
+ * "A ficha completa: anamnese, exames, cálculo energético, medidas, evolução."
+ *
+ * Tudo aqui é leitura direta de tabela, pelo mesmo motivo das consultas acima:
+ * as políticas já recortam pela carteira dela. Quem transforma o que o sistema
+ * gravou em algo legível é `leituraDoProntuario.ts`, que o teste exercita.
+ *
+ * Os nomes das colunas foram conferidos em `supabase/esquema/estrutura.sql` do
+ * sistema em 11/09, e as listas de `select` são as mesmas que as telas do
+ * sistema usam. Onde a tabela é larga e só alguns campos importam, `*`. */
+
+export type AnamneseDaPaciente = {
+  id: number
+  titulo: string
+  /* ISO. Nulo só se nem a data escrita nem a de gravação servirem. */
+  quando: string | null
+  secoes: SecaoLida[]
+  importado: boolean
+}
+
+export type ResultadoAnamneses =
+  | { tipo: 'ok'; anamneses: AnamneseDaPaciente[] }
+  | { tipo: 'erro'; mensagem: string }
+
+export async function anamnesesDaPaciente(pacienteId: number): Promise<ResultadoAnamneses> {
+  const { data, error } = await supabase
+    .from('anamnese_preenchidas')
+    .select('id, titulo, template_nome, data_anamnese, created_at, respostas')
+    .eq('paciente_id', pacienteId)
+    /* Pela GRAVAÇÃO, e não por `data_anamnese`: aquela coluna é texto
+       dd/mm/aaaa, e ordenar texto assim põe "04/08" antes de "25/07". A ordem
+       certa, pela data de verdade, é refeita logo abaixo. */
+    .order('created_at', { ascending: false })
+    .limit(12)
+  if (error) {
+    return { tipo: 'erro', mensagem: falha('Não consegui abrir a anamnese agora.', error) }
+  }
+  const anamneses = ((data ?? []) as Record<string, unknown>[]).map(a => {
+    const lida = anamneseLida(a.respostas)
+    const titulo =
+      (typeof a.titulo === 'string' && a.titulo.trim()) ||
+      (typeof a.template_nome === 'string' && a.template_nome.trim()) ||
+      'Anamnese'
+    return {
+      id: Number(a.id),
+      titulo,
+      quando: dataDaAnamnese(a.data_anamnese, a.created_at),
+      secoes: lida.secoes,
+      importado: lida.importado,
+    }
+  })
+  /* A data escrita manda: uma anamnese de papel digitada hoje é de março. */
+  anamneses.sort((x, y) => (y.quando ?? '').localeCompare(x.quando ?? ''))
+  return { tipo: 'ok', anamneses }
+}
+
+export type ExameDaPaciente = {
+  id: number
+  nome: string
+  /* A data da COLETA. É obrigatória no banco desde 31/08. */
+  quando: string | null
+  observacoes: string | null
+  /* Nulo: o exame foi enviado e ainda não foi lido. */
+  leitura: ExameLido | null
+}
+
+export type ResultadoExames =
+  | { tipo: 'ok'; exames: ExameDaPaciente[] }
+  | { tipo: 'erro'; mensagem: string }
+
+export async function examesDaPaciente(pacienteId: number): Promise<ResultadoExames> {
+  const { data, error } = await supabase
+    .from('exames_laboratoriais')
+    /* O mesmo `embed` do sistema (`SELECT_ANALISE`, em `analiseExame.ts`). A
+       política de `analises_de_exame` devolve só a análise DELA -- duas
+       profissionais podem ler o mesmo exame, e cada uma vê a sua. */
+    .select('id, nome, data_exame, created_at, observacoes, analises_de_exame ( texto, atualizada_em )')
+    .eq('paciente_id', pacienteId)
+    .order('data_exame', { ascending: false })
+    .limit(20)
+  if (error) {
+    return { tipo: 'erro', mensagem: falha('Não consegui abrir os exames agora.', error) }
+  }
+  return {
+    tipo: 'ok',
+    exames: ((data ?? []) as Record<string, unknown>[]).map(e => {
+      const bruto = e.analises_de_exame
+      const analise = (Array.isArray(bruto) ? bruto[0] : bruto) as { texto?: unknown } | null | undefined
+      return {
+        id: Number(e.id),
+        nome: (typeof e.nome === 'string' && e.nome.trim()) || 'Exame',
+        quando:
+          typeof e.data_exame === 'string'
+            ? e.data_exame.slice(0, 10)
+            : typeof e.created_at === 'string'
+              ? e.created_at.slice(0, 10)
+              : null,
+        observacoes: typeof e.observacoes === 'string' ? e.observacoes.trim() || null : null,
+        leitura: exameLido(analise?.texto),
+      }
+    }),
+  }
+}
+
+export type CalculoEnergeticoDaPaciente = {
+  id: number
+  quando: string
+  formula: string
+  tmb: number | null
+  /* O gasto total. É o número que ela usa para montar o plano. */
+  get: number | null
+  peso: number | null
+  altura: number | null
+  idade: number | null
+  fatorAtividade: number | null
+  fatorLesao: number | null
+  adicionalGestante: number | null
+  pesoAlvo: number | null
+  proteinaGkg: number | null
+  carboPct: number | null
+  observacoes: string | null
+}
+
+export type ResultadoCalculos =
+  | { tipo: 'ok'; calculos: CalculoEnergeticoDaPaciente[] }
+  | { tipo: 'erro'; mensagem: string }
+
+/* O mais novo é o que vale: a tabela não tem marca de "ativo", e todo leitor
+   do sistema pega o último por `created_at`. Os anteriores vêm junto, porque
+   "o gasto subiu de 1.800 para 2.100" é informação. */
+export async function calculosDaPaciente(pacienteId: number): Promise<ResultadoCalculos> {
+  const { data, error } = await supabase
+    .from('calculo_energetico')
+    .select('*')
+    .eq('paciente_id', pacienteId)
+    .order('created_at', { ascending: false })
+    .limit(6)
+  if (error) {
+    return { tipo: 'erro', mensagem: falha('Não consegui abrir o cálculo energético agora.', error) }
+  }
+  const n = (v: unknown): number | null => {
+    const x = typeof v === 'string' ? Number(v.replace(',', '.')) : typeof v === 'number' ? v : NaN
+    return Number.isFinite(x) ? x : null
+  }
+  return {
+    tipo: 'ok',
+    calculos: ((data ?? []) as Record<string, unknown>[]).map(c => ({
+      id: Number(c.id),
+      quando: String(c.created_at ?? '').slice(0, 10),
+      formula: rotuloDaFormula(c.formula),
+      tmb: n(c.tmb),
+      get: n(c.get_total),
+      peso: n(c.peso),
+      altura: n(c.altura),
+      idade: n(c.idade),
+      fatorAtividade: n(c.fator_atividade),
+      fatorLesao: n(c.fator_lesao),
+      adicionalGestante: n(c.adicional_gestante),
+      pesoAlvo: n(c.peso_alvo),
+      proteinaGkg: n(c.proteina_gkg),
+      carboPct: n(c.carbo_pct),
+      observacoes: typeof c.observacoes === 'string' ? c.observacoes.trim() || null : null,
+    })),
+  }
+}
+
+/* ════════════════════════ O RESUMO DA AURORA ════════════════════════
+ *
+ * O MESMO do sistema -- ver `resumoDaAurora` em `leituraDoProntuario.ts`. A
+ * função `aurora-monitor` responde na hora e lê em segundo plano; quem acompanha
+ * é `aurora_estado`, perguntado de tempos em tempos pela tela. O teto de duas
+ * leituras por paciente por dia é do banco, e vale para os dois lados juntos:
+ * pedir no celular gasta a mesma cota que pedir no computador. */
+
+export async function estadoDoResumoDaPaciente(
+  pacienteId: number,
+): Promise<{ tipo: 'ok'; estado: EstadoDoResumo } | { tipo: 'erro'; mensagem: string }> {
+  try {
+    const { data, error } = await supabase.rpc('aurora_estado', { p_paciente_id: pacienteId })
+    if (error) return { tipo: 'erro', mensagem: falha('Não consegui ler o resumo da Aurora agora.', error) }
+    return { tipo: 'ok', estado: estadoDoResumo(data) }
+  } catch (e) {
+    return { tipo: 'erro', mensagem: falha('Não consegui ler o resumo da Aurora agora.', e) }
+  }
+}
+
+const NAO_COMECOU = 'A Aurora não conseguiu começar o resumo agora. Tente de novo em instantes.'
+
+export async function pedirResumoDaPaciente(pacienteId: number): Promise<PedidoDoResumo> {
+  try {
+    const { data, error } = await supabase.functions.invoke('aurora-monitor', {
+      body: { paciente_id: pacienteId },
+    })
+    if (error) {
+      /* Fora do 2xx o corpo vem em `error.context`. É lá que está a frase do
+         teste grátis, escrita pelo sistema para ser lida. */
+      const ctx = (error as { context?: Response }).context
+      let corpo: unknown = null
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          corpo = await ctx.json()
+        } catch {
+          corpo = null
+        }
+      }
+      falha('A Aurora não conseguiu começar o resumo.', error)
+      const lido = pedidoDoResumo(corpo)
+      /* A frase do sistema passa só se tiver cara de frase para gente --
+         `mensagemDoBanco` barra o "unauthorized" cru. Armadilha 12. */
+      if (lido.tipo === 'recusado') {
+        return { tipo: 'recusado', mensagem: mensagemDoBanco({ message: lido.mensagem }, NAO_COMECOU) }
+      }
+      return { tipo: 'recusado', mensagem: NAO_COMECOU }
+    }
+    return pedidoDoResumo(data)
+  } catch (e) {
+    return { tipo: 'recusado', mensagem: falha('Sem conexão para pedir o resumo agora.', e) }
+  }
+}

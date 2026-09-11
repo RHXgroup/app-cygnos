@@ -12,12 +12,26 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
+  anamnesesDaPaciente,
+  calculosDaPaciente,
   consultasDaPaciente,
+  examesDaPaciente,
   planoTerapeuticoDaPaciente,
   TETO_DO_HISTORICO,
+  type AnamneseDaPaciente,
+  type CalculoEnergeticoDaPaciente,
   type ConsultaDoHistorico,
+  type ExameDaPaciente,
   type PlanoTerapeuticoDaPaciente,
 } from '../lib/dossieDaPaciente'
+import { medidasDaPaciente, type Medida } from '../lib/pacientesDaNutri'
+import {
+  Anamneses,
+  Energetico,
+  Evolucao,
+  Exames,
+  ResumoDaAurora,
+} from '../components/SecoesDoProntuario'
 import {
   BANDAS,
   alertaDeReacao,
@@ -36,18 +50,52 @@ import {
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
 
-export type SecaoDoDossie = 'terapeutico' | 'consultas'
+export type SecaoDoDossie =
+  | 'terapeutico'
+  | 'consultas'
+  | 'anamnese'
+  | 'exames'
+  | 'energetico'
+  | 'evolucao'
+  | 'resumo'
 
-/* O plano terapêutico e o histórico de consultas, abertos pela ficha.
+/* O título de cada seção. Função com `switch`, e não `Record`: é o mesmo tipo
+   dos dois lados, mas assim o compilador acusa a seção nova que esquecer o
+   título -- o `Record` também acusaria, e o `switch` ainda deixa o nome junto. */
+function tituloDaSecao(secao: SecaoDoDossie, nome: string): string {
+  switch (secao) {
+    case 'terapeutico':
+      return `Plano de ${nome}`
+    case 'consultas':
+      return `Consultas de ${nome}`
+    case 'anamnese':
+      return `Anamnese de ${nome}`
+    case 'exames':
+      return `Exames de ${nome}`
+    case 'energetico':
+      return `Gasto energético de ${nome}`
+    case 'evolucao':
+      return `Evolução de ${nome}`
+    case 'resumo':
+      return `Resumo de ${nome}`
+  }
+}
+
+/* Quantas avaliações a evolução mostra. A ficha pede três; aqui é a série. */
+const AVALIACOES_NA_EVOLUCAO = 12
+
+/* Tudo o que a ficha abre por cima de si: plano terapêutico, consultas e, desde
+ * 11/09, o prontuário para ler -- anamnese, exames, gasto energético, evolução
+ * das medidas e o resumo da Aurora.
  *
- * ──────────────────── Uma tela para as duas, e não duas telas ────────────────────
- * As duas têm exatamente a mesma moldura -- cabeçalho com voltar, rolagem,
+ * ──────────────────── Uma tela para todas, e não sete telas ────────────────────
+ * Todas têm exatamente a mesma moldura -- cabeçalho com voltar, rolagem,
  * puxar para reler, erro em cima, vazio no meio -- e diferem só no que
- * desenham no miolo. Duas telas seriam duas folhas de estilo repetidas, e a
- * segunda envelheceria: é a armadilha 5 pelo lado do componente.
+ * desenham no miolo. Sete telas seriam sete folhas de estilo repetidas, e as
+ * cópias envelheceriam: é a armadilha 5 pelo lado do componente.
  *
- * O que MUDA fica em dois blocos pequenos aqui embaixo; o que se repete fica
- * aqui em cima, uma vez.
+ * O miolo do plano e das consultas mora aqui embaixo; o do prontuário, em
+ * `components/SecoesDoProntuario.tsx`.
  */
 export function DossieDaPacienteScreen({
   pacienteId,
@@ -65,25 +113,75 @@ export function DossieDaPacienteScreen({
 
   const [terapeutico, setTerapeutico] = useState<PlanoTerapeuticoDaPaciente | null>(null)
   const [consultas, setConsultas] = useState<ConsultaDoHistorico[]>([])
+  const [anamneses, setAnamneses] = useState<AnamneseDaPaciente[]>([])
+  const [exames, setExames] = useState<ExameDaPaciente[]>([])
+  const [calculos, setCalculos] = useState<CalculoEnergeticoDaPaciente[]>([])
+  const [medidas, setMedidas] = useState<Medida[]>([])
+  /* Sobe a cada "puxar para reler" -- o resumo da Aurora lê sozinho, porque
+     precisa voltar a perguntar enquanto ela está lendo, e é assim que a
+     moldura avisa que é para ler de novo. */
+  const [versao, setVersao] = useState(0)
   const [carregando, setCarregando] = useState(true)
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
 
+  /* Erro limpo no sucesso em todos os ramos -- armadilha 9. Esta tela relê ao
+     puxar. */
   const carregar = useCallback(async () => {
-    if (secao === 'terapeutico') {
-      const r = await planoTerapeuticoDaPaciente(pacienteId)
-      /* Erro limpo no sucesso -- armadilha 9. Esta tela relê ao puxar. */
-      if (r.tipo === 'ok') {
+    switch (secao) {
+      case 'terapeutico': {
+        const r = await planoTerapeuticoDaPaciente(pacienteId)
+        if (r.tipo === 'ok') {
+          setErro('')
+          setTerapeutico(r.plano)
+        } else setErro(r.mensagem)
+        return
+      }
+      case 'consultas': {
+        const r = await consultasDaPaciente(pacienteId)
+        if (r.tipo === 'ok') {
+          setErro('')
+          setConsultas(r.consultas)
+        } else setErro(r.mensagem)
+        return
+      }
+      case 'anamnese': {
+        const r = await anamnesesDaPaciente(pacienteId)
+        if (r.tipo === 'ok') {
+          setErro('')
+          setAnamneses(r.anamneses)
+        } else setErro(r.mensagem)
+        return
+      }
+      case 'exames': {
+        const r = await examesDaPaciente(pacienteId)
+        if (r.tipo === 'ok') {
+          setErro('')
+          setExames(r.exames)
+        } else setErro(r.mensagem)
+        return
+      }
+      case 'energetico': {
+        const r = await calculosDaPaciente(pacienteId)
+        if (r.tipo === 'ok') {
+          setErro('')
+          setCalculos(r.calculos)
+        } else setErro(r.mensagem)
+        return
+      }
+      case 'evolucao': {
+        /* `medidasDaPaciente` não rejeita e não devolve erro: falhou, vem
+           vazia, e a tela diz "sem avaliação". É o preço de ela ser a mesma
+           função da ficha, que precisa dela assim. */
         setErro('')
-        setTerapeutico(r.plano)
-      } else setErro(r.mensagem)
-      return
+        setMedidas(await medidasDaPaciente(pacienteId, AVALIACOES_NA_EVOLUCAO))
+        return
+      }
+      case 'resumo':
+        /* Lê sozinho -- ver `versao`. */
+        setVersao(v => v + 1)
+        return
     }
-    const r = await consultasDaPaciente(pacienteId)
-    if (r.tipo === 'ok') {
-      setErro('')
-      setConsultas(r.consultas)
-    } else setErro(r.mensagem)
   }, [pacienteId, secao])
 
   useEffect(() => {
@@ -107,7 +205,7 @@ export function DossieDaPacienteScreen({
     return () => sub.remove()
   })
 
-  const titulo = secao === 'terapeutico' ? `Plano de ${nome}` : `Consultas de ${nome}`
+  const titulo = tituloDaSecao(secao, nome)
 
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
@@ -154,6 +252,14 @@ export function DossieDaPacienteScreen({
             <Terapeutico plano={terapeutico} nome={nome} />
           )}
           {!erro && secao === 'consultas' && <Historico consultas={consultas} nome={nome} />}
+          {!erro && secao === 'anamnese' && <Anamneses anamneses={anamneses} nome={nome} />}
+          {!erro && secao === 'exames' && <Exames exames={exames} nome={nome} />}
+          {!erro && secao === 'energetico' && <Energetico calculos={calculos} nome={nome} />}
+          {!erro && secao === 'evolucao' && <Evolucao medidas={medidas} nome={nome} />}
+          {/* O resumo tem o próprio erro e a própria espera: ele continua
+              perguntando enquanto a Aurora lê, e um erro de rede numa das
+              voltas não pode apagar o resumo que já está na tela. */}
+          {secao === 'resumo' && <ResumoDaAurora pacienteId={pacienteId} nome={nome} versao={versao} />}
         </ScrollView>
       )}
     </View>
