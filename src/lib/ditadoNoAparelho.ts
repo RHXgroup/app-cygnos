@@ -135,9 +135,16 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
       }
     }
 
+    /* Sem permissão de RECONHECER, segue calado pelo servidor.
+     *
+     * Chamava `aoErro` ("o Cygnos não tem permissão para usar o microfone") E
+     * devolvia `indisponivel` -- e o `<Ditado>` trata `indisponivel` gravando
+     * pelo servidor. Ela lia que não havia microfone com o microfone gravando.
+     * O microfone em si já foi liberado antes daqui (`prepararMicrofone`); o
+     * que faltou é a permissão de transcrever no aparelho, que no iPhone é
+     * outra. O servidor não precisa dela. */
     const permissao = await m.requestPermissionsAsync()
     if (!permissao?.granted) {
-      op.aoErro(desfechoParaErro('not-allowed'))
       return { tipo: 'indisponivel', motivo: 'sem_permissao' }
     }
   } catch (e) {
@@ -150,7 +157,28 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
   /* ──────────────────── A ESCUTA ──────────────────── */
   const fechados: string[] = []
   let parcial = ''
+  /* Um desfecho só por escuta.
+   *
+   * A biblioteca promete que `end` é "sempre o último evento, INCLUSIVE depois
+   * de erro" -- está no README dela. Então todo erro que já tinha virado
+   * `aoErro` recebia um `aoFinal` logo em seguida, e o segundo desfazia o
+   * primeiro:
+   *   - na RESERVA, `aoErro` começava a gravar para o servidor, e o `end` que
+   *     chegava depois punha a tela em "parado" com o gravador ainda aberto: o
+   *     microfone ficava ligado sem ninguém ver, e o toque seguinte recusava
+   *     abrir o microfone;
+   *   - no erro comum, a frase certa ("o microfone está ocupado...") era
+   *     trocada por "Não ouvi nada".
+   * Achado na terceira rodada de testes, lendo o README contra os ouvintes,
+   * antes do primeiro teste do build de desenvolvimento.
+   *
+   * `terminou` passa a valer para os dois caminhos: quem chega primeiro decide,
+   * e o outro é ignorado. */
   let terminou = false
+  /* `cancelar` promete jogar fora o que foi ouvido. Mas `abort` também termina
+     em `end`, e o `end` entregava o texto como se ela tivesse tocado em
+     "pronto". */
+  let cancelada = false
 
   const inscricoes: { remove: () => void }[] = []
   const desligar = () => {
@@ -183,7 +211,12 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
   inscricoes.push(
     m.addListener('error', ev => {
       const d = desfechoDoErro(ev?.error)
+      /* Silêncio e parada seguem para o `end`, que entrega o que houver (ou
+         "não ouvi nada"). Todo o resto decide AQUI, e fecha a escuta. */
       if (d.tipo === 'parou' || d.tipo === 'silencio') return
+      if (terminou) return
+      terminou = true
+      desligar()
       if (d.tipo === 'reserva') {
         op.aoErro({ reserva: true, mensagem: '' })
         return
@@ -197,6 +230,7 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
       if (terminou) return
       terminou = true
       desligar()
+      if (cancelada) return
       op.aoFinal(juntarFalas(fechados, parcial))
     }),
   )
@@ -232,6 +266,7 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
       }
     },
     cancelar: () => {
+      cancelada = true
       try {
         m.abort()
       } catch (e) {
@@ -239,11 +274,4 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
       }
     },
   }
-}
-
-function desfechoParaErro(codigo: string): { reserva: boolean; mensagem: string } {
-  const d = desfechoDoErro(codigo)
-  if (d.tipo === 'reserva') return { reserva: true, mensagem: '' }
-  if (d.tipo === 'erro') return { reserva: false, mensagem: d.mensagem }
-  return { reserva: false, mensagem: '' }
 }
