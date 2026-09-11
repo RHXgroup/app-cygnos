@@ -444,6 +444,10 @@ export function CicloScreen({
         <ScrollView
           contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 32 }]}
           showsVerticalScrollIndicator={false}
+          /* "handled": o `<MeuCiclo>` tem dois campos numéricos AQUI dentro, e o
+             teclado numérico do Android não tem "ok". Sem isto, o primeiro toque
+             em "Guardar" só fechava o teclado, e ela tocava de novo. */
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             /* Também na ramificação de erro, e é ali que mais importa: puxar
                para tentar de novo é o gesto de quem leu "verifique a conexão". */

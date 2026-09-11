@@ -93,6 +93,11 @@ export function MaisDaNutriScreen({
       <ScrollView
         contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 28 }]}
         showsVerticalScrollIndicator={false}
+        /* "handled": os campos do aviso moram DENTRO desta rolagem, e sem isto
+           o primeiro toque em "Criar" com o teclado aberto só fechava o teclado
+           -- ela tocava, nada acontecia, e tocava de novo. Achado na terceira
+           rodada de testes, varrendo rolagem com campo e botão juntos. */
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={puxando}
