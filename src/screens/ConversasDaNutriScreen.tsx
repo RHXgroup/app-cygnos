@@ -118,6 +118,9 @@ export function ConversasDaNutriScreen({
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
   const rolagem = useRef<ScrollView>(null)
+  /* O que estava no campo quando o primeiro pedaço do ditado chegou. Nulo
+     fora de um ditado. Ver o `onParcial` do `<Ditado>`. */
+  const baseDoDitado = useRef<string | null>(null)
 
   /* O que a barra mostra: seta quando há texto, microfone quando não há.
      Derivado do campo, e não um estado paralelo que pode divergir dele. */
@@ -453,10 +456,40 @@ export function ConversasDaNutriScreen({
                  O padrao ('refeicao') seria pior ainda, que e lista de
                  alimento. */
               assunto="recado"
-              onTexto={ouvido =>
-                setTexto(antes => (antes.trim() ? antes.trim() + ' ' + ouvido : ouvido))
-              }
-              onErro={mensagem => setErro(mensagem)}
+              /* ENQUANTO ela fala, o mesmo padrão da Aurora (`baseDoDitado`
+                 lá): o parcial é a hipótese INTEIRA até ali, reescrita a cada
+                 pedaço -- e não o pedaço novo. Somar cada parcial ao campo daria
+                 "oi oi Ana oi Ana seu exame". Guarda o que estava escrito antes
+                 do primeiro pedaço e mostra começo + parcial, SUBSTITUINDO.
+
+                 Levantado pela sessão APP 2, que ligou o microfone e deixou
+                 esta tela para mim: o recado já ia pelo celular, mas só aparecia
+                 no fim. */
+              onParcial={parcial => {
+                setTexto(atual => {
+                  if (baseDoDitado.current === null) baseDoDitado.current = atual.trim()
+                  const base = baseDoDitado.current
+                  return base ? base + ' ' + parcial : parcial
+                })
+              }}
+              onTexto={ouvido => {
+                /* Com parcial, o começo certo é o guardado ANTES do primeiro
+                   pedaço -- o campo agora contém a frase parcial, e juntar a
+                   final nele duplicaria a fala. Sem parcial (Whisper), é o que
+                   está no campo, como sempre foi. */
+                const base = baseDoDitado.current
+                baseDoDitado.current = null
+                setTexto(antes => {
+                  const inicio = base !== null ? base : antes.trim()
+                  return inicio ? inicio + ' ' + ouvido : ouvido
+                })
+              }}
+              onErro={mensagem => {
+                /* O que foi ouvido fica no campo -- é dela --, mas o começo
+                   guardado sai, senão o próximo ditado começaria em cima dele. */
+                baseDoDitado.current = null
+                setErro(mensagem)
+              }}
             />
           )}
         </View>
