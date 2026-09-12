@@ -347,37 +347,16 @@ export function PainelDaNutriScreen({
             </Text>
             <Text style={styles.resumo}>{resumoDaAgenda(dia)}</Text>
           </View>
-          {/* —— AS MENSAGENS, no alto e do lado ——
-              Aqui e não numa aba: uma quinta aba desequilibraria a barra, que é
-              duas de cada lado do botão da Aurora. E aqui é onde ela cai ao
-              abrir o app — um ponto vermelho no primeiro lugar em que o olho
-              bate é o que faz ela ir olhar. */}
-          {!!onConversas && (
-            <Pressable
-              onPress={onConversas}
-              style={styles.botaoSair}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={
-                naoLidas > 0
-                  ? `Conversas, ${naoLidas} sem ler`
-                  : 'Conversas com os pacientes'
-              }
-            >
-              <Ionicons
-                name={naoLidas > 0 ? 'chatbubble' : 'chatbubble-outline'}
-                size={20}
-                color={naoLidas > 0 ? paleta().cores.verde : paleta().inkFraco}
-              />
-              {naoLidas > 0 && (
-                <View style={styles.pontinho}>
-                  <Text style={styles.numeroDoPontinho}>
-                    {naoLidas > 9 ? '9+' : naoLidas}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          )}
+          {/* O balãozinho SAIU daqui.
+              "Tinha avisado que a mensagem ficou lá no Mais; estava na tela
+              inicial, volta pra tela inicial, está muito ruim assim." Ele não
+              tinha saído -- era este ícone de 20 pontos, sem rótulo, colado no
+              botão de sair. Para quem usa, isso é o mesmo que não existir.
+
+              Agora é um cartão no corpo da tela, com a palavra escrita e o
+              número de não lidas. E fica um só: dois caminhos para a mesma
+              conversa, cada um com o seu pontinho, viram dúvida sobre qual
+              deles zera. */}
           <Pressable
             onPress={onSair}
             style={styles.botaoSair}
@@ -391,6 +370,45 @@ export function PainelDaNutriScreen({
         {/* O erro fica ACIMA do conteúdo, e não no fim: quem não vê a agenda
             que esperava precisa saber por quê antes de rolar atrás dela. */}
         {!!erro && <Text style={styles.erro}>{erro}</Text>}
+
+        {/* ──────────────────── AS CONVERSAS ────────────────────
+            Alto na tela, com a palavra escrita e o número na frente: é o que
+            ele pediu de volta. O número puxa o olho porque é o que muda -- e
+            quando não há nada sem ler, a linha continua ali, discreta, porque
+            começar uma conversa é gesto dela, e não só resposta. */}
+        {!!onConversas && (
+          <Pressable
+            onPress={onConversas}
+            style={({ pressed }) => [
+              styles.cartaoDeConversas,
+              naoLidas > 0 && styles.cartaoDeConversasAceso,
+              pressed && styles.pressionada,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              naoLidas > 0
+                ? `Conversas: ${naoLidas} ${naoLidas === 1 ? 'mensagem sem ler' : 'mensagens sem ler'}`
+                : 'Conversas com os pacientes'
+            }
+          >
+            <View style={[styles.iconeDasConversas, naoLidas > 0 && styles.iconeAceso]}>
+              <Ionicons
+                name={naoLidas > 0 ? 'chatbubble' : 'chatbubble-outline'}
+                size={18}
+                color={naoLidas > 0 ? paleta().cores.branco : paleta().inkSuave}
+              />
+            </View>
+            <View style={styles.textosDasConversas}>
+              <Text style={styles.tituloDasConversas}>Conversas</Text>
+              <Text style={[styles.detalheDasConversas, naoLidas > 0 && styles.detalheAceso]}>
+                {naoLidas > 0
+                  ? `${naoLidas} ${naoLidas === 1 ? 'mensagem sem ler' : 'mensagens sem ler'}`
+                  : 'Falar com os seus pacientes'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color={paleta().inkFraco} />
+          </Pressable>
+        )}
 
         {/* ── QUEM ESTÁ COM ELA AGORA ──────────────────────────────────
             O único cartão grande da tela. Se tudo tivesse o mesmo peso, a
@@ -1081,27 +1099,6 @@ const estilos = estilosDe(t =>
       color: t.inkFraco,
       marginBottom: 8,
     },
-    /* O ponto sobre o ícone. `position: absolute` dentro do botão, e não um
-       irmão ao lado: ao lado ele empurraria o botão de sair para a esquerda
-       toda vez que chegasse mensagem, e a saída mudaria de lugar sozinha. */
-    pontinho: {
-      position: 'absolute',
-      top: 2,
-      right: 2,
-      minWidth: 15,
-      height: 15,
-      borderRadius: 8,
-      paddingHorizontal: 3,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: t.cores.verde,
-    },
-    numeroDoPontinho: {
-      fontFamily: FONTE.forte,
-      fontSize: 9,
-      color: t.cores.branco,
-      fontVariant: ['tabular-nums'],
-    },
 
     botaoSair: { padding: 8, marginTop: -4, marginRight: -8 },
 
@@ -1272,6 +1269,36 @@ const estilos = estilosDe(t =>
     /* ──── O painel clínico ────
        Cartão alto, com respiro: o gráfico precisa de ar em volta para parecer
        gráfico, e não faixa colorida. */
+    /* ──── As conversas ────
+       Cartão de uma linha, com o ícone num quadrado: é a forma que o resto do
+       app usa para "abrir outra tela", e repeti-la aqui faz a linha ser
+       reconhecida antes de ser lida. Aceso quando há mensagem sem ler. */
+    cartaoDeConversas: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    cartaoDeConversasAceso: { borderColor: t.cores.verde },
+    iconeDasConversas: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.superficie,
+    },
+    iconeAceso: { backgroundColor: t.cores.verde },
+    textosDasConversas: { flex: 1, gap: 1 },
+    tituloDasConversas: { fontFamily: FONTE.forte, fontSize: 15, color: t.cores.ink },
+    detalheDasConversas: { fontSize: 12.5, color: t.inkFraco },
+    detalheAceso: { color: t.cores.verde, fontFamily: FONTE.meia },
+
     cartaoDoPulso: {
       backgroundColor: t.cores.cartao,
       borderWidth: 1,

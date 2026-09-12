@@ -116,13 +116,39 @@ const emParagrafos = (texto: string): string =>
  * e as classes são `[^*]` em vez de `.+?` porque dois destaques na mesma linha
  * viravam um só, engolindo o que estava no meio. */
 export function comMarcacoes(escapado: string): string {
-  return escapado
+  /* ── A LINHA DE ASSINATURA SAI DA FRENTE PRIMEIRO ──
+   *
+   * O contrato tem linhas assim:
+   *
+   *     _______________________________________
+   *     CONTRATADA — Renan — CRN 12345
+   *     1. Nome: ____________________ CPF: ____________
+   *
+   * E o sublinhado do editor do sistema é `__assim__`. Sem tirar os tracejados
+   * da frente, o `__` do fim de um casa com o `__` do começo do outro e engole
+   * o que está no meio -- justamente o nome de quem assina. Três ou mais
+   * sublinhados seguidos são traço para escrever à mão, e nunca marcação.
+   *
+   * O guardado volta no fim, porque o marcador de posição não pode sobreviver à
+   * função: um `` impresso no contrato seria um quadradinho no papel. */
+  const tracos: string[] = []
+  const semTracos = escapado.replace(/_{3,}/g, trecho => {
+    tracos.push(trecho)
+    return `${tracos.length - 1}`
+  })
+
+  const comTags = semTracos
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/__([^_]+)__/g, '<u>$1</u>')
     .replace(/==([^=]+)==/g, '<mark>$1</mark>')
     .replace(/\+\+([^+]+)\+\+/g, '<span class="grande">$1</span>')
     .replace(/~~([^~]+)~~/g, '<span class="pequeno">$1</span>')
     .replace(/_([^_]+)_/g, '<em>$1</em>')
+
+  return comTags.replace(
+    /(\d+)/g,
+    (_, n) => `<span class="assinar">${tracos[Number(n)] ?? ''}</span>`,
+  )
 }
 
 /* O mesmo vocabulário da tela (`CicloEDocumentos`), e com reserva explícita:
