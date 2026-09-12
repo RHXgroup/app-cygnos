@@ -103,7 +103,8 @@ import {
 import { calcularMetaDoDia, fraseDoDia, type MetaDoDia, type Pilar } from '../lib/metaDoDia'
 import { proximoPasso } from '../lib/proximoPasso'
 import { daquiA, janelaAcordada, ritmoDaAgua } from '../lib/ritmoAgua'
-import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
+import { PADDING_CARTAO, RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
+
 import { aSuaNutri, elaPronome } from '../lib/tratamentoDaNutri'
 
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
@@ -135,6 +136,7 @@ export function HomeScreen({
   onEditarPlano,
   onAbrirAgua,
   onAbrirCompras,
+  onAbrirPlanoInteiro,
   onRecarregar,
   onAbrirMetas,
   onAbrirPeso,
@@ -176,6 +178,9 @@ export function HomeScreen({
   onAbrirAgua: () => void
   /* A lista de compras nasce de um plano, entao quem abre entrega o plano. */
   onAbrirCompras: (plano: PlanoCompleto) => void
+  /* Abre o plano inteiro, por refeição, com as trocas que a nutricionista
+     cadastrou -- a tela que nasceu da página do link. */
+  onAbrirPlanoInteiro: (plano: PlanoCompleto) => void
   /* Puxar para atualizar. Sobe todos os contadores de uma vez, no App, porque é
      lá que eles moram — e um gesto que atualizasse um pedaço só deixaria o
      resto velho, o que é pior do que não atualizar: a pessoa acha que
@@ -1126,6 +1131,7 @@ export function HomeScreen({
         onMontarPlano={onMontarPlano}
         onEditarPlano={onEditarPlano}
         onAbrirCompras={onAbrirCompras}
+        onAbrirPlanoInteiro={onAbrirPlanoInteiro}
       />
 
       {/* ── Água + próxima refeição ── */}
@@ -1219,6 +1225,7 @@ function BlocoPlano({
   onMontarPlano,
   onEditarPlano,
   onAbrirCompras,
+  onAbrirPlanoInteiro,
 }: {
   plano: PlanoCompleto | null
   /* Quando o plano na tela é o de um acompanhamento que ACABOU. Ele continua
@@ -1230,6 +1237,9 @@ function BlocoPlano({
   onMontarPlano: () => void
   onEditarPlano: (plano: PlanoCompleto) => void
   onAbrirCompras: (plano: PlanoCompleto) => void
+  /* Abre o plano inteiro, por refeição, com as trocas que a nutricionista
+     cadastrou -- a tela que nasceu da página do link. */
+  onAbrirPlanoInteiro: (plano: PlanoCompleto) => void
 }) {
   const styles = estilos()
   if (carregando) {
@@ -1362,6 +1372,24 @@ function BlocoPlano({
           >
             <Ionicons name="cart-outline" size={16} color={paleta().cores.verde} />
             <Text style={styles.textoBotaoCompras}>Lista de compras</Text>
+          </Pressable>
+
+          {/* O PLANO INTEIRO, por refeição.
+              O cartão acima mostra o dia de hoje, para registrar. Ver o plano
+              todo -- e as trocas que ela cadastrou -- é outra coisa, e é o que
+              a página do link faz bem. Mesmo isolamento de toque do botão de
+              compras, pelo mesmo motivo. */}
+          <Pressable
+            onPress={e => {
+              e.stopPropagation()
+              onAbrirPlanoInteiro(plano)
+            }}
+            style={({ pressed }) => [styles.botaoCompras, pressed && styles.botaoComprasPressionado]}
+            accessibilityRole="button"
+            accessibilityLabel="Ver o plano inteiro, por refeição, com as opções de troca"
+          >
+            <Ionicons name="list-outline" size={16} color={paleta().cores.verde} />
+            <Text style={styles.textoBotaoCompras}>Ver o plano inteiro</Text>
           </Pressable>
         </>
       )}

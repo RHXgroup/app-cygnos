@@ -33,6 +33,7 @@ import { CodigoScreen } from './src/screens/CodigoScreen'
 import { ContadorCaloriasScreen } from './src/screens/ContadorCaloriasScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { ListaDeComprasScreen } from './src/screens/ListaDeComprasScreen'
+import { MeuPlanoScreen } from './src/screens/MeuPlanoScreen'
 import { LoginScreen } from './src/screens/LoginScreen'
 import { EditarPlanoScreen } from './src/screens/EditarPlanoScreen'
 import { ExcluirContaScreen } from './src/screens/ExcluirContaScreen'
@@ -362,6 +363,10 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   /* Guarda o plano, e nao um booleano: a lista de compras nao existe sem um,
      e passar o plano junto evita a tela ter de busca-lo de novo. */
   const [comprasDe, setComprasDe] = useState<PlanoCompleto | null>(null)
+  /* O plano inteiro, por refeição, com as trocas -- a tela que nasceu da página
+     do link. Guarda o PLANO, e não um booleano: a tela precisa dele, e buscar
+     de novo lá dentro seria uma segunda leitura do que a inicial já tem. */
+  const [planoInteiro, setPlanoInteiro] = useState<PlanoCompleto | null>(null)
   /* null = fechada. Aberta, guarda O QUE editar: um conjunto escolhido na lista,
      'nova' para começar em branco, ou 'ativa' quando veio do menu e a pessoa só
      quer mexer no que está valendo. */
@@ -578,6 +583,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         [questionarioAberto, () => setQuestionarioAberto(false)],
         [metasAbertas !== null, () => setMetasAbertas(null)],
         [comprasDe !== null, () => setComprasDe(null)],
+        [planoInteiro !== null, () => setPlanoInteiro(null)],
         [aguaAberta, () => setAguaAberta(false)],
         [planoEmEdicao !== null, () => setPlanoEmEdicao(null)],
         [cadastrosAberto, () => setCadastrosAberto(false)],
@@ -703,6 +709,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
                 onEditarPlano={setPlanoEmEdicao}
                 onAbrirAgua={() => setAguaAberta(true)}
                 onAbrirCompras={setComprasDe}
+                onAbrirPlanoInteiro={setPlanoInteiro}
                 /* Da tela inicial vai-se para o conjunto que está valendo: o
                    convite ali é "defina sua meta", não "crie mais uma". */
                 onAbrirMetas={() => setMetasAbertas('ativa')}
@@ -891,6 +898,12 @@ function AreaLogada({ sessao }: { sessao: Session }) {
         {comprasDe && (
           <Sobreposta>
             <ListaDeComprasScreen plano={comprasDe} onFechar={() => setComprasDe(null)} />
+          </Sobreposta>
+        )}
+
+        {planoInteiro && (
+          <Sobreposta>
+            <MeuPlanoScreen plano={planoInteiro} onFechar={() => setPlanoInteiro(null)} />
           </Sobreposta>
         )}
 
@@ -1083,6 +1096,7 @@ function TelaDaAba({
   onEditarPlano,
   onAbrirAgua,
   onAbrirCompras,
+  onAbrirPlanoInteiro,
   onAbrirMetas,
   onAbrirPeso,
   onAbrirContador,
@@ -1126,6 +1140,7 @@ function TelaDaAba({
   onEditarPlano: (plano: PlanoCompleto) => void
   onAbrirAgua: () => void
   onAbrirCompras: (plano: PlanoCompleto) => void
+  onAbrirPlanoInteiro: (plano: PlanoCompleto) => void
   onAbrirMetas: () => void
   onAbrirPeso: () => void
   onAbrirContador: () => void
@@ -1163,6 +1178,7 @@ function TelaDaAba({
           onEditarPlano={onEditarPlano}
           onAbrirAgua={onAbrirAgua}
           onAbrirCompras={onAbrirCompras}
+          onAbrirPlanoInteiro={onAbrirPlanoInteiro}
           onAbrirMetas={onAbrirMetas}
           onAbrirPeso={onAbrirPeso}
           onAbrirContador={onAbrirContador}
