@@ -125,6 +125,11 @@ export function Ditado({
      antes de ela falar, cai no servidor sem ela perceber; depois, as palavras
      dela se perderam, e aí ela precisa saber. */
   const recebeuParcial = useRef(false)
+  /* Quem encerrou a escuta do aparelho, e quando ela começou. Os dois existem
+     para a válvula do `aoFinal` saber distinguir "ela tocou em pronto" de "o
+     aparelho desistiu". */
+  const pararFoiDela = useRef(false)
+  const comecouAOuvir = useRef(0)
   /* A oferta do português fica para DEPOIS desta frase: aparecer com a pessoa
      no meio da fala seria uma caixa por cima do que ela está fazendo. */
   const ofertaPendente = useRef(false)
@@ -258,6 +263,8 @@ export function Ditado({
 
     if (OUVE_NO_APARELHO.has(assunto) && !semEscutaNoAparelho) {
       recebeuParcial.current = false
+      pararFoiDela.current = false
+      comecouAOuvir.current = Date.now()
       const e = await ouvirNoAparelho({
         aoParcial: texto => {
           recebeuParcial.current = true
@@ -267,6 +274,28 @@ export function Ditado({
           escuta.current = null
           setEstado('parado')
           const limpo = texto.trim()
+
+          /* ──────────────────── A VÁLVULA ────────────────────
+           *
+           * "Aurora com o mesmo defeito, não consigo falar uma palavra."
+           *
+           * Quando a escuta do aparelho encerra SOZINHA, com quase nada ouvido
+           * e em poucos segundos, o problema é do reconhecedor -- e insistir
+           * nele deixa ela sem ditar. Nesse caso o ditado vai pelo servidor na
+           * hora, sem ela precisar tocar de novo: é mais lento, e lento é
+           * melhor do que impossível.
+           *
+           * Só quando ELA NÃO mandou parar: uma palavra dita e o toque em
+           * "pronto" é uso legítimo, e mandar isso para o servidor apagaria o
+           * que ela acabou de ditar. */
+          const rapidoDemais = Date.now() - comecouAOuvir.current < 6000
+          if (!pararFoiDela.current && rapidoDemais && limpo.length < 15) {
+            console.log('[cygnos] ditado: o aparelho desistiu cedo; indo pelo servidor')
+            semEscutaNoAparelho = true
+            void gravarNoServidor()
+            return
+          }
+
           if (limpo) onTexto(limpo)
           /* Sem "ouvir a gravação": aqui não há gravação para ouvir. A frase do
              servidor manda tocar um áudio que não existe neste caminho. */
@@ -335,6 +364,10 @@ export function Ditado({
     /* Ouvindo pelo celular: parar ENTREGA o que foi ouvido -- chega pelo
        `aoFinal`. A referência sai antes de chamar, para um segundo toque não
        parar a mesma escuta duas vezes. */
+    /* Quem mandou parar foi ELA. Ver a válvula no `aoFinal`: o que distingue
+       "ela disse uma palavra e tocou em pronto" de "o aparelho desistiu na
+       primeira palavra" é exatamente isto. */
+    pararFoiDela.current = true
     const aberta = escuta.current
     if (aberta) {
       escuta.current = null

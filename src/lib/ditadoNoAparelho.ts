@@ -285,7 +285,16 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
     terminou = true
     desligar()
     if (cancelada) return
-    op.aoFinal(juntarFalas(fechados, parcial))
+    const tudo = juntarFalas(fechados, parcial)
+    console.log(
+      '[cygnos] ditado: entregando',
+      tudo.length,
+      'letras depois de',
+      recomecos,
+      'recomeços e',
+      Math.round((Date.now() - COMECOU_EM) / 1000) + 's',
+    )
+    op.aoFinal(tudo)
   }
 
   /* ── O RESPIRO DO ANDROID ──
@@ -326,6 +335,10 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
 
       /* Ela não mandou parar, ainda cabe tempo: recomeça, e o que já foi ouvido
          fica. É isto que transforma várias sessões do Android numa frase só. */
+      console.log(
+        '[cygnos] ditado: a escuta do aparelho encerrou.',
+        pediuParar ? 'Ela mandou parar.' : 'Sozinha -- vou recomeçar.',
+      )
       if (
         !pediuParar &&
         !cancelada &&
