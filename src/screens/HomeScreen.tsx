@@ -1957,7 +1957,14 @@ function FolhaDoDia({ doDia, onFechar }: { doDia: MetaDoDia; onFechar: () => voi
        abas sem escurecê-la — as outras folhas do app moram no App justamente
        para cobrir a barra. Centralizado, a questão não existe. */
     <View style={[StyleSheet.absoluteFill, styles.centroFolha]}>
-      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <Pressable
+        style={styles.fundoFolha}
+        onPress={onFechar}
+        /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+           disso: sem rótulo ele anuncia "botão" e nada mais. */
+        accessibilityRole="button"
+        accessibilityLabel="Fechar"
+      />
       <View style={[styles.folha, { marginBottom: bottom }]}>
         <View style={styles.topoFolha}>
           <AnelProgresso percentual={doDia.percentual} />

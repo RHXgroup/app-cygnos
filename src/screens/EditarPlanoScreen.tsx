@@ -367,7 +367,14 @@ export function EditarPlanoScreen({
           do app — Modal empilhado no iOS dá problema com o teclado. */}
       {acoesDe && (
         <View style={StyleSheet.absoluteFill}>
-          <Pressable style={styles.fundoMenu} onPress={() => setAcoesDe(null)} />
+          <Pressable
+            style={styles.fundoMenu}
+            onPress={() => setAcoesDe(null)}
+            /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+               disso: sem rótulo ele anuncia "botão" e nada mais. */
+            accessibilityRole="button"
+            accessibilityLabel="Fechar"
+          />
           <View style={[styles.menu, { paddingBottom: Math.max(bottom, 16) }]}>
             <View style={styles.puxador} />
             <Text style={styles.nomeMenu} numberOfLines={2}>

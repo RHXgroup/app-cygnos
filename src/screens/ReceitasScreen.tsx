@@ -239,7 +239,14 @@ export function ReceitasScreen({
           toque a mais sem escolha nenhuma. */}
       {usando && (
         <View style={StyleSheet.absoluteFill}>
-          <Pressable style={styles.fundoFolha} onPress={() => setUsando(null)} />
+          <Pressable
+            style={styles.fundoFolha}
+            onPress={() => setUsando(null)}
+            /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+               disso: sem rótulo ele anuncia "botão" e nada mais. */
+            accessibilityRole="button"
+            accessibilityLabel="Fechar"
+          />
           <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
             <View style={styles.puxador} />
             <Text style={styles.tituloFolha}>Quanto você comeu?</Text>

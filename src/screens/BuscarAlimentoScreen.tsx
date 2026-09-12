@@ -519,6 +519,11 @@ export function BuscarAlimentoScreen({
               fecharTeclado()
               limparPainel()
             }}
+            /* Sem rótulo, o leitor de tela anuncia só "botão" para a área que
+               ocupa a tela inteira -- e quem depende dele não tem como saber
+               que aquilo fecha o painel. */
+            accessibilityRole="button"
+            accessibilityLabel="Fechar"
           />
           <View
             style={[

@@ -1665,7 +1665,14 @@ function ConfirmarFoto({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable style={styles.fundoFolha} onPress={onDescartar} />
+      <Pressable
+        style={styles.fundoFolha}
+        onPress={onDescartar}
+        /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+           disso: sem rótulo ele anuncia "botão" e nada mais. */
+        accessibilityRole="button"
+        accessibilityLabel="Fechar"
+      />
       <View style={[styles.folha, styles.folhaAlta, { paddingBottom: Math.max(bottom, 16) }]}>
         {/* ── O PRATO ABRE A FOLHA ──────────────────────────────────────
          *
@@ -2073,7 +2080,14 @@ function EscolherDoPlano({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <Pressable
+        style={styles.fundoFolha}
+        onPress={onFechar}
+        /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+           disso: sem rótulo ele anuncia "botão" e nada mais. */
+        accessibilityRole="button"
+        accessibilityLabel="Fechar"
+      />
       <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
         <View style={styles.puxador} />
 
@@ -2160,7 +2174,14 @@ function ConferirDoPlano({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <Pressable
+        style={styles.fundoFolha}
+        onPress={onFechar}
+        /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+           disso: sem rótulo ele anuncia "botão" e nada mais. */
+        accessibilityRole="button"
+        accessibilityLabel="Fechar"
+      />
       <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
         <View style={styles.puxador} />
 
@@ -2298,7 +2319,14 @@ function Repetir({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <Pressable
+        style={styles.fundoFolha}
+        onPress={onFechar}
+        /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+           disso: sem rótulo ele anuncia "botão" e nada mais. */
+        accessibilityRole="button"
+        accessibilityLabel="Fechar"
+      />
       <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
         <View style={styles.puxador} />
 
@@ -2420,7 +2448,14 @@ function AcoesDoItem({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable style={styles.fundoFolha} onPress={onFechar} />
+      <Pressable
+        style={styles.fundoFolha}
+        onPress={onFechar}
+        /* O fundo fecha a folha, e o leitor de tela precisa saber o nome
+           disso: sem rótulo ele anuncia "botão" e nada mais. */
+        accessibilityRole="button"
+        accessibilityLabel="Fechar"
+      />
       <View style={[styles.folha, { paddingBottom: Math.max(bottom, 16) }]}>
         <View style={styles.puxador} />
 
