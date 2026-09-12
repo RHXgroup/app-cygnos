@@ -46,6 +46,25 @@ export function tipoDoVideo(uri: string): string {
   return 'video/mp4'
 }
 
+/* ──── E o `mp4` no fim é LISTA DE EXCEÇÃO, de propósito ────
+ *
+ * A régua que a gente acabou de escrever diz o contrário: quando o padrão de um
+ * valor não decidido pode incomodar alguém, o padrão é o lado calado e a lista é
+ * de quem PODE. Foi assim que `deveApitar` nasceu explícita.
+ *
+ * Aqui é o inverso, e a exceção precisa ficar escrita, senão alguém "conserta"
+ * isto para uma lista explícita e quebra o caminho comum: **no Android a
+ * galeria devolve `content://...` SEM extensão nenhuma**. Recusar o
+ * desconhecido recusaria justamente a escolha normal de quem pega um vídeo da
+ * galeria -- e esses vídeos são mp4 na esmagadora maioria.
+ *
+ * O custo de deixar assim, dito por inteiro: um arquivo com extensão exótica
+ * (`.avi`) sai rotulado de mp4, o balde aceita porque o rótulo está na lista, e
+ * quem falha é o tocador do outro lado -- "o vídeo não abre", sem erro nenhum.
+ * É uma falha silenciosa, e é o preço de não recusar o `content://`.
+ *
+ * A régua continua valendo; o que muda é qual lado é o calado. Aqui recusar é o
+ * lado RUIDOSO, porque recusa a maioria para proteger a minoria. */
 const nomeUnico = (extensao: string) =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.${extensao}`
 
