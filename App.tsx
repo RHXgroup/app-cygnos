@@ -262,7 +262,26 @@ function Raiz() {
        nenhuma tela do paciente, então não existe caminho — nem por
        engano — de uma para a outra. */
     if (acesso === 'nutricionista') {
-      return <AreaDaNutri onSair={() => void sairDaConta()} />
+      return (
+        <>
+          <AreaDaNutri onSair={() => void sairDaConta()} />
+          {/* O CARIMBO TAMBÉM AQUI.
+           *
+           * Ele existia só na árvore do paciente -- e a dela sai por este
+           * `return`, antes daquele JSX. Resultado: passei um dia inteiro
+           * pedindo "confira o carimbo no canto" para alguém que nunca teve
+           * carimbo nenhum na tela, e cada teste dele virou dúvida sobre qual
+           * versão estava rodando.
+           *
+           * É a armadilha 5 pelo lado do LAYOUT: duas árvores separadas de
+           * propósito, e o que se acrescenta numa não aparece na outra. */}
+          {__DEV__ && (
+            <View style={[styles.marca, styles.marcaDaNutri]} pointerEvents="none">
+              <Text style={styles.marcaTexto}>{MARCA_DO_PACOTE}</Text>
+            </View>
+          )}
+        </>
+      )
     }
     return <AreaLogada sessao={sessao} />
   }
@@ -1247,6 +1266,10 @@ const estilos = estilosDe(t =>
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   marcaTexto: { fontSize: 10, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
+  /* Na árvore dela não há `insets` à mão -- ela mede a própria área segura lá
+     dentro. 46 é a faixa de status de qualquer aparelho recente, e o carimbo é
+     pintura: dois pontos a mais ou a menos não atrapalham nada. */
+  marcaDaNutri: { top: 46 },
   telaApp: { flex: 1, backgroundColor: t.cores.fundo },
   carrossel: { flex: 1 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.cores.fundo },
