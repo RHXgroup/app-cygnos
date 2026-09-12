@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -14,6 +14,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDesvioDoTeclado } from '../lib/teclado'
+import { NovaConsultaScreen } from './NovaConsultaScreen'
+import { confirmarConsulta, geraFinanceiroSozinho, marcarComoAtendida } from '../lib/acoesDaConsulta'
 import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import {
@@ -98,6 +100,14 @@ export function AgendaDaNutriScreen({
      na mão. */
   const [agindoEm, setAgindoEm] = useState<ConsultaDoDia | null>(null)
 
+  /* Marcar consulta, aberta por cima da agenda. Guarda o dia e a hora de onde
+     ela tocou: do horário livre vêm os dois, do botão do topo vem só o dia em
+     foco -- e do dia vazio, o dia também. Nulo quando está fechada. */
+  const [marcando, setMarcando] = useState<{ data: string; hora?: string } | null>(null)
+  /* A frase que a agenda mostra depois de marcar, que é a do BANCO ("Consulta
+     agendada para 12/09/2026 14:30."). Some sozinha: é confirmação, não erro. */
+  const [recado, setRecado] = useState('')
+
   /* O expediente dela, lido uma vez. Não entra no `buscar` porque não muda
      quando ela troca de dia -- e põ-lo lá faria uma ida ao banco a cada seta. */
   const [expediente, setExpediente] = useState<Expediente>(EXPEDIENTE_PADRAO)
@@ -115,6 +125,10 @@ export function AgendaDaNutriScreen({
      fecham, que é quando ele deve ficar na frente. Armadilha 1. */
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (marcando) {
+        setMarcando(null)
+        return true
+      }
       if (agindoEm) {
         setAgindoEm(null)
         return true
@@ -126,7 +140,7 @@ export function AgendaDaNutriScreen({
       return false
     })
     return () => sub.remove()
-  }, [agindoEm, fichaAberta])
+  }, [agindoEm, fichaAberta, marcando])
 
   /* Que pedaço do calendário está na tela. O mês pede a grade INTEIRA, sobras
      inclusive: as células de 31 de agosto e 4 de outubro também mostram
@@ -201,6 +215,25 @@ export function AgendaDaNutriScreen({
     )
   }
 
+  if (marcando) {
+    return (
+      <NovaConsultaScreen
+        dataInicial={marcando.data}
+        horaInicial={marcando.hora}
+        onFechar={() => setMarcando(null)}
+        onMarcou={(diaISO, mensagem) => {
+          setMarcando(null)
+          /* Vai para o dia em que ela marcou, e não fica onde estava: a
+             conferência de "entrou mesmo?" é ver a consulta na lista. */
+          setFoco(diaISO)
+          setVista('dia')
+          setRecado(mensagem)
+          void buscar()
+        }}
+      />
+    )
+  }
+
   const painel = agindoEm ? (
     <PainelDaConsulta
       consulta={agindoEm}
@@ -265,6 +298,19 @@ export function AgendaDaNutriScreen({
         >
           <Ionicons name="chevron-forward" size={21} color={paleta().cores.ink} />
         </Pressable>
+
+        {/* MARCAR, no lugar mais alcançável da tela.
+            Vinha faltando desde que a agenda nasceu, e era o primeiro gesto que
+            ela tentava: "estou no dia, quero incluir aqui, e não deixa". */}
+        <Pressable
+          onPress={() => setMarcando({ data: emBarras(foco) })}
+          hitSlop={10}
+          style={styles.botaoMarcar}
+          accessibilityRole="button"
+          accessibilityLabel="Marcar consulta"
+        >
+          <Ionicons name="add" size={22} color={paleta().cores.branco} />
+        </Pressable>
       </View>
 
       <View style={styles.seletor}>
@@ -284,6 +330,11 @@ export function AgendaDaNutriScreen({
       </View>
 
       {!!erro && <Text style={styles.erro}>{erro}</Text>}
+      {!!recado && (
+        <Pressable onPress={() => setRecado('')} accessibilityRole="button" accessibilityLabel="Entendi">
+          <Text style={styles.recadoDaAgenda}>{recado}</Text>
+        </Pressable>
+      )}
 
       {carregando ? (
         <View style={styles.centro}>
@@ -346,6 +397,7 @@ export function AgendaDaNutriScreen({
               )}
               onAbrirFicha={setFichaAberta}
               onAgir={setAgindoEm}
+              onMarcar={hora => setMarcando({ data: emBarras(foco), hora })}
             />
           )}
         </ScrollView>
@@ -560,6 +612,7 @@ function BlocoDeDia({
 }
 
 function ListaDoDia({
+  onMarcar,
   consultas,
   buracos,
   onAbrirFicha,
@@ -567,6 +620,8 @@ function ListaDoDia({
 }: {
   consultas: ConsultaDoDia[]
   buracos: Buraco[]
+  /** Abre a tela de marcar já com esta hora ("14:30"), ou só com o dia. */
+  onMarcar: (hora?: string) => void
   onAbrirFicha: (id: number) => void
   onAgir: (c: ConsultaDoDia) => void
 }) {
@@ -591,6 +646,17 @@ function ListaDoDia({
       <View style={styles.vazio}>
         <Ionicons name="calendar-clear-outline" size={22} color={paleta().inkFraco} />
         <Text style={styles.textoVazio}>Sem consulta marcada neste dia.</Text>
+        {/* O dia vazio é onde ele travou: "estou no dia que não tem nenhum, não
+            deixa incluir". Um dia vazio sem saída é a tela dizendo não. */}
+        <Pressable
+          onPress={() => onMarcar()}
+          style={({ pressed }) => [styles.botaoDoVazio, pressed && styles.pressionado]}
+          accessibilityRole="button"
+          accessibilityLabel="Marcar consulta neste dia"
+        >
+          <Ionicons name="add" size={16} color={paleta().cores.branco} />
+          <Text style={styles.textoDoBotaoDoVazio}>Marcar consulta</Text>
+        </Pressable>
       </View>
     )
   }
@@ -601,7 +667,7 @@ function ListaDoDia({
         x.consulta ? (
           <Linha key={x.chave} consulta={x.consulta} onAbrirFicha={onAbrirFicha} onAgir={onAgir} />
         ) : (
-          <VagaLivre key={x.chave} buraco={x.buraco!} />
+          <VagaLivre key={x.chave} buraco={x.buraco!} onMarcar={onMarcar} />
         ),
       )}
     </View>
@@ -614,13 +680,13 @@ function ListaDoDia({
  * contorno cheio diz "isto está ocupado" e o tracejado diz "isto está vazio",
  * e as duas coisas na mesma lista precisam se distinguir sem ela ler.
  *
- * ──── NÃO é botão, e isso é escolha ────
- * Tocar aqui deveria abrir "agendar neste horário" -- e agendar exige escolher
- * o paciente, o tipo e a duração, que é uma tela que ainda não existe no
- * celular. Um retângulo que parece tocável e não faz nada é pior do que um
- * que não promete: ela toca, nada acontece, e passa a desconfiar do resto da
- * tela. Quando a tela de agendar existir, esta linha vira botão. */
-function VagaLivre({ buraco }: { buraco: Buraco }) {
+ * ──── E AGORA É BOTÃO ────
+ * Dizia aqui que não era, porque a tela de marcar não existia e um retângulo
+ * que parece tocável e não faz nada é pior do que um que não promete. A tela
+ * existe desde 11/09: tocar num horário livre abre a marcação com o dia e a
+ * HORA deste buraco já preenchidos, que é o caminho mais curto entre ver o
+ * vazio e preenchê-lo. */
+function VagaLivre({ buraco, onMarcar }: { buraco: Buraco; onMarcar: (hora?: string) => void }) {
   const styles = estilos()
   const hora = (t: number) => {
     const x = new Date(t)
@@ -630,17 +696,19 @@ function VagaLivre({ buraco }: { buraco: Buraco }) {
   const ate = hora(buraco.ate)
 
   return (
-    <View
-      style={styles.vaga}
-      accessibilityRole="text"
-      accessibilityLabel={`Livre das ${de} às ${ate}, ${duracaoPorExtenso(buraco.minutos)}`}
+    <Pressable
+      onPress={() => onMarcar(de)}
+      style={({ pressed }) => [styles.vaga, pressed && styles.pressionado]}
+      accessibilityRole="button"
+      accessibilityLabel={`Livre das ${de} às ${ate}, ${duracaoPorExtenso(buraco.minutos)}. Marcar consulta.`}
     >
       <Text style={styles.horaDaVaga}>{de}</Text>
       <Text style={styles.textoDaVaga}>
         Livre até {ate}
       </Text>
       <Text style={styles.duracaoDaVaga}>{duracaoPorExtenso(buraco.minutos)}</Text>
-    </View>
+      <Ionicons name="add-circle-outline" size={18} color={paleta().cores.verde} />
+    </Pressable>
   )
 }
 
@@ -734,6 +802,12 @@ function Linha({
  * Mora aqui e nao num arquivo proprio porque ela usa a folha de estilo desta
  * tela inteira; mover exigiria duplicar a folha, que e o mesmo problema com
  * outro nome. */
+/* "2026-09-12" vira "12/09/2026" -- o formato do campo da tela de marcar. */
+function emBarras(iso: string): string {
+  const [ano, mes, dia] = iso.split('-')
+  return dia && mes && ano ? `${dia}/${mes}/${ano}` : ''
+}
+
 export function PainelDaConsulta({
   consulta,
   onFechar,
@@ -764,7 +838,23 @@ export function PainelDaConsulta({
   const [hora, setHora] = useState('')
   const [motivo, setMotivo] = useState('')
   const [salvando, setSalvando] = useState(false)
+  /* A trava do toque duplo: `salvando` só vale na renderização seguinte, e
+     confirmar duas vezes é pedir ao banco duas vezes a mesma coisa. */
+  const salvandoAgora = useRef(false)
   const [recado, setRecado] = useState('')
+  /* Ligado quando o consultório gera título sozinho ao dar por atendida. Serve
+     só para a frase: é o que diz a ela que o lançamento NÃO nasceu aqui. */
+  const [financeiroAuto, setFinanceiroAuto] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    void geraFinanceiroSozinho().then(x => {
+      if (vivo) setFinanceiroAuto(x)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
 
   /* Sem lista de dependências, pelo mesmo motivo da tela: assim este fica na
      frente do da agenda e do `AreaDaNutri`, e o voltar descasca um degrau por
@@ -782,6 +872,31 @@ export function PainelDaConsulta({
     })
     return () => sub.remove()
   })
+
+  /* ──────────────────── O BÁSICO QUE SÓ EXISTIA NO SITE ────────────────────
+   *
+   * "Confirmar que eu atendi, essas coisinhas têm que funcionar aqui." Eram
+   * dois toques no computador, e no celular não havia nenhum: a agenda mostrava
+   * o dia e não deixava mexer no estado de nada. */
+  async function acao(qual: 'confirmar' | 'atendida') {
+    if (salvando || salvandoAgora.current) return
+    salvandoAgora.current = true
+    setSalvando(true)
+    setRecado('')
+
+    const r =
+      qual === 'confirmar'
+        ? await confirmarConsulta(consulta.id)
+        : await marcarComoAtendida(consulta.id)
+
+    salvandoAgora.current = false
+    setSalvando(false)
+
+    /* Deu certo: o painel fecha e a agenda relê -- a prova é a linha mudando de
+       cor na lista, e não uma frase dentro de uma folha que sumiu. */
+    if (r.ok) onMudou()
+    else setRecado(r.mensagem)
+  }
 
   async function confirmarRemarcacao() {
     const lido = interpretarRemarcacao(data, hora)
@@ -834,6 +949,47 @@ export function PainelDaConsulta({
 
         {modo === 'menu' && (
           <>
+            {/* Só o que cabe NESTE estado. Confirmar uma consulta já confirmada
+                ou dar por atendida uma cancelada são opções que existiriam para
+                a pessoa descobrir, tocando, que não fazem nada. */}
+            {consulta.status === 'pendente' && (
+              <Pressable
+                onPress={() => void acao('confirmar')}
+                disabled={salvando}
+                style={({ pressed }) => [styles.opcaoDaFolha, pressed && styles.pressionado]}
+                accessibilityRole="button"
+                accessibilityLabel="Confirmar consulta"
+              >
+                <Ionicons name="checkmark-circle-outline" size={18} color={paleta().cores.verde} />
+                <Text style={styles.textoDaOpcao}>Confirmar</Text>
+              </Pressable>
+            )}
+
+            {(consulta.status === 'pendente' || consulta.status === 'confirmada') && (
+              <Pressable
+                onPress={() => void acao('atendida')}
+                disabled={salvando}
+                style={({ pressed }) => [styles.opcaoDaFolha, pressed && styles.pressionado]}
+                accessibilityRole="button"
+                accessibilityLabel="Marcar como atendida"
+              >
+                <Ionicons name="person-circle-outline" size={18} color={paleta().cores.ink} />
+                <Text style={styles.textoDaOpcao}>Atendi esta consulta</Text>
+              </Pressable>
+            )}
+
+            {financeiroAuto &&
+              (consulta.status === 'pendente' || consulta.status === 'confirmada') && (
+                /* Dito ANTES, e não depois: no sistema, dar por atendida também
+                   gera o título quando o consultório tem geração automática, e
+                   essa regra (mensalidade, convênio, parcelas) mora lá. Marcar
+                   aqui e ela descobrir sozinha que a cobrança não nasceu é o
+                   defeito que já custou dez consultas sem título em agosto. */
+                <Text style={styles.dica}>
+                  O lançamento no financeiro continua sendo feito no computador.
+                </Text>
+              )}
+
             <Pressable
               onPress={() => {
                 setModo('remarcar')
@@ -1106,6 +1262,23 @@ const estilos = estilosDe(t =>
       paddingBottom: 6,
     },
     seta: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    botaoMarcar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.cores.verde,
+    },
+    recadoDaAgenda: {
+      marginHorizontal: 16,
+      marginBottom: 8,
+      fontSize: 13.5,
+      color: t.cores.ink,
+      backgroundColor: t.cores.verdeMenta,
+      padding: 12,
+      borderRadius: 12,
+    },
     tituloArea: { flex: 1, alignItems: 'center' },
     /* 23 e não 18. É o título desta tela, e ele estava do tamanho de um
        subtítulo -- espremido entre duas setas, sem peso nenhum para dizer que
@@ -1302,6 +1475,17 @@ const estilos = estilosDe(t =>
       borderRadius: RAIO_CARTAO,
     },
     textoVazio: { fontSize: 14, color: t.inkSuave },
+    botaoDoVazio: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 4,
+      backgroundColor: t.cores.verde,
+      borderRadius: 999,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+    },
+    textoDoBotaoDoVazio: { fontFamily: FONTE.forte, fontSize: 13.5, color: t.cores.branco },
 
     pressionado: { opacity: 0.75 },
   }),
