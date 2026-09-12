@@ -132,7 +132,7 @@ export type MedicamentoDoDocumento = {
 
 export type DocumentoDaPaciente = {
   id: number
-  /** "receituario", "atestado"… como o sistema gravou. */
+  /** "receituario" ou "atestado" -- a BASE, como o sistema gravou. */
   tipo: string
   /** O que ela deu de nome, ou o rótulo do modelo. */
   titulo: string | null
@@ -241,6 +241,64 @@ export async function documentosDaPaciente(
   const todos = [...doSistema, ...deFora].sort((a, b) => (b.quando ?? '').localeCompare(a.quando ?? ''))
 
   return { tipo: 'ok', documentos: todos.slice(0, TETO_DE_DOCUMENTOS) }
+}
+
+/* ══════════════ QUE DOCUMENTO É ESTE, DE VERDADE ══════════════
+ *
+ * Relatado em uso: "ele está como atestado, mas não é atestado. É um contrato
+ * de prestação de serviço. Tá parecendo tudo como atestado, mas na verdade não
+ * são: tem atestado, tem contrato, tem avaliação, e aparece como atestado."
+ *
+ * E o sistema está certo: a coluna `tipo` guarda a BASE -- 'receituario' abre a
+ * lista de medicamentos, 'atestado' é texto livre --, e QUAL documento é fica no
+ * TÍTULO. Treze modelos diferentes gravam `tipo = 'atestado'`.
+ *
+ * A tela do sistema resolve isso procurando o título na lista de modelos, e é o
+ * mesmo caminho aqui. A lista está copiada de `lib/documentoDoPaciente.ts` do
+ * sistema, e copiada de propósito: são dois repositórios, e importar de lá não
+ * existe. Quando um modelo novo nascer, um título que não estiver aqui cai na
+ * base -- "Atestado" ou "Receituário" --, que é o que era antes desta função e
+ * continua sendo resposta honesta. */
+const MODELOS: { rotulo: string; base: string }[] = [
+  { rotulo: 'Atestado', base: 'atestado' },
+  { rotulo: 'Receituário', base: 'receituario' },
+  { rotulo: 'Avaliação Antropométrica', base: 'atestado' },
+  { rotulo: 'Exames Bioquímicos', base: 'atestado' },
+  { rotulo: 'Relatório Sequencial de Consultas', base: 'atestado' },
+  { rotulo: 'Solicitação de Exames Laboratoriais', base: 'atestado' },
+  { rotulo: 'Tabela de Alimentos', base: 'atestado' },
+  { rotulo: 'Encaminhamento', base: 'atestado' },
+  { rotulo: 'Solicitação de Exames Bioquímicos', base: 'atestado' },
+  { rotulo: 'Plano Alimentar Qualitativo', base: 'atestado' },
+  { rotulo: 'Relatório Inicial', base: 'atestado' },
+  { rotulo: 'Relatório de Contrarreferência', base: 'atestado' },
+  { rotulo: 'Contrato de Prestação de Serviços', base: 'atestado' },
+]
+
+/* Sem acento, sem caixa e sem espaço duplo: o título foi digitado por gente, e
+   "Contrato de prestação de serviços" é o mesmo documento que o do modelo. */
+const chaveDoTitulo = (texto: string): string =>
+  [...texto.normalize('NFD')]
+    .filter(c => {
+      const n = c.codePointAt(0) ?? 0
+      return n < 0x300 || n > 0x36f
+    })
+    .join('')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+export function comoSeChama(documento: { tipo: string; titulo: string | null }): string {
+  const titulo = (documento.titulo ?? '').trim()
+  if (titulo) {
+    const chave = chaveDoTitulo(titulo)
+    const modelo = MODELOS.find(m => chaveDoTitulo(m.rotulo) === chave)
+    if (modelo) return modelo.rotulo
+    /* Título que não é modelo nenhum é nome que ELA deu ("Contrato Maria
+       2026"), e o nome dela vale mais que o nosso rótulo. */
+    return titulo
+  }
+  return documento.tipo === 'receituario' ? 'Receituário' : 'Atestado'
 }
 
 /* O `medicamentos` é `jsonb` e vem do que a tela do sistema gravou. Cada item é

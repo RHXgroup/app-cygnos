@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
@@ -256,15 +256,31 @@ export function DossieDaPacienteScreen({
     }
   }, [carregar])
 
-  /* Sem lista de dependências: põe este tratador na frente do da ficha e do da
-     área a partir da segunda renderização. Armadilha 1. */
+  /* ──── REGISTRADO UMA VEZ, e não a cada renderização ────
+   *
+   * Relatado em uso: "eu mando voltar, mesma coisa, ele volta lá pra tela do
+   * paciente e tem que voltar pra tela de prescrições".
+   *
+   * Este arquivo dizia "sem lista de dependências, para ficar na frente do
+   * tratador da ficha". Isso valia quando ele não hospedava nada. Hoje ele
+   * hospeda QUATRO telas -- documento, importar exame, novo cálculo e anamnese
+   * --, e sem lista ele se re-registra a cada renderização: como o React roda os
+   * efeitos do FILHO antes dos do PAI, o daqui entrava por último e ganhava de
+   * todas elas. O voltar dentro do documento fechava o dossiê inteiro.
+   *
+   * Com `[]` e o `onFechar` num `ref`, ele é registrado na abertura e fica
+   * ATRÁS de tudo o que abrir depois -- que é a ordem certa. É o mesmo desenho
+   * do `PlanoDaPacienteScreen`, e o motivo está escrito lá também. */
+  const fechar = useRef(onFechar)
+  fechar.current = onFechar
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onFechar()
+      fechar.current()
       return true
     })
     return () => sub.remove()
-  })
+  }, [])
 
   const titulo = tituloDaSecao(secao, nome)
 

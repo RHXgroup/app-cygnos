@@ -29,11 +29,11 @@ import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 import { File, Paths } from 'expo-file-system'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import type { DocumentoDaPaciente } from '../lib/fichaCompleta'
+import { comoSeChama, type DocumentoDaPaciente } from '../lib/fichaCompleta'
 import {
   folhaDoDocumento,
   nomeDoArquivoDoDocumento,
-  rotuloDoTipo,
+  semMarcacoes,
   tituloComData,
 } from '../lib/folhaDoDocumento'
 import { timbradoDaNutri } from '../lib/souNutri'
@@ -92,7 +92,20 @@ export function DocumentoDaPacienteScreen({
     try {
       /* O timbrado é lido na hora: é o nome e o registro DELA no alto da folha,
          e sem ele o papel sai anônimo. Falhar a leitura não impede o PDF. */
+      /* O TAMANHO no log, e não uma teoria sobre o corte.
+         Relatado: "ele para na cláusula quinze, e a assinatura da paciente não
+         tem". Este número separa as duas causas possíveis -- texto que chegou
+         cortado do banco, ou folha que cortou na impressão -- e é o mesmo
+         truque que resolveu o PDF do plano: medir em vez de deduzir. */
+      console.log(
+        '[cygnos] documento:',
+        (documento.conteudo ?? '').length,
+        'caracteres de texto,',
+        documento.medicamentos.length,
+        'itens',
+      )
       const html = folhaDoDocumento(documento, nome, await timbradoDaNutri())
+      console.log('[cygnos] documento: folha com', html.length, 'caracteres')
       const feito = await Print.printToFileAsync({ html, base64: true })
       uri = feito.uri
       base64 = feito.base64
@@ -144,7 +157,7 @@ export function DocumentoDaPacienteScreen({
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela} numberOfLines={1}>
-          {rotuloDoTipo(documento.tipo)}
+          {comoSeChama(documento)}
         </Text>
         <View style={styles.botaoVoltar} />
       </View>
@@ -153,7 +166,7 @@ export function DocumentoDaPacienteScreen({
         contentContainerStyle={[styles.conteudo, { paddingBottom: bottom + 28 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.titulo}>{documento.titulo || rotuloDoTipo(documento.tipo)}</Text>
+        <Text style={styles.titulo}>{comoSeChama(documento)}</Text>
         <Text style={styles.subtitulo}>
           {nome}
           {documento.quando ? ` · ${porExtenso(documento.quando)}` : ''}
@@ -179,7 +192,7 @@ export function DocumentoDaPacienteScreen({
             linhas, e é aqui que ela vem ler o que escreveu. */}
         {!!documento.conteudo && (
           <Text style={styles.texto} selectable>
-            {documento.conteudo}
+            {semMarcacoes(documento.conteudo)}
           </Text>
         )}
 

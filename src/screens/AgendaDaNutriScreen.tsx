@@ -128,17 +128,32 @@ export function AgendaDaNutriScreen({
      dentro, e o voltar fechava a ficha inteira em vez da seção aberta nela.
      Com a lista, ele só se re-registra quando a ficha ou a folha abrem e
      fecham, que é quando ele deve ficar na frente. Armadilha 1. */
+  /* ──── Registrado UMA VEZ, lendo o estado por `ref` ────
+   *
+   * Com lista de dependências ele se re-registrava toda vez que a tela de
+   * marcar abria -- e, como os efeitos do FILHO rodam antes dos do PAI, entrava
+   * por último e ganhava dela: o voltar dentro da busca de paciente fechava a
+   * marcação inteira em vez de voltar ao formulário.
+   *
+   * Registrado na abertura, ele fica ATRÁS de tudo o que abre depois, e só
+   * decide quando ninguém de dentro decidiu. O estado vem de `ref` porque um
+   * tratador registrado uma vez leria para sempre os valores da primeira
+   * renderização. */
+  const estado = useRef({ marcando, agindoEm, fichaAberta, vista })
+  estado.current = { marcando, agindoEm, fichaAberta, vista }
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (marcando) {
+      const agora = estado.current
+      if (agora.marcando) {
         setMarcando(null)
         return true
       }
-      if (agindoEm) {
+      if (agora.agindoEm) {
         setAgindoEm(null)
         return true
       }
-      if (fichaAberta !== null) {
+      if (agora.fichaAberta !== null) {
         setFichaAberta(null)
         return true
       }
@@ -154,14 +169,14 @@ export function AgendaDaNutriScreen({
        * inteira -- e a pessoa perdia o lugar onde estava.
        *
        * Do MÊS, que é onde a tela abre, o voltar devolve: aí sim é sair. */
-      if (vista !== 'mes') {
+      if (agora.vista !== 'mes') {
         setVista('mes')
         return true
       }
       return false
     })
     return () => sub.remove()
-  }, [agindoEm, fichaAberta, marcando, vista])
+  }, [])
 
   /* Que pedaço do calendário está na tela. O mês pede a grade INTEIRA, sobras
      inclusive: as células de 31 de agosto e 4 de outubro também mostram

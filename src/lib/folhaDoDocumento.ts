@@ -1,5 +1,5 @@
 import { folhaPadrao, seguro, type TimbradoDaNutri } from './folhaPadrao'
-import type { DocumentoDaPaciente } from './fichaCompleta'
+import { comoSeChama, type DocumentoDaPaciente } from './fichaCompleta'
 
 /* O PDF de um receituário, atestado ou prescrição -- no padrão da casa.
  *
@@ -35,8 +35,11 @@ export function folhaDoDocumento(
     .join('\n')
 
   return folhaPadrao({
-    rotulo: rotuloDoTipo(documento.tipo),
-    titulo: documento.titulo || rotuloDoTipo(documento.tipo),
+    /* O que o documento É -- contrato, avaliação, encaminhamento --, e não a
+       base 'atestado' que treze modelos diferentes gravam. Um contrato de
+       prestação de serviços saindo com "ATESTADO" no canto é papel errado. */
+    rotulo: comoSeChama(documento),
+    titulo: comoSeChama(documento),
     subtitulo: `Paciente: ${paciente}`,
     corpo,
     nutri,
@@ -49,7 +52,13 @@ export function folhaDoDocumento(
       }
       .itens td { padding: 9px 10px 9px 0; border-bottom: 1px solid #f0f2ed; vertical-align: top }
       .itens td.nome { font-weight: 600; color: #262921 }
-      .texto p { margin-bottom: 10px }
+      /* Uma linha sozinha no pé ou no alto da página é o que faz um documento
+         longo parecer cortado; e a linha de assinatura partida ao meio é papel
+         que ninguém aceita. */
+      .texto p { margin-bottom: 10px; orphans: 3; widows: 3; page-break-inside: avoid }
+      .texto mark { background: #fdf0a0; padding: 0 2px }
+      .texto .grande { font-size: 1.15em }
+      .texto .pequeno { font-size: 0.85em; color: #4b5347 }
       .vazio { color: #6b7264; font-style: italic }
     `,
   })
@@ -59,7 +68,7 @@ export function folhaDoDocumento(
    impressa é um papel que ninguém sabe de quando é -- e o rodapé traz a data em
    que o PDF foi gerado, que é outra coisa. */
 export function tituloComData(documento: DocumentoDaPaciente): string {
-  const base = documento.titulo || rotuloDoTipo(documento.tipo)
+  const base = comoSeChama(documento)
   if (!documento.quando) return base
   const [ano, mes, dia] = documento.quando.split('-')
   return dia && mes && ano ? `${base} — ${dia}/${mes}/${ano}` : base
@@ -85,8 +94,36 @@ function tabelaDeItens(documento: DocumentoDaPaciente): string {
 const emParagrafos = (texto: string): string =>
   `<div class="texto">${texto
     .split(/\n{2,}/)
-    .map(p => `<p>${seguro(p.trim()).replace(/\n/g, '<br>')}</p>`)
+    .map(p => `<p>${comMarcacoes(seguro(p.trim())).replace(/\n/g, '<br>')}</p>`)
     .join('\n')}</div>`
+
+/* Os marcadores do editor do sistema viram tag.
+ *
+ * O editor guarda destaque dentro do próprio texto (o vocabulário está em
+ * `lib/textoRico.ts`, no sistema):
+ *
+ *     **negrito**   _itálico_   __sublinhado__   ==marca-texto==
+ *     ++grande++    ~~pequeno~~
+ *
+ * Sem traduzir isso, o contrato saía do app com `**CLÁUSULA 1ª**` escrito
+ * assim, marcadores e tudo -- e o que era título de cláusula virava linha igual
+ * às outras.
+ *
+ * Feito DEPOIS do escape, sobre o texto já seguro: um `<b>` que ela tenha
+ * digitado continua sendo texto, e só os nossos marcadores viram tag.
+ *
+ * A ordem é a mesma da leitura de lá -- `**` antes de `*`, `__` antes de `_` --
+ * e as classes são `[^*]` em vez de `.+?` porque dois destaques na mesma linha
+ * viravam um só, engolindo o que estava no meio. */
+export function comMarcacoes(escapado: string): string {
+  return escapado
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<u>$1</u>')
+    .replace(/==([^=]+)==/g, '<mark>$1</mark>')
+    .replace(/\+\+([^+]+)\+\+/g, '<span class="grande">$1</span>')
+    .replace(/~~([^~]+)~~/g, '<span class="pequeno">$1</span>')
+    .replace(/_([^_]+)_/g, '<em>$1</em>')
+}
 
 /* O mesmo vocabulário da tela (`CicloEDocumentos`), e com reserva explícita:
    um tipo novo no sistema não pode sair impresso como `undefined`. */
@@ -130,5 +167,21 @@ export function nomeDoArquivoDoDocumento(
     ? ''
     : `-${agora.getFullYear()}${dois(agora.getMonth() + 1)}${dois(agora.getDate())}`
 
-  return `${limpo(rotuloDoTipo(documento.tipo)) || 'documento'}-${limpo(paciente) || 'paciente'}${data}.pdf`
+  return `${limpo(comoSeChama(documento)) || 'documento'}-${limpo(paciente) || 'paciente'}${data}.pdf`
+}
+
+/* O mesmo texto para LER na tela, sem os marcadores.
+ *
+ * A tela mostra texto simples -- negrito dentro de um parágrafo exigiria partir
+ * cada linha em vários `<Text>`, e o que ela faz aqui é conferir o conteúdo,
+ * não revisar a diagramação. Tirar os marcadores é melhor do que mostrá-los:
+ * `**CLÁUSULA 1ª**` na tela é o app expondo o próprio encanamento. */
+export function semMarcacoes(texto: string): string {
+  return texto
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/==([^=]+)==/g, '$1')
+    .replace(/\+\+([^+]+)\+\+/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
 }

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
-import type { CicloDaPaciente, DocumentoDaPaciente } from '../lib/fichaCompleta'
+import { comoSeChama, type CicloDaPaciente, type DocumentoDaPaciente } from '../lib/fichaCompleta'
 import { estilosDe, paleta } from '../lib/tema'
 
 /* As duas seções novas da ficha: o ciclo e o que foi prescrito.
@@ -121,7 +121,7 @@ export function DocumentosDaFicha({
           onPress={() => onAbrir(d)}
           style={({ pressed }) => [styles.cartaoDoDocumento, pressed && styles.pressionado]}
           accessibilityRole="button"
-          accessibilityLabel={(d.titulo || nomeDoTipo(d.tipo)) + '. Abrir e gerar PDF.'}
+          accessibilityLabel={comoSeChama(d) + '. Abrir e gerar PDF.'}
         >
           <View style={styles.topoDoDocumento}>
             <Ionicons
@@ -130,7 +130,10 @@ export function DocumentosDaFicha({
               color={paleta().cores.verde}
             />
             <Text style={styles.tituloDoDocumento} numberOfLines={2}>
-              {d.titulo || nomeDoTipo(d.tipo)}
+              {/* O que o documento É, e não a base que o sistema gravou: treze
+                  modelos diferentes salvam `tipo = 'atestado'`, e a lista
+                  chamava contrato, avaliação e encaminhamento de "Atestado". */}
+              {comoSeChama(d)}
             </Text>
             <Text style={styles.dataDoDocumento}>{curta(d.quando)}</Text>
           </View>
@@ -159,7 +162,7 @@ export function DocumentosDaFicha({
 
           <View style={styles.rodapeDoCartao}>
             <Text style={styles.rodapeDoDocumento}>
-              {nomeDoTipo(d.tipo)}
+              {d.medicamentos.length > 0 ? 'Receituário' : 'Documento'}
               {d.importado ? ' · importado de outro sistema' : ''}
             </Text>
             <Ionicons name="chevron-forward" size={15} color={paleta().inkFraco} />
@@ -191,26 +194,6 @@ function Linha({
 }
 
 const primeiro = (nome: string) => nome.trim().split(/\s+/)[0] ?? nome
-
-/* O vocabulário do sistema virando o da tela. `Object.hasOwn` e reserva
-   explícita: um tipo novo lá não pode aparecer aqui como `undefined`
-   (armadilha 10). */
-const NOMES: Record<string, string> = {
-  receituario: 'Receituário',
-  atestado: 'Atestado',
-  encaminhamento: 'Encaminhamento',
-  solic_exames_lab: 'Solicitação de exames',
-  solic_exames_bio: 'Solicitação de exames',
-  avaliacao_antro: 'Avaliação antropométrica',
-  relatorio_inicial: 'Relatório inicial',
-  relatorio_sequencial: 'Relatório de consultas',
-  contrarreferencia: 'Contrarreferência',
-  plano_qualitativo: 'Plano qualitativo',
-  outro: 'Documento',
-}
-
-const nomeDoTipo = (tipo: string): string =>
-  Object.hasOwn(NOMES, tipo) ? NOMES[tipo] : 'Documento'
 
 const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
