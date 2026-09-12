@@ -141,16 +141,35 @@ export function Ditado({
   const gravandoAgora = useRef(false)
   gravandoAgora.current = estado === 'gravando'
 
+  /* ──────────────────── O EFEITO QUE MATAVA O DITADO ────────────────────
+   *
+   * Isto tinha `[gravador]` na lista de dependências -- e o objeto que
+   * `useAudioRecorder` devolve NÃO é o mesmo entre renderizações. Resultado: a
+   * limpeza, escrita para rodar quando a tela SAI, rodava a cada renderização
+   * -- e ela cancela a escuta.
+   *
+   * Enquanto nada re-renderizava o ditado durante a fala, ninguém viu. O
+   * relógio que entrou hoje ("deixa igual o gravador de mensagem, com os
+   * minutinhos") re-renderiza uma vez por segundo: a escuta passou a ser
+   * cancelada um segundo depois de começar, e o que sobrava na tela era a
+   * primeira palavra. O registro dele mostrou a frase exata -- "a escuta do
+   * aparelho encerrou. Ela mandou parar." -- sem ela ter tocado em nada.
+   *
+   * Agora a lista é vazia e o gravador vem de um ref: a limpeza roda UMA vez,
+   * quando a tela sai de verdade, que é o que ela sempre quis fazer. */
+  const gravadorAgora = useRef(gravador)
+  gravadorAgora.current = gravador
+
   useEffect(
     () => () => {
-      if (gravandoAgora.current) gravador.stop().catch(() => {})
+      if (gravandoAgora.current) gravadorAgora.current.stop().catch(() => {})
       /* Sair da tela ouvindo não pode deixar o microfone do sistema aberto --
          e cancelar, e não parar: parar entregaria a frase a uma tela que já
          não existe. */
       escuta.current?.cancelar()
       escuta.current = null
     },
-    [gravador],
+    [],
   )
 
   const segundos = estadoDoGravador.durationMillis / 1000
