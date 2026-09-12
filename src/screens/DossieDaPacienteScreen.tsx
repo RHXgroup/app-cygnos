@@ -49,6 +49,7 @@ import {
 } from '../lib/escaladaDoComer'
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
+import { ImportarExameScreen } from './ImportarExameScreen'
 
 export type SecaoDoDossie =
   | 'terapeutico'
@@ -97,6 +98,11 @@ const AVALIACOES_NA_EVOLUCAO = 12
  * O miolo do plano e das consultas mora aqui embaixo; o do prontuário, em
  * `components/SecoesDoProntuario.tsx`.
  */
+/* Uma seção pode PÔR coisa, e não só mostrar. Hoje: exame.
+ *
+ * "Não consigo adicionar o exame aqui. Se eu quiser adicionar pra subir pro
+ * site, não consigo." A ficha lia o prontuário inteiro e não deixava pôr
+ * nada -- e o exame é o que chega pelo WhatsApp dela, com o celular na mão. */
 export function DossieDaPacienteScreen({
   pacienteId,
   nome,
@@ -124,6 +130,10 @@ export function DossieDaPacienteScreen({
   const [carregando, setCarregando] = useState(true)
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
+  /* A tela de importar exame, aberta por cima desta. */
+  const [importando, setImportando] = useState(false)
+  /* A frase do que acabou de entrar. Some ao tocar: é confirmação, não erro. */
+  const [recado, setRecado] = useState('')
 
   /* Erro limpo no sucesso em todos os ramos -- armadilha 9. Esta tela relê ao
      puxar. */
@@ -207,6 +217,27 @@ export function DossieDaPacienteScreen({
 
   const titulo = tituloDaSecao(secao, nome)
 
+  /* A tela de importar toma a frente inteira, e não abre como folha: são três
+     campos e uma escolha de arquivo, que é tela, não gaveta. O voltar dela
+     fecha só ela -- o tratador daqui continua atrás, e é o que faz o degrau
+     descascar um por vez (armadilha 1). */
+  if (importando) {
+    return (
+      <ImportarExameScreen
+        pacienteId={pacienteId}
+        nome={nome}
+        onFechar={() => setImportando(false)}
+        onImportou={mensagem => {
+          setImportando(false)
+          setRecado(mensagem)
+          /* Relê a seção: o exame que ela acabou de mandar precisa aparecer na
+             lista, senão a única prova de que entrou é a frase. */
+          void carregar()
+        }}
+      />
+    )
+  }
+
   return (
     <View style={[styles.tela, { paddingTop: top + 8 }]}>
       <View style={styles.cabecalho}>
@@ -253,7 +284,27 @@ export function DossieDaPacienteScreen({
           )}
           {!erro && secao === 'consultas' && <Historico consultas={consultas} nome={nome} />}
           {!erro && secao === 'anamnese' && <Anamneses anamneses={anamneses} nome={nome} />}
-          {!erro && secao === 'exames' && <Exames exames={exames} nome={nome} />}
+          {!erro && secao === 'exames' && (
+            <>
+              {/* O botão vem ANTES da lista: numa ficha com dez exames, um
+                  botão no fim é um botão que ela procura rolando. */}
+              <Pressable
+                onPress={() => setImportando(true)}
+                style={({ pressed }) => [estilosDoImportar.botao, pressed && { opacity: 0.75 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Importar exame"
+              >
+                <Ionicons name="add" size={17} color={paleta().cores.branco} />
+                <Text style={estilosDoImportar.texto}>Importar exame</Text>
+              </Pressable>
+              {!!recado && (
+                <Pressable onPress={() => setRecado('')} accessibilityRole="button" accessibilityLabel="Entendi">
+                  <Text style={estilosDoImportar.recado}>{recado}</Text>
+                </Pressable>
+              )}
+              <Exames exames={exames} nome={nome} />
+            </>
+          )}
           {!erro && secao === 'energetico' && <Energetico calculos={calculos} nome={nome} />}
           {!erro && secao === 'evolucao' && <Evolucao medidas={medidas} nome={nome} />}
           {/* O resumo tem o próprio erro e a própria espera: ele continua
@@ -747,3 +798,28 @@ const estilos = estilosDe(t =>
     },
   }),
 )
+
+/* Os estilos do importar ficam aqui embaixo, e não dentro do `estilos` deste
+   arquivo, porque o arquivo é dividido com outra sessão: um `StyleSheet` à
+   parte não conflita na mesma linha quando as duas mexem ao mesmo tempo. */
+const estilosDoImportar = StyleSheet.create({
+  botao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: paleta().cores.verde,
+    borderRadius: 999,
+    paddingVertical: 11,
+    marginBottom: 10,
+  },
+  texto: { fontSize: 14, fontWeight: '800', color: paleta().cores.branco },
+  recado: {
+    fontSize: 13,
+    color: paleta().cores.ink,
+    backgroundColor: paleta().cores.verdeMenta,
+    padding: 11,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+})
