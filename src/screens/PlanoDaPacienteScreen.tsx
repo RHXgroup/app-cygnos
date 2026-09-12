@@ -20,6 +20,7 @@ import {
 } from '../lib/planoDoPacienteDaNutri'
 import { folhaDoPlano, nomeDoArquivo } from '../lib/folhaDoPlano'
 import { timbradoDaNutri } from '../lib/souNutri'
+import { trocasDoPlanoDaPaciente, type TrocasPorItem } from '../lib/trocasDoPlano'
 import {
   procurarAlimento,
   trocarItem,
@@ -64,6 +65,14 @@ export function PlanoDaPacienteScreen({
   const [puxando, setPuxando] = useState(false)
   const [erro, setErro] = useState('')
   const [gerando, setGerando] = useState(false)
+  /* As trocas que ELA cadastrou para cada item -- o "pode trocar por" que a
+     paciente vê na página do link e, desde hoje, no aplicativo. Aqui elas
+     aparecem para ela conferir o que a paciente está lendo.
+     Leitura à parte do plano: se falhar, o plano continua na tela. */
+  const [trocas, setTrocas] = useState<TrocasPorItem>(new Map())
+  /* Qual item está com as trocas abertas. Uma por vez, como na página do
+     link: abrir todas vira um paredão de texto. */
+  const [trocasAbertas, setTrocasAbertas] = useState<number | null>(null)
   /* O item que ela tocou para trocar, ou nenhum. Guarda o rótulo junto e não
      só o id: a folha mostra o nome do que está saindo, e ir buscar isso de novo
      seria uma leitura para um dado que já estava na mão. */
@@ -76,6 +85,11 @@ export function PlanoDaPacienteScreen({
     if (r.tipo === 'ok') {
       setErro('')
       setPlano(r.plano)
+      /* As trocas DEPOIS do plano, e só dos itens que vieram: a leitura pede os
+         ids, e pedir antes seria pedir de um plano que talvez nem exista.
+         Nunca derruba nada -- volta vazia quando falha. */
+      const ids = (r.plano?.refeicoes ?? []).flatMap(ref => ref.itens.map(i => i.id))
+      setTrocas(await trocasDoPlanoDaPaciente(ids))
     } else {
       setErro(r.mensagem)
     }
@@ -368,11 +382,11 @@ export function PlanoDaPacienteScreen({
                       <Text style={styles.refeicaoVazia}>Sem itens.</Text>
                     ) : (
                       r.itens.map(i => (
-                        /* Tocar no item abre a troca. É a única edição que esta
-                           tela faz, e é a que ele pediu com a paciente na
-                           frente: "agora pediu pra trocar". */
+                        <View key={i.id}>
+                        {/* Tocar no item abre a troca. É a única edição que esta
+                            tela faz, e é a que ele pediu com a paciente na
+                            frente: "agora pediu pra trocar". */}
                         <Pressable
-                          key={i.id}
                           onPress={() => setTrocando({ id: i.id, rotulo: i.rotulo })}
                           style={({ pressed }) => [styles.item, pressed && styles.pressionado]}
                           accessibilityRole="button"
@@ -386,6 +400,52 @@ export function PlanoDaPacienteScreen({
                           )}
                           <Ionicons name="swap-horizontal" size={14} color={paleta().inkFraco} />
                         </Pressable>
+
+                        {/* AS EQUIVALÊNCIAS que ela cadastrou no sistema.
+                            É o que a paciente lê na página do link e, desde
+                            hoje, no aplicativo -- e aqui ela confere o que a
+                            paciente está vendo, sem abrir o computador. */}
+                        {(trocas.get(String(i.id))?.length ?? 0) > 0 && (
+                          <>
+                            <Pressable
+                              onPress={() =>
+                                setTrocasAbertas(trocasAbertas === i.id ? null : i.id)
+                              }
+                              style={styles.verTrocas}
+                              accessibilityRole="button"
+                              accessibilityState={{ expanded: trocasAbertas === i.id }}
+                              accessibilityLabel={'Ver as equivalências de ' + i.rotulo}
+                            >
+                              <Text style={styles.textoVerTrocas}>
+                                {trocasAbertas === i.id
+                                  ? 'esconder as trocas'
+                                  : (trocas.get(String(i.id))?.length ?? 0) === 1
+                                    ? '1 troca cadastrada'
+                                    : (trocas.get(String(i.id))?.length ?? 0) + ' trocas cadastradas'}
+                              </Text>
+                              <Ionicons
+                                name={trocasAbertas === i.id ? 'chevron-up' : 'chevron-down'}
+                                size={12}
+                                color={paleta().cores.verde}
+                              />
+                            </Pressable>
+
+                            {trocasAbertas === i.id && (
+                              <View style={styles.listaDeTrocas}>
+                                {(trocas.get(String(i.id)) ?? []).map((tr, k) => (
+                                  <View key={k} style={styles.umaTroca}>
+                                    <Ionicons name="checkmark" size={12} color={paleta().cores.verde} />
+                                    <Text style={styles.nomeDaTroca}>{tr.nome}</Text>
+                                    {!!tr.detalhe && (
+                                      <Text style={styles.quantidadeDaTroca}>{tr.detalhe}</Text>
+                                    )}
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                          </>
+                        )}
+                        </View>
                       ))
                     )}
 
@@ -700,6 +760,29 @@ const estilos = estilosDe(t =>
       paddingTop: 6,
     },
 
+    verTrocas: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingLeft: 2,
+      paddingBottom: 6,
+    },
+    textoVerTrocas: { fontFamily: FONTE.meia, fontSize: 11.5, color: t.cores.verde },
+    listaDeTrocas: {
+      gap: 5,
+      marginBottom: 8,
+      padding: 9,
+      borderRadius: 10,
+      backgroundColor: t.cores.verdeMenta,
+    },
+    umaTroca: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    nomeDaTroca: { flex: 1, fontFamily: FONTE.normal, fontSize: 13, color: t.cores.ink },
+    quantidadeDaTroca: {
+      fontFamily: FONTE.meia,
+      fontSize: 12,
+      color: t.inkSuave,
+      fontVariant: ['tabular-nums'],
+    },
     botaoPdf: {
       flexDirection: 'row',
       alignItems: 'center',
