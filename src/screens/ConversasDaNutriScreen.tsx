@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AudioDoBalao } from '../components/AudioDoBalao'
 import { Ditado } from '../components/Ditado'
+import { CameraDoApp } from '../components/CameraDoApp'
 import { GravadorDoRecado } from '../components/GravadorDoRecado'
 import { guardarAudioDaConversa } from '../lib/audioDaConversa'
 import {
@@ -137,6 +138,11 @@ export function ConversasDaNutriScreen({
      balão conseguiu -- assinar de novo aqui seria uma segunda ida à rede para
      ver o que já está na tela. */
   const [fotoGrande, setFotoGrande] = useState<string | null>(null)
+  /* A câmera DE DENTRO do app, aberta por cima da conversa. Ver `CameraDoApp`:
+     a do sistema fazia o Android matar o Cygnos enquanto ela estava na frente,
+     e o app voltava do zero -- "ao tirar foto no app de mensagem o app
+     reconecta". */
+  const [camera, setCamera] = useState(false)
 
   /* Falso até a primeira leitura voltar. Ver o efeito que avisa o pai. */
   const jaCarregou = useRef(false)
@@ -222,6 +228,10 @@ export function ConversasDaNutriScreen({
       /* A gravação e o menu são o degrau mais de dentro. O anexo esperando
          NÃO sai com o voltar: é trabalho dela -- para tirar, há o X da
          prévia. */
+      if (camera) {
+        setCamera(false)
+        return true
+      }
       if (fotoGrande) {
         setFotoGrande(null)
         return true
@@ -281,10 +291,19 @@ export function ConversasDaNutriScreen({
     setAnexo(null)
     setMenuDeAnexo(false)
     setGravando(false)
+    setCamera(false)
   }
 
   async function anexarFoto(origem: 'camera' | 'galeria') {
     setMenuDeAnexo(false)
+    /* A câmera é NOSSA; a galeria continua sendo a do sistema. Escolher arquivo
+       é uma tela que a Google faz melhor, e o seletor de imagens é leve -- o
+       relato de reiniciar nunca foi sobre ele. */
+    if (origem === 'camera') {
+      setErro('')
+      setCamera(true)
+      return
+    }
     const escolha = await escolherFoto(origem)
     if (escolha.tipo === 'cancelado') return
     if (escolha.tipo === 'erro') {
@@ -683,6 +702,20 @@ export function ConversasDaNutriScreen({
             pequenininha." O balão mostra 200 por 200: serve para saber que
             chegou uma foto, e não para ler o rótulo de um produto ou olhar a
             marmita. Toque abre aqui, e qualquer toque fecha. */}
+        {camera && (
+          <CameraDoApp
+            onPronta={foto => {
+              setCamera(false)
+              setAnexo({ tipo: 'foto', uri: foto.uri, base64: foto.base64, caminho: null })
+            }}
+            onFechar={() => setCamera(false)}
+            onErro={mensagem => {
+              setCamera(false)
+              setErro(mensagem)
+            }}
+          />
+        )}
+
         {!!fotoGrande && (
           <Pressable
             style={styles.fotoCheia}

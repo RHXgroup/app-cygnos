@@ -145,6 +145,16 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
 
   if (escolha.canceled || !escolha.assets?.[0]) return { tipo: 'cancelado' }
 
+  return prepararFoto(escolha.assets[0].uri)
+}
+
+/* Reduz e devolve a foto pronta para subir: caminho reduzido + texto.
+ *
+ * Separada de `escolherFoto` porque a CÂMERA DE DENTRO DO APP passa pelo mesmo
+ * caminho -- ver `CameraDoApp`. Duas cópias destes dois passos divergiriam, e o
+ * comentário abaixo explica por que justamente estes dois passos existem: é
+ * conhecimento que custou uma semana, e não formatação. */
+export async function prepararFoto(uri: string): Promise<FotoEscolhida> {
   try {
     /* Só a largura: passar as duas dimensões esticaria uma foto retangular para
        um quadrado. */
@@ -168,7 +178,7 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
      *
      * O problema nunca foi o texto existir. Foi ele nascer AO LADO do bitmap. */
     const reduzida = await manipulateAsync(
-      escolha.assets[0].uri,
+      uri,
       [{ resize: { width: LADO_MAIOR } }],
       { compress: 0.8, format: SaveFormat.JPEG },
     )
