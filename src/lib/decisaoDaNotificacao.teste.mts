@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   depoisDoPedido,
+  deveApitar,
   leituraDaPermissao,
   liberou,
 } from './decisaoDaNotificacao.ts'
@@ -106,6 +107,30 @@ caso('duas recusas seguidas, encadeadas como no app', () => {
   assert.equal(primeira.estado, 'perguntar')
   assert.equal(segunda.estado, 'bloqueadas')
   assert.equal(segunda.abrirConfiguracao, true)
+})
+
+console.log('')
+console.log('quem apita com o app aberto')
+
+caso('o lembrete que ela pediu à Aurora apita', () =>
+  /* O relato: "notificou às sete da manhã e não apitou, só pôs na tela". */
+  assert.equal(deveApitar('nutri'), true))
+caso('o lembrete de refeição apita', () => assert.equal(deveApitar('refeicao'), true))
+caso('o lembrete de água apita', () => assert.equal(deveApitar('agua'), true))
+caso('o da sequência apita', () => assert.equal(deveApitar('sequencia'), true))
+caso('a CONFIRMAÇÃO de água NÃO apita -- ela não tem tipo', () =>
+  /* Avisa de uma coisa que a pessoa acabou de fazer. Apitar aqui era o defeito
+     que o canal MIN dela existe para evitar, e é por isso que o tratador
+     calava tudo por atacado. */
+  assert.equal(deveApitar(undefined), false))
+caso('tipo desconhecido entra CALADO, e não apitando', () =>
+  /* Notificação nova calada faz alguém perceber e decidir; apitando sem
+     ninguém ter decidido, não. */
+  assert.equal(deveApitar('promocao'), false))
+caso('tipo que não é texto não derruba nada', () => {
+  assert.equal(deveApitar(null), false)
+  assert.equal(deveApitar(7), false)
+  assert.equal(deveApitar({ tipo: 'nutri' }), false)
 })
 
 console.log(`\n${passaram} passaram, ${falharam} falharam\n`)

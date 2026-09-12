@@ -98,3 +98,35 @@ export function depoisDoPedido(
   }
   return { estado: 'perguntar', abrirConfiguracao: false, jaPedi: true }
 }
+
+/* ──────────────────── QUEM PODE APITAR COM O APP ABERTO ────────────────────
+ *
+ * Relatado: "a Aurora me notificou às sete da manhã, mas não apitou, não fez
+ * nada -- só pôs um lembrete na tela do celular. Não deveria ter apitado?"
+ *
+ * Deveria. O canal do aviso dela é HIGH com som desde o primeiro dia, então o
+ * culpado não era o canal: era o `setNotificationHandler`, que decide o que
+ * acontece quando a notificação chega COM O APP ABERTO -- e ele devolvia
+ * `shouldPlaySound: false` para TODAS, por atacado.
+ *
+ * O atacado existia por um motivo legítimo: a confirmação de água ("3º copo de
+ * hoje") não pode apitar. Ela avisa de uma coisa que a pessoa acabou de fazer, e
+ * cobrar atenção por isso é o que o canal MIN dela existe para evitar. Só que
+ * calar todas para calar essa calou também o lembrete que ela PEDIU -- e um
+ * lembrete que não apita não é lembrete, é um recado esperando ser encontrado.
+ *
+ * Então a decisão passou a ser por TIPO. O tipo viaja dentro da notificação
+ * (`data.tipo`) desde que os avisos ganharam dono; a confirmação de água não
+ * tem tipo nenhum, e é isso que a separa: ausência é "não apita".
+ *
+ * Continua valendo só para o app ABERTO. Com o app fechado, quem decide é o
+ * canal do Android, e todos os canais de lembrete já são HIGH ou DEFAULT. */
+
+/* Os tipos que PEDEM atenção. Lista explícita, e não "tudo menos a água":
+   notificação nova entra calada e alguém percebe, o que é melhor do que entrar
+   apitando sem ninguém ter decidido. Armadilha 10, pelo lado do padrão. */
+const APITAM = new Set(['nutri', 'refeicao', 'agua', 'sequencia'])
+
+export function deveApitar(tipo: unknown): boolean {
+  return typeof tipo === 'string' && APITAM.has(tipo)
+}

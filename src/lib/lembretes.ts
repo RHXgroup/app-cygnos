@@ -3,7 +3,7 @@ import { Linking, LogBox, Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 import { falha } from './erros'
 import { moduloProtegido } from './moduloProtegido'
-import { depoisDoPedido, leituraDaPermissao } from './decisaoDaNotificacao'
+import { depoisDoPedido, deveApitar, leituraDaPermissao } from './decisaoDaNotificacao'
 import type { EstadoDasNotificacoes } from './decisaoDaNotificacao'
 import { ACAO_COPO, copoDoAviso } from './copoDoAviso'
 import { textoDaSequencia } from './sequenciaDaPessoa' 
@@ -144,12 +144,25 @@ export function notificacoes(): Promise<ModuloNotificacoes> {
        * não parecia notificação: parecia que o app inteiro tinha quebrado. */
       if (typeof n.setNotificationHandler === 'function') {
         n.setNotificationHandler({
-          handleNotification: async () => ({
-            shouldShowBanner: true,
-            shouldShowList: true,
-            shouldPlaySound: false,
-            shouldSetBadge: false,
-          }),
+          /* O SOM é decidido por TIPO, e não por atacado.
+           *
+           * Isto devolvia `shouldPlaySound: false` para todas, e o relato veio
+           * assim: "a Aurora me notificou às sete da manhã, mas não apitou, não
+           * fez nada -- só pôs um lembrete na tela do celular".
+           *
+           * O canal do aviso dela é HIGH com som desde o primeiro dia, então
+           * não era o canal: era esta linha. E o atacado existia por um motivo
+           * real -- a confirmação de água não pode apitar --, que agora é
+           * atendido sem calar o resto. Ver `deveApitar`. */
+          handleNotification: async aviso => {
+            const dado = aviso?.request?.content?.data as { tipo?: unknown } | undefined
+            return {
+              shouldShowBanner: true,
+              shouldShowList: true,
+              shouldPlaySound: deveApitar(dado?.tipo),
+              shouldSetBadge: false,
+            }
+          },
         })
       }
       return protegido(n)
