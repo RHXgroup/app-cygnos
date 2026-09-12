@@ -212,7 +212,14 @@ export async function confirmarAcao(acao: AcaoPendente): Promise<RespostaDaAuror
     body: { confirmar: { ferramenta: acao.ferramenta, argumentos: acao.argumentos } },
   })
 
-  let resposta = data as { resposta?: string; error?: string; aurora_no_teste?: boolean } | null
+  let resposta = data as {
+    resposta?: string
+    /* Falso quando o BANCO recusou -- horário ocupado, sem vínculo, sem
+       permissão. Ver o bloco `O DESFECHO` logo abaixo. */
+    ok?: boolean
+    error?: string
+    aurora_no_teste?: boolean
+  } | null
   if (error) {
     const ctx = (error as { context?: Response }).context
     if (ctx && typeof ctx.json === 'function') {
@@ -225,7 +232,28 @@ export async function confirmarAcao(acao: AcaoPendente): Promise<RespostaDaAuror
     falha('A Aurora não conseguiu executar.', error)
   }
 
-  if (resposta?.resposta?.trim()) return { tipo: 'ok', texto: resposta.resposta.trim() }
+  /* ──────────────────── O DESFECHO, e não só o texto ────────────────────
+   *
+   * Isto era "tem texto, então deu certo", e com isso uma RECUSA DO BANCO
+   * chegava como sucesso: o cartão marcava "Confirmado por você" e o balão logo
+   * abaixo dizia que nada tinha sido gravado. Duas frases opostas, uma embaixo
+   * da outra -- exatamente o defeito que esta tela já tinha consertado do lado
+   * DELA, sobrevivendo do lado do servidor.
+   *
+   * Foi o que escondeu duas mensagens perdidas: `mandar_recado` falhou duas
+   * vezes, e a tela disse que tinha dado certo. Quem sabia era a MEDIÇÃO, que
+   * ninguém lê no dia a dia -- e foi lendo ela com ele que isto apareceu.
+   *
+   * `=== false` de propósito, e não `!resposta.ok`: um servidor antigo não manda
+   * o campo, e `undefined` ali tem de continuar valendo como sucesso -- senão
+   * toda confirmação vira erro no dia em que as duas pontas se desencontram.
+   *
+   * O texto é o que o BANCO escreveu, e vai inteiro para a tela: a recusa por
+   * choque de horário precisa chegar com o nome de quem está naquele horário.
+   * É a exceção do item 12, e aqui ela é a regra. */
+  const texto = resposta?.resposta?.trim()
+  if (texto && resposta?.ok === false) return { tipo: 'erro', mensagem: texto }
+  if (texto) return { tipo: 'ok', texto }
 
   /* A recusa do teste grátis também acontece AQUI, e não só na pergunta: a
      trava do servidor vale para as duas chamadas. Vai com a frase de que nada
