@@ -1,6 +1,8 @@
 import { confirmarAcao, type AcaoPendente, type RespostaDaAurora } from './auroraDaNutri'
 import { apagarAviso, avisosPendentes, criarAviso } from './avisosDaNutri'
+import { falha } from './erros'
 import { ehDoAparelho } from './ferramentasDoAparelho'
+import { supabase } from './supabase'
 
 /* O que a Aurora manda fazer e que só o APARELHO consegue fazer.
  *
@@ -49,13 +51,58 @@ import { ehDoAparelho } from './ferramentasDoAparelho'
 export async function executarAcaoConfirmada(acao: AcaoPendente): Promise<RespostaDaAurora> {
   if (!ehDoAparelho(acao.ferramenta)) return confirmarAcao(acao)
 
-  if (acao.ferramenta === 'criar_aviso') return await avisar(acao)
-  if (acao.ferramenta === 'apagar_aviso') return await desmarcar(acao)
+  if (acao.ferramenta === 'criar_aviso') return await medindo(acao, avisar)
+  if (acao.ferramenta === 'apagar_aviso') return await medindo(acao, desmarcar)
 
   /* Está na lista e não tem caminho: é erro de programação, não da pessoa. A
      frase diz que nada aconteceu, porque é o que importa para quem acabou de
      tocar em Confirmar. */
   return { tipo: 'erro', mensagem: 'Não consegui fazer isso aqui. Nada foi criado.' }
+}
+
+/* ──────────────────── O DESFECHO VOLTA PARA A MEDIÇÃO ────────────────────
+ *
+ * A medição da Aurora mora no servidor, e ação do aparelho nunca passa por lá --
+ * então ela nascia invisível. Achado lendo a tabela com ele: `criar_aviso`
+ * aparecia com SEIS chamadas e ZERO confirmações, o que se lê como "ela pede e
+ * desiste". Era o contrário: ela confirmava, o lembrete tocava, e ninguém
+ * contava.
+ *
+ * Números que mentem são piores do que números que faltam, porque a decisão
+ * seguinte é tomada em cima deles -- eu quase escrevi ferramenta nova achando
+ * que o cartão do lembrete tinha um problema de confiança.
+ *
+ * `aurora_medir` é chamada direto daqui: ela é `security definer`, resolve a
+ * carteira sozinha e está liberada para quem tem sessão. Sem texto nenhum -- a
+ * tabela não guarda frase, e `mandou_pro_computador` é falso por construção,
+ * porque a ação ACONTECEU aqui.
+ *
+ * E medir NÃO pode atrapalhar: a resposta da ação é devolvida antes, e a falha
+ * na medição vira linha de console. Um lembrete que não é criado porque a
+ * medição caiu seria trocar o fim pelo meio. */
+async function medindo(
+  acao: AcaoPendente,
+  executar: (a: AcaoPendente) => Promise<RespostaDaAurora>,
+): Promise<RespostaDaAurora> {
+  const r = await executar(acao)
+
+  void supabase
+    .rpc('aurora_medir', {
+      p_onde: 'app',
+      p_ferramenta: acao.ferramenta,
+      /* 'erro' e não 'recusou' quando falha. `recusou` quer dizer que ELA disse
+         não, e falha de execução não é recusa dela -- ver o comentário igual no
+         `medir` da função do servidor, que tinha essa mesma troca e foi
+         corrigido junto. */
+      p_desfecho: r.tipo === 'ok' ? 'confirmou' : 'erro',
+      p_voltas: 0,
+      p_mandou_pro_computador: false,
+    })
+    .then(({ error }) => {
+      if (error) falha('Não consegui medir a ação do aparelho.', error)
+    })
+
+  return r
 }
 
 /* Tirar um lembrete que ela mesma (ou a Aurora) marcou.
