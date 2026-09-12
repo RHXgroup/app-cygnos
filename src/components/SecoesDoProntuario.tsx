@@ -112,8 +112,13 @@ export function Exames({ exames, nome }: { exames: ExameDaPaciente[]; nome: stri
   }
   return (
     <>
-      {exames.map(e => (
-        <Exame key={e.id} exame={e} />
+      {/* O PRIMEIRO aberto, os outros fechados.
+          "O exame não dá pra recolher e expandir?" -- cada exame são dezenas de
+          marcadores, e quatro exames abertos viram uma rolagem de vinte telas
+          para achar o de hoje. O de cima é o mais recente, que é o que ela
+          abriu a tela para ver. */}
+      {exames.map((e, i) => (
+        <Exame key={e.id} exame={e} comecaAberto={i === 0} />
       ))}
       <Text style={styles.rodape}>
         A leitura de cada exame é a que você fez no sistema. Exame sem leitura foi
@@ -123,8 +128,9 @@ export function Exames({ exames, nome }: { exames: ExameDaPaciente[]; nome: stri
   )
 }
 
-function Exame({ exame: e }: { exame: ExameDaPaciente }) {
+function Exame({ exame: e, comecaAberto }: { exame: ExameDaPaciente; comecaAberto: boolean }) {
   const styles = estilos()
+  const [aberto, setAberto] = useState(comecaAberto)
   /* Os normais ficam recolhidos: num hemograma são trinta linhas que dizem
      "está tudo bem", e o que ela procura é o que NÃO está. */
   const [verNormais, setVerNormais] = useState(false)
@@ -134,25 +140,46 @@ function Exame({ exame: e }: { exame: ExameDaPaciente }) {
 
   return (
     <View style={styles.cartao}>
-      <View style={{ gap: 2 }}>
-        <Text style={styles.titulo}>{e.nome}</Text>
-        <Text style={styles.sub}>
-          {[ddmmaaaa(e.quando) ? 'Coleta ' + ddmmaaaa(e.quando) : null, contagem(l)].filter(Boolean).join(' · ')}
-        </Text>
-      </View>
+      <Pressable
+        onPress={() => setAberto(a => !a)}
+        style={styles.topoTocavel}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: aberto }}
+        accessibilityLabel={e.nome + ', ' + (ddmmaaaa(e.quando) || 'sem data')}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={styles.titulo}>{e.nome}</Text>
+          <Text style={styles.sub}>
+            {[ddmmaaaa(e.quando) ? 'Coleta ' + ddmmaaaa(e.quando) : null, contagem(l)].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+        <Ionicons
+          name={aberto ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={paleta().inkFraco}
+        />
+      </Pressable>
 
-      {!l && <Text style={styles.fraco}>Ainda sem leitura.</Text>}
-      {!!l?.resumo && (
+      {/* FECHADO, o que sobra é o cabeçalho -- e ele já diz o que importa de
+          relance: a data e quantos estão fora da referência. */}
+      {!aberto && (l?.criticos ?? 0) + (l?.alterados ?? 0) > 0 && (
+        <Text style={styles.fraco}>Toque para ver o que está fora da referência.</Text>
+      )}
+
+      {aberto && !l && <Text style={styles.fraco}>Ainda sem leitura.</Text>}
+      {aberto && !!l?.resumo && (
         <Text style={styles.texto} selectable>
           {l.resumo}
         </Text>
       )}
 
-      {destaque.map((m, i) => (
-        <LinhaDoMarcador key={'d' + i} m={m} />
-      ))}
+      {aberto &&
+        destaque.map((m, i) => (
+          <LinhaDoMarcador key={'d' + i} m={m} />
+        ))}
 
-      {normais.length > 0 &&
+      {aberto &&
+        normais.length > 0 &&
         (verNormais ? (
           normais.map((m, i) => <LinhaDoMarcador key={'n' + i} m={m} />)
         ) : (
@@ -167,7 +194,7 @@ function Exame({ exame: e }: { exame: ExameDaPaciente }) {
           </Pressable>
         ))}
 
-      {!!e.observacoes && (
+      {aberto && !!e.observacoes && (
         <Text style={styles.fraco} selectable>
           {e.observacoes}
         </Text>

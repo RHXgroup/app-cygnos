@@ -39,6 +39,13 @@ export type ItemDoPlano = {
   rotulo: string
   quantidade: string | null
   kcal: number | null
+  /* Os três macros do item, já na quantidade servida -- não por 100 g.
+     "Cadê a parte de macronutrientes?", ele perguntou olhando o plano: a tela
+     mostrava só caloria, e quem monta plano conversa em proteína.
+     Nulos pelo mesmo motivo da caloria: zero somaria como verdade. */
+  proteina: number | null
+  carboidrato: number | null
+  gordura: number | null
 }
 
 export type RefeicaoDoPlano = {
@@ -112,7 +119,10 @@ export async function planoDaPaciente(pacienteId: number): Promise<ResultadoDoPl
            cadastrado ("café sem açúcar"). */
         .select(
           'id, refeicao_id, tipo, quantidade_g, medida_caseira, descricao, ordem, ' +
-          'alimentos(nome, energia_kcal)',
+          /* Os macros vêm do MESMO aninhado da caloria: são colunas da mesma
+             linha de `alimentos`, e pedir junto não custa uma segunda ida.
+             Os nomes foram conferidos no esquema do sistema em 12/09. */
+          'alimentos(nome, energia_kcal, proteina_g, carboidrato_g, lipideo_g)',
         )
         .in('refeicao_id', ids)
         .order('ordem')
@@ -141,7 +151,14 @@ export async function planoDaPaciente(pacienteId: number): Promise<ResultadoDoPl
     /* O PostgREST devolve o aninhado como objeto ou como lista de um, conforme
        enxerga a relação. Tratar os dois evita um "Sem nome" que só aparece em
        produção. */
-    const al = bruto.alimentos as { nome?: string; energia_kcal?: number } | { nome?: string; energia_kcal?: number }[] | null
+    type AlimentoDoItem = {
+      nome?: string
+      energia_kcal?: number
+      proteina_g?: number
+      carboidrato_g?: number
+      lipideo_g?: number
+    }
+    const al = bruto.alimentos as AlimentoDoItem | AlimentoDoItem[] | null
     const alimento = Array.isArray(al) ? al[0] : al
 
     /* O nome do alimento primeiro, a descrição livre depois. `descricao` existe
@@ -165,8 +182,24 @@ export async function planoDaPaciente(pacienteId: number): Promise<ResultadoDoPl
         ? Math.round((por100 * gramas) / 100)
         : null
 
+    /* A mesma regra de três da caloria, e a mesma recusa a inventar zero. */
+    const porcao = (por100g: unknown): number | null => {
+      const v = Number(por100g)
+      return Number.isFinite(v) && v > 0 && Number.isFinite(gramas) && gramas > 0
+        ? Math.round(((v * gramas) / 100) * 10) / 10
+        : null
+    }
+
     const lista = porRefeicao.get(ref) ?? []
-    lista.push({ id: Number(bruto.id), rotulo, quantidade, kcal })
+    lista.push({
+      id: Number(bruto.id),
+      rotulo,
+      quantidade,
+      kcal,
+      proteina: porcao(alimento?.proteina_g),
+      carboidrato: porcao(alimento?.carboidrato_g),
+      gordura: porcao(alimento?.lipideo_g),
+    })
     porRefeicao.set(ref, lista)
   }
 
@@ -200,6 +233,27 @@ function formatarGramas(g: number): string {
 }
 
 /** O total de calorias de uma refeição, ou nulo quando NENHUM item tem valor. */
+/* Os macros da refeição inteira. Nulo quando NENHUM item tem aquele macro --
+   é a mesma distinção da caloria: "esta refeição não tem proteína" e "eu não
+   sei a proteína desta refeição" são coisas diferentes, e a segunda não pode
+   ser escrita como zero. */
+export function macrosDaRefeicao(r: RefeicaoDoPlano): {
+  proteina: number | null
+  carboidrato: number | null
+  gordura: number | null
+} {
+  const somar = (pega: (i: ItemDoPlano) => number | null): number | null => {
+    const valores = r.itens.map(pega).filter((v): v is number => v !== null)
+    if (valores.length === 0) return null
+    return Math.round(valores.reduce((s, v) => s + v, 0))
+  }
+  return {
+    proteina: somar(i => i.proteina),
+    carboidrato: somar(i => i.carboidrato),
+    gordura: somar(i => i.gordura),
+  }
+}
+
 export function kcalDaRefeicao(r: RefeicaoDoPlano): number | null {
   const comValor = r.itens.filter(i => i.kcal !== null)
   /* Nulo, e não zero, quando ninguém tem valor: é a diferença entre "esta

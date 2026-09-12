@@ -315,6 +315,10 @@ export function AuroraDaNutriScreen({
     /* Só agora. Na falha o cartão CONTINUA aberto, com os dois botões: ela
        acabou de ler que nada foi gravado, e o gesto seguinte é tentar de novo
        ou desistir -- não há por que tirar dela essa escolha. */
+    /* Sobrou cartão esperando decisão? A fala desta ação ainda não está marcada
+       aqui (o `setFalas` abaixo é que marca), então ela sai da conta. */
+    const aindaFalta = falas.some(f => f.acao && f.decidida === undefined && f.id !== fala.id)
+
     if (r.tipo === 'ok') {
       setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, decidida: 'feita' } : f)))
       /* E reconta: ela acabou de confirmar as três consultas de hoje, e o chip
@@ -333,7 +337,12 @@ export function AuroraDaNutriScreen({
          fronteira é o que faz o histórico servir para conferir depois.
          Na falha não vai: quem acabou de ler que nada foi gravado não está
          procurando o que fazer em seguida. */
-      ...(r.tipo === 'ok' ? [novaFala('aurora', FECHAMENTO)] : []),
+      /* O "precisa de mais alguma coisa?" só depois da ÚLTIMA.
+         Relatado com dois lembretes de uma vez: "combinado, te aviso às 7 --
+         precisa de mais alguma coisa? combinado, te aviso às 9 -- precisa de
+         mais alguma coisa?". Perguntar entre uma confirmação e outra é
+         interromper ela no meio do que ela mesma pediu. */
+      ...(r.tipo === 'ok' && !aindaFalta ? [novaFala('aurora', FECHAMENTO)] : []),
     ])
 
     return r.tipo === 'ok'

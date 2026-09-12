@@ -14,6 +14,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   kcalDaRefeicao,
+  macrosDaRefeicao,
   planoDaPaciente,
   semCaloriaEm,
   type PlanoDaPaciente,
@@ -373,6 +374,7 @@ export function PlanoDaPacienteScreen({
                 refeicoes={plano.refeicoes.map(r => {
                   const total = kcalDaRefeicao(r)
                   const faltando = semCaloriaEm(r)
+                  const macros = macrosDaRefeicao(r)
                   return {
                     id: String(r.id),
                     nome: r.nome,
@@ -380,12 +382,20 @@ export function PlanoDaPacienteScreen({
                     /* "—" quando NENHUM item tem caloria: zero seria mentira. É a
                        diferença entre "esta refeição não tem caloria" e "eu não
                        sei a caloria desta refeição". Item 6. */
+                    /* "420 kcal · P 32 g · C 48 g · G 9 g".
+                       "Cadê a parte de macronutrientes?" -- a tela mostrava só
+                       caloria, e quem monta plano conversa em proteína. As
+                       iniciais porque a linha inteira não cabe na largura de um
+                       telefone, e "P/C/G" é o que ela já usa escrevendo. */
                     resumo: [
                       total === null ? '— kcal' : `${total} kcal`,
+                      macros.proteina !== null ? `P ${macros.proteina} g` : '',
+                      macros.carboidrato !== null ? `C ${macros.carboidrato} g` : '',
+                      macros.gordura !== null ? `G ${macros.gordura} g` : '',
                       faltando > 0 && total !== null
                         ? faltando === 1
-                          ? '1 item sem caloria cadastrada ficou de fora'
-                          : `${faltando} itens sem caloria cadastrada ficaram de fora`
+                          ? '1 item sem valor cadastrado ficou de fora'
+                          : `${faltando} itens sem valor cadastrado ficaram de fora`
                         : '',
                     ]
                       .filter(Boolean)
@@ -393,7 +403,15 @@ export function PlanoDaPacienteScreen({
                     itens: r.itens.map(i => ({
                       id: String(i.id),
                       nome: i.rotulo,
-                      detalhe: i.quantidade,
+                      /* A quantidade e, quando existe, o que ela pesa em macro:
+                         é o número que ela usa para decidir a troca. */
+                      detalhe: [
+                        i.quantidade,
+                        i.kcal !== null ? `${i.kcal} kcal` : '',
+                        i.proteina !== null ? `P ${i.proteina}` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || null,
                       trocas: trocas.get(String(i.id)) ?? [],
                       aoTocar: () => setTrocando({ id: i.id, rotulo: i.rotulo }),
                     })),
