@@ -59,6 +59,10 @@ export type Fala = {
      legível depois: rolar para cima e ver "Confirmado" é o que responde
      "eu marquei mesmo aquela consulta?". */
   decidida?: 'feita' | 'cancelada'
+  /* Ela já tocou em "não era isso" nesta resposta. Guardado na própria fala,
+     como a decisão do cartão: rolar para cima e ver "anotado" é o que impede
+     ela de apontar a mesma resposta três vezes achando que não pegou. */
+  apontada?: boolean
 }
 
 let proximoId = 1

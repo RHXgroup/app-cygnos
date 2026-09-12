@@ -36,6 +36,7 @@ import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
 import { executarAcaoConfirmada } from '../lib/acoesNoAparelho'
+import { apontarQueNaoEraIsso } from '../lib/naoEraIsso'
 import { Ditado } from '../components/Ditado'
 
 /* A Aurora dela, no bolso.
@@ -274,7 +275,9 @@ export function AuroraDaNutriScreen({
     setFalas(atual => [
       ...atual,
       r.tipo === 'ok'
-        ? novaFala('aurora', r.texto)
+        /* A pergunta viaja junto da resposta. Sem ela, o "não era isso" seria
+           um contador: saberíamos que algo falhou e nunca o quê. */
+        ? { ...novaFala('aurora', r.texto), pergunta: limpa }
         /* A falha guarda a pergunta junto: é ela que o "tentar de novo" reenvia.
            Sem isso, sem sinal, a pessoa redigita tudo -- e uma pergunta longa
            ditada no meio do consultório ninguém redigita: desiste. */
@@ -370,6 +373,32 @@ export function AuroraDaNutriScreen({
   function cancelarTodos(pendentes: Fala[]) {
     const ids = new Set(pendentes.map(f => f.id))
     setFalas(atual => atual.map(f => (ids.has(f.id) ? { ...f, decidida: 'cancelada' } : f)))
+  }
+
+  /* A pergunta que produziu esta resposta.
+   *
+   * Normalmente ela viaja na própria fala. Para as respostas gravadas ANTES
+   * deste recurso -- e para as que nascem de um cartão confirmado -- ela não
+   * existe, e aí vale a última coisa que ELA escreveu antes: é isso que a
+   * Aurora estava respondendo. */
+  function perguntaAntesDe(lista: Fala[], resposta: Fala): string {
+    const onde = lista.findIndex(f => f.id === resposta.id)
+    for (let i = (onde === -1 ? lista.length : onde) - 1; i >= 0; i--) {
+      if (lista[i].papel === 'nutri') return lista[i].texto
+    }
+    return '(a conversa começou antes desta resposta)'
+  }
+
+  /* Aponta a resposta que não serviu. Marca a fala ANTES de a rede voltar: o
+     toque precisa responder no instante, e o registro nunca falha de um jeito
+     que ela precise saber -- ver `naoEraIsso.ts`. */
+  async function apontar(fala: Fala) {
+    setFalas(atual => atual.map(f => (f.id === fala.id ? { ...f, apontada: true } : f)))
+    await apontarQueNaoEraIsso({
+      pergunta: fala.pergunta ?? perguntaAntesDe(falas, fala),
+      resposta: fala.texto,
+      ferramenta: fala.acao?.ferramenta ?? null,
+    })
   }
 
   function cancelar(fala: Fala) {
@@ -546,6 +575,31 @@ export function AuroraDaNutriScreen({
                 >
                   <Text style={styles.tentarDeNovo}>Tentar de novo</Text>
                 </Pressable>
+              ) : null}
+
+              {/* ──── "NÃO ERA ISSO" ────
+                  A medição conta quantas vezes a Aurora não deu conta, e nunca
+                  do quê -- ela não guarda texto. Este toque é a única peça que
+                  guarda O QUE faltou, e é dele que sai a próxima ferramenta em
+                  vez de palpite nosso.
+
+                  Só na resposta DELA, só quando não é falha de rede (ali o
+                  problema é o sinal, não a resposta) e só uma vez por fala.
+                  Discreto de propósito: quem está satisfeita não deve tropeçar
+                  nele. */}
+              {f.papel === 'aurora' && !f.local && !f.falhou ? (
+                f.apontada ? (
+                  <Text style={styles.anotado}>Anotado. Vou usar para melhorar a Aurora.</Text>
+                ) : (
+                  <Pressable
+                    onPress={() => void apontar(f)}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Não era isso que eu queria"
+                  >
+                    <Text style={styles.naoEraIsso}>Não era isso</Text>
+                  </Pressable>
+                )
               ) : null}
             </View>
           ),
@@ -803,6 +857,10 @@ const estilos = estilosDe(t =>
       color: t.cores.verde,
       marginTop: 8,
     },
+    /* Discreto de propósito: quem está satisfeita não pode tropeçar nele, e
+       quem não está precisa achá-lo sem procurar. Cinza, pequeno, embaixo. */
+    naoEraIsso: { fontSize: 12, color: t.inkFraco, marginTop: 8 },
+    anotado: { fontSize: 12, color: t.inkFraco, marginTop: 8, fontStyle: 'italic' },
     /* ──────────────────── O balão dela deixa de ser VERDE ────────────────────
        Verde é a cor da ação neste app -- o botão Confirmar, o Aceitar. Uma
        conversa inteira dela em verde punha a cor de "executa" em cima do que ela
