@@ -2,6 +2,7 @@ import { Fragment, memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   AppState,
   Linking,
@@ -144,6 +145,28 @@ export function MensagensScreen({
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
 
   const [nutri, setNutri] = useState<Nutricionista | null>(null)
+  /* O voltar fecha a foto ampliada ANTES de sair da aba. Sem lista de
+     dependências: é o que põe este tratador na frente do central do `App.tsx`,
+     que só sabe fechar sobreposição. Armadilha 1. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (fotoGrandeAgora.current) {
+        setFotoGrande(null)
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
+
+  /* A foto aberta em tela cheia, ou nula. Guarda o endereço JÁ assinado que o
+     balão conseguiu -- assinar de novo seria uma segunda ida à rede para ver o
+     que já está na tela. */
+  const [fotoGrande, setFotoGrande] = useState<string | null>(null)
+  /* O tratador do voltar lê por referência: sem ela, o `fotoGrande` de dentro
+     dele seria o da renderização em que foi registrado. */
+  const fotoGrandeAgora = useRef<string | null>(null)
+  fotoGrandeAgora.current = fotoGrande
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [carregando, setCarregando] = useState(true)
   const [texto, setTexto] = useState('')
@@ -795,7 +818,7 @@ export function MensagensScreen({
                   {mudouDeDia(mensagens[i - 1], m) && (
                     <Text style={styles.dia}>{rotuloDoDia(new Date(m.criadaEm), new Date())}</Text>
                   )}
-                  <Balao mensagem={m} />
+                  <Balao mensagem={m} onAmpliar={setFotoGrande} />
                 </Fragment>
               ))
             )}
@@ -982,6 +1005,24 @@ export function MensagensScreen({
         ]}
         onCancelar={() => setEscolhendoFoto(false)}
       />
+
+      {/* ──────────────────── A FOTO EM TELA CHEIA ────────────────────
+          O balão mostra um quadro pequeno: serve para saber que chegou foto,
+          e não para ler o rótulo de um produto ou olhar o prato. Toque abre,
+          qualquer toque fecha -- e o voltar do aparelho também. */}
+      {!!fotoGrande && (
+        <Pressable
+          style={styles.fotoCheia}
+          onPress={() => setFotoGrande(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Fechar a foto"
+        >
+          <Image source={{ uri: fotoGrande }} style={styles.imagemCheia} resizeMode="contain" />
+          <View style={styles.fecharFoto}>
+            <Ionicons name="close" size={26} color="#FFFFFF" />
+          </View>
+        </Pressable>
+      )}
     </View>
   )
 }
@@ -1010,7 +1051,17 @@ function mudouDeDia(anterior: Mensagem | undefined, atual: Mensagem): boolean {
  * A comparação padrão basta porque `mensagem` só troca de
  * identidade quando a conversa é relida de verdade — e aí recarregar
  * a foto é o certo. */
-const Balao = memo(function Balao({ mensagem }: { mensagem: Mensagem }) {
+const Balao = memo(function Balao({
+  mensagem,
+  onAmpliar,
+}: {
+  mensagem: Mensagem
+  /* Abre a foto em tela cheia. "Quando eu clico na foto não consigo aumentar
+     ela, fica pequenininha" -- ele disse do lado dele, e do lado do paciente
+     era igual: o balão mostra um quadro pequeno, que serve para saber que
+     chegou foto, e não para ler o rótulo de um produto. */
+  onAmpliar: (endereco: string) => void
+}) {
   const styles = estilos()
   const minha = ehMinha(mensagem)
 
@@ -1079,7 +1130,13 @@ const Balao = memo(function Balao({ mensagem }: { mensagem: Mensagem }) {
          * caminho, o quadro é a promessa certa. */}
         {mensagem.anexoTipo === 'foto' &&
           (endereco !== falhou ? (
-            <View style={styles.fotoDoBalao}>
+            <Pressable
+              onPress={() => endereco && onAmpliar(endereco)}
+              disabled={!endereco}
+              style={styles.fotoDoBalao}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="Abrir a foto em tela cheia"
+            >
               {!!endereco && (
                 <Image
                   source={{ uri: endereco }}
@@ -1088,7 +1145,7 @@ const Balao = memo(function Balao({ mensagem }: { mensagem: Mensagem }) {
                   accessibilityLabel={minha ? 'Foto que você mandou' : `Foto que ${elaPronome()} mandou`}
                 />
               )}
-            </View>
+            </Pressable>
           ) : null)}
 
         {/* ── Áudio ────────────────────────────────────────────────────────
@@ -1236,6 +1293,18 @@ const estilos = estilosDe(t =>
   /* A foto DENTRO do quadro reservado: ela só preenche o que já estava
      guardado, e por isso a chegada dela não mexe na altura de nada. */
   fotoDentroDoQuadro: { width: '100%', height: '100%', borderRadius: 12 },
+  fotoCheia: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagemCheia: { width: '100%', height: '100%' },
+  fecharFoto: { position: 'absolute', top: 44, right: 14 },
   fotoDoBalao: {
     width: '100%',
     /* Proporção, e não altura fixa: 170 de altura numa foto em pé corta cabeça
