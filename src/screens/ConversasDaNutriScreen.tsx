@@ -123,6 +123,9 @@ export function ConversasDaNutriScreen({
   const [aberta, setAberta] = useState<ConversaDaNutri | null>(null)
   const [fio, setFio] = useState<MensagemDaConversa[]>([])
   const [abrindo, setAbrindo] = useState(false)
+  /* O fio já parou de se mexer? Falso do toque na conversa até a rolagem
+     assentar no fim. Ver `styles.aindaMexendo`. */
+  const [assentada, setAssentada] = useState(true)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   /* A trava do toque duplo. `enviando` só vale na renderização seguinte, e o
@@ -276,6 +279,7 @@ export function ConversasDaNutriScreen({
     setMenuDeAnexo(false)
     setGravando(false)
     setAbrindo(true)
+    setAssentada(false)
     setErro('')
 
     const r = await conversaCom(c.contaId)
@@ -442,16 +446,39 @@ export function ConversasDaNutriScreen({
    * altura, o balão de áudio mede o próprio tamanho. Cada um desses acontece
    * num instante diferente, e a rolagem que já tinha acontecido fica no meio.
    *
-   * Então ele insiste: agora, e de novo depois de 60, 250 e 700 ms. São quatro
-   * chamadas baratas numa tela que ela abre dezenas de vezes por dia -- e o
-   * `onContentSizeChange` continua cuidando do que crescer depois disso. */
+   * Então ele insiste: agora, e de novo depois de 50, 180 e 350 ms.
+   *
+   * ──────────────────── E ninguém vê isso acontecer ────────────────────
+   * A insistência consertou o destino e criou um segundo relato: "ele vai no
+   * último certinho, mas dá um bug, tipo carregando as mensagens". O bug era a
+   * própria correção acontecendo à vista -- três saltos em meio segundo, que na
+   * tela se leem como a conversa tremendo.
+   *
+   * Então o fio fica INVISÍVEL enquanto se assenta, com o indicador de carregar
+   * no lugar dele, e aparece já no fim. É meio segundo de "carregando" honesto
+   * em vez de meio segundo de tremor -- e o `onContentSizeChange` continua
+   * cuidando do que crescer depois, aí sim com a tela à vista.
+   *
+   * Some junto o que ele relatava desde o começo: a conversa nunca é vista
+   * começando do início. */
   useEffect(() => {
-    if (!fio.length) return
+    if (!fio.length) {
+      /* Conversa sem mensagem nenhuma: não há o que assentar, e esperar aqui
+         deixaria o indicador girando para sempre em cima de "comece a
+         conversa".
+         Mas só depois que a leitura VOLTAR: no instante do toque o fio também
+         está vazio, e declarar assentado ali deixaria o fio à vista justamente
+         durante os saltos que esta invisibilidade existe para esconder. */
+      if (!abrindo) setAssentada(true)
+      return
+    }
     const aoFim = () => rolagem.current?.scrollToEnd({ animated: false })
     aoFim()
-    const ids = [60, 250, 700].map(ms => setTimeout(aoFim, ms))
+    const ids = [50, 180, 350].map(ms => setTimeout(aoFim, ms))
+    /* 30 ms depois do último salto, para o salto já ter desenhado. */
+    ids.push(setTimeout(() => setAssentada(true), 380))
     return () => ids.forEach(clearTimeout)
-  }, [fio])
+  }, [fio, abrindo])
 
   /* O TECLADO também manda rolar, e isto era um defeito relatado em uso:
    *
@@ -560,8 +587,23 @@ export function ConversasDaNutriScreen({
 
         {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
+        {/* O indicador fica POR CIMA do fio invisível, e não dentro dele: ali
+            dentro ele subiria junto com a rolagem e sairia da tela. */}
+        {!assentada && (
+          /* `pointerEvents="none"`: ela cobre a tela inteira do pai, barra de
+             escrever incluída, e sem isto os 380 ms comeriam o primeiro toque
+             de quem já ia responder. */
+          <View style={styles.carregandoOFio} pointerEvents="none">
+            <ActivityIndicator color={paleta().cores.verde} />
+          </View>
+        )}
+
         <ScrollView
           ref={rolagem}
+          /* Invisível enquanto se assenta -- e não `display: none`, que tiraria
+             a medida do conteúdo e com ela a possibilidade de rolar até o fim
+             antes de aparecer. */
+          style={!assentada && styles.aindaMexendo}
           contentContainerStyle={styles.fio}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -1275,6 +1317,18 @@ const estilos = estilosDe(t =>
     },
     textoPendente: { fontFamily: FONTE.meia, fontSize: 13, color: t.cores.ink, fontVariant: ['tabular-nums'] },
     dicaPendente: { flex: 1, fontFamily: FONTE.normal, fontSize: 12.5, color: t.inkFraco, lineHeight: 17 },
+
+    aindaMexendo: { opacity: 0 },
+    carregandoOFio: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1,
+    },
 
     menuDeAnexo: {
       flexDirection: 'row',

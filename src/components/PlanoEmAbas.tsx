@@ -53,17 +53,26 @@ export type RefeicaoEmAbas = {
   resumo?: string | null
 }
 
-/* O ícone sai do NOME da refeição, como no site. Café, almoço, lanche e jantar
-   têm desenho próprio; o que não casar com nenhum vira a maçã -- e nunca fica
-   sem ícone, que deixaria a aba torta ao lado das outras. */
+/* O ícone sai do NOME da refeição, como no site.
+ *
+ * ──────────────────── Um por refeição, e nenhum repetido ────────────────────
+ * "O da ceia e o do jantar ficou o mesmo, no desenho aqui." Eram os dois a lua,
+ * e o lanche era a mesma xícara do café da manhã -- num plano de cinco refeições
+ * a fila tinha três desenhos para cinco abas, e a aba deixa de servir de marca.
+ *
+ * Agora: xícara no café, maçã no lanche, prato no almoço, lua no jantar e cama
+ * na ceia -- que é a refeição de antes de dormir, e é assim que ela se explica
+ * sozinha. O que não casar com nenhum vira o sanduíche, que também não repete. */
 function iconeDaRefeicao(nome: string): React.ComponentProps<typeof Ionicons>['name'] {
   const n = nome.toLowerCase()
+  /* A CEIA primeiro: "ceia" costuma vir escrita como "ceia da noite", e o teste
+     da noite mais abaixo pegaria ela antes. Ordem é regra aqui. */
+  if (/ceia/.test(n)) return 'bed-outline'
   if (/café|cafe|manhã|manha|desjejum/.test(n)) return 'cafe-outline'
   if (/almoço|almoco/.test(n)) return 'restaurant-outline'
-  if (/lanche|tarde|colação|colacao/.test(n)) return 'cafe-outline'
+  if (/lanche|tarde|colação|colacao/.test(n)) return 'nutrition-outline'
   if (/jantar|noite/.test(n)) return 'moon-outline'
-  if (/ceia/.test(n)) return 'moon-outline'
-  return 'nutrition-outline'
+  return 'fast-food-outline'
 }
 
 /* A aba "todos" não é uma refeição, então não pode ser um índice: com 4
@@ -122,37 +131,14 @@ export function PlanoEmAbas({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.abas}
       >
-        {refeicoes.map((r, i) => {
-          const escolhida = i === aba
-          return (
-            <Pressable
-              key={r.id}
-              onPress={() => {
-                setAbaAberta(i)
-                setTrocaAberta(null)
-              }}
-              style={({ pressed }) => [styles.aba, escolhida && styles.abaEscolhida, pressed && { opacity: 0.8 }]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: escolhida }}
-              accessibilityLabel={r.nome + (r.hora ? ', ' + r.hora : '')}
-            >
-              <Ionicons
-                name={iconeDaRefeicao(r.nome)}
-                size={18}
-                color={escolhida ? paleta().cores.verde : paleta().inkFraco}
-              />
-              <Text style={[styles.nomeDaAba, escolhida && styles.nomeDaAbaEscolhida]} numberOfLines={1}>
-                {r.nome}
-              </Text>
-            </Pressable>
-          )
-        })}
+        {/* ── TODOS, NO COMEÇO ──
+            Ele pediu no fim, viu, e mudou de ideia: "coloca no começo, eu acho
+            que é melhor, antes do café da manhã". E está certo -- a fila rola de
+            lado, e o que fica no fim de cinco refeições não se vê sem rolar.
+            Primeiro é o único lugar que aparece sempre.
 
-        {/* ── TODOS, no fim da fila ──
-            "Poderia colocar uma opçãozinha aqui de todos, que ia aparecer tudo
-            numa folha. Coloca lá no final." Fica depois das refeições de
-            propósito: quem abre o plano quer ver a próxima refeição, e o dia
-            inteiro é a segunda pergunta. */}
+            Ele fica primeiro sem VIR aberto: quem entra no plano quer a próxima
+            refeição, e o dia inteiro é a segunda pergunta. */}
         {temTodos && (
           <Pressable
             onPress={() => {
@@ -181,6 +167,33 @@ export function PlanoEmAbas({
             </Text>
           </Pressable>
         )}
+
+        {refeicoes.map((r, i) => {
+          const escolhida = i === aba
+          return (
+            <Pressable
+              key={r.id}
+              onPress={() => {
+                setAbaAberta(i)
+                setTrocaAberta(null)
+              }}
+              style={({ pressed }) => [styles.aba, escolhida && styles.abaEscolhida, pressed && { opacity: 0.8 }]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: escolhida }}
+              accessibilityLabel={r.nome + (r.hora ? ', ' + r.hora : '')}
+            >
+              <Ionicons
+                name={iconeDaRefeicao(r.nome)}
+                size={18}
+                color={escolhida ? paleta().cores.verde : paleta().inkFraco}
+              />
+              <Text style={[styles.nomeDaAba, escolhida && styles.nomeDaAbaEscolhida]} numberOfLines={1}>
+                {r.nome}
+              </Text>
+            </Pressable>
+          )
+        })}
+
       </ScrollView>
 
       {/* Uma refeição, ou o dia inteiro na mesma folha. */}
