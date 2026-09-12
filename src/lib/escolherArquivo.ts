@@ -37,6 +37,21 @@ export async function escolherArquivoDoExame(
   return daCamera(origem === 'camera')
 }
 
+/* ──────────── O `import()` daqui FICA, e o do PDF foi embora ────────────
+ *
+ * Os dois seletores seguem dinâmicos de propósito, e a diferença vale escrita
+ * porque ela não é óbvia: o `import()` dá ao módulo um NÚMERO que o Metro
+ * resolve só na hora do toque, e número errado vira "Requiring unknown module
+ * 1267" -- foi o que aconteceu no botão de PDF, e por isso lá passou a estático.
+ *
+ * Aqui o preço se paga por algo: quando o seletor não existe no pacote
+ * instalado, a falha vira a frase "ainda não funciona nesta versão, use a
+ * galeria" e a pessoa segue por outro caminho. Import estático não deixa
+ * escolher: ele resolve na avaliação do módulo, e um módulo faltando derruba
+ * quem importa esta lib.
+ *
+ * A regra, então: dinâmico só onde exista uma SAÍDA para a ausência. Se algum
+ * dia o `catch` daqui só souber dizer "não deu", ele virou estático também. */
 async function doSeletorDeArquivos(): Promise<EscolhaDeArquivo> {
   let DocumentPicker: typeof import('expo-document-picker')
   try {

@@ -11,6 +11,25 @@ import {
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
+/* ──────────────────── POR QUE ESTÁTICO, E NÃO `import()` ────────────────────
+ *
+ * Estes três entravam por `import()` DENTRO da função, para o módulo nativo não
+ * ser resolvido na abertura da tela -- um cuidado escrito para o Expo Go, onde
+ * um módulo faltando derrubava a tela inteira em vez de só o botão.
+ *
+ * O cuidado nunca protegeu do que ele prometia: `import()` carrega o lado JS, e
+ * quem falta é o NATIVO -- o estouro acontecia na chamada, dentro do `try` que
+ * já existe. E cobrava um preço real: o Metro dá ao pedaço carregado assim um
+ * NÚMERO de módulo, resolvido só na hora do toque, e quando esse número não
+ * bate com o pacote que está rodando o erro é "Requiring unknown module 1267".
+ * Foi o que ele viu ao tocar em PDF -- nada a ver com a folha, com o timbrado
+ * ou com a impressora.
+ *
+ * Desde 11/09 o app roda em build de desenvolvimento, onde os três módulos
+ * nativos ESTÃO dentro do pacote. Import estático não tem número para errar. */
+import * as Print from 'expo-print'
+import * as Sharing from 'expo-sharing'
+import { File, Paths } from 'expo-file-system'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   kcalDaRefeicao,
@@ -113,11 +132,8 @@ export function PlanoDaPacienteScreen({
    * imprime. Não é o app que decide o destino, e isso é o certo: a bandeja do
    * telefone dela já tem os aplicativos que ela usa.
    *
-   * Os dois entram por `import()` DENTRO da função, e não no topo do arquivo.
-   * Import estático desses dois faria o módulo nativo ser resolvido na abertura
-   * da tela; num Expo Go que não os tenha completos, isso derruba a tela em vez
-   * de derrubar o botão -- e a tela existe para LER o plano, que funciona sem
-   * PDF nenhum.
+   * Os dois entram por import ESTÁTICO -- ver a nota no alto do arquivo, que
+   * conta por que eram dinâmicos e o que isso custou.
    *
    * Falhar aqui vira frase e não estouro: item 11. */
   async function gerarPdf() {
@@ -141,17 +157,6 @@ export function PlanoDaPacienteScreen({
      * baixo, e a primeira vez é lenta por natureza. Sem o número, "lento" não
      * diz se são dois segundos ou vinte. */
     const comecou = Date.now()
-
-    let Print: typeof import('expo-print')
-    let Sharing: typeof import('expo-sharing')
-    try {
-      Print = await import('expo-print')
-      Sharing = await import('expo-sharing')
-    } catch (e) {
-      setGerando(false)
-      setErro(falha('Este aplicativo não consegue gerar PDF neste aparelho.', e))
-      return
-    }
 
     let uri = ''
     /* O PDF também em base64, e é ele que vai para a pasta compartilhável --
@@ -219,7 +224,6 @@ export function PlanoDaPacienteScreen({
      * aparelho: a linha "pdf: na pasta compartilhável, N bytes" no Metro diz que
      * a escrita passou. */
     try {
-      const { File, Paths } = await import('expo-file-system')
       const destino = new File(Paths.cache, nomeDoArquivo(nome))
       if (base64) {
         if (destino.exists) destino.delete()

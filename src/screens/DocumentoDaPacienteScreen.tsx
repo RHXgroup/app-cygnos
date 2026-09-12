@@ -9,6 +9,25 @@ import {
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
+/* ──────────────────── POR QUE ESTÁTICO, E NÃO `import()` ────────────────────
+ *
+ * Estes três entravam por `import()` DENTRO da função, para o módulo nativo não
+ * ser resolvido na abertura da tela -- um cuidado escrito para o Expo Go, onde
+ * um módulo faltando derrubava a tela inteira em vez de só o botão.
+ *
+ * O cuidado nunca protegeu do que ele prometia: `import()` carrega o lado JS, e
+ * quem falta é o NATIVO -- o estouro acontecia na chamada, dentro do `try` que
+ * já existe. E cobrava um preço real: o Metro dá ao pedaço carregado assim um
+ * NÚMERO de módulo, resolvido só na hora do toque, e quando esse número não
+ * bate com o pacote que está rodando o erro é "Requiring unknown module 1267".
+ * Foi o que ele viu ao tocar em PDF -- nada a ver com a folha, com o timbrado
+ * ou com a impressora.
+ *
+ * Desde 11/09 o app roda em build de desenvolvimento, onde os três módulos
+ * nativos ESTÃO dentro do pacote. Import estático não tem número para errar. */
+import * as Print from 'expo-print'
+import * as Sharing from 'expo-sharing'
+import { File, Paths } from 'expo-file-system'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { DocumentoDaPaciente } from '../lib/fichaCompleta'
 import {
@@ -68,17 +87,6 @@ export function DocumentoDaPacienteScreen({
     setGerando(true)
     setErro('')
 
-    let Print: typeof import('expo-print')
-    let Sharing: typeof import('expo-sharing')
-    try {
-      Print = await import('expo-print')
-      Sharing = await import('expo-sharing')
-    } catch (e) {
-      setGerando(false)
-      setErro(falha('Este aplicativo não consegue gerar PDF neste aparelho.', e))
-      return
-    }
-
     let uri = ''
     let base64: string | undefined
     try {
@@ -95,7 +103,6 @@ export function DocumentoDaPacienteScreen({
     }
 
     try {
-      const { File, Paths } = await import('expo-file-system')
       const destino = new File(Paths.cache, nomeDoArquivoDoDocumento(documento, nome))
       if (destino.exists) destino.delete()
       if (base64) destino.write(base64, { encoding: 'base64' })

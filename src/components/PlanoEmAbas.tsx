@@ -66,6 +66,11 @@ function iconeDaRefeicao(nome: string): React.ComponentProps<typeof Ionicons>['n
   return 'nutrition-outline'
 }
 
+/* A aba "todos" não é uma refeição, então não pode ser um índice: com 4
+   refeições, o índice 4 seria uma quinta que não existe. Um símbolo próprio faz
+   o `tsc` reclamar de qualquer conta feita com ele. */
+const TODOS = 'todos' as const
+
 export function PlanoEmAbas({
   refeicoes,
   alergias = [],
@@ -78,21 +83,25 @@ export function PlanoEmAbas({
   rodape?: string
 }) {
   const styles = estilos()
-  const [abaAberta, setAbaAberta] = useState(0)
+  /* O índice da refeição, ou 'todos'. Ver `TODOS`, logo acima. */
+  const [abaAberta, setAbaAberta] = useState<number | typeof TODOS>(0)
   /* Qual item está com a lista de trocas aberta. Um por vez: abrir todas
      transformaria a refeição num paredão de texto, que é o que a página do link
      evita fechando as outras. */
   const [trocaAberta, setTrocaAberta] = useState<string | null>(null)
 
   /* A aba nunca pode apontar para uma refeição que não existe mais -- o plano
-     recarrega e pode vir com menos refeições. */
+     recarrega e pode vir com menos refeições. 'todos' sempre existe. */
   const aba = useMemo(
-    () => (abaAberta < refeicoes.length ? abaAberta : 0),
+    () => (abaAberta === TODOS || abaAberta < refeicoes.length ? abaAberta : 0),
     [abaAberta, refeicoes.length],
   )
 
   if (refeicoes.length === 0) return null
-  const atual = refeicoes[aba]
+  /* Com uma refeição só, "todos" mostraria exatamente a mesma coisa que a aba
+     dela -- e uma aba que não muda nada ensina a desconfiar das outras. */
+  const temTodos = refeicoes.length > 1
+  const mostradas = aba === TODOS ? refeicoes : [refeicoes[aba]]
 
   return (
     <View style={styles.tudo}>
@@ -138,86 +147,127 @@ export function PlanoEmAbas({
             </Pressable>
           )
         })}
+
+        {/* ── TODOS, no fim da fila ──
+            "Poderia colocar uma opçãozinha aqui de todos, que ia aparecer tudo
+            numa folha. Coloca lá no final." Fica depois das refeições de
+            propósito: quem abre o plano quer ver a próxima refeição, e o dia
+            inteiro é a segunda pergunta. */}
+        {temTodos && (
+          <Pressable
+            onPress={() => {
+              setAbaAberta(TODOS)
+              setTrocaAberta(null)
+            }}
+            style={({ pressed }) => [
+              styles.aba,
+              aba === TODOS && styles.abaEscolhida,
+              pressed && { opacity: 0.8 },
+            ]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: aba === TODOS }}
+            accessibilityLabel={`Todas as ${refeicoes.length} refeições do dia`}
+          >
+            <Ionicons
+              name="list-outline"
+              size={18}
+              color={aba === TODOS ? paleta().cores.verde : paleta().inkFraco}
+            />
+            <Text
+              style={[styles.nomeDaAba, aba === TODOS && styles.nomeDaAbaEscolhida]}
+              numberOfLines={1}
+            >
+              Todos
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
 
-      <View style={styles.cartao}>
-        <View style={styles.topoDoCartao}>
-          <Ionicons name={iconeDaRefeicao(atual.nome)} size={17} color={paleta().cores.verde} />
-          <Text style={styles.nomeDaRefeicao}>{atual.nome}</Text>
-          {!!atual.hora && (
-            <View style={styles.hora}>
-              <Ionicons name="time-outline" size={12} color={paleta().inkSuave} />
-              <Text style={styles.textoDaHora}>{atual.hora}</Text>
-            </View>
-          )}
-        </View>
+      {/* Uma refeição, ou o dia inteiro na mesma folha. */}
+      {mostradas.map(atual => (
+        <View key={atual.id} style={styles.cartao}>
+          <View style={styles.topoDoCartao}>
+            <Ionicons name={iconeDaRefeicao(atual.nome)} size={17} color={paleta().cores.verde} />
+            <Text style={styles.nomeDaRefeicao}>{atual.nome}</Text>
+            {!!atual.hora && (
+              <View style={styles.hora}>
+                <Ionicons name="time-outline" size={12} color={paleta().inkSuave} />
+                <Text style={styles.textoDaHora}>{atual.hora}</Text>
+              </View>
+            )}
+          </View>
 
-        {!!atual.resumo && <Text style={styles.resumoDaRefeicao}>{atual.resumo}</Text>}
+          {!!atual.resumo && <Text style={styles.resumoDaRefeicao}>{atual.resumo}</Text>}
 
-        {atual.itens.length === 0 && <Text style={styles.vazio}>Sem itens nesta refeição.</Text>}
+          {atual.itens.length === 0 && <Text style={styles.vazio}>Sem itens nesta refeição.</Text>}
 
-        {atual.itens.map(item => {
-          const aberta = trocaAberta === item.id
-          return (
-            <View key={item.id} style={styles.item}>
-              <View style={styles.linhaDoItem}>
-                {item.aoTocar ? (
-                  <Pressable
-                    onPress={item.aoTocar}
-                    style={({ pressed }) => [styles.tocavel, pressed && { opacity: 0.6 }]}
-                    accessibilityRole="button"
-                    accessibilityLabel={item.nome + '. Toque para trocar por outro alimento.'}
-                  >
+          {atual.itens.map(item => {
+            /* A chave leva a REFEIÇÃO junto: em "todos" o mesmo alimento pode
+               estar no almoço e no jantar, e o id do item nem sempre é único
+               entre refeições -- abrir a troca de um abriria a do outro. */
+            const chave = atual.id + ':' + item.id
+            const aberta = trocaAberta === chave
+            return (
+              <View key={item.id} style={styles.item}>
+                <View style={styles.linhaDoItem}>
+                  {item.aoTocar ? (
+                    <Pressable
+                      onPress={item.aoTocar}
+                      style={({ pressed }) => [styles.tocavel, pressed && { opacity: 0.6 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.nome + '. Toque para trocar por outro alimento.'}
+                    >
+                      <Text style={styles.nomeDoItem}>
+                        {item.nome}
+                        {item.detalhe ? <Text style={styles.detalheDoItem}> — {item.detalhe}</Text> : null}
+                      </Text>
+                      <Ionicons name="swap-horizontal" size={14} color={paleta().inkFraco} />
+                    </Pressable>
+                  ) : (
                     <Text style={styles.nomeDoItem}>
                       {item.nome}
                       {item.detalhe ? <Text style={styles.detalheDoItem}> — {item.detalhe}</Text> : null}
                     </Text>
-                    <Ionicons name="swap-horizontal" size={14} color={paleta().inkFraco} />
-                  </Pressable>
-                ) : (
-                  <Text style={styles.nomeDoItem}>
-                    {item.nome}
-                    {item.detalhe ? <Text style={styles.detalheDoItem}> — {item.detalhe}</Text> : null}
-                  </Text>
-                )}
+                  )}
 
-                {item.trocas.length > 0 && (
-                  <Pressable
-                    onPress={() => setTrocaAberta(aberta ? null : item.id)}
-                    style={({ pressed }) => [styles.botaoTrocar, pressed && { opacity: 0.8 }]}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: aberta }}
-                    accessibilityLabel={
-                      aberta ? 'Fechar as trocas de ' + item.nome : 'Ver por que trocar ' + item.nome
-                    }
-                  >
-                    <Ionicons name="swap-horizontal" size={13} color={paleta().cores.verde} />
-                    <Text style={styles.textoTrocar}>trocar</Text>
-                    <Ionicons
-                      name={aberta ? 'chevron-up' : 'chevron-down'}
-                      size={13}
-                      color={paleta().cores.verde}
-                    />
-                  </Pressable>
+                  {item.trocas.length > 0 && (
+                    <Pressable
+                      onPress={() => setTrocaAberta(aberta ? null : chave)}
+                      style={({ pressed }) => [styles.botaoTrocar, pressed && { opacity: 0.8 }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: aberta }}
+                      accessibilityLabel={
+                        aberta ? 'Fechar as trocas de ' + item.nome : 'Ver por que trocar ' + item.nome
+                      }
+                    >
+                      <Ionicons name="swap-horizontal" size={13} color={paleta().cores.verde} />
+                      <Text style={styles.textoTrocar}>trocar</Text>
+                      <Ionicons
+                        name={aberta ? 'chevron-up' : 'chevron-down'}
+                        size={13}
+                        color={paleta().cores.verde}
+                      />
+                    </Pressable>
+                  )}
+                </View>
+
+                {aberta && (
+                  <View style={styles.trocas}>
+                    <Text style={styles.rotuloDasTrocas}>Pode trocar por:</Text>
+                    {item.trocas.map((t, i) => (
+                      <View key={i} style={styles.troca}>
+                        <Ionicons name="checkmark" size={13} color={paleta().cores.verde} />
+                        <Text style={styles.nomeDaTroca}>{t.nome}</Text>
+                        {!!t.detalhe && <Text style={styles.detalheDaTroca}>{t.detalhe}</Text>}
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
-
-              {aberta && (
-                <View style={styles.trocas}>
-                  <Text style={styles.rotuloDasTrocas}>Pode trocar por:</Text>
-                  {item.trocas.map((t, i) => (
-                    <View key={i} style={styles.troca}>
-                      <Ionicons name="checkmark" size={13} color={paleta().cores.verde} />
-                      <Text style={styles.nomeDaTroca}>{t.nome}</Text>
-                      {!!t.detalhe && <Text style={styles.detalheDaTroca}>{t.detalhe}</Text>}
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          )
-        })}
-      </View>
+            )
+          })}
+        </View>
+      ))}
 
       {!!rodape && <Text style={styles.rodape}>{rodape}</Text>}
     </View>

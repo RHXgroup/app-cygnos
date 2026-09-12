@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from './supabase'
 import { falha } from './erros'
@@ -78,7 +79,6 @@ export async function importarExame(pedido: {
   let base64 = ''
   let tamanho = 0
   try {
-    const { File } = await import('expo-file-system')
     const arquivo = new File(pedido.arquivo.uri)
     if (!arquivo.exists) {
       return { tipo: 'erro', mensagem: 'Não achei esse arquivo no celular. Escolha de novo.' }

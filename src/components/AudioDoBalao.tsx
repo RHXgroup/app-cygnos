@@ -79,6 +79,12 @@ export function AudioDoBalao({
       if (tocador.current && !tocador.current.playing) {
         setTocando(false)
         setSegundos(0)
+        /* PAUSA antes de voltar ao começo -- e é isso que conserta o defeito
+           que ele relatou: "fica repetindo; ouviu uma vez, parou, acabou, tem
+           que ser assim". Um `seekTo` sozinho, num tocador que acabou de
+           terminar, faz ele VOLTAR A TOCAR: a posição muda e o estado interno
+           ainda é o de quem estava tocando. O áudio recomeçava para sempre. */
+        tocador.current.pause()
         tocador.current.seekTo(0)
       }
     }, 1000)
@@ -120,6 +126,10 @@ export function AudioDoBalao({
       await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' })
 
       const p = createAudioPlayer({ uri: url })
+      /* Dito com todas as letras, mesmo sendo o padrão: recado de voz se ouve
+         uma vez. Um tocador em laço numa conversa é a coisa mais perto de
+         "meu telefone endoidou" que este app consegue fazer. */
+      p.loop = false
       tocador.current = p
       setSegundos(0)
       p.play()

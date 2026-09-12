@@ -415,8 +415,25 @@ export function ConversasDaNutriScreen({
     )
   }
 
+  /* ──────────────────── TEIMOSO DE PROPÓSITO ────────────────────
+   *
+   * Terceira vez que ele relata a mesma coisa: "ele começa lá no início, não
+   * vai no final, eu tenho que ir até o fim".
+   *
+   * Um `scrollToEnd` só nunca bastou porque o conteúdo CRESCE depois: a foto
+   * de um balão chega do servidor e empurra tudo para baixo, o teclado muda a
+   * altura, o balão de áudio mede o próprio tamanho. Cada um desses acontece
+   * num instante diferente, e a rolagem que já tinha acontecido fica no meio.
+   *
+   * Então ele insiste: agora, e de novo depois de 60, 250 e 700 ms. São quatro
+   * chamadas baratas numa tela que ela abre dezenas de vezes por dia -- e o
+   * `onContentSizeChange` continua cuidando do que crescer depois disso. */
   useEffect(() => {
-    if (fio.length) rolagem.current?.scrollToEnd({ animated: true })
+    if (!fio.length) return
+    const aoFim = () => rolagem.current?.scrollToEnd({ animated: false })
+    aoFim()
+    const ids = [60, 250, 700].map(ms => setTimeout(aoFim, ms))
+    return () => ids.forEach(clearTimeout)
   }, [fio])
 
   /* O TECLADO também manda rolar, e isto era um defeito relatado em uso:
