@@ -95,6 +95,49 @@ Quatro regras que vieram de erro real:
   `[]` (ver `PlanoDaPacienteScreen`). Achado em 11/09/2026 pela sessão APP 2
   lendo o código, antes de alguém tropeçar.
 
+  **E a lista de dependências não basta quando o estado que ela observa é o que
+  ABRE a tela de dentro.** Isto custou dois relatos em 12/09/2026 — "clico num
+  dia, aperto voltar e ele volta pra tela inicial do aplicativo" e "volto e ele
+  vai pra tela do paciente em vez da de prescrições". O motivo é a ordem: quando
+  `documentoAberto` (ou `marcando`, ou `importando`) muda, o PAI re-renderiza,
+  o filho monta e registra o tratador dele — e o efeito do pai, que depende
+  daquele mesmo estado, roda DEPOIS e entra na frente. O pai ganha de novo, e o
+  voltar do filho nunca acontece.
+
+  **Quem hospeda telas registra UMA VEZ, com `[]`, lendo o estado por `ref`.**
+  Assim ele fica atrás de tudo o que abrir depois — que é a ordem certa — e
+  continua decidindo quando ninguém de dentro decidiu:
+
+  ```tsx
+  const estado = useRef({ aberto, vista })
+  estado.current = { aberto, vista }          // a cada renderização
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const agora = estado.current              // sem ref, leria a 1ª renderização
+      if (agora.aberto) { fechar(); return true }
+      if (agora.vista !== 'mes') { setVista('mes'); return true }
+      return false
+    })
+    return () => sub.remove()
+  }, [])
+  ```
+
+  **E trocar de VISTA é um degrau**, mesmo sem tela nova: dia → semana → mês, a
+  etapa de um formulário, a seção de um índice. Sem isso o voltar cai no
+  tratador de cima, que só sabe fechar a tela inteira — e a pessoa perde onde
+  estava. A varredura que achou os casos abertos:
+
+  ```bash
+  grep -rn "const \[\(vista\|passo\|modo\|secao\|etapa\)" src/screens
+  ```
+
+  e, para cada um, conferir se o nome aparece dentro de algum
+  `hardwareBackPress` do arquivo. Em 12/09 sobravam três: agenda (dia/semana),
+  cálculo energético (três etapas, sem tratador nenhum) e recuperar senha — esta
+  a pior, porque sair na etapa da senha deixava a sessão de recuperação aberta
+  com a senha velha.
+
 ## 2. O teclado, e a pergunta que vem ANTES de mexer no componente
 
 > **Este item já esteve errado DUAS vezes, e a segunda versão errada durou
