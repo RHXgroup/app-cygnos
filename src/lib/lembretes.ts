@@ -3,6 +3,8 @@ import { Linking, LogBox, Platform } from 'react-native'
 import type { PlanoCompleto } from './plano'
 import { falha } from './erros'
 import { moduloProtegido } from './moduloProtegido'
+import { depoisDoPedido, leituraDaPermissao } from './decisaoDaNotificacao'
+import type { EstadoDasNotificacoes } from './decisaoDaNotificacao'
 import { ACAO_COPO, copoDoAviso } from './copoDoAviso'
 import { textoDaSequencia } from './sequenciaDaPessoa' 
 
@@ -416,7 +418,12 @@ export async function precisaExplicarNotificacao(): Promise<boolean> {
  * a seção do build no AGENTS). Recusar uma vez em qualquer projeto bloqueia
  * aqui também -- e é por isso que 'bloqueadas' aparece sem ela lembrar de ter
  * recusado nada. */
-export type EstadoDasNotificacoes = 'ligadas' | 'perguntar' | 'bloqueadas'
+/* A DECISÃO mora em `decisaoDaNotificacao`, e não aqui, para poder ser
+   exercitada sem celular -- este arquivo importa AsyncStorage e o próprio
+   expo-notifications, e qualquer um dos dois arrasta o aparelho para dentro do
+   Node. Lá estão as quatro formas em que a mesma resposta chega, e a regra da
+   caixa que o Android não desenha mais. 22 casos. */
+export type { EstadoDasNotificacoes }
 
 export async function estadoDasNotificacoes(): Promise<EstadoDasNotificacoes> {
   try {
@@ -426,14 +433,7 @@ export async function estadoDasNotificacoes(): Promise<EstadoDasNotificacoes> {
        mentindo, e este `catch` engolia o motivo. A linha diz o que voltou --
        objeto, lista vazia (o módulo de mentira) ou nada. */
     console.log('[cygnos] permissao de notificacao:', JSON.stringify(p))
-    /* `?.` porque o embrulho protegido devolve `undefined` para o que o módulo
-       não tiver no Expo Go -- e ler `.granted` de nada derrubaria a tela Mais
-       inteira por causa de uma linha de status. */
-    /* `granted` OU `status`: são dois nomes para a mesma resposta, e versões
-       diferentes do módulo preenchem um e esquecem o outro. Ler os dois custa
-       uma comparação e fecha a hipótese de a leitura ser a mentirosa. */
-    if (p?.granted || p?.status === 'granted') return 'ligadas'
-    return p?.canAskAgain === false ? 'bloqueadas' : 'perguntar'
+    return leituraDaPermissao(p)
   } catch (e) {
     /* Sem conseguir perguntar, 'perguntar' é o estado honesto: o botão tenta,
        e o resultado diz o resto. 'bloqueadas' mandaria para a configuração
@@ -499,26 +499,18 @@ export async function ligarNotificacoes(): Promise<EstadoDasNotificacoes> {
       '| ja tinha pedido:',
       jaPedi,
     )
-    if (r?.granted || r?.status === 'granted') {
-      jaPedi = false
-      return 'ligadas'
-    }
-    if (r?.canAskAgain === false) return 'bloqueadas'
+    const desfecho = depoisDoPedido(r, jaPedi)
+    jaPedi = desfecho.jaPedi
 
-    /* Segunda vez negado: a caixa não vai aparecer mais. Ver o comentário do
-       `jaPedi` -- é aqui que o botão para de mentir. */
-    if (jaPedi) {
+    if (desfecho.abrirConfiguracao) {
       console.log('[cygnos] a caixa nao aparece mais; abrindo a configuracao')
       try {
         await Linking.openSettings()
       } catch (e) {
         falha('Não consegui abrir as configurações do telefone.', e)
       }
-      return 'bloqueadas'
     }
-
-    jaPedi = true
-    return 'perguntar'
+    return desfecho.estado
   } catch (e) {
     falha('Não consegui pedir a permissão de notificação.', e)
     return 'perguntar'
