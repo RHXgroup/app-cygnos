@@ -51,6 +51,7 @@ import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
 import { ImportarExameScreen } from './ImportarExameScreen'
 import { CicloDaFicha, DocumentosDaFicha } from '../components/CicloEDocumentos'
+import { NovoCalculoScreen } from './NovoCalculoScreen'
 import {
   cicloDaPaciente,
   documentosDaPaciente,
@@ -150,6 +151,9 @@ export function DossieDaPacienteScreen({
   const [erro, setErro] = useState('')
   /* A tela de importar exame, aberta por cima desta. */
   const [importando, setImportando] = useState(false)
+  /* O cálculo novo, aberto por cima. "Editar" no sistema é gravar outro: a
+     tabela não tem ativo, e todo leitor pega o último. */
+  const [calculando, setCalculando] = useState(false)
   /* A frase do que acabou de entrar. Some ao tocar: é confirmação, não erro. */
   const [recado, setRecado] = useState('')
 
@@ -259,6 +263,29 @@ export function DossieDaPacienteScreen({
      campos e uma escolha de arquivo, que é tela, não gaveta. O voltar dela
      fecha só ela -- o tratador daqui continua atrás, e é o que faz o degrau
      descascar um por vez (armadilha 1). */
+  if (calculando) {
+    return (
+      <NovoCalculoScreen
+        pacienteId={pacienteId}
+        nome={nome}
+        /* O que o último cálculo dela já sabia: peso, altura, idade e sexo
+           voltam preenchidos, e ela muda só o que mudou. Redigitar quatro
+           campos para trocar um peso é o que faz alguém desistir e ir ao
+           computador. */
+        pesoSugerido={calculos[0]?.peso ?? null}
+        alturaSugerida={calculos[0]?.altura ?? null}
+        idadeSugerida={calculos[0]?.idade ?? null}
+        sexoSugerido={null}
+        onFechar={() => setCalculando(false)}
+        onSalvou={mensagem => {
+          setCalculando(false)
+          setRecado(mensagem)
+          void carregar()
+        }}
+      />
+    )
+  }
+
   if (importando) {
     return (
       <ImportarExameScreen
@@ -343,7 +370,25 @@ export function DossieDaPacienteScreen({
               <Exames exames={exames} nome={nome} />
             </>
           )}
-          {!erro && secao === 'energetico' && <Energetico calculos={calculos} nome={nome} />}
+          {!erro && secao === 'energetico' && (
+            <>
+              <Pressable
+                onPress={() => setCalculando(true)}
+                style={({ pressed }) => [estilosDoImportar.botao, pressed && { opacity: 0.75 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Novo cálculo de gasto energético"
+              >
+                <Ionicons name="add" size={17} color={paleta().cores.branco} />
+                <Text style={estilosDoImportar.texto}>Novo cálculo</Text>
+              </Pressable>
+              {!!recado && (
+                <Pressable onPress={() => setRecado('')} accessibilityRole="button" accessibilityLabel="Entendi">
+                  <Text style={estilosDoImportar.recado}>{recado}</Text>
+                </Pressable>
+              )}
+              <Energetico calculos={calculos} nome={nome} />
+            </>
+          )}
           {!erro && secao === 'evolucao' && <Evolucao medidas={medidas} nome={nome} />}
           {/* O resumo tem o próprio erro e a própria espera: ele continua
               perguntando enquanto a Aurora lê, e um erro de rede numa das
