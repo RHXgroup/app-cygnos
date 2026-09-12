@@ -38,13 +38,11 @@ import {
 export function MaisDaNutriScreen({
   onSair,
   onLerCodigo,
-  onFotoDoPrato,
   onConversas,
   naoLidas = 0,
 }: {
   onSair: () => void
   onLerCodigo: () => void
-  onFotoDoPrato: () => void
   onConversas?: () => void
   /* Ver o comentário igual em `PainelDaNutriScreen`: quem conta é a área. */
   naoLidas?: number
@@ -179,12 +177,12 @@ export function MaisDaNutriScreen({
           {/* A mesma análise que o paciente usa, do lado dela. O caso é o do
               consultório: a paciente mostra a foto do almoço, ou ela fotografa
               o prato ali na mesa, e quer o número para conversar em cima. */}
-          <Opcao
-            icone="camera-outline"
-            titulo="Foto do prato"
-            texto="Estimar o que tem no prato, para conversar na hora"
-            onPress={onFotoDoPrato}
-          />
+          {/* A FOTO DO PRATO saiu daqui em 12/09.
+              "A foto do prato eu ainda não sei se vou deixar, acho que a nutri
+              não vai usar isso, era bom a gente tirar essa opção aí."
+              A tela continua no repositório (`FotoDoPratoDaNutriScreen.tsx`), e
+              voltar é este bloco mais a ligação na área -- ver o cabeçalho dela.
+              Tirei a ENTRADA, e não o trabalho, porque ele disse "ainda não sei". */}
         </View>
 
         <View style={styles.cartao}>

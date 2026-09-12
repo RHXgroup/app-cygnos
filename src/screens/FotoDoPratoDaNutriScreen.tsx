@@ -16,7 +16,19 @@ import { type Estimativa } from '../lib/estimativaDaFoto'
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
 
-/* A foto do prato, do lado dela.
+/* A foto do prato, do lado dela. ESTACIONADA desde 12/09/2026.
+ *
+ * ──────────────────── Sem entrada, e de propósito ────────────────────
+ * "A foto do prato eu ainda não sei se eu vou deixar aqui, viu? Eu acho que a
+ * nutri não vai usar isso, acho que era bom a gente tirar essa opção aí."
+ *
+ * Ele disse "ainda não sei", então a TELA fica e a entrada sai. Para trazer de
+ * volta são duas linhas: o `<Opcao>` em `MaisDaNutriScreen` (o comentário está
+ * no lugar exato) e `onFotoDoPrato={() => setFotografando(true)}` em
+ * `AreaDaNutri`. O estado `fotografando` e o degrau do voltar continuam lá.
+ *
+ * Se a decisão virar definitiva, o que se apaga é isto, o estado e o degrau --
+ * e não antes, porque apagar é o único movimento que custa caro para desfazer.
  *
  * ──────────────────── Por que ela também ────────────────────
  * "Eu acho que pra nutri a gente também tinha que colocar a opção dela tirar

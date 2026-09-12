@@ -319,7 +319,6 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
           <MaisDaNutriScreen
             onSair={onSair}
             onLerCodigo={() => setLendoCodigo(true)}
-            onFotoDoPrato={() => setFotografando(true)}
             naoLidas={naoLidas}
             onConversas={() => setConversando(true)}
           />
