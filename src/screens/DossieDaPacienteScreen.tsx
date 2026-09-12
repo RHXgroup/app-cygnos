@@ -52,6 +52,7 @@ import { estilosDe, paleta } from '../lib/tema'
 import { ImportarExameScreen } from './ImportarExameScreen'
 import { CicloDaFicha, DocumentosDaFicha } from '../components/CicloEDocumentos'
 import { NovoCalculoScreen } from './NovoCalculoScreen'
+import { AnamnesePorVozScreen } from './AnamnesePorVozScreen'
 import {
   cicloDaPaciente,
   documentosDaPaciente,
@@ -154,6 +155,9 @@ export function DossieDaPacienteScreen({
   /* O cálculo novo, aberto por cima. "Editar" no sistema é gravar outro: a
      tabela não tem ativo, e todo leitor pega o último. */
   const [calculando, setCalculando] = useState(false)
+  /* A anamnese ditada, aberta por cima. "E se usar a transcrição aqui também,
+     e preencher tudo pra mim? Tem que ter facilidades, não complicações." */
+  const [anamnesando, setAnamnesando] = useState(false)
   /* A frase do que acabou de entrar. Some ao tocar: é confirmação, não erro. */
   const [recado, setRecado] = useState('')
 
@@ -263,6 +267,21 @@ export function DossieDaPacienteScreen({
      campos e uma escolha de arquivo, que é tela, não gaveta. O voltar dela
      fecha só ela -- o tratador daqui continua atrás, e é o que faz o degrau
      descascar um por vez (armadilha 1). */
+  if (anamnesando) {
+    return (
+      <AnamnesePorVozScreen
+        pacienteId={pacienteId}
+        nome={nome}
+        onFechar={() => setAnamnesando(false)}
+        onSalvou={mensagem => {
+          setAnamnesando(false)
+          setRecado(mensagem)
+          void carregar()
+        }}
+      />
+    )
+  }
+
   if (calculando) {
     return (
       <NovoCalculoScreen
@@ -348,7 +367,25 @@ export function DossieDaPacienteScreen({
             <Terapeutico plano={terapeutico} nome={nome} />
           )}
           {!erro && secao === 'consultas' && <Historico consultas={consultas} nome={nome} />}
-          {!erro && secao === 'anamnese' && <Anamneses anamneses={anamneses} nome={nome} />}
+          {!erro && secao === 'anamnese' && (
+            <>
+              <Pressable
+                onPress={() => setAnamnesando(true)}
+                style={({ pressed }) => [estilosDoImportar.botao, pressed && { opacity: 0.75 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Fazer anamnese falando"
+              >
+                <Ionicons name="mic" size={16} color={paleta().cores.branco} />
+                <Text style={estilosDoImportar.texto}>Fazer anamnese falando</Text>
+              </Pressable>
+              {!!recado && (
+                <Pressable onPress={() => setRecado('')} accessibilityRole="button" accessibilityLabel="Entendi">
+                  <Text style={estilosDoImportar.recado}>{recado}</Text>
+                </Pressable>
+              )}
+              <Anamneses anamneses={anamneses} nome={nome} />
+            </>
+          )}
           {!erro && secao === 'exames' && (
             <>
               {/* O botão vem ANTES da lista: numa ficha com dez exames, um
