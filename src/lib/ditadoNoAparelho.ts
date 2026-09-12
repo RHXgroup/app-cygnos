@@ -256,8 +256,36 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
   /* As opções de início ficam aqui em cima porque o recomeço usa as MESMAS:
      duas listas iguais escritas em dois lugares divergiriam no primeiro ajuste,
      e o recomeço passaria a ouvir diferente do começo. Armadilha 5. */
+  /* ── QUAL SERVIÇO OUVE ──
+   *
+   * No Android existe mais de um: o do aplicativo do Google
+   * (`com.google.android.googlequicksearchbox`), que é o de busca por voz e
+   * historicamente trabalha ONLINE, e o `com.google.android.tts` -- o "Speech
+   * Services by Google", que é quem guarda os idiomas baixados e faz o
+   * reconhecimento DENTRO do aparelho.
+   *
+   * Sem dizer qual, o Android escolhe o padrão dele; num Samsung isso pode cair
+   * no que encerra a cada frase, que é exatamente o defeito relatado ("falo uma
+   * palavra e ele para"). Então: se o de dentro do aparelho estiver visível,
+   * é ele.
+   *
+   * A lista vai para o registro porque ela varia de aparelho para aparelho, e
+   * sem ver a lista qualquer conserto aqui é chute. */
+  let servico: string | undefined
+  try {
+    const servicos =
+      typeof m.getSpeechRecognitionServices === 'function' ? m.getSpeechRecognitionServices() : []
+    console.log('[cygnos] ditado: serviços de voz no aparelho:', (servicos ?? []).join(', ') || '(nenhum)')
+    servico = (servicos ?? []).find((s: string) => s === 'com.google.android.tts')
+  } catch (e) {
+    falha('Não consegui listar os serviços de voz.', e)
+  }
+
   const comoOuvir = {
     lang: 'pt-BR',
+    /* Indefinido quando o de dentro do aparelho não aparece na lista: aí vale o
+       padrão do sistema, que é o que já acontecia. */
+    androidRecognitionServicePackage: servico,
     interimResults: true,
     /* Contínua: ela fala com pausas ("marca um lembrete... pras oito...").
        Onde o aparelho respeita, é ela que segura; onde não respeita, quem
@@ -272,6 +300,18 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
        Três segundos é a pausa de quem está formulando; acima disso, o recomeço
        assume. */
     androidIntentOptions: {
+      /* A SESSÃO SEGMENTADA, dita com todas as letras.
+       *
+       * É assim que o Android faz escuta contínua: um `EXTRA_SEGMENTED_SESSION`
+       * apontando para OUTRO extra, que é o critério de corte de cada segmento.
+       * A documentação do módulo avisa que, ao usá-lo, o extra apontado precisa
+       * estar no MESMO intent -- e é o que está aqui embaixo.
+       *
+       * Sem isto, `continuous: true` sozinho não tem efeito no reconhecedor de
+       * dentro do celular: ele ouve uma frase, encerra, e o que aparece é uma
+       * palavra só. */
+      EXTRA_SEGMENTED_SESSION:
+        'android.speech.extras.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS' as const,
       EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
       EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
       EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 8000,

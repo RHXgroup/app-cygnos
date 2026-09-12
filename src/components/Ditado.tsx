@@ -288,8 +288,13 @@ export function Ditado({
            * Só quando ELA NÃO mandou parar: uma palavra dita e o toque em
            * "pronto" é uso legítimo, e mandar isso para o servidor apagaria o
            * que ela acabou de ditar. */
-          const rapidoDemais = Date.now() - comecouAOuvir.current < 6000
-          if (!pararFoiDela.current && rapidoDemais && limpo.length < 15) {
+          /* SEM condição de tempo. A primeira versão só valia para escuta de
+             menos de 6 segundos, e o caso dele não é esse: ele fala, o
+             reconhecedor espera o silêncio, encerra sozinho depois de oito ou
+             dez segundos e entrega UMA palavra. Para quem está falando, isso é
+             igualmente inútil -- o que importa é ter encerrado SOZINHA com
+             quase nada, e não em quanto tempo. */
+          if (!pararFoiDela.current && limpo.length < 25) {
             console.log('[cygnos] ditado: o aparelho desistiu cedo; indo pelo servidor')
             semEscutaNoAparelho = true
             void gravarNoServidor()
