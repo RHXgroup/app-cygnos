@@ -429,7 +429,10 @@ export async function estadoDasNotificacoes(): Promise<EstadoDasNotificacoes> {
     /* `?.` porque o embrulho protegido devolve `undefined` para o que o módulo
        não tiver no Expo Go -- e ler `.granted` de nada derrubaria a tela Mais
        inteira por causa de uma linha de status. */
-    if (p?.granted) return 'ligadas'
+    /* `granted` OU `status`: são dois nomes para a mesma resposta, e versões
+       diferentes do módulo preenchem um e esquecem o outro. Ler os dois custa
+       uma comparação e fecha a hipótese de a leitura ser a mentirosa. */
+    if (p?.granted || p?.status === 'granted') return 'ligadas'
     return p?.canAskAgain === false ? 'bloqueadas' : 'perguntar'
   } catch (e) {
     /* Sem conseguir perguntar, 'perguntar' é o estado honesto: o botão tenta,
@@ -444,6 +447,31 @@ export async function estadoDasNotificacoes(): Promise<EstadoDasNotificacoes> {
  * Faz o que a situação pede: pergunta, ou abre a configuração do telefone.
  * Devolve o estado DEPOIS, para a tela não precisar adivinhar.
  */
+/* Já pedimos a permissão nesta sessão do app?
+ *
+ * ──────────────────── A CAIXA QUE NUNCA APARECE ────────────────────
+ * Relatado três vezes, com as mesmas palavras: "clico pra ligar e ele fala que o
+ * telefone não liberou, toque de novo e responda permitir -- e não aparece caixa
+ * nenhuma". Tocar de novo não muda nada, então o botão estava mandando fazer uma
+ * coisa impossível.
+ *
+ * No Android 13 para cima, `POST_NOTIFICATIONS` é permissão de caixa, e o
+ * sistema só mostra a caixa DUAS VEZES. Da terceira em diante ele devolve
+ * "negado" na hora, sem desenhar nada -- e nesse caso `canAskAgain` deveria vir
+ * falso, que é o sinal que nos manda abrir a configuração. Nem sempre vem: é o
+ * módulo relatando o que PEDIU, e não o que o sistema decidiu.
+ *
+ * Do lado do app as duas situações são indistinguíveis: pedido negado com
+ * caixa, e pedido negado sem caixa, chegam iguais. O que as separa é o
+ * histórico -- se eu JÁ pedi e voltou negado outra vez, a caixa não vai
+ * aparecer, e insistir é o que ele viveu.
+ *
+ * Então o segundo toque abre a configuração do telefone em vez de repetir a
+ * frase. Custa: quem de fato recusou a caixa uma vez vai para as configurações
+ * em vez de ver a caixa de novo. Paga: ninguém fica preso num botão que não faz
+ * nada, que é o defeito relatado. */
+let jaPedi = false
+
 export async function ligarNotificacoes(): Promise<EstadoDasNotificacoes> {
   const antes = await estadoDasNotificacoes()
   console.log('[cygnos] ligar notificacoes: estado antes =', antes)
@@ -465,9 +493,32 @@ export async function ligarNotificacoes(): Promise<EstadoDasNotificacoes> {
   try {
     const N = await notificacoes()
     const r = await N.requestPermissionsAsync()
-    console.log('[cygnos] pedido de notificacao devolveu:', JSON.stringify(r))
-    if (r?.granted) return 'ligadas'
-    return r?.canAskAgain === false ? 'bloqueadas' : 'perguntar'
+    console.log(
+      '[cygnos] pedido de notificacao devolveu:',
+      JSON.stringify(r),
+      '| ja tinha pedido:',
+      jaPedi,
+    )
+    if (r?.granted || r?.status === 'granted') {
+      jaPedi = false
+      return 'ligadas'
+    }
+    if (r?.canAskAgain === false) return 'bloqueadas'
+
+    /* Segunda vez negado: a caixa não vai aparecer mais. Ver o comentário do
+       `jaPedi` -- é aqui que o botão para de mentir. */
+    if (jaPedi) {
+      console.log('[cygnos] a caixa nao aparece mais; abrindo a configuracao')
+      try {
+        await Linking.openSettings()
+      } catch (e) {
+        falha('Não consegui abrir as configurações do telefone.', e)
+      }
+      return 'bloqueadas'
+    }
+
+    jaPedi = true
+    return 'perguntar'
   } catch (e) {
     falha('Não consegui pedir a permissão de notificação.', e)
     return 'perguntar'

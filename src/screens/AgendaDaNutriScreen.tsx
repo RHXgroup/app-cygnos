@@ -14,6 +14,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDesvioDoTeclado } from '../lib/teclado'
+import { useVoltarDoAparelho } from '../lib/voltarDoAparelho'
 import { NovaConsultaScreen } from './NovaConsultaScreen'
 import {
   confirmarConsulta,
@@ -128,55 +129,62 @@ export function AgendaDaNutriScreen({
      dentro, e o voltar fechava a ficha inteira em vez da seção aberta nela.
      Com a lista, ele só se re-registra quando a ficha ou a folha abrem e
      fecham, que é quando ele deve ficar na frente. Armadilha 1. */
-  /* ──── Registrado UMA VEZ, lendo o estado por `ref` ────
+  /* ──── Registrado NUMA MICROTAREFA, lendo o estado por `ref` ────
    *
-   * Com lista de dependências ele se re-registrava toda vez que a tela de
-   * marcar abria -- e, como os efeitos do FILHO rodam antes dos do PAI, entrava
-   * por último e ganhava dela: o voltar dentro da busca de paciente fechava a
-   * marcação inteira em vez de voltar ao formulário.
+   * Ele já foi registrado com lista de dependências, e depois uma vez só, e as
+   * duas versões tinham um defeito de ORDEM -- cada uma de um lado:
    *
-   * Registrado na abertura, ele fica ATRÁS de tudo o que abre depois, e só
-   * decide quando ninguém de dentro decidiu. O estado vem de `ref` porque um
-   * tratador registrado uma vez leria para sempre os valores da primeira
-   * renderização. */
+   *   - COM lista, ele se re-registrava ao abrir a marcação e passava na frente
+   *     da PRÓPRIA filha: o voltar dentro da busca de paciente fechava a
+   *     marcação inteira em vez de voltar ao formulário.
+   *   - UMA VEZ SÓ, ele perdia para o PAI. Tocar na aba da agenda muda `aba` na
+   *     área e monta esta tela na MESMA renderização, e numa renderização só os
+   *     efeitos do filho rodam antes dos do pai: a área registrava por último e
+   *     ganhava. Relatado assim: "clico no dia trinta, aperto voltar e ele vai
+   *     pra página inicial -- devia voltar pro calendário".
+   *
+   * `useVoltarDoAparelho` sai do instante: registra numa microtarefa, que roda
+   * depois de TODOS os efeitos daquela renderização, os do pai inclusive. Fica
+   * na frente do pai sem se re-registrar nunca, e atrás de qualquer tela que
+   * monte depois. O porquê inteiro está no cabeçalho de `lib/voltarDoAparelho.ts`.
+   *
+   * O estado vem de `ref` porque um tratador registrado uma vez leria para
+   * sempre os valores da primeira renderização. */
   const estado = useRef({ marcando, agindoEm, fichaAberta, vista })
   estado.current = { marcando, agindoEm, fichaAberta, vista }
 
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      const agora = estado.current
-      if (agora.marcando) {
-        setMarcando(null)
-        return true
-      }
-      if (agora.agindoEm) {
-        setAgindoEm(null)
-        return true
-      }
-      if (agora.fichaAberta !== null) {
-        setFichaAberta(null)
-        return true
-      }
-      /* ──── O DIA E A SEMANA SÃO DEGRAUS, e o voltar não sabia ────
-       *
-       * Relatado em uso: "estou na agenda, clico num dia, aparece livre até as
-       * vinte horas; aperto voltar querendo o calendário e ele volta pra tela
-       * inicial do aplicativo".
-       *
-       * Trocar de vista é NAVEGAR, mesmo sem tela nova: ela entrou no dia a
-       * partir do mês, e o voltar tem de desfazer a entrada. Sem este degrau o
-       * evento caía para o tratador da área, que só sabe fechar a agenda
-       * inteira -- e a pessoa perdia o lugar onde estava.
-       *
-       * Do MÊS, que é onde a tela abre, o voltar devolve: aí sim é sair. */
-      if (agora.vista !== 'mes') {
-        setVista('mes')
-        return true
-      }
-      return false
-    })
-    return () => sub.remove()
-  }, [])
+  useVoltarDoAparelho(() => {
+    const agora = estado.current
+    if (agora.marcando) {
+      setMarcando(null)
+      return true
+    }
+    if (agora.agindoEm) {
+      setAgindoEm(null)
+      return true
+    }
+    if (agora.fichaAberta !== null) {
+      setFichaAberta(null)
+      return true
+    }
+    /* ──── O DIA E A SEMANA SÃO DEGRAUS, e o voltar não sabia ────
+     *
+     * Relatado em uso: "estou na agenda, clico num dia, aparece livre até as
+     * vinte horas; aperto voltar querendo o calendário e ele volta pra tela
+     * inicial do aplicativo".
+     *
+     * Trocar de vista é NAVEGAR, mesmo sem tela nova: ela entrou no dia a
+     * partir do mês, e o voltar tem de desfazer a entrada. Sem este degrau o
+     * evento caía para o tratador da área, que só sabe fechar a agenda
+     * inteira -- e a pessoa perdia o lugar onde estava.
+     *
+     * Do MÊS, que é onde a tela abre, o voltar devolve: aí sim é sair. */
+    if (agora.vista !== 'mes') {
+      setVista('mes')
+      return true
+    }
+    return false
+  })
 
   /* Que pedaço do calendário está na tela. O mês pede a grade INTEIRA, sobras
      inclusive: as células de 31 de agosto e 4 de outubro também mostram
