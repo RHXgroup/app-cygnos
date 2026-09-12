@@ -15,7 +15,12 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { NovaConsultaScreen } from './NovaConsultaScreen'
-import { confirmarConsulta, geraFinanceiroSozinho, marcarComoAtendida } from '../lib/acoesDaConsulta'
+import {
+  confirmarConsulta,
+  geraFinanceiroSozinho,
+  marcarComoAtendida,
+  salvarNotaDoAtendimento,
+} from '../lib/acoesDaConsulta'
 import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { FichaDoPacienteScreen } from './PacientesDaNutriScreen'
 import {
@@ -833,7 +838,11 @@ export function PainelDaConsulta({
    * tentativas na tela de conversa. */
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
-  const [modo, setModo] = useState<'menu' | 'remarcar' | 'cancelar'>('menu')
+  const [modo, setModo] = useState<'menu' | 'remarcar' | 'cancelar' | 'nota'>('menu')
+  /* A nota do atendimento, escrita logo depois de dar por atendida. É a mesma
+     coluna que a ficha mostra no topo como "onde a gente parou" -- escrita no
+     corredor ela existe; deixada para a noite, é o que mais se perde. */
+  const [nota, setNota] = useState('')
   const [data, setData] = useState('')
   const [hora, setHora] = useState('')
   const [motivo, setMotivo] = useState('')
@@ -892,8 +901,32 @@ export function PainelDaConsulta({
     salvandoAgora.current = false
     setSalvando(false)
 
-    /* Deu certo: o painel fecha e a agenda relê -- a prova é a linha mudando de
-       cor na lista, e não uma frase dentro de uma folha que sumiu. */
+    if (!r.ok) {
+      setRecado(r.mensagem)
+      return
+    }
+
+    /* Confirmar fecha: a prova é a linha mudando de cor na lista. Atendida NÃO
+       fecha -- ela abre a nota, porque é o instante em que a nota existe na
+       cabeça dela. Pular direto seria mandar escrever depois, e depois quer
+       dizer nunca. */
+    if (qual === 'confirmar') onMudou()
+    else {
+      setModo('nota')
+      setRecado('Consulta dada por atendida.')
+    }
+  }
+
+  async function guardarNota() {
+    if (salvando || salvandoAgora.current) return
+    salvandoAgora.current = true
+    setSalvando(true)
+
+    const r = await salvarNotaDoAtendimento(consulta.id, nota)
+
+    salvandoAgora.current = false
+    setSalvando(false)
+
     if (r.ok) onMudou()
     else setRecado(r.mensagem)
   }
@@ -1013,6 +1046,35 @@ export function PainelDaConsulta({
               <Ionicons name="close-circle-outline" size={18} color={paleta().cores.erroTexto} />
               <Text style={[styles.textoDaOpcao, styles.textoPerigo]}>Cancelar consulta</Text>
             </Pressable>
+          </>
+        )}
+
+        {modo === 'nota' && (
+          <>
+            <Text style={styles.dica}>
+              O que ficou desta consulta? Aparece no topo da ficha dela, e é o que você lê antes
+              da próxima.
+            </Text>
+            <TextInput
+              value={nota}
+              onChangeText={setNota}
+              placeholder="Trouxe os exames, começou a caminhada, vai voltar em 30 dias…"
+              placeholderTextColor={paleta().inkFraco}
+              multiline
+              style={[styles.campo, styles.campoDaNota]}
+              accessibilityLabel="Nota do atendimento"
+            />
+            {!!recado && <Text style={styles.recado}>{recado}</Text>}
+            <BotoesDaFolha
+              rotulo="Guardar nota"
+              salvando={salvando}
+              onVoltar={() => {
+                /* Sem nota também é uma resposta, e a consulta já está
+                   atendida: fechar aqui não desfaz nada. */
+                onMudou()
+              }}
+              onConfirmar={() => void guardarNota()}
+            />
           </>
         )}
 
@@ -1212,6 +1274,10 @@ const estilos = estilosDe(t =>
       color: t.cores.ink,
     },
     campoLargo: { minHeight: 68, textAlignVertical: 'top' },
+    /* Mais alta que a do motivo: a nota do atendimento é o texto mais longo que
+       ela escreve nesta folha, e um campo de três linhas faz parecer que só
+       cabe uma frase. */
+    campoDaNota: { minHeight: 96, textAlignVertical: 'top' },
     dica: { fontSize: 11.5, color: t.inkFraco, lineHeight: 16 },
     /* A frase do banco, com folga para caber inteira: a recusa de choque traz
        nome e horário, e cortar isso em duas linhas com reticências tiraria

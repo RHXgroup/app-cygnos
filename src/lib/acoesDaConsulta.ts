@@ -72,3 +72,30 @@ export async function geraFinanceiroSozinho(): Promise<boolean> {
   }
   return (data as { gerar_financeiro_auto?: boolean } | null)?.gerar_financeiro_auto ?? true
 }
+
+/* A nota do atendimento, escrita logo depois de dar a consulta por atendida.
+ *
+ * ── Por que aqui, e não "depois, no computador" ──────────────────────────
+ * É a mesma coluna que a ficha já lê e mostra no topo como "onde a gente
+ * parou" -- o motivo pelo qual a maioria das fichas é aberta. Escrita no
+ * corredor, entre uma paciente e outra, ela existe; deixada para a noite, ela
+ * é o que mais se perde.
+ *
+ * Vazio APAGA, e não é engano: ela pode ter escrito por engano e querer tirar.
+ * Guardar texto em branco e deixar a nota velha no lugar seria a tela dizendo
+ * que salvou e não ter salvado. */
+export async function salvarNotaDoAtendimento(
+  id: number,
+  nota: string,
+): Promise<ResultadoDaAcao> {
+  const limpa = nota.trim()
+  const { error } = await supabase
+    .from('consultas')
+    .update({ notas_atendimento: limpa || null })
+    .eq('id', id)
+
+  if (error) {
+    return { ok: false, mensagem: falha('Não consegui salvar a nota agora.', error) }
+  }
+  return { ok: true, mensagem: limpa ? 'Nota guardada.' : 'Nota apagada.' }
+}
