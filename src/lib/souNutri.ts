@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
-import type { TimbradoDaNutri } from './folhaDoPlano'
+import type { TimbradoDaNutri } from './folhaPadrao'
 
 /* Quem entrou: paciente, nutricionista, ou ninguém disso.
  *
@@ -146,6 +146,48 @@ export async function quemEntrou(): Promise<QuemEntrou | null> {
  * O TIPO mora em `folhaDoPlano`, que é quem desenha a folha: dois tipos de mesmo
  * nome e mesma forma em dois arquivos são a armadilha 5 -- o compilador aceita a
  * troca, e o dia em que um ganhar um campo o outro não ganha. */
+/* O endereço da logo (ou da foto) pronto para entrar no PDF.
+ *
+ * O balde é privado desde 25/08 -- endereço público ali devolve 400 e a imagem
+ * simplesmente não aparece, sem erro nenhum (armadilha 7). Então é preciso
+ * ASSINAR, e o balde sai do próprio endereço guardado: o sistema grava o
+ * caminho completo, e a parte depois de `/object/public/` ou `/object/sign/`
+ * diz qual balde é.
+ *
+ * Devolve nulo em qualquer tropeço -- sem logo o papel sai com o nome dela, e
+ * uma imagem quebrada no meio do timbrado é pior do que nenhuma.
+ *
+ * A flag `usar_logo_documentos` é a mesma do sistema: ligada, vale a logo; sem
+ * ela, a foto dela. */
+async function enderecoDaLogo(p: Record<string, unknown>): Promise<string | null> {
+  const bruto =
+    (p.usar_logo_documentos === true && typeof p.logo_doc_url === 'string' && p.logo_doc_url) ||
+    (typeof p.foto_url === 'string' && p.foto_url) ||
+    (typeof p.logo_doc_url === 'string' && p.logo_doc_url) ||
+    ''
+  if (!bruto) return null
+
+  /* Já assinado: o endereço traz o token e vale por uma hora -- o PDF é gerado
+     e compartilhado em segundos, então serve. */
+  if (bruto.includes('/object/sign/')) return bruto
+
+  const m = bruto.match(/\/object\/(?:public|sign)\/([^/]+)\/(.+?)(?:\?|$)/)
+  if (!m) return null
+  const [, balde, caminho] = m
+
+  try {
+    const { data, error } = await supabase.storage.from(balde).createSignedUrl(caminho, 3600)
+    if (error || !data?.signedUrl) {
+      falha('Não consegui assinar a logo do timbrado.', error)
+      return null
+    }
+    return data.signedUrl
+  } catch (e) {
+    falha('Não consegui assinar a logo do timbrado.', e)
+    return null
+  }
+}
+
 export async function timbradoDaNutri(): Promise<TimbradoDaNutri | null> {
   try {
     const { data: sessao } = await supabase.auth.getSession()
@@ -187,6 +229,7 @@ export async function timbradoDaNutri(): Promise<TimbradoDaNutri | null> {
       nome: nome || doCadastro?.nome || 'Cygnos',
       crn: texto(p.crn) || null,
       contato: contato || null,
+      logo: await enderecoDaLogo(p),
     }
   } catch (e) {
     falha('Não consegui ler o seu timbrado.', e)
