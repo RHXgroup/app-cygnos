@@ -21,6 +21,7 @@ import {
 import { folhaDoPlano, nomeDoArquivo } from '../lib/folhaDoPlano'
 import { timbradoDaNutri } from '../lib/souNutri'
 import { trocasDoPlanoDaPaciente, type TrocasPorItem } from '../lib/trocasDoPlano'
+import { PlanoEmAbas } from '../components/PlanoEmAbas'
 import {
   procurarAlimento,
   trocarItem,
@@ -70,9 +71,7 @@ export function PlanoDaPacienteScreen({
      aparecem para ela conferir o que a paciente está lendo.
      Leitura à parte do plano: se falhar, o plano continua na tela. */
   const [trocas, setTrocas] = useState<TrocasPorItem>(new Map())
-  /* Qual item está com as trocas abertas. Uma por vez, como na página do
-     link: abrir todas vira um paredão de texto. */
-  const [trocasAbertas, setTrocasAbertas] = useState<number | null>(null)
+
   /* O item que ela tocou para trocar, ou nenhum. Guarda o rótulo junto e não
      só o id: a folha mostra o nome do que está saindo, e ir buscar isso de novo
      seria uma leitura para um dado que já estava na mão. */
@@ -362,105 +361,46 @@ export function PlanoDaPacienteScreen({
                 </Text>
               )}
 
-              {plano.refeicoes.map(r => {
-                const total = kcalDaRefeicao(r)
-                const faltando = semCaloriaEm(r)
-                return (
-                  <View key={r.id} style={styles.refeicao}>
-                    <View style={styles.topoDaRefeicao}>
-                      {!!r.horario && <Text style={styles.horario}>{r.horario}</Text>}
-                      <Text style={styles.nomeDaRefeicao}>{r.nome}</Text>
-                      {/* "—" quando NENHUM item tem caloria. Zero seria mentira:
-                          é a diferença entre "esta refeição não tem caloria" e
-                          "eu não sei a caloria desta refeição". Item 6. */}
-                      <Text style={styles.kcalDaRefeicao}>
-                        {total === null ? '—' : `${total} kcal`}
-                      </Text>
-                    </View>
+              {/* ── O PLANO POR REFEIÇÃO ──
+                  "Você não colocou lá aquelas opçõezinhas: café da manhã,
+                  almoço, janta, conforme as imagens que eu te passei."
 
-                    {r.itens.length === 0 ? (
-                      <Text style={styles.refeicaoVazia}>Sem itens.</Text>
-                    ) : (
-                      r.itens.map(i => (
-                        <View key={i.id}>
-                        {/* Tocar no item abre a troca. É a única edição que esta
-                            tela faz, e é a que ele pediu com a paciente na
-                            frente: "agora pediu pra trocar". */}
-                        <Pressable
-                          onPress={() => setTrocando({ id: i.id, rotulo: i.rotulo })}
-                          style={({ pressed }) => [styles.item, pressed && styles.pressionado]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${i.rotulo}. Toque para trocar por outro alimento.`}
-                        >
-                          <Text style={styles.rotuloDoItem} numberOfLines={2}>
-                            {i.rotulo}
-                          </Text>
-                          {!!i.quantidade && (
-                            <Text style={styles.quantidadeDoItem}>{i.quantidade}</Text>
-                          )}
-                          <Ionicons name="swap-horizontal" size={14} color={paleta().inkFraco} />
-                        </Pressable>
-
-                        {/* AS EQUIVALÊNCIAS que ela cadastrou no sistema.
-                            É o que a paciente lê na página do link e, desde
-                            hoje, no aplicativo -- e aqui ela confere o que a
-                            paciente está vendo, sem abrir o computador. */}
-                        {(trocas.get(String(i.id))?.length ?? 0) > 0 && (
-                          <>
-                            <Pressable
-                              onPress={() =>
-                                setTrocasAbertas(trocasAbertas === i.id ? null : i.id)
-                              }
-                              style={styles.verTrocas}
-                              accessibilityRole="button"
-                              accessibilityState={{ expanded: trocasAbertas === i.id }}
-                              accessibilityLabel={'Ver as equivalências de ' + i.rotulo}
-                            >
-                              <Text style={styles.textoVerTrocas}>
-                                {trocasAbertas === i.id
-                                  ? 'esconder as trocas'
-                                  : (trocas.get(String(i.id))?.length ?? 0) === 1
-                                    ? '1 troca cadastrada'
-                                    : (trocas.get(String(i.id))?.length ?? 0) + ' trocas cadastradas'}
-                              </Text>
-                              <Ionicons
-                                name={trocasAbertas === i.id ? 'chevron-up' : 'chevron-down'}
-                                size={12}
-                                color={paleta().cores.verde}
-                              />
-                            </Pressable>
-
-                            {trocasAbertas === i.id && (
-                              <View style={styles.listaDeTrocas}>
-                                {(trocas.get(String(i.id)) ?? []).map((tr, k) => (
-                                  <View key={k} style={styles.umaTroca}>
-                                    <Ionicons name="checkmark" size={12} color={paleta().cores.verde} />
-                                    <Text style={styles.nomeDaTroca}>{tr.nome}</Text>
-                                    {!!tr.detalhe && (
-                                      <Text style={styles.quantidadeDaTroca}>{tr.detalhe}</Text>
-                                    )}
-                                  </View>
-                                ))}
-                              </View>
-                            )}
-                          </>
-                        )}
-                        </View>
-                      ))
-                    )}
-
-                    {/* Dito, e não escondido: um total que ignora três itens sem
-                        caloria é um total que ela some de cabeça e não bate. */}
-                    {faltando > 0 && total !== null && (
-                      <Text style={styles.semCaloria}>
-                        {faltando === 1
-                          ? 'Um item sem caloria cadastrada não entrou na conta.'
-                          : `${faltando} itens sem caloria cadastrada não entraram na conta.`}
-                      </Text>
-                    )}
-                  </View>
-                )
-              })}
+                  A mesma peça que o app do paciente usa, para as duas telas não
+                  divergirem -- e com o que só existe deste lado: as calorias da
+                  refeição, o toque no item para trocar de alimento, e as
+                  equivalências que a paciente lê. */}
+              <PlanoEmAbas
+                refeicoes={plano.refeicoes.map(r => {
+                  const total = kcalDaRefeicao(r)
+                  const faltando = semCaloriaEm(r)
+                  return {
+                    id: String(r.id),
+                    nome: r.nome,
+                    hora: r.horario,
+                    /* "—" quando NENHUM item tem caloria: zero seria mentira. É a
+                       diferença entre "esta refeição não tem caloria" e "eu não
+                       sei a caloria desta refeição". Item 6. */
+                    resumo: [
+                      total === null ? '— kcal' : `${total} kcal`,
+                      faltando > 0 && total !== null
+                        ? faltando === 1
+                          ? '1 item sem caloria cadastrada ficou de fora'
+                          : `${faltando} itens sem caloria cadastrada ficaram de fora`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                    itens: r.itens.map(i => ({
+                      id: String(i.id),
+                      nome: i.rotulo,
+                      detalhe: i.quantidade,
+                      trocas: trocas.get(String(i.id)) ?? [],
+                      aoTocar: () => setTrocando({ id: i.id, rotulo: i.rotulo }),
+                    })),
+                  }
+                })}
+                rodape="Toque num item para trocar o alimento · toque em “trocar” para ver as equivalências que a paciente lê."
+              />
 
               {/* O botão fica no FIM, e não no cabeçalho.
                   Gerar o PDF é o que ela faz depois de ler e concordar com o
@@ -760,29 +700,6 @@ const estilos = estilosDe(t =>
       paddingTop: 6,
     },
 
-    verTrocas: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingLeft: 2,
-      paddingBottom: 6,
-    },
-    textoVerTrocas: { fontFamily: FONTE.meia, fontSize: 11.5, color: t.cores.verde },
-    listaDeTrocas: {
-      gap: 5,
-      marginBottom: 8,
-      padding: 9,
-      borderRadius: 10,
-      backgroundColor: t.cores.verdeMenta,
-    },
-    umaTroca: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    nomeDaTroca: { flex: 1, fontFamily: FONTE.normal, fontSize: 13, color: t.cores.ink },
-    quantidadeDaTroca: {
-      fontFamily: FONTE.meia,
-      fontSize: 12,
-      color: t.inkSuave,
-      fontVariant: ['tabular-nums'],
-    },
     botaoPdf: {
       flexDirection: 'row',
       alignItems: 'center',

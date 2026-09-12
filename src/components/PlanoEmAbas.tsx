@@ -36,6 +36,10 @@ export type ItemEmAbas = {
   nome: string
   detalhe: string | null
   trocas: TrocaEmAbas[]
+  /* Só do lado DELA: tocar no item abre a troca de alimento. Ausente no app do
+     paciente, e aí o item não é botão -- um item que afunda e não faz nada
+     ensina em dez segundos a não tentar mais. */
+  aoTocar?: () => void
 }
 
 export type RefeicaoEmAbas = {
@@ -43,6 +47,10 @@ export type RefeicaoEmAbas = {
   nome: string
   hora: string | null
   itens: ItemEmAbas[]
+  /* A linha embaixo do nome da refeição: "420 kcal · 32 g de proteína". Vem
+     pronta de quem montou, porque quem sabe somar macro é a tela dela -- o app
+     do paciente não mostra esse número no plano. */
+  resumo?: string | null
 }
 
 /* O ícone sai do NOME da refeição, como no site. Café, almoço, lanche e jantar
@@ -144,6 +152,8 @@ export function PlanoEmAbas({
           )}
         </View>
 
+        {!!atual.resumo && <Text style={styles.resumoDaRefeicao}>{atual.resumo}</Text>}
+
         {atual.itens.length === 0 && <Text style={styles.vazio}>Sem itens nesta refeição.</Text>}
 
         {atual.itens.map(item => {
@@ -151,10 +161,25 @@ export function PlanoEmAbas({
           return (
             <View key={item.id} style={styles.item}>
               <View style={styles.linhaDoItem}>
-                <Text style={styles.nomeDoItem}>
-                  {item.nome}
-                  {item.detalhe ? <Text style={styles.detalheDoItem}> — {item.detalhe}</Text> : null}
-                </Text>
+                {item.aoTocar ? (
+                  <Pressable
+                    onPress={item.aoTocar}
+                    style={({ pressed }) => [styles.tocavel, pressed && { opacity: 0.6 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.nome + '. Toque para trocar por outro alimento.'}
+                  >
+                    <Text style={styles.nomeDoItem}>
+                      {item.nome}
+                      {item.detalhe ? <Text style={styles.detalheDoItem}> — {item.detalhe}</Text> : null}
+                    </Text>
+                    <Ionicons name="swap-horizontal" size={14} color={paleta().inkFraco} />
+                  </Pressable>
+                ) : (
+                  <Text style={styles.nomeDoItem}>
+                    {item.nome}
+                    {item.detalhe ? <Text style={styles.detalheDoItem}> — {item.detalhe}</Text> : null}
+                  </Text>
+                )}
 
                 {item.trocas.length > 0 && (
                   <Pressable
@@ -252,6 +277,14 @@ const estilos = estilosDe(t =>
     item: { paddingVertical: 9, borderTopWidth: 1, borderTopColor: t.cores.borda },
     linhaDoItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     nomeDoItem: { flex: 1, fontFamily: FONTE.normal, fontSize: 14.5, color: t.cores.ink, lineHeight: 20 },
+    tocavel: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    resumoDaRefeicao: {
+      fontFamily: FONTE.meia,
+      fontSize: 12,
+      color: t.cores.verde,
+      paddingBottom: 4,
+      fontVariant: ['tabular-nums'],
+    },
     detalheDoItem: { fontFamily: FONTE.meia, color: t.inkSuave },
 
     botaoTrocar: {

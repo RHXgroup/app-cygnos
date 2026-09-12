@@ -19,6 +19,7 @@ import type { Medida } from '../lib/pacientesDaNutri'
 import { decimal, milhar } from '../lib/formatar'
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
+import { GraficoDaEvolucao } from './GraficoDaEvolucao'
 
 /* As seções de LEITURA do prontuário, abertas pela ficha dentro da moldura de
  * `DossieDaPacienteScreen`.
@@ -282,50 +283,179 @@ const fator = (n: number) => String(n).replace('.', ',')
 
 // ════════════════════════════ EVOLUÇÃO ════════════════════════════
 
+/* Quais medidas a evolução sabe desenhar. A ordem é a da conversa: peso
+   primeiro, porque é o que a paciente pergunta; composição depois. */
+type MedidaDoGrafico = {
+  chave: string
+  rotulo: string
+  unidade: string
+  casas: number
+  valor: (m: Medida) => number | null
+}
+
+const MEDIDAS_DO_GRAFICO: MedidaDoGrafico[] = [
+  { chave: 'peso', rotulo: 'Peso', unidade: ' kg', casas: 1, valor: m => m.peso },
+  { chave: 'imc', rotulo: 'IMC', unidade: '', casas: 1, valor: m => m.imc },
+  { chave: 'gordura', rotulo: 'Gordura', unidade: '%', casas: 1, valor: m => m.gordura },
+  { chave: 'cintura', rotulo: 'Cintura', unidade: ' cm', casas: 1, valor: m => m.cintura },
+  { chave: 'massaMagra', rotulo: 'Massa magra', unidade: ' kg', casas: 1, valor: m => m.massaMagra },
+]
+
+/* Na criança o IMC não se lê pela faixa do adulto, e sim pelo escore z do
+   IMC para a idade -- o sistema tem uma tela de curva de crescimento por isso. */
+const IMC_DA_CRIANCA: MedidaDoGrafico = {
+  chave: 'zImcIdade',
+  rotulo: 'IMC/idade (z)',
+  unidade: '',
+  casas: 2,
+  valor: m => m.zImcIdade,
+}
+
 export function Evolucao({ medidas, nome }: { medidas: Medida[]; nome: string }) {
   const styles = estilos()
+  const [escolhida, setEscolhida] = useState('peso')
+  const [detalhes, setDetalhes] = useState(false)
+  /* A largura do gráfico vem do layout: o SVG precisa de número, e "100%" daria
+     um traçado esticado errado. */
+  const [largura, setLargura] = useState(0)
+
   if (medidas.length === 0) {
     return <Vazio icone="analytics-outline" texto={`${nome} ainda não tem avaliação com medidas.`} />
   }
-  const primeira = medidas[medidas.length - 1]
-  const ultima = medidas[0]
+
   const crianca = medidas.some(m => m.zImcIdade !== null)
+  const disponiveis = (crianca
+    ? MEDIDAS_DO_GRAFICO.map(x => (x.chave === 'imc' ? IMC_DA_CRIANCA : x))
+    : MEDIDAS_DO_GRAFICO
+  ).filter(x => medidas.some(m => x.valor(m) !== null))
+
+  /* Nenhuma medida com número em nenhuma avaliação: a paciente tem avaliação
+     sem nada preenchido, e o gráfico seria uma moldura vazia. */
+  if (disponiveis.length === 0) {
+    return <Vazio icone="analytics-outline" texto={`As avaliações de ${nome} ainda não têm números.`} />
+  }
+
+  const medida = disponiveis.find(x => x.chave === escolhida) ?? disponiveis[0]
+
+  /* Do mais ANTIGO para o mais novo -- a lista vem ao contrário, que é a ordem
+     de leitura da ficha, e não a de uma linha do tempo. E só o que tem número:
+     ponto inventado no meio afirmaria uma medida que ninguém fez. */
+  const serie = [...medidas]
+    .reverse()
+    .map(m => ({ quando: m.quando, valor: medida.valor(m) }))
+    .filter((p): p is { quando: string; valor: number } => p.valor !== null)
+
+  const primeiro = serie[0]
+  const ultimo = serie[serie.length - 1]
+  const variacao = serie.length > 1 && primeiro && ultimo ? ultimo.valor - primeiro.valor : null
+
   return (
     <>
-      {medidas.length > 1 && (
-        <View style={styles.cartao}>
-          <Text style={styles.rotuloDeSecao}>
-            DE {ddmmaaaa(primeira.quando)} A {ddmmaaaa(ultima.quando)}
-          </Text>
-          {/* A variação diz o SENTIDO e o tamanho, sem verde de "bom" nem
-              vermelho de "ruim": quem está em ganho de massa sobe de propósito.
-              Quem interpreta é ela -- a mesma regra da ficha. */}
-          <Variacao rotulo="Peso" de={primeira.peso} para={ultima.peso} unidade="kg" />
-          {!crianca && <Variacao rotulo="IMC" de={primeira.imc} para={ultima.imc} unidade="" />}
-          {crianca && <Variacao rotulo="IMC/idade (escore z)" de={primeira.zImcIdade} para={ultima.zImcIdade} unidade="" casas={2} />}
-          <Variacao rotulo="Gordura" de={primeira.gordura} para={ultima.gordura} unidade="%" />
-          <Variacao rotulo="Cintura" de={primeira.cintura} para={ultima.cintura} unidade="cm" />
-          <Variacao rotulo="Massa magra" de={primeira.massaMagra} para={ultima.massaMagra} unidade="kg" />
+      {/* ── O GRÁFICO ── */}
+      <View style={styles.cartao} onLayout={e => setLargura(e.nativeEvent.layout.width - 28)}>
+        {/* As medidas como abas: ela toca no que quer ver, e o gráfico troca.
+            Cinco gráficos empilhados seriam cinco rolagens para comparar duas
+            coisas. */}
+        <View style={styles.abasDaMedida}>
+          {disponiveis.map(x => {
+            const atual = x.chave === medida.chave
+            return (
+              <Pressable
+                key={x.chave}
+                onPress={() => setEscolhida(x.chave)}
+                style={({ pressed }) => [
+                  styles.abaDaMedida,
+                  atual && styles.abaDaMedidaEscolhida,
+                  pressed && { opacity: 0.8 },
+                ]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: atual }}
+              >
+                <Text style={[styles.textoDaAbaDaMedida, atual && styles.textoDaAbaEscolhida]}>
+                  {x.rotulo}
+                </Text>
+              </Pressable>
+            )
+          })}
         </View>
-      )}
 
-      {medidas.map((m, i) => (
-        <View key={i} style={styles.cartao}>
-          <Text style={styles.rotuloDeSecao}>{ddmmaaaa(m.quando) || 'Sem data'}</Text>
-          <View style={styles.grade}>
-            <Celula rotulo="Peso" valor={m.peso} unidade=" kg" />
-            <Celula rotulo="Altura" valor={m.altura} unidade=" cm" casas={0} />
-            {crianca ? (
-              <Celula rotulo="z IMC/idade" valor={m.zImcIdade} casas={2} />
-            ) : (
-              <Celula rotulo="IMC" valor={m.imc} />
-            )}
-            <Celula rotulo="Gordura" valor={m.gordura} unidade="%" />
-            <Celula rotulo="Cintura" valor={m.cintura} unidade=" cm" />
-            {!crianca && <Celula rotulo="Massa magra" valor={m.massaMagra} unidade=" kg" />}
+        {serie.length === 0 ? (
+          <Text style={styles.fraco}>Sem número de {medida.rotulo.toLowerCase()} nas avaliações.</Text>
+        ) : serie.length === 1 ? (
+          /* Um ponto não é uma linha. Dizer isso é melhor do que desenhar um
+             traço reto que sugere estabilidade que ninguém mediu. */
+          <View style={styles.soUmPonto}>
+            <Text style={styles.numeroSozinho}>
+              {decimal(serie[0].valor, medida.casas)}
+              <Text style={styles.unidade}>{medida.unidade}</Text>
+            </Text>
+            <Text style={styles.fraco}>
+              Uma avaliação só. A linha começa a existir na segunda.
+            </Text>
           </View>
-        </View>
-      ))}
+        ) : (
+          <>
+            <GraficoDaEvolucao
+              pontos={serie}
+              unidade={medida.unidade}
+              casas={medida.casas}
+              largura={largura}
+            />
+
+            {/* A frase que ela usa na consulta. Sem cor de bom ou ruim: quem
+                está em ganho de massa sobe de propósito, e pintar isso de
+                vermelho seria o app dando conduta. */}
+            {variacao !== null && (
+              <Text style={styles.frase}>
+                {Math.abs(variacao) < Math.pow(10, -medida.casas) / 2
+                  ? `${medida.rotulo} estável entre as ${serie.length} avaliações.`
+                  : `${variacao > 0 ? 'Subiu' : 'Desceu'} ${decimal(Math.abs(variacao), medida.casas)}${medida.unidade} em ${serie.length} avaliações, de ${ddmmaaaa(primeiro.quando)} a ${ddmmaaaa(ultimo.quando)}.`}
+              </Text>
+            )}
+          </>
+        )}
+      </View>
+
+      {/* ── OS NÚMEROS, quando ela quiser ──
+          A tabela responde "quanto era em agosto", que é pergunta de conferência
+          e não de conversa. Fechada por padrão: quem abriu a evolução veio ver a
+          direção. */}
+      <Pressable
+        onPress={() => setDetalhes(d => !d)}
+        style={({ pressed }) => [styles.verNumeros, pressed && { opacity: 0.8 }]}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: detalhes }}
+      >
+        <Ionicons name="list-outline" size={15} color={paleta().cores.verde} />
+        <Text style={styles.textoVerNumeros}>
+          {detalhes ? 'Esconder os números' : `Ver os números das ${medidas.length} avaliações`}
+        </Text>
+        <Ionicons
+          name={detalhes ? 'chevron-up' : 'chevron-down'}
+          size={14}
+          color={paleta().cores.verde}
+        />
+      </Pressable>
+
+      {detalhes &&
+        medidas.map((m, i) => (
+          <View key={i} style={styles.cartao}>
+            <Text style={styles.rotuloDeSecao}>{ddmmaaaa(m.quando) || 'Sem data'}</Text>
+            <View style={styles.grade}>
+              <Celula rotulo="Peso" valor={m.peso} unidade=" kg" />
+              <Celula rotulo="Altura" valor={m.altura} unidade=" cm" casas={0} />
+              {crianca ? (
+                <Celula rotulo="z IMC/idade" valor={m.zImcIdade} casas={2} />
+              ) : (
+                <Celula rotulo="IMC" valor={m.imc} />
+              )}
+              <Celula rotulo="Gordura" valor={m.gordura} unidade="%" />
+              <Celula rotulo="Cintura" valor={m.cintura} unidade=" cm" />
+              {!crianca && <Celula rotulo="Massa magra" valor={m.massaMagra} unidade=" kg" />}
+            </View>
+          </View>
+        ))}
+
       <Text style={styles.rodape}>
         As {medidas.length} avaliações mais recentes. Dobras, circunferências e
         curvas de crescimento estão no sistema.
@@ -491,11 +621,18 @@ export function ResumoDaAurora({
       {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
       {calculando && (
-        <View style={[styles.cartao, styles.lendo]}>
-          <ActivityIndicator color={paleta().cores.verde} />
-          <Text style={styles.texto}>
-            A Aurora está lendo a ficha de {nome}. Leva perto de um minuto. Pode sair
-            desta tela: a leitura continua e fica guardada.
+        /* CENTRADO, e não um cartão solto no alto.
+           Relatado com foto: "desenquadrado". Numa tela que fica vazia enquanto
+           a Aurora lê, um cartão colado no cabeçalho parece pedaço de coisa que
+           não carregou -- e ainda ficava embaixo do botão redondo do sistema,
+           no canto. No meio da tela, com a roda em cima do texto, o vazio em
+           volta vira espera, que é o que ele é. */
+        <View style={styles.lendo}>
+          <ActivityIndicator color={paleta().cores.verde} size="large" />
+          <Text style={styles.textoDoLendo}>A Aurora está lendo a ficha de {nome}</Text>
+          <Text style={styles.detalheDoLendo}>
+            Leva perto de um minuto. Você pode sair desta tela: a leitura continua e fica
+            guardada.
           </Text>
         </View>
       )}
@@ -767,12 +904,55 @@ const estilos = estilosDe(t =>
     valorDaLinha: { flex: 1, fontFamily: FONTE.meia, fontSize: 13.5, color: t.cores.ink, textAlign: 'right', fontVariant: ['tabular-nums'] },
 
     grade: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 10 },
+
+    abasDaMedida: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingBottom: 4 },
+    abaDaMedida: {
+      paddingHorizontal: 11,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: t.cores.trilho,
+    },
+    abaDaMedidaEscolhida: { backgroundColor: t.cores.verde },
+    textoDaAbaDaMedida: { fontFamily: FONTE.meia, fontSize: 12, color: t.inkSuave },
+    textoDaAbaEscolhida: { color: t.cores.branco },
+    frase: { fontFamily: FONTE.normal, fontSize: 13, color: t.inkSuave, lineHeight: 19, paddingTop: 8 },
+    soUmPonto: { alignItems: 'center', gap: 6, paddingVertical: 18 },
+    numeroSozinho: {
+      fontFamily: FONTE.bruta,
+      fontSize: 30,
+      color: t.cores.ink,
+      letterSpacing: -0.8,
+      fontVariant: ['tabular-nums'],
+    },
+    verNumeros: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+    },
+    textoVerNumeros: { fontFamily: FONTE.meia, fontSize: 13, color: t.cores.verde },
     celula: { width: '33.33%', gap: 1 },
     rotuloDaCelula: { fontFamily: FONTE.normal, fontSize: 12, color: t.inkFraco },
     valorDaCelula: { fontFamily: FONTE.meia, fontSize: 15, color: t.cores.ink, fontVariant: ['tabular-nums'] },
 
     achado: { gap: 3, paddingTop: 8, borderTopWidth: 1, borderTopColor: t.cores.borda },
-    lendo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    lendo: { alignItems: 'center', gap: 10, paddingVertical: 56, paddingHorizontal: 24 },
+    textoDoLendo: {
+      fontFamily: FONTE.meia,
+      fontSize: 15,
+      color: t.cores.ink,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+    detalheDoLendo: {
+      fontFamily: FONTE.normal,
+      fontSize: 13,
+      color: t.inkFraco,
+      textAlign: 'center',
+      lineHeight: 19,
+      maxWidth: 300,
+    },
     botao: {
       flexDirection: 'row',
       alignItems: 'center',
