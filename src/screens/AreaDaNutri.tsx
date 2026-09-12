@@ -220,36 +220,50 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
        esta lista poder ficar vazia. */
   }, [])
 
-  /* ──── O voltar central, COM lista de dependências ────
+  /* ──── O voltar central, registrado UMA VEZ e lendo por `ref` ────
    *
-   * Esta lista é a correção de um defeito, e não enfeite. Sem ela, o tratador
-   * se re-registrava a cada renderização da área -- e a área re-renderiza a
-   * cada mensagem que chega (`naoLidas`). Numa re-renderização o React roda os
-   * efeitos do filho ANTES dos do pai, então o pai registrava por último e
-   * passava na frente de TODOS os tratadores de dentro: com uma ficha aberta,
-   * chegava uma mensagem, ela apertava voltar e caía na aba Hoje em vez de
-   * fechar a ficha. Achado pela sessão APP 2 lendo o código, sem aparelho.
+   * Ele já teve as duas formas, e cada uma quebrou de um lado.
    *
-   * Com a lista, ele só se re-registra quando muda o que ele lê -- abrir ou
-   * fechar uma sobreposição, trocar de aba --, que é justamente quando ele deve
-   * ficar na frente. Os de dentro (folhas sem lista) passam na frente dele de
-   * novo na primeira renderização deles. Armadilha 1: quem HOSPEDA outra tela
-   * com voltar próprio precisa de lista; só as folhas ficam sem. */
+   * SEM lista, ele se re-registrava a cada renderização -- e a área re-renderiza
+   * a cada mensagem que chega (`naoLidas`). Como os efeitos do filho rodam antes
+   * dos do pai, o pai entrava por último e passava na frente de TODOS os de
+   * dentro: ficha aberta, chega mensagem, ela aperta voltar e cai na aba Hoje.
+   *
+   * COM lista, ele se re-registrava quando o que ele lê mudava -- e `aba` é uma
+   * dessas coisas. Tocar na aba da agenda MUDA `aba` aqui e MONTA a tela da
+   * agenda na mesma renderização: a agenda registra primeiro, a área depois, e a
+   * área ganha. Relatado em 12/09: "clico no dia trinta, aperto voltar e ele vai
+   * pra página inicial -- devia voltar pro calendário".
+   *
+   * As duas formas erram pelo MESMO motivo, e por isso a saída é a terceira:
+   * registrar uma vez só, na montagem, e nunca mais. Aqui a área é o tratador
+   * mais de FORA da parte logada -- ela deve estar no fundo da fila, e quem
+   * monta depois passa na frente dela sozinho. O estado vem de `ref` porque um
+   * tratador registrado uma vez leria para sempre os valores da primeira
+   * renderização.
+   *
+   * Sobra um caso, e está escrito na armadilha 1: uma tela que monta no MESMO
+   * instante que a área (a primeira aba) registra ANTES dela e perde. Para essas
+   * existe `useVoltarDoAparelho`, que registra numa microtarefa. */
+  const oQueEstaAberto = useRef({ conversando, fotografando, lendoCodigo, auroraAberta, aba })
+  oQueEstaAberto.current = { conversando, fotografando, lendoCodigo, auroraAberta, aba }
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (conversando) {
+      const agora = oQueEstaAberto.current
+      if (agora.conversando) {
         setConversando(false)
         return true
       }
-      if (fotografando) {
+      if (agora.fotografando) {
         setFotografando(false)
         return true
       }
-      if (lendoCodigo) {
+      if (agora.lendoCodigo) {
         setLendoCodigo(false)
         return true
       }
-      if (auroraAberta) {
+      if (agora.auroraAberta) {
         setAuroraAberta(false)
         /* O foco morre junto. Sem isto, abrir a Aurora pela barra depois de a
            ter aberto por uma ficha traria a paciente anterior de volta -- e as
@@ -260,14 +274,14 @@ export function AreaDaNutri({ onSair }: { onSair: () => void }) {
       /* De qualquer aba, o voltar leva à inicial antes de sair do app. É o que
          todo mundo espera, e é o degrau que impede o gesto de fechar o app com
          ela no meio da agenda. */
-      if (aba !== 'hoje') {
+      if (agora.aba !== 'hoje') {
         setAba('hoje')
         return true
       }
       return false
     })
     return () => sub.remove()
-  }, [conversando, fotografando, lendoCodigo, auroraAberta, aba])
+  }, [])
 
   /* As sobreposições vêm ANTES das abas e substituem a tela inteira: as duas
      são gestos de um minuto, e a barra de abas embaixo delas só ofereceria uma

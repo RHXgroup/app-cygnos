@@ -77,31 +77,6 @@ Quatro regras que vieram de erro real:
 
   Descoberto em `MeusCadastrosScreen`: quem entrava em "Metas" para conferir uma
   linha era jogado para fora da tela inteira, porque o central só sabia fechar.
-- **E há um terceiro caso, que nenhuma das duas saídas resolve: a tela que nasce
-  NO MESMO instante em que o pai se re-registra.** Tocar na aba da agenda muda
-  `aba` na área e MONTA a tela da agenda na mesma renderização. Numa
-  renderização só, o React roda os efeitos do filho antes dos do pai — então a
-  agenda registra primeiro, a área depois, e a área ganha. Relatado assim:
-  "clico no dia trinta, aperto voltar e ele vai pra página inicial, devia voltar
-  pro calendário".
-
-  Com lista de dependências a agenda passava na frente da PRÓPRIA filha; sem
-  lista, perdia para o pai. As duas saídas falham, cada uma de um lado.
-
-  **`useVoltarDoAparelho`, de `lib/voltarDoAparelho.ts`, sai do instante**:
-  registra numa microtarefa, que roda depois de TODOS os efeitos daquela
-  renderização — os do pai inclusive. Fica na frente do pai sem se re-registrar
-  nunca, e atrás de qualquer tela que monte depois.
-
-  **O que ele NÃO resolve, e vale saber antes de espalhar:** dois hospedeiros
-  usando microtarefa e montando no mesmo instante voltam a errar, porque as
-  microtarefas drenam na ordem em que foram enfileiradas — a do filho primeiro.
-  Hoje isso não acontece (a área registra de forma síncrona), e a saída
-  definitiva é outra: **um ouvinte só no alto e uma pilha de tratadores**, em que
-  o mais de dentro decide por construção e a ordem deixa de ser consequência de
-  quando cada efeito rodou. Enquanto a pilha não existir, esta lista de
-  armadilhas continua sendo a regra — e ela já produziu seis defeitos relatados
-  em uso, o que é o argumento para a pilha.
 - **"Sem lista de dependências" vale para a FOLHA, nunca para quem hospeda outra
   tela com voltar próprio.** Numa re-renderização o React roda os efeitos do
   filho antes dos do pai — então, quando um PAI sem lista re-renderiza, todos
@@ -112,13 +87,18 @@ Quatro regras que vieram de erro real:
   para a lista de pacientes, e o voltar fechava a ficha inteira. Nada disso
   aparece testando com calma — só com uma mensagem chegando no meio.
 
-  A regra, então: quem hospeda (área, lista → ficha, agenda → ficha, plano →
-  folha de trocar) usa **lista com exatamente o que o tratador lê**, e assim só
-  se re-registra quando abre ou fecha alguma coisa — que é quando deve ficar na
-  frente. Se o tratador lê uma função que vem do pai (`onFechar`), ela muda a
-  cada renderização e a lista não adianta: ponha num `useRef` e registre com
-  `[]` (ver `PlanoDaPacienteScreen`). Achado em 11/09/2026 pela sessão APP 2
-  lendo o código, antes de alguém tropeçar.
+  A primeira regra escrita aqui foi **lista com exatamente o que o tratador
+  lê**, para o hospedeiro só se re-registrar quando abre ou fecha alguma coisa.
+  Ela resolvia o caso de cima e **está superada** pelo que vem dois parágrafos
+  abaixo — fica registrada porque a leitura de um documento é sequencial, e uma
+  regra revogada que continua escrita como regra vai ser aplicada por alguém.
+  Achada em 11/09/2026 pela sessão APP 2 lendo o código, antes de alguém
+  tropeçar; superada em 12/09, depois de dois relatos no aparelho.
+
+  O que sobrevive dela: se o tratador lê uma função que vem do pai (`onFechar`),
+  ela muda a cada renderização e lista nenhuma adianta — ponha num `useRef`
+  (ver `PlanoDaPacienteScreen`). É a mesma conclusão a que a regra de hoje
+  chega por outro caminho.
 
   **E a lista de dependências não basta quando o estado que ela observa é o que
   ABRE a tela de dentro.** Isto custou dois relatos em 12/09/2026 — "clico num
@@ -128,6 +108,12 @@ Quatro regras que vieram de erro real:
   o filho monta e registra o tratador dele — e o efeito do pai, que depende
   daquele mesmo estado, roda DEPOIS e entra na frente. O pai ganha de novo, e o
   voltar do filho nunca acontece.
+
+  **E o mesmo vale quando o estado que muda é a ABA.** Tocar na aba da agenda
+  muda `aba` na área e MONTA a tela da agenda na mesma renderização: a agenda
+  registra primeiro, a área depois, e a área ganha — "clico no dia trinta,
+  aperto voltar e ele vai pra página inicial". É o mesmo defeito com outro
+  nome, e foi assim que ele apareceu no aparelho dele em 12/09/2026.
 
   **Quem hospeda telas registra UMA VEZ, com `[]`, lendo o estado por `ref`.**
   Assim ele fica atrás de tudo o que abrir depois — que é a ordem certa — e
@@ -147,6 +133,27 @@ Quatro regras que vieram de erro real:
     return () => sub.remove()
   }, [])
   ```
+
+  **Sobra UM caso, e ele não se resolve com lista nenhuma: a tela que monta no
+  MESMO instante que o pai.** A primeira aba monta junto com a área; e enquanto
+  algum pai ainda registrar de forma síncrona ao re-renderizar, qualquer tela que
+  nasça naquela renderização registra ANTES dele e perde. Não há valor de lista
+  que mude isso: o problema é que o efeito do filho roda antes do efeito do pai,
+  sempre.
+
+  Para esses casos existe **`useVoltarDoAparelho`, de `lib/voltarDoAparelho.ts`**:
+  ele registra numa MICROTAREFA, que roda depois de todos os efeitos daquela
+  renderização — os do pai inclusive. Entra na fila por último sem se
+  re-registrar nunca. Está em uso na agenda.
+
+  **E o que ele também não resolve, para ninguém espalhar achando que resolve:**
+  dois hospedeiros em microtarefa montando no mesmo instante voltam a errar, porque
+  as microtarefas drenam na ordem em que foram enfileiradas — a do filho primeiro.
+  Hoje não acontece; se acontecer, é sinal de que chegou a hora da saída
+  definitiva, que é outra: **um ouvinte só no alto e uma pilha de tratadores**, em
+  que o mais de dentro decide por construção e a ordem deixa de ser consequência
+  de quando cada efeito rodou. Sete defeitos relatados em uso já saíram desta
+  ordem — é o argumento para a pilha, e ele só cresce.
 
   **E trocar de VISTA é um degrau**, mesmo sem tela nova: dia → semana → mês, a
   etapa de um formulário, a seção de um índice. Sem isso o voltar cai no
