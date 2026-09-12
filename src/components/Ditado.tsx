@@ -68,10 +68,26 @@ const ESPACO_BARRA = 3
 const ALTURA_MIN = 3
 const ALTURA_MAX = 26
 
+/* ──────────────────── POR QUE ELE AVISA QUE ESTÁ OUVINDO ────────────────────
+ *
+ * As barras de escrever trocam o microfone pelo botão de enviar assim que há
+ * texto no campo. E o ditado ao vivo PÕE texto no campo na primeira palavra --
+ * então a barra tirava o microfone da tela no meio da fala, o componente saía,
+ * e a limpeza dele cancelava a escuta. Sobrava uma palavra.
+ *
+ * Foi a causa dos relatos "gravou só o oi", "escreveu ouro e parou" e "falei
+ * 'eu' e saiu só o ponto" -- e ficou escondida porque cada um parecia defeito
+ * do reconhecedor de voz. O registro dele fechou a conta: "a escuta do aparelho
+ * encerrou. Ela mandou parar", logo depois da primeira palavra, sem ela ter
+ * tocado em nada.
+ *
+ * Com este aviso, a tela sabe que há ditado em curso e NÃO troca o botão
+ * enquanto ele durar. */
 export function Ditado({
   onTexto,
   onErro,
   onParcial,
+  aoMudarEscuta,
   assunto = 'refeicao',
   compacto = false,
 }: {
@@ -87,6 +103,9 @@ export function Ditado({
      nunca acrescenta -- senão o campo vira "remarca remarca a remarca a
      consulta". No fim chega `onTexto` com a frase final, como sempre. */
   onParcial?: (texto: string) => void
+  /* Verdadeiro enquanto o microfone está aberto -- ouvindo no aparelho ou
+     gravando para o servidor. Ver o comentário acima. */
+  aoMudarEscuta?: (emCurso: boolean) => void
   /* Qual vocabulário o servidor deve esperar. Padrão 'refeicao' porque é o que
      as duas telas que já usam este componente pedem — acrescentar o parâmetro
      não pode mudar o que elas fazem hoje. */
@@ -171,6 +190,13 @@ export function Ditado({
     },
     [],
   )
+
+  /* Avisa a tela a cada troca de estado. Num efeito, e não em cada
+     `setEstado`: assim vale para TODOS os caminhos que mudam o estado, e são
+     oito -- um esquecido deixaria a barra travada no microfone para sempre. */
+  useEffect(() => {
+    aoMudarEscuta?.(estado === 'ouvindo' || estado === 'gravando')
+  }, [estado, aoMudarEscuta])
 
   const segundos = estadoDoGravador.durationMillis / 1000
 

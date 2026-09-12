@@ -134,6 +134,10 @@ export function ConversasDaNutriScreen({
   const [anexo, setAnexo] = useState<AnexoPendente | null>(null)
   const [menuDeAnexo, setMenuDeAnexo] = useState(false)
   const [gravando, setGravando] = useState(false)
+  /* Há um ditado em curso? Enquanto houver, a barra NÃO troca o microfone pelo
+     botão de enviar -- trocar desmonta o `<Ditado>` e cancela a escuta no meio
+     da fala, que era o defeito da primeira palavra. */
+  const [ditandoAgora, setDitandoAgora] = useState(false)
   /* A foto aberta em tela cheia, ou nula. Guarda o ENDEREÇO já assinado que o
      balão conseguiu -- assinar de novo aqui seria uma segunda ida à rede para
      ver o que já está na tela. */
@@ -631,7 +635,7 @@ export function ConversasDaNutriScreen({
             />
           </View>
 
-          {podeMandar ? (
+          {podeMandar && !ditandoAgora ? (
             <Pressable
               onPress={() => void enviar()}
               disabled={enviando}
@@ -647,6 +651,7 @@ export function ConversasDaNutriScreen({
             </Pressable>
           ) : (
             <Ditado
+              aoMudarEscuta={setDitandoAgora}
               compacto
               /* 'recado', e nao 'nutri'. Achado cacando defeito depois de
                  subir: 'nutri' e vocabulario de COMANDO -- "remarca",

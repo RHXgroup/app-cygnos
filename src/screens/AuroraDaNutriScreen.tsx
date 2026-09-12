@@ -165,6 +165,10 @@ export function AuroraDaNutriScreen({
     return () => sub.remove()
   }, [contar])
   const [pensando, setPensando] = useState(false)
+  /* Há um ditado em curso? Enquanto houver, a barra NÃO troca o microfone pelo
+     botão de enviar -- trocar desmonta o `<Ditado>` e cancela a escuta no meio
+     da fala, que era o defeito da primeira palavra. */
+  const [ditandoAgora, setDitandoAgora] = useState(false)
 
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
@@ -644,7 +648,7 @@ export function AuroraDaNutriScreen({
           />
         </View>
 
-        {temTexto ? (
+        {temTexto && !ditandoAgora ? (
           <Pressable
             onPress={() => void mandar(texto)}
             disabled={pensando}
@@ -679,6 +683,7 @@ export function AuroraDaNutriScreen({
            * que faz o botão virar seta sozinho quando a transcrição chega: o
            * gesto seguinte já é o de mandar. */
           <Ditado
+            aoMudarEscuta={setDitandoAgora}
             compacto
             assunto="nutri"
             onParcial={parcial => {
