@@ -373,10 +373,13 @@ export function DossieDaPacienteScreen({
                 onPress={() => setAnamnesando(true)}
                 style={({ pressed }) => [estilosDoImportar.botao, pressed && { opacity: 0.75 }]}
                 accessibilityRole="button"
-                accessibilityLabel="Fazer anamnese falando"
+                accessibilityLabel="Nova anamnese"
               >
-                <Ionicons name="mic" size={16} color={paleta().cores.branco} />
-                <Text style={estilosDoImportar.texto}>Fazer anamnese falando</Text>
+                <Ionicons name="add" size={17} color={paleta().cores.branco} />
+                {/* "Nova anamnese", e não "falando": dentro dela estão os dois
+                    caminhos, e o rótulo que anuncia só um fez parecer que o
+                    outro não existia -- "não posso fazer manual?". */}
+                <Text style={estilosDoImportar.texto}>Nova anamnese</Text>
               </Pressable>
               {!!recado && (
                 <Pressable onPress={() => setRecado('')} accessibilityRole="button" accessibilityLabel="Entendi">

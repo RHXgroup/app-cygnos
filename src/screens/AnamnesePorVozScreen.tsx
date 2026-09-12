@@ -25,7 +25,7 @@ import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
 
-/* Anamnese falando, e a Aurora preenchendo.
+/* Anamnese: falando, ou na mão.
  *
  * ──────────────────── O pedido ────────────────────
  * "Você não vai fazer uma anamnese aqui porque é muito campo. E se usar a
@@ -43,6 +43,16 @@ import { FONTE } from '../lib/fontes'
  *
  * SALVAR: vai para o mesmo lugar do sistema, com o mesmo retrato de seções --
  * abre no computador como qualquer anamnese feita lá.
+ *
+ * ──────────────────── E NA MÃO, que é o caminho de sempre ────────────────────
+ * "Não posso fazer manual? Qual o problema?" -- ele abriu a tela e viu só o
+ * botão de falar. Não havia problema nenhum: o que havia era uma tela que
+ * oferecia um caminho só, e um caminho só parece obrigação.
+ *
+ * Preencher na mão abre o modelo INTEIRO, seção por seção, campo por campo --
+ * os mesmos campos que a conferência da Aurora mostra. É a mesma tela do passo
+ * de conferir, com tudo vazio: um formulário a menos para manter, e o que ela
+ * aprende num caminho vale no outro.
  *
  * ──────────────────── O que ela NÃO faz ────────────────────
  * Não grava áudio da consulta inteira, com a paciente falando. Isso é gravação
@@ -64,6 +74,9 @@ export function AnamnesePorVozScreen({
   const { top, bottom } = useSafeAreaInsets()
 
   const [passo, setPasso] = useState<'falar' | 'conferir'>('falar')
+  /* Na mão: a conferência mostra o modelo inteiro, e não só o que a Aurora
+     achou. Um booleano, e não um terceiro passo, porque a tela é a mesma. */
+  const [naMao, setNaMao] = useState(false)
   const [modelo, setModelo] = useState<ModeloDeAnamnese | null>(null)
   const [modelos, setModelos] = useState<{ id: number; nome: string; tipoPaciente: string }[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -118,6 +131,7 @@ export function AnamnesePorVozScreen({
       if (salvando || pensando) return true
       if (passo === 'conferir') {
         setPasso('falar')
+        setNaMao(false)
         return true
       }
       onFechar()
@@ -204,8 +218,10 @@ export function AnamnesePorVozScreen({
         <Pressable
           onPress={() => {
             if (salvando || pensando) return
-            if (passo === 'conferir') setPasso('falar')
-            else onFechar()
+            if (passo === 'conferir') {
+              setPasso('falar')
+              setNaMao(false)
+            } else onFechar()
           }}
           style={styles.botaoVoltar}
           hitSlop={8}
@@ -215,7 +231,11 @@ export function AnamnesePorVozScreen({
           <Ionicons name="chevron-back" size={22} color={paleta().cores.ink} />
         </Pressable>
         <Text style={styles.tituloTela} numberOfLines={1}>
-          {passo === 'falar' ? `Anamnese de ${nome.split(' ')[0]}` : 'Confira antes de salvar'}
+          {passo === 'falar'
+            ? `Anamnese de ${nome.split(' ')[0]}`
+            : naMao
+              ? `Anamnese de ${nome.split(' ')[0]}`
+              : 'Confira antes de salvar'}
         </Text>
         <View style={styles.botaoVoltar} />
       </View>
@@ -296,6 +316,9 @@ export function AnamnesePorVozScreen({
 
             {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
+            {/* Os dois caminhos, lado a lado e no mesmo peso visual: o de cima
+                é o atalho, o de baixo é o de sempre. Esconder o segundo foi o
+                que fez parecer que só havia um. */}
             <Pressable
               onPress={() => void pedirParaAurora()}
               disabled={pensando || texto.trim().length < 40}
@@ -313,6 +336,23 @@ export function AnamnesePorVozScreen({
                 <Text style={styles.textoDoBotao}>Preencher com a Aurora</Text>
               )}
             </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setNaMao(true)
+                setRespostas({})
+                setResumo(null)
+                setNaoAbordados([])
+                setErro('')
+                setPasso('conferir')
+              }}
+              disabled={pensando}
+              style={({ pressed }) => [styles.botaoVazado, pressed && styles.pressionado]}
+              accessibilityRole="button"
+              accessibilityLabel="Preencher na mão"
+            >
+              <Text style={styles.textoDoBotaoVazado}>Preencher na mão</Text>
+            </Pressable>
           </>
         )}
 
@@ -322,14 +362,23 @@ export function AnamnesePorVozScreen({
               <Text style={styles.numeroDoPlacar}>{quantosPreenchidos}</Text>
               <Text style={styles.textoDoPlacar}>
                 {quantosPreenchidos === 1 ? 'campo preenchido' : 'campos preenchidos'}
-                {naoAbordados.length > 0 ? ` · ${naoAbordados.length} sem resposta na sua fala` : ''}
+                {naMao
+                  ? ' · preencha o que fizer sentido; campo vazio não entra'
+                  : naoAbordados.length > 0
+                    ? ` · ${naoAbordados.length} sem resposta na sua fala`
+                    : ''}
               </Text>
             </View>
 
             {!!resumo && <Text style={styles.resumo}>{resumo}</Text>}
 
             {modelo.secoes.map(s => {
-              const comValor = s.campos.filter(c => respostas[String(c.id)] !== undefined)
+              /* Na mão, TODOS os campos; vindo da Aurora, só os que ela achou.
+                 Mostrar os cento e poucos campos vazios depois de uma fala seria
+                 esconder as vinte respostas que ela precisa conferir. */
+              const comValor = naMao
+                ? s.campos
+                : s.campos.filter(c => respostas[String(c.id)] !== undefined)
               if (comValor.length === 0) return null
               return (
                 <View key={s.id} style={styles.secao}>
@@ -356,10 +405,10 @@ export function AnamnesePorVozScreen({
               )
             })}
 
-            {quantosPreenchidos === 0 && (
+            {quantosPreenchidos === 0 && !naMao && (
               <Text style={styles.vazio}>
                 A Aurora não achou nada do modelo na sua fala. Volte e conte com mais detalhe, ou
-                preencha no computador.
+                preencha na mão.
               </Text>
             )}
 
@@ -566,6 +615,16 @@ const estilos = estilosDe(t =>
       minHeight: 50,
     },
     botaoApagado: { opacity: 0.45 },
+    botaoVazado: {
+      marginTop: 8,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      paddingVertical: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    textoDoBotaoVazado: { fontSize: 14.5, fontWeight: '700', color: t.cores.ink },
     textoDoBotao: { fontSize: 15, fontWeight: '800', color: t.cores.branco },
     pressionado: { opacity: 0.75 },
     nota: { fontSize: 12, lineHeight: 17, color: t.inkFraco, marginTop: 10 },
