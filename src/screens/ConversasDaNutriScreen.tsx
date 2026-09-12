@@ -18,8 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AudioDoBalao } from '../components/AudioDoBalao'
 import { Ditado } from '../components/Ditado'
 import { CameraDoApp } from '../components/CameraDoApp'
+import { VideoCheio, VideoNoBalao } from '../components/VideoCheio'
 import { GravadorDoRecado } from '../components/GravadorDoRecado'
 import { guardarAudioDaConversa } from '../lib/audioDaConversa'
+import { escolherVideo } from '../lib/fotoDoDiario'
+import { guardarVideoDaConversa } from '../lib/videoDaConversa'
 import {
   conversaCom,
   conversasDaNutri,
@@ -147,6 +150,9 @@ export function ConversasDaNutriScreen({
      e o app voltava do zero -- "ao tirar foto no app de mensagem o app
      reconecta". */
   const [camera, setCamera] = useState(false)
+  /* O vídeo aberto em tela cheia, pelo CAMINHO no balde -- quem assina o
+     endereço é o tocador, no primeiro toque. */
+  const [videoGrande, setVideoGrande] = useState<string | null>(null)
 
   /* Falso até a primeira leitura voltar. Ver o efeito que avisa o pai. */
   const jaCarregou = useRef(false)
@@ -232,6 +238,10 @@ export function ConversasDaNutriScreen({
       /* A gravação e o menu são o degrau mais de dentro. O anexo esperando
          NÃO sai com o voltar: é trabalho dela -- para tirar, há o X da
          prévia. */
+      if (videoGrande) {
+        setVideoGrande(null)
+        return true
+      }
       if (camera) {
         setCamera(false)
         return true
@@ -318,6 +328,18 @@ export function ConversasDaNutriScreen({
     setAnexo({ tipo: 'foto', uri: escolha.uri, base64: escolha.base64, caminho: null })
   }
 
+  async function anexarVideo() {
+    setMenuDeAnexo(false)
+    const escolha = await escolherVideo()
+    if (escolha.tipo === 'cancelado') return
+    if (escolha.tipo === 'erro') {
+      setErro(escolha.mensagem)
+      return
+    }
+    setErro('')
+    setAnexo({ tipo: 'video', uri: escolha.uri, caminho: null })
+  }
+
   /* Sobe o anexo para a pasta da paciente, ou devolve a frase do que falhou. */
   async function subir(
     a: AnexoPendente,
@@ -330,6 +352,7 @@ export function ConversasDaNutriScreen({
         ? { tipo: 'ok', caminho }
         : { tipo: 'erro', mensagem: 'Não consegui subir a foto agora. Tente enviar de novo.' }
     }
+    if (a.tipo === 'video') return guardarVideoDaConversa(contaId, a.uri)
     return guardarAudioDaConversa(contaId, a.uri)
   }
 
@@ -340,7 +363,7 @@ export function ConversasDaNutriScreen({
     setEnviando(true)
     setErro('')
 
-    let subido: { path: string; tipo: 'foto' | 'audio' } | null = null
+    let subido: { path: string; tipo: 'foto' | 'audio' | 'video' } | null = null
     if (anexo) {
       const s = await subir(anexo, aberta.contaId)
       if (s.tipo === 'erro') {
@@ -534,7 +557,13 @@ export function ConversasDaNutriScreen({
           )}
 
           {fio.map(m => (
-            <Balao key={m.id} mensagem={m} autor={aberta.nome} onAmpliar={setFotoGrande} />
+            <Balao
+              key={m.id}
+              mensagem={m}
+              autor={aberta.nome}
+              onAmpliar={setFotoGrande}
+              onAbrirVideo={setVideoGrande}
+            />
           ))}
         </ScrollView>
 
@@ -550,9 +579,13 @@ export function ConversasDaNutriScreen({
               <Image source={fonteDaMiniatura} style={styles.miniatura} />
             ) : (
               <View style={styles.audioPendente}>
-                <Ionicons name="mic" size={16} color={paleta().cores.verde} />
+                <Ionicons
+                  name={anexo.tipo === 'video' ? 'videocam' : 'mic'}
+                  size={16}
+                  color={paleta().cores.verde}
+                />
                 <Text style={styles.textoPendente}>
-                  {anexo.tipo === 'audio' ? mmss(anexo.segundos) : ''}
+                  {anexo.tipo === 'audio' ? mmss(anexo.segundos) : 'Vídeo'}
                 </Text>
               </View>
             )}
@@ -561,14 +594,16 @@ export function ConversasDaNutriScreen({
                 ? 'Enviando…'
                 : anexo.tipo === 'foto'
                   ? 'Foto pronta. Escreva uma legenda, se quiser, e envie.'
-                  : 'Áudio pronto. Escreva uma legenda, se quiser, e envie.'}
+                  : anexo.tipo === 'video'
+                    ? 'Vídeo pronto. Escreva uma legenda, se quiser, e envie.'
+                    : 'Áudio pronto. Escreva uma legenda, se quiser, e envie.'}
             </Text>
             {!enviando && (
               <Pressable
                 onPress={() => setAnexo(null)}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel={anexo.tipo === 'foto' ? 'Tirar a foto' : 'Tirar o áudio'}
+                accessibilityLabel={'Tirar o anexo'}
               >
                 <Ionicons name="close-circle" size={22} color={paleta().inkFraco} />
               </Pressable>
@@ -583,6 +618,7 @@ export function ConversasDaNutriScreen({
           <View style={styles.menuDeAnexo}>
             <OpcaoDeAnexo icone="camera-outline" rotulo="Câmera" onPress={() => void anexarFoto('camera')} />
             <OpcaoDeAnexo icone="images-outline" rotulo="Galeria" onPress={() => void anexarFoto('galeria')} />
+            <OpcaoDeAnexo icone="videocam-outline" rotulo="Vídeo" onPress={() => void anexarVideo()} />
             <OpcaoDeAnexo
               icone="mic-outline"
               rotulo="Gravar áudio"
@@ -707,6 +743,10 @@ export function ConversasDaNutriScreen({
             pequenininha." O balão mostra 200 por 200: serve para saber que
             chegou uma foto, e não para ler o rótulo de um produto ou olhar a
             marmita. Toque abre aqui, e qualquer toque fecha. */}
+        {!!videoGrande && (
+          <VideoCheio caminho={videoGrande} onFechar={() => setVideoGrande(null)} />
+        )}
+
         {camera && (
           <CameraDoApp
             onPronta={foto => {
@@ -852,6 +892,7 @@ export function ConversasDaNutriScreen({
 type AnexoPendente =
   | { tipo: 'foto'; uri: string; base64: string; caminho: string | null }
   | { tipo: 'audio'; uri: string; segundos: number; caminho: string | null }
+  | { tipo: 'video'; uri: string; caminho: string | null }
 
 function OpcaoDeAnexo({
   icone,
@@ -882,10 +923,14 @@ function Balao({
   mensagem,
   autor,
   onAmpliar,
+  onAbrirVideo,
 }: {
   mensagem: MensagemDaConversa
   autor: string
   onAmpliar: (endereco: string) => void
+  /* Recebe o CAMINHO, e não o endereço: o vídeo é assinado só quando ela abre.
+     Ver `VideoCheio`. */
+  onAbrirVideo: (caminho: string) => void
 }) {
   const styles = estilos()
   /* "Minha" é a mensagem DELA: esta tela é a dela. No app do paciente a mesma
@@ -936,6 +981,10 @@ function Balao({
             </Text>
           </View>
         ))}
+
+      {mensagem.anexoTipo === 'video' && mensagem.anexoPath && (
+        <VideoNoBalao minha={minha} onAbrir={() => onAbrirVideo(mensagem.anexoPath!)} />
+      )}
 
       {mensagem.anexoTipo === 'audio' && mensagem.anexoPath && (
         <AudioDoBalao caminho={mensagem.anexoPath} minha={minha} autor={`de ${autor}`} />

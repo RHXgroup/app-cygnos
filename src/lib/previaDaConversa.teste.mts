@@ -49,8 +49,12 @@ ok('áudio com legenda ainda diz Áudio',
   previaDaConversa(c('ouve isso', 'paciente', 'audio')) === 'Áudio')
 /* Um ponto que a pessoa DIGITOU, sem anexo nenhum, é o que ela escreveu. */
 ok('ponto sem anexo continua sendo o texto', previaDaConversa(c('.')) === '.')
-/* E um tipo que esta tela ainda não sabe desenhar não pode virar um ponto. */
-ok('anexo de tipo novo vira "Anexo"', previaDaConversa(c('.', 'paciente', 'video')) === 'Anexo')
+/* O vídeo entrou em 11/09, e desde então ele tem nome próprio na prévia. */
+ok('vídeo com legenda diz Vídeo', previaDaConversa(c('.', 'paciente', 'video')) === 'Vídeo')
+/* E um tipo que esta tela ainda não sabe desenhar continua não virando um
+   ponto: o dia em que a coluna aceitar 'documento', a prévia não pode mostrar
+   a legenda vazia como se fosse a mensagem. */
+ok('anexo de tipo novo vira "Anexo"', previaDaConversa(c('.', 'paciente', 'documento')) === 'Anexo')
 
 // ──── CONVERSA VAZIA ────
 /* `nutri_conversas` traz TODO vínculo, inclusive quem nunca trocou mensagem --

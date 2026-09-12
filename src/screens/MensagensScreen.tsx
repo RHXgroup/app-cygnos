@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
+import { VideoCheio, VideoNoBalao } from '../components/VideoCheio'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AvatarNutri } from '../components/AvatarNutri'
 import {
@@ -154,6 +155,10 @@ export function MensagensScreen({
         setFotoGrande(null)
         return true
       }
+      if (videoGrandeAgora.current) {
+        setVideoGrande(null)
+        return true
+      }
       return false
     })
     return () => sub.remove()
@@ -163,10 +168,16 @@ export function MensagensScreen({
      balão conseguiu -- assinar de novo seria uma segunda ida à rede para ver o
      que já está na tela. */
   const [fotoGrande, setFotoGrande] = useState<string | null>(null)
+  /* O vídeo aberto, pelo CAMINHO: quem assina o endereço é o tocador, e só
+     quando ela abre -- assinar todos os vídeos da conversa seria gastar a
+     internet dela com o que ninguém pediu. */
+  const [videoGrande, setVideoGrande] = useState<string | null>(null)
   /* O tratador do voltar lê por referência: sem ela, o `fotoGrande` de dentro
      dele seria o da renderização em que foi registrado. */
   const fotoGrandeAgora = useRef<string | null>(null)
   fotoGrandeAgora.current = fotoGrande
+  const videoGrandeAgora = useRef<string | null>(null)
+  videoGrandeAgora.current = videoGrande
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [carregando, setCarregando] = useState(true)
   const [texto, setTexto] = useState('')
@@ -818,7 +829,7 @@ export function MensagensScreen({
                   {mudouDeDia(mensagens[i - 1], m) && (
                     <Text style={styles.dia}>{rotuloDoDia(new Date(m.criadaEm), new Date())}</Text>
                   )}
-                  <Balao mensagem={m} onAmpliar={setFotoGrande} />
+                  <Balao mensagem={m} onAmpliar={setFotoGrande} onAbrirVideo={setVideoGrande} />
                 </Fragment>
               ))
             )}
@@ -1010,6 +1021,10 @@ export function MensagensScreen({
           O balão mostra um quadro pequeno: serve para saber que chegou foto,
           e não para ler o rótulo de um produto ou olhar o prato. Toque abre,
           qualquer toque fecha -- e o voltar do aparelho também. */}
+      {!!videoGrande && (
+        <VideoCheio caminho={videoGrande} onFechar={() => setVideoGrande(null)} />
+      )}
+
       {!!fotoGrande && (
         <Pressable
           style={styles.fotoCheia}
@@ -1054,6 +1069,7 @@ function mudouDeDia(anterior: Mensagem | undefined, atual: Mensagem): boolean {
 const Balao = memo(function Balao({
   mensagem,
   onAmpliar,
+  onAbrirVideo,
 }: {
   mensagem: Mensagem
   /* Abre a foto em tela cheia. "Quando eu clico na foto não consigo aumentar
@@ -1061,6 +1077,8 @@ const Balao = memo(function Balao({
      era igual: o balão mostra um quadro pequeno, que serve para saber que
      chegou foto, e não para ler o rótulo de um produto. */
   onAmpliar: (endereco: string) => void
+  /* Abre o vídeo. Recebe o CAMINHO, e não o endereço. */
+  onAbrirVideo: (caminho: string) => void
 }) {
   const styles = estilos()
   const minha = ehMinha(mensagem)
@@ -1157,6 +1175,15 @@ const Balao = memo(function Balao({
          * Agora toca. O player pede o endereço no primeiro toque, e não ao
          * montar: `createAudioPlayer` segura recurso nativo, e uma lista de
          * conversa abriria dezenas de tocadores para ouvir um. */}
+        {/* ── Vídeo ──
+            O balão mostra um retângulo com o símbolo de tocar; o vídeo abre em
+            tela cheia. Sem tocador na lista: ele baixaria o começo de cada
+            vídeo da conversa, e isso é a internet dela indo embora sem
+            ninguém pedir. */}
+        {mensagem.anexoTipo === 'video' && mensagem.anexoPath && (
+          <VideoNoBalao minha={minha} onAbrir={() => onAbrirVideo(mensagem.anexoPath!)} />
+        )}
+
         {mensagem.anexoTipo === 'audio' && mensagem.anexoPath && (
           <AudioDoBalao caminho={mensagem.anexoPath} minha={minha} />
         )}

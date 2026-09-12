@@ -446,6 +446,7 @@ export async function estadoDasNotificacoes(): Promise<EstadoDasNotificacoes> {
  */
 export async function ligarNotificacoes(): Promise<EstadoDasNotificacoes> {
   const antes = await estadoDasNotificacoes()
+  console.log('[cygnos] ligar notificacoes: estado antes =', antes)
   if (antes === 'ligadas') return 'ligadas'
 
   if (antes === 'bloqueadas') {

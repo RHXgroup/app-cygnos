@@ -137,8 +137,14 @@ export async function criarAviso(
 
   try {
     const atual = await N.getPermissionsAsync()
+    /* O aviso dizia "não está permitido no seu celular" enquanto o Android
+       respondia `granted: true` -- medido no aparelho dele. A linha mostra o
+       que ESTE caminho recebeu, que é o que faltava para separar "o sistema
+       negou" de "o app perguntou errado". */
+    console.log('[cygnos] criar aviso: permissao atual =', JSON.stringify(atual))
     if (!atual.granted) {
       const pedida = await N.requestPermissionsAsync()
+      console.log('[cygnos] criar aviso: depois de pedir =', JSON.stringify(pedida))
       if (!pedida.granted) return { tipo: 'sem_permissao' }
     }
 

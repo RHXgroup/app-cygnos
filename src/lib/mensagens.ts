@@ -21,7 +21,10 @@ import { falha, mensagemDoBanco } from './erros'
 /* 'foto' ou 'audio'. O app precisa saber ANTES de baixar — imagem se desenha,
    áudio se toca —, e descobrir pela extensão do caminho quebraria no dia em que
    o formato mudar. */
-export type TipoDeAnexo = 'foto' | 'audio'
+/* 'video' entrou em 11/09, quando a nutricionista passou a poder mandar um.
+   Ver a migração 20260911233000: o tipo existe no banco para os dois lados; a
+   TELA de mandar, por ora, só ela tem. */
+export type TipoDeAnexo = 'foto' | 'audio' | 'video'
 
 export type Mensagem = {
   id: number
@@ -65,7 +68,10 @@ const daLinha = (l: Linha): Mensagem => ({
      valor novo na coluna derrubaria a conversa inteira, e conversa é a tela em
      que a pessoa está esperando resposta de gente. Sem tipo, o anexo
      simplesmente não desenha — o texto continua lá. */
-  anexoTipo: l.anexo_tipo === 'foto' || l.anexo_tipo === 'audio' ? l.anexo_tipo : null,
+  anexoTipo:
+    l.anexo_tipo === 'foto' || l.anexo_tipo === 'audio' || l.anexo_tipo === 'video'
+      ? l.anexo_tipo
+      : null,
 })
 
 export const ehMinha = (m: Mensagem) => m.de === 'paciente'

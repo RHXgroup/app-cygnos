@@ -38,6 +38,7 @@ export function previaDaConversa(c: PreviaDaConversa): string {
 
   if (c.ultimaAnexoTipo === 'foto') return quem + 'Foto'
   if (c.ultimaAnexoTipo === 'audio') return quem + 'Áudio'
+  if (c.ultimaAnexoTipo === 'video') return quem + 'Vídeo'
 
   const texto = typeof c.ultima === 'string' ? c.ultima.trim() : ''
   if (!texto) return ''

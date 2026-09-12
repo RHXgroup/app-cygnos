@@ -176,7 +176,7 @@ export async function responder(
   texto: string,
   /* O anexo JÁ SUBIDO: o caminho no balde, na pasta do paciente. A função do
      banco confere que ele está na pasta DESTE paciente e que existe. */
-  anexo?: { path: string; tipo: 'foto' | 'audio' } | null,
+  anexo?: { path: string; tipo: 'foto' | 'audio' | 'video' } | null,
 ): Promise<ResultadoDoEnvio> {
   const { error } = await supabase.rpc('nutri_enviar_mensagem', {
     p_conta_id: contaId,

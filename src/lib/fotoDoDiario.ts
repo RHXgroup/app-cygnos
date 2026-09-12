@@ -154,6 +154,45 @@ export async function escolherFoto(origem: 'galeria' | 'camera'): Promise<FotoEs
  * caminho -- ver `CameraDoApp`. Duas cópias destes dois passos divergiriam, e o
  * comentário abaixo explica por que justamente estes dois passos existem: é
  * conhecimento que custou uma semana, e não formatação. */
+/* O VÍDEO da galeria.
+ *
+ * Mesma biblioteca da foto, e por isso mora aqui: um seletor novo noutro
+ * arquivo nasceria sem a permissão, sem o `presentationStyle` que impede a
+ * folha de nunca resolver, e sem o cuidado de memória que este arquivo aprendeu
+ * a caro.
+ *
+ * SEM redimensionar: reduzir vídeo no aparelho exige transcodificar, que é
+ * módulo nativo e minutos de espera. O tamanho é conferido antes de subir --
+ * ver `guardarVideoDaConversa`.
+ *
+ * `videoMaxDuration` é o freio que existe de graça: um minuto já passa do teto
+ * de 25 MB em boa parte dos aparelhos, e é melhor a pessoa descobrir na hora de
+ * gravar do que depois de esperar a subida. */
+export type VideoEscolhido =
+  | { tipo: 'ok'; uri: string }
+  | { tipo: 'cancelado' }
+  | { tipo: 'erro'; mensagem: string }
+
+export async function escolherVideo(): Promise<VideoEscolhido> {
+  const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+  if (!granted) {
+    return {
+      tipo: 'erro',
+      mensagem: 'Para mandar um vídeo, o Cygnos precisa da sua galeria. Você pode liberar nas configurações do telefone.',
+    }
+  }
+
+  const escolha = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['videos'],
+    allowsEditing: false,
+    videoMaxDuration: 60,
+    presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
+  })
+
+  if (escolha.canceled || !escolha.assets?.[0]?.uri) return { tipo: 'cancelado' }
+  return { tipo: 'ok', uri: escolha.assets[0].uri }
+}
+
 export async function prepararFoto(uri: string): Promise<FotoEscolhida> {
   try {
     /* Só a largura: passar as duas dimensões esticaria uma foto retangular para
