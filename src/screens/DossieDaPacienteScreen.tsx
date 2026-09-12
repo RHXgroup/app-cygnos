@@ -53,6 +53,7 @@ import { ImportarExameScreen } from './ImportarExameScreen'
 import { CicloDaFicha, DocumentosDaFicha } from '../components/CicloEDocumentos'
 import { NovoCalculoScreen } from './NovoCalculoScreen'
 import { AnamnesePorVozScreen } from './AnamnesePorVozScreen'
+import { DocumentoDaPacienteScreen } from './DocumentoDaPacienteScreen'
 import {
   cicloDaPaciente,
   documentosDaPaciente,
@@ -158,6 +159,10 @@ export function DossieDaPacienteScreen({
   /* A anamnese ditada, aberta por cima. "E se usar a transcrição aqui também,
      e preencher tudo pra mim? Tem que ter facilidades, não complicações." */
   const [anamnesando, setAnamnesando] = useState(false)
+  /* O documento aberto, ou nenhum. Guarda o documento inteiro, e não o id: a
+     lista já trouxe tudo o que a tela dele mostra, e buscar de novo seria uma
+     ida ao banco para um dado que estava na mão. */
+  const [documentoAberto, setDocumentoAberto] = useState<DocumentoDaPaciente | null>(null)
   /* A frase do que acabou de entrar. Some ao tocar: é confirmação, não erro. */
   const [recado, setRecado] = useState('')
 
@@ -267,6 +272,16 @@ export function DossieDaPacienteScreen({
      campos e uma escolha de arquivo, que é tela, não gaveta. O voltar dela
      fecha só ela -- o tratador daqui continua atrás, e é o que faz o degrau
      descascar um por vez (armadilha 1). */
+  if (documentoAberto) {
+    return (
+      <DocumentoDaPacienteScreen
+        documento={documentoAberto}
+        nome={nome}
+        onFechar={() => setDocumentoAberto(null)}
+      />
+    )
+  }
+
   if (anamnesando) {
     return (
       <AnamnesePorVozScreen
@@ -435,7 +450,13 @@ export function DossieDaPacienteScreen({
               voltas não pode apagar o resumo que já está na tela. */}
           {secao === 'resumo' && <ResumoDaAurora pacienteId={pacienteId} nome={nome} versao={versao} />}
           {!erro && secao === 'ciclo' && <CicloDaFicha ciclo={ciclo} nome={nome} />}
-          {!erro && secao === 'documentos' && <DocumentosDaFicha documentos={documentos} nome={nome} />}
+          {!erro && secao === 'documentos' && (
+            <DocumentosDaFicha
+              documentos={documentos}
+              nome={nome}
+              onAbrir={setDocumentoAberto}
+            />
+          )}
         </ScrollView>
       )}
     </View>

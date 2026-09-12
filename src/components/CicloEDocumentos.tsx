@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import type { CicloDaPaciente, DocumentoDaPaciente } from '../lib/fichaCompleta'
 import { estilosDe, paleta } from '../lib/tema'
@@ -91,9 +91,13 @@ export function CicloDaFicha({ ciclo, nome }: { ciclo: CicloDaPaciente | null; n
 export function DocumentosDaFicha({
   documentos,
   nome,
+  onAbrir,
 }: {
   documentos: DocumentoDaPaciente[]
   nome: string
+  /* Tocar abre o documento inteiro, com o botão de PDF. "Clico e não faz nada"
+     era a lista sem esta linha: um cartão que parece tocável e não é. */
+  onAbrir: (documento: DocumentoDaPaciente) => void
 }) {
   const styles = estilos()
 
@@ -112,7 +116,13 @@ export function DocumentosDaFicha({
   return (
     <View style={styles.bloco}>
       {documentos.map(d => (
-        <View key={d.tipo + d.id} style={styles.cartaoDoDocumento}>
+        <Pressable
+          key={d.tipo + d.id}
+          onPress={() => onAbrir(d)}
+          style={({ pressed }) => [styles.cartaoDoDocumento, pressed && styles.pressionado]}
+          accessibilityRole="button"
+          accessibilityLabel={(d.titulo || nomeDoTipo(d.tipo)) + '. Abrir e gerar PDF.'}
+        >
           <View style={styles.topoDoDocumento}>
             <Ionicons
               name={d.medicamentos.length > 0 ? 'medkit-outline' : 'document-text-outline'}
@@ -147,11 +157,14 @@ export function DocumentosDaFicha({
             </Text>
           )}
 
-          <Text style={styles.rodapeDoDocumento}>
-            {nomeDoTipo(d.tipo)}
-            {d.importado ? ' · importado de outro sistema' : ''}
-          </Text>
-        </View>
+          <View style={styles.rodapeDoCartao}>
+            <Text style={styles.rodapeDoDocumento}>
+              {nomeDoTipo(d.tipo)}
+              {d.importado ? ' · importado de outro sistema' : ''}
+            </Text>
+            <Ionicons name="chevron-forward" size={15} color={paleta().inkFraco} />
+          </View>
+        </Pressable>
       ))}
     </View>
   )
@@ -281,6 +294,8 @@ const estilos = estilosDe(t =>
     listaDeItens: { gap: 3 },
     item: { fontSize: 13.5, lineHeight: 19, color: t.cores.ink },
     trecho: { fontSize: 13, lineHeight: 18, color: t.inkSuave },
-    rodapeDoDocumento: { fontSize: 11.5, color: t.inkFraco },
+    rodapeDoCartao: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    rodapeDoDocumento: { flex: 1, fontSize: 11.5, color: t.inkFraco },
+    pressionado: { opacity: 0.75 },
   }),
 )

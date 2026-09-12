@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  BackHandler,
   ActivityIndicator,
   Pressable,
   ScrollView,
@@ -68,6 +69,26 @@ export function CalculoEnergeticoScreen({
   const styles = estilos()
   const { top, bottom } = useSafeAreaInsets()
   const [etapa, setEtapa] = useState(1)
+
+  /* ──── O voltar desce uma ETAPA, e não fecha a tela ────
+   *
+   * São três perguntas em três telas, e sem este tratador o botão do aparelho
+   * caía no voltar central do App: a pessoa preenchia peso, altura e idade,
+   * apertava voltar para conferir a etapa anterior, e perdia tudo.
+   *
+   * Sem lista de dependências, de propósito: é o que põe este na frente do
+   * central a partir da primeira re-renderização -- que aqui acontece a cada
+   * tecla. Armadilha 1. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (etapa > 1) {
+        setEtapa(e => e - 1)
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
 

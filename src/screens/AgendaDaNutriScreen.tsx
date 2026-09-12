@@ -142,10 +142,26 @@ export function AgendaDaNutriScreen({
         setFichaAberta(null)
         return true
       }
+      /* ──── O DIA E A SEMANA SÃO DEGRAUS, e o voltar não sabia ────
+       *
+       * Relatado em uso: "estou na agenda, clico num dia, aparece livre até as
+       * vinte horas; aperto voltar querendo o calendário e ele volta pra tela
+       * inicial do aplicativo".
+       *
+       * Trocar de vista é NAVEGAR, mesmo sem tela nova: ela entrou no dia a
+       * partir do mês, e o voltar tem de desfazer a entrada. Sem este degrau o
+       * evento caía para o tratador da área, que só sabe fechar a agenda
+       * inteira -- e a pessoa perdia o lugar onde estava.
+       *
+       * Do MÊS, que é onde a tela abre, o voltar devolve: aí sim é sair. */
+      if (vista !== 'mes') {
+        setVista('mes')
+        return true
+      }
       return false
     })
     return () => sub.remove()
-  }, [agindoEm, fichaAberta, marcando])
+  }, [agindoEm, fichaAberta, marcando, vista])
 
   /* Que pedaço do calendário está na tela. O mês pede a grade INTEIRA, sobras
      inclusive: as células de 31 de agosto e 4 de outubro também mostram

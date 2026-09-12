@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  BackHandler,
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
@@ -284,6 +285,35 @@ export function RecuperarSenhaScreen({
     if (etapa === 'senha') await supabase.auth.signOut()
     onVoltar()
   }
+
+  /* ──── O voltar do aparelho desce uma ETAPA ────
+   *
+   * Sem este tratador, o evento caía no voltar central do `App`, que só sabe
+   * levar para o login: quem digitasse o código errado e apertasse voltar para
+   * conferir o e-mail recomeçava do zero -- e, pior, quem estivesse na tela da
+   * SENHA saía com a sessão de recuperação ainda aberta e a senha velha. Sair
+   * dali tem de passar pelo `cancelar`, que encerra a sessão. É a regra do
+   * AGENTS: caminho de saída que pula o aviso existe só para quem usa o botão
+   * do aparelho, e é justamente quem mais o usa.
+   *
+   * Sem lista de dependências: é o que o põe na frente do central a partir da
+   * primeira re-renderização, que aqui acontece a cada tecla. Armadilha 1. */
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (carregando) return true
+      if (etapa === 'codigo') {
+        setEtapa('pedir')
+        setErro('')
+        return true
+      }
+      if (etapa === 'senha') {
+        void cancelar()
+        return true
+      }
+      return false
+    })
+    return () => sub.remove()
+  })
 
   return (
     <View style={styles.flex} onLayout={e => setAlturaDaTela(e.nativeEvent.layout.height)}>
