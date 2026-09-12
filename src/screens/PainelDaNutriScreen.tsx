@@ -145,6 +145,10 @@ export function PainelDaNutriScreen({
      e um deles mudaria um dia sem ninguém lembrar deste número. O `onLayout`
      pergunta ao próprio desenho. */
   const [larguraDoGrafico, setLarguraDoGrafico] = useState(0)
+  /* Qual métrica o gráfico do dinheiro está mostrando. Pergunta dele: "não dá
+     pra mudar as opções de gráfico também?" -- dá, e é o mesmo desenho: só a
+     série muda. Começa em ENTROU, que é a pergunta de todo dia. */
+  const [metrica, setMetrica] = useState<'entrou' | 'saiu' | 'saldo'>('entrou')
 
   /* ──────────────────── O VOLTAR, que esta tela NUNCA teve ────────────────────
    *
@@ -693,24 +697,58 @@ export function PainelDaNutriScreen({
           <View style={styles.cartaoDoPulso}>
             <View style={styles.topoDoCartao}>
               <View style={styles.textosDoCartao}>
-                <Text style={styles.rotuloDoCartao}>ENTROU NO CAIXA</Text>
+                <Text style={styles.rotuloDoCartao}>{ROTULO_DA_METRICA[metrica]}</Text>
                 <Text style={styles.numeroDoCartao}>
-                  {reais(pulso?.caixa ? totalDaSerie(pulso.caixa) : (dinheiro?.recebido ?? 0))}
+                  {reais(serieDaMetrica(pulso, metrica)
+                    ? totalDaSerie(serieDaMetrica(pulso, metrica)!)
+                    : (dinheiro?.recebido ?? 0))}
                 </Text>
                 <Text style={styles.periodoDoCartao}>
                   {pulso?.caixa ? `nos últimos ${pulso.dias} dias` : 'hoje'}
                 </Text>
               </View>
-              {!!pulso?.caixa && (
-                <Tendencia variacao={compararMetades(pulso.caixa).variacao} styles={styles} />
+              {!!serieDaMetrica(pulso, metrica) && (
+                <Tendencia
+                  variacao={compararMetades(serieDaMetrica(pulso, metrica)!).variacao}
+                  styles={styles}
+                />
               )}
             </View>
 
-            {!!pulso?.caixa && larguraDoGrafico > 0 && (
+            {/* ──── AS OPÇÕES DO GRÁFICO ────
+                "Esse que entrou no caixa: se entrou, saiu, vai mostrar tudo
+                aqui, ele vai mostrar pra cima ou pra baixo, se gastou mais do
+                que recebeu." As três séries são o mesmo desenho, e o SALDO é o
+                único que desce abaixo da linha do zero -- é ali que a pergunta
+                dele é respondida. */}
+            {!!pulso?.caixa && !!pulso?.saiu && (
+              <View style={styles.abasDaMetrica}>
+                {(['entrou', 'saiu', 'saldo'] as const).map(m => (
+                  <Pressable
+                    key={m}
+                    onPress={() => setMetrica(m)}
+                    style={({ pressed }) => [
+                      styles.aba,
+                      metrica === m && styles.abaAtiva,
+                      pressed && styles.pressionada,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: metrica === m }}
+                    accessibilityLabel={NOME_DA_METRICA[m]}
+                  >
+                    <Text style={[styles.textoDaAba, metrica === m && styles.textoDaAbaAtiva]}>
+                      {NOME_DA_METRICA[m]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            {!!serieDaMetrica(pulso, metrica) && larguraDoGrafico > 0 && (
               <GraficoDoPeriodo
-                serie={pulso.caixa}
+                serie={serieDaMetrica(pulso, metrica)!}
                 largura={larguraDoGrafico}
-                cor={paleta().cores.gold}
+                cor={metrica === 'saiu' ? paleta().cores.gold : paleta().cores.verde}
                 formatar={reais}
               />
             )}
@@ -1021,6 +1059,21 @@ function diaCurto(iso: string): string {
   return String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0')
 }
 
+const NOME_DA_METRICA = { entrou: 'Entrou', saiu: 'Saiu', saldo: 'Saldo' } as const
+const ROTULO_DA_METRICA = {
+  entrou: 'ENTROU NO CAIXA',
+  saiu: 'SAIU DO CAIXA',
+  saldo: 'SALDO DO PERÍODO',
+} as const
+
+/* Qual série o gráfico do dinheiro mostra. Nula quando aquele lado não veio --
+   e aí a aba correspondente nem aparece, em vez de desenhar uma linha reta que
+   se leria como "não houve nada". */
+const serieDaMetrica = (
+  pulso: PulsoDoConsultorio | null,
+  metrica: 'entrou' | 'saiu' | 'saldo',
+) => (metrica === 'entrou' ? pulso?.caixa : metrica === 'saiu' ? pulso?.saiu : pulso?.saldo) ?? null
+
 /* A seta com a variação. Sem cor de julgamento no número em si: subir consulta
    é bom, subir conta a pagar não é -- quem decide o significado é o cartão em
    que ela está, e por isso a cor vem de fora do componente... não vem: aqui ela
@@ -1310,6 +1363,25 @@ const estilos = estilosDe(t =>
       gap: 10,
     },
     topoDoCartao: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+
+    /* As abas do gráfico: pílulas, no mesmo desenho das da evolução -- ela vai
+       abrir as duas telas, e coisa que faz o mesmo precisa parecer a mesma. */
+    abasDaMetrica: {
+      flexDirection: 'row',
+      gap: 6,
+      backgroundColor: t.cores.superficie,
+      borderRadius: 999,
+      padding: 3,
+    },
+    aba: {
+      flex: 1,
+      alignItems: 'center',
+      borderRadius: 999,
+      paddingVertical: 7,
+    },
+    abaAtiva: { backgroundColor: t.cores.cartao },
+    textoDaAba: { fontFamily: FONTE.media, fontSize: 12.5, color: t.inkFraco },
+    textoDaAbaAtiva: { fontFamily: FONTE.forte, color: t.cores.ink },
     textosDoCartao: { flex: 1, gap: 1 },
     rotuloDoCartao: {
       fontFamily: FONTE.forte,

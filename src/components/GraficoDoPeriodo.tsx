@@ -26,6 +26,10 @@ import { estilosDe, paleta } from '../lib/tema'
  * celular viram uma tarja cinza ilegível. */
 
 const ALTURA = 150
+
+/* Onde o zero cai, de 0 a 1, para o degradê trocar de cor exatamente ali. */
+const paradaDoZero = (zero: number): string =>
+  String(Math.max(0, Math.min(1, zero / ALTURA)))
 const RESPIRO_CIMA = 26
 const RESPIRO_BAIXO = 22
 
@@ -51,10 +55,23 @@ export function GraficoDoPeriodo({
   const desenho = useMemo(() => {
     if (serie.length < 2 || largura <= 0) return null
 
+    /* ── QUANDO O VALOR PODE SER NEGATIVO ──
+     *
+     * Pedido dele sobre o caixa: "se entrou, saiu, vai mostrar tudo aqui, ele
+     * vai mostrar pra cima ou pra baixo, se gastou mais do que recebeu". Saldo
+     * negativo precisa DESCER abaixo de uma linha de zero, e não ser cortado no
+     * chão -- um dia de prejuízo desenhado como zero é o gráfico mentindo
+     * justamente no dia que importa.
+     *
+     * Com série toda positiva nada muda: o piso continua sendo o zero. */
+    const menor = serie.reduce((m, p) => (p.valor < m ? p.valor : m), 0)
     const teto = tetoDoEixo(maiorDaSerie(serie))
+    const piso = menor < 0 ? -tetoDoEixo(Math.abs(menor)) : 0
+    const faixa = teto - piso || 1
+
     const alturaUtil = ALTURA - RESPIRO_CIMA - RESPIRO_BAIXO
     const x = (i: number) => (i / (serie.length - 1)) * largura
-    const y = (valor: number) => RESPIRO_CIMA + (1 - valor / teto) * alturaUtil
+    const y = (valor: number) => RESPIRO_CIMA + (1 - (valor - piso) / faixa) * alturaUtil
 
     const pontos = serie.map((p, i) => ({ x: x(i), y: y(p.valor), ...p }))
 
@@ -70,14 +87,32 @@ export function GraficoDoPeriodo({
     linha += ` L ${pontos[pontos.length - 1].x} ${pontos[pontos.length - 1].y}`
 
     const chao = ALTURA - RESPIRO_BAIXO
-    const area = `${linha} L ${largura} ${chao} L 0 ${chao} Z`
+    /* A área fecha na linha do ZERO, e não no chão do desenho: com saldo
+       negativo, fechar no chão pintaria de verde o buraco. */
+    const zero = y(0)
+    const area = `${linha} L ${largura} ${zero} L 0 ${zero} Z`
 
     /* O pico: o primeiro maior, e não o último -- se dois dias empatam, o
        número fica no que veio antes, que é onde o olho já estava. */
     let pico = pontos[0]
     for (const p of pontos) if (p.valor > pico.valor) pico = p
 
-    return { pontos, linha, area, chao, pico, teto, ultimo: pontos[pontos.length - 1] }
+    /* O pior dia, quando há negativo: é o que a pergunta dele procura. */
+    let fundo = pontos[0]
+    for (const p of pontos) if (p.valor < fundo.valor) fundo = p
+
+    return {
+      pontos,
+      linha,
+      area,
+      chao,
+      zero,
+      pico,
+      fundo,
+      teto,
+      temNegativo: menor < 0,
+      ultimo: pontos[pontos.length - 1],
+    }
   }, [serie, largura])
 
   if (!desenho) {
@@ -88,23 +123,47 @@ export function GraficoDoPeriodo({
     )
   }
 
-  const { pontos, linha, area, chao, pico, ultimo } = desenho
+  const { pontos, linha, area, chao, zero, pico, fundo, temNegativo, ultimo } = desenho
   const semNada = pico.valor === 0
 
   return (
     <View>
       <Svg width={largura} height={ALTURA}>
         <Defs>
-          <LinearGradient id="pulso" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={traco} stopOpacity="0.28" />
-            <Stop offset="1" stopColor={traco} stopOpacity="0" />
-          </LinearGradient>
+          {/* O degradê troca de cor NA LINHA DO ZERO: verde para cima, âmbar
+              para baixo -- é o que faz "gastei mais do que recebi" se ver sem
+              legenda. São dois degradês inteiros, e não paradas condicionais,
+              porque `<Stop>` é filho tipado: uma lista ou um `false` ali não
+              compila. */}
+          {temNegativo ? (
+            <LinearGradient id="pulso" x1="0" y1="0" x2="0" y2={ALTURA} gradientUnits="userSpaceOnUse">
+              <Stop offset="0" stopColor={traco} stopOpacity="0.28" />
+              <Stop offset={paradaDoZero(zero)} stopColor={traco} stopOpacity="0.02" />
+              <Stop offset={paradaDoZero(zero)} stopColor={paleta().cores.gold} stopOpacity="0.04" />
+              <Stop offset="1" stopColor={paleta().cores.gold} stopOpacity="0.3" />
+            </LinearGradient>
+          ) : (
+            <LinearGradient id="pulso" x1="0" y1="0" x2="0" y2={ALTURA} gradientUnits="userSpaceOnUse">
+              <Stop offset="0" stopColor={traco} stopOpacity="0.28" />
+              <Stop offset="1" stopColor={traco} stopOpacity="0" />
+            </LinearGradient>
+          )}
         </Defs>
 
         {/* Duas linhas de apoio, bem fracas: dão profundidade sem virar grade de
-            planilha. A de baixo é o chão (zero), e é ela que diz que a escala
-            começa no zero -- sem isso, qualquer subida parece enorme. */}
-        <Line x1="0" y1={chao} x2={largura} y2={chao} stroke={paleta().cores.borda} strokeWidth={1} />
+            planilha.
+
+            A linha do zero: no chão quando tudo é positivo, e no meio do
+            desenho quando há dia negativo. É a régua que dá sentido ao que está
+            abaixo dela. */}
+        <Line
+          x1="0"
+          y1={temNegativo ? zero : chao}
+          x2={largura}
+          y2={temNegativo ? zero : chao}
+          stroke={temNegativo ? paleta().inkFraco : paleta().cores.borda}
+          strokeWidth={1}
+        />
         <Line
           x1="0"
           y1={RESPIRO_CIMA}
@@ -124,6 +183,23 @@ export function GraficoDoPeriodo({
           strokeLinejoin="round"
           fill="none"
         />
+
+        {!semNada && temNegativo && (
+          <>
+            {/* O pior dia, escrito: é a pergunta que o saldo negativo levanta. */}
+            <Circle cx={fundo.x} cy={fundo.y} r={3.5} fill={paleta().cores.gold} />
+            <TextoSvg
+              x={Math.min(Math.max(fundo.x, 16), largura - 16)}
+              y={Math.min(fundo.y + 16, ALTURA - 4)}
+              fill={paleta().cores.ink}
+              fontSize={12}
+              fontWeight="700"
+              textAnchor="middle"
+            >
+              {formatar(fundo.valor)}
+            </TextoSvg>
+          </>
+        )}
 
         {!semNada && (
           <>

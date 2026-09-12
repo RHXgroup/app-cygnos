@@ -1,5 +1,10 @@
 import { folhaPadrao, seguro, type TimbradoDaNutri } from './folhaPadrao'
+import { comMarcacoes } from './marcacoesDoTexto'
 import { comoSeChama, type DocumentoDaPaciente } from './fichaCompleta'
+
+/* Reexportado para a tela, que já importava daqui: o TEXTO mudou de arquivo,
+   e o caminho de quem usa não precisa mudar junto. */
+export { semMarcacoes } from './marcacoesDoTexto'
 
 /* O PDF de um receituário, atestado ou prescrição -- no padrão da casa.
  *
@@ -30,6 +35,19 @@ export function folhaDoDocumento(
     documento.medicamentos.length === 0 && !documento.conteudo
       ? '<p class="vazio">Este documento não tem texto guardado no sistema.</p>'
       : '',
+    /* ── O FIM ESCRITO ──
+     *
+     * Relato dele, sobre um contrato: "a contratante, testemunha, essas coisas
+     * não estão aparecendo... pulou uma nova página, provavelmente". Pulou
+     * mesmo: um contrato tem duas páginas, e o visualizador que abre do lado de
+     * fora -- a prévia do WhatsApp, o leitor do celular -- mostra a primeira e
+     * não avisa que existe outra.
+     *
+     * A folha não consegue numerar as páginas (o motor de impressão do Android
+     * não desenha contador de página), mas consegue dizer onde ela ACABA. Quem
+     * não vê esta linha sabe que ainda falta rolar -- e isso separa "o app
+     * cortou o documento" de "o meu leitor abriu só a primeira folha". */
+    '<p class="fim">— fim do documento —</p>',
   ]
     .filter(Boolean)
     .join('\n')
@@ -60,6 +78,10 @@ export function folhaDoDocumento(
       .texto .grande { font-size: 1.15em }
       .texto .pequeno { font-size: 0.85em; color: #4b5347 }
       .vazio { color: #6b7264; font-style: italic }
+      .fim {
+        margin-top: 20px; text-align: center; color: #9aa396;
+        font-size: 11px; letter-spacing: .06em;
+      }
     `,
   })
 }
@@ -97,59 +119,6 @@ const emParagrafos = (texto: string): string =>
     .map(p => `<p>${comMarcacoes(seguro(p.trim())).replace(/\n/g, '<br>')}</p>`)
     .join('\n')}</div>`
 
-/* Os marcadores do editor do sistema viram tag.
- *
- * O editor guarda destaque dentro do próprio texto (o vocabulário está em
- * `lib/textoRico.ts`, no sistema):
- *
- *     **negrito**   _itálico_   __sublinhado__   ==marca-texto==
- *     ++grande++    ~~pequeno~~
- *
- * Sem traduzir isso, o contrato saía do app com `**CLÁUSULA 1ª**` escrito
- * assim, marcadores e tudo -- e o que era título de cláusula virava linha igual
- * às outras.
- *
- * Feito DEPOIS do escape, sobre o texto já seguro: um `<b>` que ela tenha
- * digitado continua sendo texto, e só os nossos marcadores viram tag.
- *
- * A ordem é a mesma da leitura de lá -- `**` antes de `*`, `__` antes de `_` --
- * e as classes são `[^*]` em vez de `.+?` porque dois destaques na mesma linha
- * viravam um só, engolindo o que estava no meio. */
-export function comMarcacoes(escapado: string): string {
-  /* ── A LINHA DE ASSINATURA SAI DA FRENTE PRIMEIRO ──
-   *
-   * O contrato tem linhas assim:
-   *
-   *     _______________________________________
-   *     CONTRATADA — Renan — CRN 12345
-   *     1. Nome: ____________________ CPF: ____________
-   *
-   * E o sublinhado do editor do sistema é `__assim__`. Sem tirar os tracejados
-   * da frente, o `__` do fim de um casa com o `__` do começo do outro e engole
-   * o que está no meio -- justamente o nome de quem assina. Três ou mais
-   * sublinhados seguidos são traço para escrever à mão, e nunca marcação.
-   *
-   * O guardado volta no fim, porque o marcador de posição não pode sobreviver à
-   * função: um `` impresso no contrato seria um quadradinho no papel. */
-  const tracos: string[] = []
-  const semTracos = escapado.replace(/_{3,}/g, trecho => {
-    tracos.push(trecho)
-    return `${tracos.length - 1}`
-  })
-
-  const comTags = semTracos
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/__([^_]+)__/g, '<u>$1</u>')
-    .replace(/==([^=]+)==/g, '<mark>$1</mark>')
-    .replace(/\+\+([^+]+)\+\+/g, '<span class="grande">$1</span>')
-    .replace(/~~([^~]+)~~/g, '<span class="pequeno">$1</span>')
-    .replace(/_([^_]+)_/g, '<em>$1</em>')
-
-  return comTags.replace(
-    /(\d+)/g,
-    (_, n) => `<span class="assinar">${tracos[Number(n)] ?? ''}</span>`,
-  )
-}
 
 /* O mesmo vocabulário da tela (`CicloEDocumentos`), e com reserva explícita:
    um tipo novo no sistema não pode sair impresso como `undefined`. */
@@ -196,18 +165,3 @@ export function nomeDoArquivoDoDocumento(
   return `${limpo(comoSeChama(documento)) || 'documento'}-${limpo(paciente) || 'paciente'}${data}.pdf`
 }
 
-/* O mesmo texto para LER na tela, sem os marcadores.
- *
- * A tela mostra texto simples -- negrito dentro de um parágrafo exigiria partir
- * cada linha em vários `<Text>`, e o que ela faz aqui é conferir o conteúdo,
- * não revisar a diagramação. Tirar os marcadores é melhor do que mostrá-los:
- * `**CLÁUSULA 1ª**` na tela é o app expondo o próprio encanamento. */
-export function semMarcacoes(texto: string): string {
-  return texto
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-    .replace(/==([^=]+)==/g, '$1')
-    .replace(/\+\+([^+]+)\+\+/g, '$1')
-    .replace(/~~([^~]+)~~/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-}

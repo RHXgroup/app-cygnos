@@ -32,6 +32,11 @@ export type PulsoDoConsultorio = {
   consultas: PontoDoDia[] | null
   /** O que ENTROU por dia, em reais. */
   caixa: PontoDoDia[] | null
+  /** O que SAIU por dia, em reais -- as contas que ela pagou. */
+  saiu: PontoDoDia[] | null
+  /** Entrou menos saiu, dia a dia. Negativo nos dias em que pagou mais do que
+      recebeu -- e é ver isso que ele pediu: "se gastou mais do que recebeu". */
+  saldo: PontoDoDia[] | null
   carteira: {
     ativos: number
     /** Entraram na carteira nos últimos 30 dias. */
@@ -66,7 +71,7 @@ export async function pulsoDoConsultorio(
 
   const trintaDiasAtras = new Date(agora.getTime() - 30 * 86400000).toISOString()
 
-  const [consultas, baixas, ativos, novos, comApp] = await Promise.all([
+  const [consultas, baixas, pagamentos, ativos, novos, comApp] = await Promise.all([
     supabase
       .from('consultas')
       .select('data_hora, status')
@@ -74,6 +79,11 @@ export async function pulsoDoConsultorio(
       .lt('data_hora', fimDeHoje.toISOString()),
     supabase
       .from('contas_receber_baixas')
+      .select('valor_pago, data_pagamento')
+      .gte('data_pagamento', primeiro)
+      .lte('data_pagamento', hoje),
+    supabase
+      .from('contas_pagar_baixas')
       .select('valor_pago, data_pagamento')
       .gte('data_pagamento', primeiro)
       .lte('data_pagamento', hoje),
@@ -87,6 +97,7 @@ export async function pulsoDoConsultorio(
 
   if (consultas.error) falha('Não consegui ler as consultas do período.', consultas.error)
   if (baixas.error) falha('Não consegui ler o que entrou no período.', baixas.error)
+  if (pagamentos.error) falha('Não consegui ler o que saiu no período.', pagamentos.error)
   if (ativos.error) falha('Não consegui contar os seus pacientes.', ativos.error)
 
   const serieDeConsultas = consultas.error
@@ -112,9 +123,34 @@ export async function pulsoDoConsultorio(
         dias,
       )
 
+  const serieDoQueSaiu = pagamentos.error
+    ? null
+    : serieDiaria(
+        ((pagamentos.data ?? []) as Record<string, unknown>[]).map(b => ({
+          dia: b.data_pagamento,
+          valor: b.valor_pago,
+        })),
+        hoje,
+        dias,
+      )
+
+  /* O saldo do dia: entrou menos saiu. Só existe quando os DOIS lados vieram --
+     com um deles faltando por permissão, "saldo" seria o que entrou disfarçado
+     de resultado, e resultado errado sobre dinheiro é pior que resultado
+     nenhum. */
+  const serieDoSaldo =
+    serieDoCaixa && serieDoQueSaiu
+      ? serieDoCaixa.map((p, i) => ({
+          dia: p.dia,
+          valor: p.valor - (serieDoQueSaiu[i]?.valor ?? 0),
+        }))
+      : null
+
   return {
     consultas: serieDeConsultas,
     caixa: serieDoCaixa,
+    saiu: serieDoQueSaiu,
+    saldo: serieDoSaldo,
     carteira: ativos.error
       ? null
       : {
