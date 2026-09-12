@@ -149,7 +149,7 @@ export function ConversasDaNutriScreen({
      a do sistema fazia o Android matar o Cygnos enquanto ela estava na frente,
      e o app voltava do zero -- "ao tirar foto no app de mensagem o app
      reconecta". */
-  const [camera, setCamera] = useState(false)
+  const [camera, setCamera] = useState<'foto' | 'video' | null>(null)
   /* O vídeo aberto em tela cheia, pelo CAMINHO no balde -- quem assina o
      endereço é o tocador, no primeiro toque. */
   const [videoGrande, setVideoGrande] = useState<string | null>(null)
@@ -243,7 +243,7 @@ export function ConversasDaNutriScreen({
         return true
       }
       if (camera) {
-        setCamera(false)
+        setCamera(null)
         return true
       }
       if (fotoGrande) {
@@ -305,7 +305,7 @@ export function ConversasDaNutriScreen({
     setAnexo(null)
     setMenuDeAnexo(false)
     setGravando(false)
-    setCamera(false)
+    setCamera(null)
   }
 
   async function anexarFoto(origem: 'camera' | 'galeria') {
@@ -315,7 +315,7 @@ export function ConversasDaNutriScreen({
        relato de reiniciar nunca foi sobre ele. */
     if (origem === 'camera') {
       setErro('')
-      setCamera(true)
+      setCamera('foto')
       return
     }
     const escolha = await escolherFoto(origem)
@@ -326,6 +326,23 @@ export function ConversasDaNutriScreen({
     }
     setErro('')
     setAnexo({ tipo: 'foto', uri: escolha.uri, base64: escolha.base64, caminho: null })
+  }
+
+  /* ──────────────────── GRAVAR, OU PEGAR DA GALERIA ────────────────────
+   *
+   * "Ele não pergunta se quer gravar um vídeo ou se quer ver um vídeo da
+   * galeria." Duas entradas escritas no menu, e não uma pergunta depois do
+   * toque: a pergunta cobra um toque a mais de quem já sabia o que queria.
+   *
+   * E gravar AQUI não é só comodidade. O vídeo dele tinha 34 MB em oito
+   * segundos, porque a câmera do sistema grava em 4K -- gravando pela nossa, a
+   * qualidade é escolhida (ver `CameraDoApp`) e um minuto cabe no teto. Da
+   * galeria o arquivo vem como está, e o teto de 25 MB é conferido antes de
+   * subir, com a frase dizendo quantos megabytes tem. */
+  function gravarVideo() {
+    setMenuDeAnexo(false)
+    setErro('')
+    setCamera('video')
   }
 
   async function anexarVideo() {
@@ -635,7 +652,12 @@ export function ConversasDaNutriScreen({
           <View style={styles.menuDeAnexo}>
             <OpcaoDeAnexo icone="camera-outline" rotulo="Câmera" onPress={() => void anexarFoto('camera')} />
             <OpcaoDeAnexo icone="images-outline" rotulo="Galeria" onPress={() => void anexarFoto('galeria')} />
-            <OpcaoDeAnexo icone="videocam-outline" rotulo="Vídeo" onPress={() => void anexarVideo()} />
+            <OpcaoDeAnexo icone="videocam-outline" rotulo="Gravar vídeo" onPress={gravarVideo} />
+            <OpcaoDeAnexo
+              icone="film-outline"
+              rotulo="Vídeo da galeria"
+              onPress={() => void anexarVideo()}
+            />
             <OpcaoDeAnexo
               icone="mic-outline"
               rotulo="Gravar áudio"
@@ -764,15 +786,20 @@ export function ConversasDaNutriScreen({
           <VideoCheio caminho={videoGrande} onFechar={() => setVideoGrande(null)} />
         )}
 
-        {camera && (
+        {!!camera && (
           <CameraDoApp
+            modo={camera}
             onPronta={foto => {
-              setCamera(false)
+              setCamera(null)
               setAnexo({ tipo: 'foto', uri: foto.uri, base64: foto.base64, caminho: null })
             }}
-            onFechar={() => setCamera(false)}
+            onVideoPronto={uri => {
+              setCamera(null)
+              setAnexo({ tipo: 'video', uri, caminho: null })
+            }}
+            onFechar={() => setCamera(null)}
             onErro={mensagem => {
-              setCamera(false)
+              setCamera(null)
               setErro(mensagem)
             }}
           />
@@ -1251,12 +1278,19 @@ const estilos = estilosDe(t =>
 
     menuDeAnexo: {
       flexDirection: 'row',
+      /* Cinco saídas não cabem numa linha de telefone, e espremer transformaria
+         "Vídeo da galeria" em três letras e um risco. Duas linhas. */
+      flexWrap: 'wrap',
       gap: 8,
       marginHorizontal: 12,
       marginBottom: 6,
     },
     opcaoDeAnexo: {
-      flex: 1,
+      /* Cresce para ocupar a linha, mas não encolhe abaixo de 92: é o que
+         mantém o rótulo legível quando são cinco. */
+      flexGrow: 1,
+      flexBasis: 92,
+      minWidth: 92,
       alignItems: 'center',
       gap: 4,
       paddingVertical: 12,
