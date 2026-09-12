@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { falha } from './erros'
+import type { TimbradoDaNutri } from './folhaDoPlano'
 
 /* Quem entrou: paciente, nutricionista, ou ninguém disso.
  *
@@ -131,6 +132,68 @@ export async function quemEntrou(): Promise<QuemEntrou | null> {
  * própria linha) e entra pelo mesmo motivo do irmão em `conta.ts`: sem ele,
  * esta leitura dependeria inteira de uma política que mora noutro repositório.
  * Com ele, o pior caso volta a ser uma resposta errada só sobre ela mesma. */
+/* O TIMBRADO da folha impressa: nome, registro e a linha de contato.
+ *
+ * "O PDF tem que sair no padrão dos relatórios do sistema." Lá o cabeçalho sai
+ * de `perfil_nutricionista`, com os mesmos campos -- `SELECT_PERFIL_RELATORIO`,
+ * em `relatorioClinico.ts`. Aqui são os mesmos, menos as imagens: logo, foto e
+ * assinatura moram em balde privado, precisariam de endereço assinado (que
+ * vence) e, se não carregassem, deixariam um buraco no papel.
+ *
+ * NUNCA rejeita e nunca vira erro na tela: sem o timbrado o PDF sai com o nome
+ * do sistema, que é melhor do que não sair. Item 11.
+ *
+ * O TIPO mora em `folhaDoPlano`, que é quem desenha a folha: dois tipos de mesmo
+ * nome e mesma forma em dois arquivos são a armadilha 5 -- o compilador aceita a
+ * troca, e o dia em que um ganhar um campo o outro não ganha. */
+export async function timbradoDaNutri(): Promise<TimbradoDaNutri | null> {
+  try {
+    const { data: sessao } = await supabase.auth.getSession()
+    const id = sessao.session?.user.id
+    if (!id) return null
+
+    /* `select('*')`: os nomes das colunas do perfil não estão conferidos neste
+       repositório, e uma coluna errada numa lista derruba a leitura inteira --
+       o que apagaria o timbrado em vez de só um campo. */
+    const { data, error } = await supabase
+      .from('perfil_nutricionista')
+      .select('*')
+      .eq('nutricionista_id', id)
+      .maybeSingle()
+    if (error) falha('Não consegui ler o seu timbrado.', error)
+
+    const p = (data ?? {}) as Record<string, unknown>
+    const texto = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+
+    const nome = texto(p.nome_completo)
+    const endereco = texto(p.logradouro)
+      ? [
+          texto(p.logradouro) + (texto(p.numero) ? ', ' + texto(p.numero) : ''),
+          texto(p.bairro),
+          texto(p.cidade) + (texto(p.uf) ? '/' + texto(p.uf) : ''),
+        ].filter(Boolean).join(' · ')
+      : ''
+    const instagram = texto(p.instagram) ? '@' + texto(p.instagram).replace(/^@+/, '') : ''
+    const contato = [
+      texto(p.telefone) ? 'Tel. ' + texto(p.telefone) : '',
+      endereco,
+      instagram,
+    ].filter(Boolean).join(' · ')
+
+    /* Sem nome no perfil, o nome do cadastro serve: o papel precisa dizer de
+       quem é. */
+    const doCadastro = await carregarPerfilDaNutri()
+    return {
+      nome: nome || doCadastro?.nome || 'Cygnos',
+      crn: texto(p.crn) || null,
+      contato: contato || null,
+    }
+  } catch (e) {
+    falha('Não consegui ler o seu timbrado.', e)
+    return null
+  }
+}
+
 export async function carregarPerfilDaNutri(): Promise<PerfilDaNutri | null> {
   const { data: sessao } = await supabase.auth.getSession()
   const id = sessao.session?.user.id

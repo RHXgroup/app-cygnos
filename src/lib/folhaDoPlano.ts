@@ -33,18 +33,42 @@ export function seguro(texto: string): string {
     .replace(/'/g, '&#39;')
 }
 
-/* "10/09/2026". A data em que a folha foi gerada, e não a do plano: é o que
-   responde "esta folha é a mais nova?" quando ela acha duas na bolsa. */
+/* "10 de setembro de 2026", como nos relatórios do sistema. A data em que a
+   folha foi gerada, e não a do plano: é o que responde "esta folha é a mais
+   nova?" quando ela acha duas na bolsa.
+   
+   Escrita à mão, e NÃO com `toLocaleDateString`: o Hermes sai de fábrica sem a
+   tabela completa do Intl, e o mês sairia em inglês em parte dos aparelhos --
+   num papel que a paciente leva para casa. */
+const MESES_POR_EXTENSO = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+]
+
 function hojePorExtenso(agora: Date): string {
   if (Number.isNaN(agora.getTime())) return ''
   const dois = (n: number) => String(n).padStart(2, '0')
-  return `${dois(agora.getDate())}/${dois(agora.getMonth() + 1)}/${agora.getFullYear()}`
+  return `${dois(agora.getDate())} de ${MESES_POR_EXTENSO[agora.getMonth()]} de ${agora.getFullYear()}`
+}
+
+/* O timbrado: quem assina a folha.
+ *
+ * Os três campos são os mesmos do cabeçalho dos relatórios do sistema
+ * (`cabecalhoHTML`, em `relatorioClinico.ts`): nome, registro e a linha de
+ * contato já montada. Montada FORA porque quem sabe juntar telefone, endereço e
+ * Instagram é quem leu o perfil -- esta função tem de continuar pura para o
+ * teste rodar fora do aparelho. */
+export type TimbradoDaNutri = {
+  nome: string
+  crn: string | null
+  contato: string | null
 }
 
 export function folhaDoPlano(
   plano: PlanoDaPaciente,
   paciente: string,
   agora: Date = new Date(),
+  nutri: TimbradoDaNutri | null = null,
 ): string {
   const refeicoes = plano.refeicoes
     .map(r => {
@@ -76,59 +100,107 @@ export function folhaDoPlano(
     })
     .join('')
 
-  /* `@page` com margem: sem isto o Chrome do Android imprime colado na borda e
-     a impressora corta a primeira coluna. */
+  /* ──────────────────── O PADRÃO É O DO SISTEMA ────────────────────
+   *
+   * "O PDF está gerando, só que tem que fazer gerar no padrão dos relatórios do
+   * sistema."
+   *
+   * O que estava aqui era uma folha inventada no app: outra tipografia, outro
+   * verde, outro cabeçalho. Impressa ao lado de um atestado ou de um relatório
+   * clínico, parecia de outra casa -- e quem recebe não sabe que são dois
+   * programas; sabe que é a nutricionista dela.
+   *
+   * As medidas abaixo vêm de `relatorioClinico.ts` (CSS_BASE, cabecalhoHTML e
+   * rodapeSanoHTML): a faixa do timbrado com o gradiente, o título com a barra
+   * verde à esquerda, a tabela com o cabeçalho em maiúsculas e o rodapé da
+   * marca. Copiadas, e não importadas -- são dois repositórios, e o `import`
+   * não atravessa.
+   *
+   * O que NÃO veio: logo, foto e assinatura. Elas moram em balde privado e
+   * precisam de endereço assinado, que vence; uma imagem que não carrega deixa
+   * um buraco no papel impresso, que é pior do que não ter imagem. O selo "via
+   * Cygnos" continua, em texto.
+   *
+   * `@page` com margem: sem isto o Chrome do Android imprime colado na borda e
+   * a impressora corta a primeira coluna. */
+  const dataExt = hojePorExtenso(agora)
+  const nomeDaNutri = nutri?.nome?.trim() || 'Cygnos'
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<title>${seguro(plano.titulo)} — Cygnos</title>
 <style>
-  @page { margin: 18mm 14mm; }
-  * { box-sizing: border-box; }
+  @page { margin: 14mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
   body {
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    color: #2F3722;
-    font-size: 12pt;
-    line-height: 1.45;
-    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #262921;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 8px;
   }
-  header { border-bottom: 2px solid #2F3722; padding-bottom: 10px; margin-bottom: 18px; }
-  h1 { font-size: 19pt; margin: 0 0 2px; letter-spacing: -0.4px; }
-  .paciente { font-size: 13pt; font-weight: 600; margin: 0; }
-  .quando { font-size: 10pt; color: #6F7C52; margin: 4px 0 0; }
-  .descricao { font-size: 11pt; color: #3F4A2E; margin: 10px 0 0; }
-  section { margin-bottom: 14px; break-inside: avoid; }
+  .top {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: linear-gradient(100deg,#f5f7f3,#fbfcfa 55%,#ffffff);
+    border: 1px solid #e2e5dd; border-radius: 14px; padding: 15px 22px; margin-bottom: 20px;
+  }
+  .brand .nm { font-size: 20px; font-weight: 700; color: #2f3921; letter-spacing: -.3px }
+  .brand .crn { font-size: 12px; font-weight: 600; color: #555; margin-top: 1px }
+  .brand .ct { font-size: 10px; color: #8a9b93; margin-top: 3px }
+  .top .r { text-align: right; flex-shrink: 0 }
+  .top .r .doc { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #2f3921 }
+  .top .r .em { font-size: 11px; color: #5a6b64; margin-top: 3px }
+  .top .r .dt { font-size: 11px; font-weight: 600; color: #41473A }
+  .top .r .selo {
+    display: inline-block; margin-top: 5px; background: #eff2ea; border-radius: 20px;
+    padding: 2px 7px; font-size: 9px; color: #536835; font-weight: 600;
+  }
+  h1 { font-size: 18px; color: #2f3921; margin-bottom: 2px; padding-left: 11px; border-left: 4px solid #79954e }
+  .sub { color: #5a6b64; font-size: 12px; margin: 2px 0 16px 15px }
+  .descricao { color: #47582d; background: #f5f7f1; border-radius: 8px; padding: 10px 12px; margin: 0 0 16px; font-size: 12px }
+  section { margin-bottom: 16px; break-inside: avoid }
   h2 {
-    font-size: 12.5pt;
-    margin: 0 0 4px;
-    padding-bottom: 3px;
-    border-bottom: 1px solid #DFE3D4;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: #5a6b64; border-bottom: 2px solid #2f3921; padding-bottom: 5px; margin-bottom: 2px;
   }
-  .hora { color: #6F7C52; font-weight: 600; margin-right: 8px; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 3px 0; vertical-align: top; }
-  .item { }
-  .qtd { text-align: right; white-space: nowrap; padding-left: 14px; color: #3F4A2E; }
-  .vazio { color: #6F7C52; font-style: italic; }
+  .hora { color: #79954e; margin-right: 8px }
+  table { width: 100%; border-collapse: collapse; font-size: 12px }
+  td { padding: 7px 8px; border-bottom: 1px solid #e8eae5; vertical-align: top }
+  .qtd { text-align: right; white-space: nowrap; padding-left: 14px; color: #5a6b64 }
+  .vazio { color: #8a9b93; font-style: italic }
   footer {
-    margin-top: 20px;
-    padding-top: 8px;
-    border-top: 1px solid #DFE3D4;
-    font-size: 9pt;
-    color: #6F7C52;
+    margin-top: 22px; padding-top: 12px; border-top: 1px solid #dfe0dc;
+    text-align: center; color: #8a9b93; font-size: 11px;
   }
+  footer b { color: #2f3921; font-weight: 600 }
+  footer .sitio { color: #728654 }
 </style>
 </head>
 <body>
-  <header>
-    <h1>${seguro(plano.titulo)}</h1>
-    <p class="paciente">${seguro(paciente)}</p>
-    <p class="quando">Gerado em ${hojePorExtenso(agora)}</p>
-    ${plano.descricao ? `<p class="descricao">${seguro(plano.descricao)}</p>` : ''}
-  </header>
-  ${refeicoes || '<p>Este plano ainda não tem refeições montadas.</p>'}
+  <div class="top">
+    <div class="brand">
+      <div class="nm">${seguro(nomeDaNutri)}</div>
+      ${nutri?.crn ? `<div class="crn">${seguro(nutri.crn)}</div>` : ''}
+      ${nutri?.contato ? `<div class="ct">${seguro(nutri.contato)}</div>` : ''}
+    </div>
+    <div class="r">
+      <div class="doc">Plano alimentar</div>
+      <div class="em">Emitido em</div>
+      <div class="dt">${dataExt}</div>
+      <div class="selo">via Cygnos</div>
+    </div>
+  </div>
+
+  <h1>${seguro(plano.titulo)}</h1>
+  <div class="sub">Paciente: ${seguro(paciente)}</div>
+  ${plano.descricao ? `<p class="descricao">${seguro(plano.descricao)}</p>` : ''}
+
+  ${refeicoes || '<p class="vazio">Este plano ainda não tem refeições montadas.</p>'}
+
   <footer>
-    Cygnos &middot; folha gerada no aplicativo. Em caso de dúvida, vale o plano do sistema.
+    Gerado com <b>Cygnos</b> · sistema para nutricionistas · <span class="sitio">cygnos-nutri.com</span>
   </footer>
 </body>
 </html>`

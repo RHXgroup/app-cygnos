@@ -70,7 +70,11 @@ ok('vazio não vira undefined', seguro('') === '')
   ok('declara utf-8', html.includes('charset="utf-8"'))
   ok('traz o título do plano', html.includes('Plano de emagrecimento'))
   ok('traz a paciente', html.includes('Maria Alves'))
-  ok('traz a data de geração', html.includes('10/09/2026'))
+  /* Por extenso, como nos relatórios do sistema -- e escrita à mão, porque o
+     Intl do Hermes devolveria "September" em parte dos aparelhos. */
+  ok('traz a data de geração por extenso', html.includes('10 de setembro de 2026'))
+  ok('e o timbrado no padrão do sistema', html.includes('Plano alimentar') && html.includes('via Cygnos'))
+  ok('com o rodapé da marca', html.includes('sistema para nutricionistas'))
   ok('traz a refeição', html.includes('Café da manhã'))
   ok('traz o horário', html.includes('07:00'))
   ok('traz os itens', html.includes('Pão integral') && html.includes('Ovo mexido'))

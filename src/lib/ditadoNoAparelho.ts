@@ -236,6 +236,12 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
       /* Silêncio e parada seguem para o `end`, que entrega o que houver (ou
          "não ouvi nada"). Todo o resto decide AQUI, e fecha a escuta. */
       if (d.tipo === 'parou' || d.tipo === 'silencio') return
+      /* "Ocupado" é o mesmo respiro do recomeço, e não uma falha do aparelho:
+         acontece quando o sistema ainda está soltando o microfone da sessão
+         anterior. Quem cuida é o `end`, que vem logo depois. */
+      /* Comparado como TEXTO: a lista de tipos do módulo não tem o `busy` do
+         Android, e o valor chega assim mesmo do lado nativo. */
+      if (/busy/i.test(String(ev?.error ?? ''))) return
       if (terminou) return
       terminou = true
       desligar()
@@ -272,6 +278,48 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
     },
   }
 
+  /* Entrega o que foi ouvido e fecha. Um lugar só: o `end` chama daqui quando
+     desiste de recomeçar, e o recomeço chama quando o microfone não reabre. */
+  const entregar = () => {
+    if (terminou) return
+    terminou = true
+    desligar()
+    if (cancelada) return
+    op.aoFinal(juntarFalas(fechados, parcial))
+  }
+
+  /* ── O RESPIRO DO ANDROID ──
+   *
+   * Relatado no segundo teste, com o recomeço já no ar: "eu falei Aurora e ele
+   * escreveu 'ouro.' e parou". O recomeço estava lá e falhava: chamar `start`
+   * DENTRO do `end` pede o microfone no mesmo instante em que o sistema o está
+   * fechando, e o Android responde "reconhecedor ocupado" -- a exceção caía no
+   * `catch` e o app entregava a primeira palavra.
+   *
+   * Então o recomeço espera um pouco e tenta de novo, com o intervalo
+   * crescendo. Três tentativas: se o microfone não voltar em pouco mais de um
+   * segundo, entregar o que tem é melhor do que ficar tentando com ela
+   * falando para uma tela parada. */
+  const RESPIRO_MS = [250, 500, 900]
+  const recomecar = (tentativa = 0) => {
+    if (terminou || pediuParar || cancelada) return
+    if (tentativa >= RESPIRO_MS.length) {
+      falha('A escuta não recomeçou depois de três tentativas.', null)
+      entregar()
+      return
+    }
+    setTimeout(() => {
+      if (terminou || pediuParar || cancelada) return
+      try {
+        m.start(comoOuvir)
+        console.log('[cygnos] ditado: escuta recomeçada', recomecos)
+      } catch (e) {
+        falha('A escuta não recomeçou; tentando de novo.', e)
+        recomecar(tentativa + 1)
+      }
+    }, RESPIRO_MS[tentativa])
+  }
+
   inscricoes.push(
     m.addListener('end', () => {
       if (terminou) return
@@ -293,20 +341,11 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
           fechados.splice(0, fechados.length, juntado)
           parcial = ''
         }
-        try {
-          m.start(comoOuvir)
-          return
-        } catch (e) {
-          /* Não conseguiu reabrir: entrega o que tem, que é melhor do que
-             perder a frase. */
-          falha('A escuta não recomeçou.', e)
-        }
+        recomecar()
+        return
       }
 
-      terminou = true
-      desligar()
-      if (cancelada) return
-      op.aoFinal(juntarFalas(fechados, parcial))
+      entregar()
     }),
   )
 

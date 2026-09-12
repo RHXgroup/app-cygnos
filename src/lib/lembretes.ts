@@ -421,15 +421,21 @@ export type EstadoDasNotificacoes = 'ligadas' | 'perguntar' | 'bloqueadas'
 export async function estadoDasNotificacoes(): Promise<EstadoDasNotificacoes> {
   try {
     const p = await (await notificacoes()).getPermissionsAsync()
+    /* MEDIDO NO APARELHO DELE: o Android diz `POST_NOTIFICATIONS granted=true` e
+       o app continuava mostrando "desligadas". Alguma coisa entre os dois está
+       mentindo, e este `catch` engolia o motivo. A linha diz o que voltou --
+       objeto, lista vazia (o módulo de mentira) ou nada. */
+    console.log('[cygnos] permissao de notificacao:', JSON.stringify(p))
     /* `?.` porque o embrulho protegido devolve `undefined` para o que o módulo
        não tiver no Expo Go -- e ler `.granted` de nada derrubaria a tela Mais
        inteira por causa de uma linha de status. */
     if (p?.granted) return 'ligadas'
     return p?.canAskAgain === false ? 'bloqueadas' : 'perguntar'
-  } catch {
+  } catch (e) {
     /* Sem conseguir perguntar, 'perguntar' é o estado honesto: o botão tenta,
        e o resultado diz o resto. 'bloqueadas' mandaria para a configuração
        sem motivo. */
+    falha('Não consegui ler a permissão de notificação.', e)
     return 'perguntar'
   }
 }
@@ -458,6 +464,7 @@ export async function ligarNotificacoes(): Promise<EstadoDasNotificacoes> {
   try {
     const N = await notificacoes()
     const r = await N.requestPermissionsAsync()
+    console.log('[cygnos] pedido de notificacao devolveu:', JSON.stringify(r))
     if (r?.granted) return 'ligadas'
     return r?.canAskAgain === false ? 'bloqueadas' : 'perguntar'
   } catch (e) {

@@ -19,6 +19,7 @@ import {
   type PlanoDaPaciente,
 } from '../lib/planoDoPacienteDaNutri'
 import { folhaDoPlano, nomeDoArquivo } from '../lib/folhaDoPlano'
+import { timbradoDaNutri } from '../lib/souNutri'
 import {
   procurarAlimento,
   trocarItem,
@@ -143,7 +144,10 @@ export function PlanoDaPacienteScreen({
        ver "A CAUSA, segunda parte", logo abaixo. */
     let base64: string | undefined
     try {
-      const html = folhaDoPlano(plano, nome)
+      /* O timbrado vai junto: o padrão dos relatórios do sistema é o nome dela
+         e o registro no alto da folha, e sem isso o papel sai anônimo. Falhou a
+         leitura, sai sem -- e não sem PDF. */
+      const html = folhaDoPlano(plano, nome, new Date(), await timbradoDaNutri())
       console.log('[cygnos] pdf: montando', html.length, 'caracteres')
       const feito = await Print.printToFileAsync({ html, base64: true })
       uri = feito.uri
