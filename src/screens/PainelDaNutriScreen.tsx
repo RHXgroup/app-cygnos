@@ -22,6 +22,9 @@ import {
   responderPedido,
 } from '../lib/agendaDaNutri'
 import { quemPedeAtencao } from '../lib/atencaoDaNutri'
+import { pulsoDoConsultorio, type PulsoDoConsultorio } from '../lib/pulsoDoConsultorio'
+import { compararMetades, totalDaSerie } from '../lib/serieDoPainel'
+import { GraficoDoPeriodo } from '../components/GraficoDoPeriodo'
 import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia'
 import {
   motivoDe,
@@ -133,6 +136,15 @@ export function PainelDaNutriScreen({
      quando não há nada -- e aí o bloco não aparece, porque uma lista de compras
      vazia é ruído numa tela que fala do dia. */
   const [compras, setCompras] = useState<ItemDeCompra[]>([])
+  /* O pulso do consultório: as séries de catorze dias que viram gráfico.
+     Nulo até chegar, e cada pedaço pode faltar sozinho -- o painel desenha o
+     que veio, e a agenda do dia nunca depende disto. */
+  const [pulso, setPulso] = useState<PulsoDoConsultorio | null>(null)
+  /* A largura do gráfico, MEDIDA no cartão -- e não calculada a partir da
+     janela. Calcular obrigaria a repetir aqui cada padding do caminho até ele,
+     e um deles mudaria um dia sem ninguém lembrar deste número. O `onLayout`
+     pergunta ao próprio desenho. */
+  const [larguraDoGrafico, setLarguraDoGrafico] = useState(0)
 
   /* ──────────────────── O VOLTAR, que esta tela NUNCA teve ────────────────────
    *
@@ -178,15 +190,17 @@ export function PainelDaNutriScreen({
     const depoisDeAmanha = new Date()
     depoisDeAmanha.setDate(depoisDeAmanha.getDate() + 1)
 
-    const [r, caixa, sinais, aguardando, oDiaSeguinte, mercado] = await Promise.all([
+    const [r, caixa, sinais, aguardando, oDiaSeguinte, mercado, oPulso] = await Promise.all([
       consultasDoDia(new Date()),
       dinheiroDoDia(),
       quemPedeAtencao(),
       pedidosDeConsulta(),
       consultasNoPeriodo(depoisDeAmanha, depoisDeAmanha),
       comprasDaSemana(),
+      pulsoDoConsultorio(),
     ])
 
+    setPulso(oPulso)
     setDinheiro(caixa)
     setCompras(mercado.tipo === 'ok' ? mercado.itens : [])
     setAtencao(sinais.tipo === 'ok' ? sinais.pessoas : [])
@@ -561,109 +575,18 @@ export function PainelDaNutriScreen({
 
         {/* Dia sem consulta NÃO é dia livre: ela pode ter mil coisas que o app
             não enxerga. A frase diz o que o app sabe, e nada além. */}
-        {/* ──────────────────── O DINHEIRO DO DIA ────────────────────
-            Só aparece quando HÁ movimento, e isso é decisão e não esquecimento.
-            A política de `contas_receber_baixas` exige a permissão de baixar:
-            quem não a tem recebe ZERO LINHA, sem erro nenhum -- idêntico a "não
-            entrou nada hoje". Escrever "R$ 0" nos dois casos seria o app
-            afirmando um número que ele não sabe, para quem decide dinheiro com
-            ele. Item 6: zero é mentira. */}
-        {/* ──────────────────── E O A PAGAR, QUE ERA LIDO E JOGADO FORA ────────────────────
-            `dinheiroDoDia` já buscava `aPagar` e `quantasAPagar`, com um
-            comentário explicando por que aquilo importa -- "é a pergunta que ela
-            faz de manhã, e não saber custa juro". Só que nenhuma tela lia os dois
-            campos: a consulta ia ao banco todo dia e a resposta era descartada.
+        {/* O dinheiro do dia MUDOU DE LUGAR, e não sumiu: ele agora vive
+            dentro do cartão do caixa, mais abaixo, junto da linha de catorze
+            dias. Três números soltos do dia não dizem se o consultório está
+            indo bem -- e era o que esta tela tinha. */}
 
-            É o mesmo formato dos três achados que fizeram nascer o `npm run
-            orfaos`: o objeto existe, e o caminho não passa por ele. Nada falha,
-            nada avisa, e ninguém descobre olhando a tela -- só olhando os dois
-            lados juntos. */}
-        {/* ──────────────────── O QUE COMPRAR ────────────────────
-            "A lista de compra também, se tiver alguma coisa pendente de alguma
-            consulta que ela for ter, deve colocar aqui."
-
-            É a única coisa desta tela que tem hora certa para ser lida: no
-            supermercado, na véspera. Descobrir no dia da sessão que faltou o
-            iogurte é descobrir tarde.
-
-            Só aparece quando há o que comprar. Um bloco vazio dizendo "nada a
-            comprar" seria ruído todo dia para uma nutricionista que não faz
-            terapia alimentar -- e são a maioria. */}
-        {compras.length > 0 && (
-          <View>
-            <Text style={styles.rotuloDeSecao}>Comprar para os próximos 7 dias</Text>
-            <View style={styles.listaDeCompras}>
-              {compras.slice(0, 8).map(i => (
-                <View key={i.nome + (i.unidade ?? '')} style={styles.itemDeCompra}>
-                  <Text style={styles.nomeDaCompra} numberOfLines={1}>
-                    {i.nome}
-                  </Text>
-                  {/* Quantidade vazia quando as unidades divergiam e não deu
-                      para somar -- e aí ela vê o item sem número, que é honesto,
-                      em vez de um total inventado. */}
-                  {!!quantidadePorExtenso(i) && (
-                    <Text style={styles.quantidadeDaCompra}>{quantidadePorExtenso(i)}</Text>
-                  )}
-                </View>
-              ))}
-              {compras.length > 8 && (
-                <Text style={styles.maisCompras}>e mais {compras.length - 8} itens</Text>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* ──────────────────── O DINHEIRO DE HOJE ────────────────────
-            As TRÊS linhas, sempre, e zero escrito como zero.
-
-            Isto já teve duas versões erradas, e as duas por conta minha. A
-            primeira escondia o bloco quando não havia movimento; a segunda
-            trocava os números por uma frase. As duas vinham do mesmo raciocínio:
-            a política de baixas exige permissão, quem não a tem recebe ZERO
-            LINHA, e isso é indistinguível de "não entrou nada" -- então
-            escrever "R$ 0" seria afirmar um número que o app não sabe.
-
-            O raciocínio continua verdadeiro e a decisão era dele, não minha. As
-            palavras foram estas: "é pra colocar aqui que você tem pra receber
-            ou tem pra pagar. Ponto. Você não tem, coloca zero." Quem lê a tela
-            todo dia sabe se tem permissão de financeiro; quem não sabe é o app.
-
-            Fica a ressalva onde ela cabe -- uma linha embaixo, e só quando tudo
-            é zero, que é o único caso em que a dúvida existe. */}
-        {!!dinheiro && (
-          <View>
-            <Text style={styles.rotuloDeSecao}>Dinheiro de hoje</Text>
-            <View style={styles.caixaDoDia}>
-              <View style={styles.verba}>
-                <Text style={styles.rotuloVerba}>Recebido</Text>
-                <Text style={[styles.valorVerba, styles.valorRecebido]}>
-                  {reais(dinheiro.recebido)}
-                </Text>
-              </View>
-              <View style={styles.verba}>
-                <Text style={styles.rotuloVerba}>A receber</Text>
-                <Text style={[styles.valorVerba, styles.valorVencendo]}>
-                  {reais(dinheiro.vencendo)}
-                </Text>
-              </View>
-              <View style={styles.verba}>
-                <Text style={styles.rotuloVerba}>A pagar</Text>
-                <Text style={[styles.valorVerba, styles.valorAPagar]}>
-                  {reais(dinheiro.aPagar)}
-                </Text>
-              </View>
-            </View>
-            {dinheiro.quantasBaixas === 0 &&
-              dinheiro.quantasVencendo === 0 &&
-              dinheiro.quantasAPagar === 0 && (
-              <Text style={styles.ressalvaDoDinheiro}>
-                Nada lançado hoje. Se a sua conta não vê o financeiro, aparece
-                zero do mesmo jeito.
-              </Text>
-            )}
-          </View>
-        )}
-
+        {/* A ATENÇÃO subiu de lugar. Relato dele, olhando a tela: "oito
+            pacientes com atenção lá no mercado, para ler código de barras, nada
+            a ver". Quem precisa dela é assunto CLÍNICO e vem antes do que é
+            ferramenta -- lista de compras e leitor de código de barras são as
+            duas últimas coisas da tela porque são as que ela procura quando já
+            decidiu ir fazer alguma coisa. */
+        }
         {/* ──────────────────── QUEM PEDE ATENÇÃO ────────────────────
             Uma LINHA, e não o painel da Carteira. O site tem a leitura inteira,
             com cinco colunas e análise por IA; repetir aquilo aqui daria uma
@@ -707,6 +630,174 @@ export function PainelDaNutriScreen({
           <View style={styles.vazio}>
             <Ionicons name="calendar-outline" size={22} color={paleta().inkFraco} />
             <Text style={styles.textoVazio}>Nada marcado para hoje na sua agenda.</Text>
+          </View>
+        )}
+
+        {/* ──────────────────── O CONSULTÓRIO EM CATORZE DIAS ────────────────────
+            Pedido dele, com a tela aberta na frente: "quero um grafo, não
+            barrinha de progressão... um painel clínico completinho, bonito, pra
+            ela bater o olho e falar que da hora". E sobre o que havia aqui:
+            "dinheiro de hoje, recebida, receber e a pagar, péssimo".
+
+            O que mudou não foi só a moldura. Três números soltos do DIA não
+            dizem se o consultório está indo bem -- para isso é preciso ver o
+            movimento. Então o dia continua (é o que ela confere de manhã), mas
+            dentro do bloco que mostra a linha das duas semanas. */}
+        {!!pulso?.consultas && (
+          <View
+            style={styles.cartaoDoPulso}
+            /* A largura vem do cartão, já descontado o padding dele. Enquanto a
+               medida não chega, o gráfico não desenha -- meio quadro com a
+               largura errada apareceria e saltaria. */
+            onLayout={e => setLarguraDoGrafico(Math.max(0, e.nativeEvent.layout.width - 32))}
+          >
+            <View style={styles.topoDoCartao}>
+              <View style={styles.textosDoCartao}>
+                <Text style={styles.rotuloDoCartao}>ATENDIMENTOS</Text>
+                <Text style={styles.numeroDoCartao}>
+                  {totalDaSerie(pulso.consultas)}
+                  <Text style={styles.unidadeDoCartao}>
+                    {totalDaSerie(pulso.consultas) === 1 ? ' consulta' : ' consultas'}
+                  </Text>
+                </Text>
+                <Text style={styles.periodoDoCartao}>nos últimos {pulso.dias} dias</Text>
+              </View>
+              <Tendencia variacao={compararMetades(pulso.consultas).variacao} styles={styles} />
+            </View>
+
+            {larguraDoGrafico > 0 && (
+              <GraficoDoPeriodo serie={pulso.consultas} largura={larguraDoGrafico} />
+            )}
+          </View>
+        )}
+
+        {(!!pulso?.caixa || !!dinheiro) && (
+          <View style={styles.cartaoDoPulso}>
+            <View style={styles.topoDoCartao}>
+              <View style={styles.textosDoCartao}>
+                <Text style={styles.rotuloDoCartao}>ENTROU NO CAIXA</Text>
+                <Text style={styles.numeroDoCartao}>
+                  {reais(pulso?.caixa ? totalDaSerie(pulso.caixa) : (dinheiro?.recebido ?? 0))}
+                </Text>
+                <Text style={styles.periodoDoCartao}>
+                  {pulso?.caixa ? `nos últimos ${pulso.dias} dias` : 'hoje'}
+                </Text>
+              </View>
+              {!!pulso?.caixa && (
+                <Tendencia variacao={compararMetades(pulso.caixa).variacao} styles={styles} />
+              )}
+            </View>
+
+            {!!pulso?.caixa && larguraDoGrafico > 0 && (
+              <GraficoDoPeriodo
+                serie={pulso.caixa}
+                largura={larguraDoGrafico}
+                cor={paleta().cores.gold}
+                formatar={reais}
+              />
+            )}
+
+            {/* O DIA, em uma linha, dentro do bloco do caixa -- e com as
+                palavras que ela usa. "Recebida / a receber / a pagar" eram
+                rótulo de sistema; "entrou hoje" e "você paga hoje" é o que se
+                fala no consultório. */}
+            {!!dinheiro && (
+              <View style={styles.linhaDoDia}>
+                <View style={styles.verba}>
+                  <Text style={styles.rotuloVerba}>Entrou hoje</Text>
+                  <Text style={[styles.valorVerba, styles.valorRecebido]}>
+                    {reais(dinheiro.recebido)}
+                  </Text>
+                </View>
+                <View style={styles.verba}>
+                  <Text style={styles.rotuloVerba}>Vence hoje</Text>
+                  <Text style={[styles.valorVerba, styles.valorVencendo]}>
+                    {reais(dinheiro.vencendo)}
+                  </Text>
+                </View>
+                <View style={styles.verba}>
+                  <Text style={styles.rotuloVerba}>Você paga hoje</Text>
+                  <Text style={[styles.valorVerba, styles.valorAPagar]}>
+                    {reais(dinheiro.aPagar)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* A ressalva continua, e continua pelo mesmo motivo: quem não tem
+                permissão de financeiro recebe ZERO LINHA, e isso é
+                indistinguível de "não entrou nada". Só quando tudo é zero. */}
+            {!!dinheiro &&
+              dinheiro.quantasBaixas === 0 &&
+              dinheiro.quantasVencendo === 0 &&
+              dinheiro.quantasAPagar === 0 && (
+                <Text style={styles.ressalvaDoDinheiro}>
+                  Nada lançado hoje. Se a sua conta não vê o financeiro, aparece zero do mesmo
+                  jeito.
+                </Text>
+              )}
+          </View>
+        )}
+
+        {/* ──────────────────── A CARTEIRA ────────────────────
+            Três números, e nenhuma barra: barra pediria uma meta, e não existe
+            meta de "quantos pacientes". O que existe é o tamanho de hoje, quem
+            chegou no mês e quantos alcançam pelo aplicativo -- e o terceiro é o
+            que diz se vale mandar recado por aqui. */}
+        {!!pulso?.carteira && (
+          <View style={styles.cartaoDaCarteira}>
+            <Numero
+              valor={String(pulso.carteira.ativos)}
+              rotulo={pulso.carteira.ativos === 1 ? 'paciente ativo' : 'pacientes ativos'}
+              styles={styles}
+            />
+            <View style={styles.divisor} />
+            <Numero
+              valor={pulso.carteira.novos > 0 ? '+' + pulso.carteira.novos : '0'}
+              rotulo="novos em 30 dias"
+              styles={styles}
+            />
+            <View style={styles.divisor} />
+            <Numero
+              valor={String(pulso.carteira.comApp)}
+              rotulo="usam o aplicativo"
+              styles={styles}
+            />
+          </View>
+        )}
+
+        {/* ──────────────────── O QUE COMPRAR ────────────────────
+            "A lista de compra também, se tiver alguma coisa pendente de alguma
+            consulta que ela for ter, deve colocar aqui."
+
+            É a única coisa desta tela que tem hora certa para ser lida: no
+            supermercado, na véspera. Descobrir no dia da sessão que faltou o
+            iogurte é descobrir tarde.
+
+            Só aparece quando há o que comprar. Um bloco vazio dizendo "nada a
+            comprar" seria ruído todo dia para uma nutricionista que não faz
+            terapia alimentar -- e são a maioria. */}
+        {compras.length > 0 && (
+          <View>
+            <Text style={styles.rotuloDeSecao}>Comprar para os próximos 7 dias</Text>
+            <View style={styles.listaDeCompras}>
+              {compras.slice(0, 8).map(i => (
+                <View key={i.nome + (i.unidade ?? '')} style={styles.itemDeCompra}>
+                  <Text style={styles.nomeDaCompra} numberOfLines={1}>
+                    {i.nome}
+                  </Text>
+                  {/* Quantidade vazia quando as unidades divergiam e não deu
+                      para somar -- e aí ela vê o item sem número, que é honesto,
+                      em vez de um total inventado. */}
+                  {!!quantidadePorExtenso(i) && (
+                    <Text style={styles.quantidadeDaCompra}>{quantidadePorExtenso(i)}</Text>
+                  )}
+                </View>
+              ))}
+              {compras.length > 8 && (
+                <Text style={styles.maisCompras}>e mais {compras.length - 8} itens</Text>
+              )}
+            </View>
           </View>
         )}
 
@@ -910,6 +1001,52 @@ function diaCurto(iso: string): string {
   const dt = new Date(iso)
   if (Number.isNaN(dt.getTime())) return ''
   return String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0')
+}
+
+/* A seta com a variação. Sem cor de julgamento no número em si: subir consulta
+   é bom, subir conta a pagar não é -- quem decide o significado é o cartão em
+   que ela está, e por isso a cor vem de fora do componente... não vem: aqui ela
+   é sempre a mesma, neutra, e o sinal fica no símbolo. Um painel que pinta de
+   vermelho uma semana mais fraca é um painel que ela evita abrir. */
+function Tendencia({
+  variacao,
+  styles,
+}: {
+  variacao: number | null
+  styles: ReturnType<typeof estilos>
+}) {
+  if (variacao === null || variacao === 0) return null
+  const subiu = variacao > 0
+  return (
+    <View style={styles.tendencia}>
+      <Ionicons
+        name={subiu ? 'trending-up' : 'trending-down'}
+        size={14}
+        color={paleta().inkSuave}
+      />
+      <Text style={styles.textoDaTendencia}>
+        {subiu ? '+' : ''}
+        {variacao}%
+      </Text>
+    </View>
+  )
+}
+
+function Numero({
+  valor,
+  rotulo,
+  styles,
+}: {
+  valor: string
+  rotulo: string
+  styles: ReturnType<typeof estilos>
+}) {
+  return (
+    <View style={styles.numeroDaCarteira}>
+      <Text style={styles.valorDaCarteira}>{valor}</Text>
+      <Text style={styles.rotuloDaCarteira}>{rotulo}</Text>
+    </View>
+  )
 }
 
 const estilos = estilosDe(t =>
@@ -1131,6 +1268,67 @@ const estilos = estilosDe(t =>
        resumo do dinheiro passa a ser a única coisa emoldurada da metade de
        baixo. É o que faz três valores se lerem como três respostas. */
     caixaDoDia: { flexDirection: 'row', gap: 9 },
+
+    /* ──── O painel clínico ────
+       Cartão alto, com respiro: o gráfico precisa de ar em volta para parecer
+       gráfico, e não faixa colorida. */
+    cartaoDoPulso: {
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 12,
+      gap: 10,
+    },
+    topoDoCartao: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    textosDoCartao: { flex: 1, gap: 1 },
+    rotuloDoCartao: {
+      fontFamily: FONTE.forte,
+      fontSize: 10.5,
+      letterSpacing: 0.8,
+      color: t.inkFraco,
+    },
+    /* O número grande é o que ela lê de relance -- e por isso ele, e não o
+       rótulo, ocupa o tamanho. */
+    numeroDoCartao: { fontFamily: FONTE.bruta, fontSize: 30, color: t.cores.ink, letterSpacing: -0.8 },
+    unidadeDoCartao: { fontFamily: FONTE.media, fontSize: 14, color: t.inkSuave, letterSpacing: 0 },
+    periodoDoCartao: { fontSize: 12, color: t.inkFraco },
+
+    tendencia: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: t.cores.superficie,
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    },
+    textoDaTendencia: { fontFamily: FONTE.forte, fontSize: 12, color: t.inkSuave },
+
+    linhaDoDia: {
+      flexDirection: 'row',
+      gap: 9,
+      borderTopWidth: 1,
+      borderTopColor: t.cores.borda,
+      paddingTop: 10,
+      marginTop: 2,
+    },
+
+    cartaoDaCarteira: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: t.cores.cartao,
+      borderWidth: 1,
+      borderColor: t.cores.borda,
+      borderRadius: 18,
+      paddingVertical: 14,
+    },
+    numeroDaCarteira: { flex: 1, alignItems: 'center', gap: 2 },
+    valorDaCarteira: { fontFamily: FONTE.bruta, fontSize: 21, color: t.cores.ink },
+    rotuloDaCarteira: { fontSize: 11, color: t.inkFraco, textAlign: 'center' },
+    divisor: { width: 1, height: 30, backgroundColor: t.cores.borda },
 
     listaDeCompras: {
       backgroundColor: t.cores.cartao,
