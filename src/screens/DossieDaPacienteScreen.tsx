@@ -50,6 +50,13 @@ import {
 import { FONTE } from '../lib/fontes'
 import { estilosDe, paleta } from '../lib/tema'
 import { ImportarExameScreen } from './ImportarExameScreen'
+import { CicloDaFicha, DocumentosDaFicha } from '../components/CicloEDocumentos'
+import {
+  cicloDaPaciente,
+  documentosDaPaciente,
+  type CicloDaPaciente,
+  type DocumentoDaPaciente,
+} from '../lib/fichaCompleta'
 
 export type SecaoDoDossie =
   | 'terapeutico'
@@ -59,6 +66,11 @@ export type SecaoDoDossie =
   | 'energetico'
   | 'evolucao'
   | 'resumo'
+  /* As duas de 11/09, pedidas por ele: "não está aparecendo o ciclo de
+     menstruação da mulher" e "se eu indiquei alguma suplementação, precisava
+     aparecer aqui". */
+  | 'ciclo'
+  | 'documentos'
 
 /* O título de cada seção. Função com `switch`, e não `Record`: é o mesmo tipo
    dos dois lados, mas assim o compilador acusa a seção nova que esquecer o
@@ -79,6 +91,10 @@ function tituloDaSecao(secao: SecaoDoDossie, nome: string): string {
       return `Evolução de ${nome}`
     case 'resumo':
       return `Resumo de ${nome}`
+    case 'ciclo':
+      return `Ciclo de ${nome}`
+    case 'documentos':
+      return `Prescrições de ${nome}`
   }
 }
 
@@ -123,6 +139,8 @@ export function DossieDaPacienteScreen({
   const [exames, setExames] = useState<ExameDaPaciente[]>([])
   const [calculos, setCalculos] = useState<CalculoEnergeticoDaPaciente[]>([])
   const [medidas, setMedidas] = useState<Medida[]>([])
+  const [ciclo, setCiclo] = useState<CicloDaPaciente | null>(null)
+  const [documentos, setDocumentos] = useState<DocumentoDaPaciente[]>([])
   /* Sobe a cada "puxar para reler" -- o resumo da Aurora lê sozinho, porque
      precisa voltar a perguntar enquanto ela está lendo, e é assim que a
      moldura avisa que é para ler de novo. */
@@ -191,6 +209,26 @@ export function DossieDaPacienteScreen({
         /* Lê sozinho -- ver `versao`. */
         setVersao(v => v + 1)
         return
+      case 'ciclo': {
+        const r = await cicloDaPaciente(pacienteId)
+        if (r.tipo === 'ok') {
+          setErro('')
+          setCiclo(r.ciclo)
+        } else {
+          setErro(r.mensagem)
+        }
+        return
+      }
+      case 'documentos': {
+        const r = await documentosDaPaciente(pacienteId)
+        if (r.tipo === 'ok') {
+          setErro('')
+          setDocumentos(r.documentos)
+        } else {
+          setErro(r.mensagem)
+        }
+        return
+      }
     }
   }, [pacienteId, secao])
 
@@ -311,6 +349,8 @@ export function DossieDaPacienteScreen({
               perguntando enquanto a Aurora lê, e um erro de rede numa das
               voltas não pode apagar o resumo que já está na tela. */}
           {secao === 'resumo' && <ResumoDaAurora pacienteId={pacienteId} nome={nome} versao={versao} />}
+          {!erro && secao === 'ciclo' && <CicloDaFicha ciclo={ciclo} nome={nome} />}
+          {!erro && secao === 'documentos' && <DocumentosDaFicha documentos={documentos} nome={nome} />}
         </ScrollView>
       )}
     </View>

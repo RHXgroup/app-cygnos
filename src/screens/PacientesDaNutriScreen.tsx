@@ -32,6 +32,7 @@ import { type PacienteEmFoco } from '../lib/auroraSobreAPaciente'
 import { PlanoDaPacienteScreen } from './PlanoDaPacienteScreen'
 import { DossieDaPacienteScreen, type SecaoDoDossie } from './DossieDaPacienteScreen'
 import { ConstanciaDoPaciente } from '../components/ConstanciaDoPaciente'
+import { mostraOCiclo } from '../lib/cicloVisivel'
 
 /* A carteira dela, no bolso.
  *
@@ -570,6 +571,23 @@ export function FichaDoPacienteScreen({
                 />
                 <Item rotulo="Exames" valor="Abrir" onAbrir={() => setDossie('exames')} />
                 <Item rotulo="Gasto energético" valor="Abrir" onAbrir={() => setDossie('energetico')} />
+                {/* As duas de 11/09. A suplementação é o que ele procurou e não
+                    achou: "se eu indiquei alguma suplementação, precisava
+                    aparecer aqui". Ela mora no receituário, junto do resto do
+                    que foi prescrito -- e por isso a linha é "Prescrições". */}
+                <Item
+                  rotulo="Prescrições e suplementação"
+                  valor="Abrir"
+                  onAbrir={() => setDossie('documentos')}
+                />
+                {/* A MESMA regra do app do paciente (`mostraOCiclo`), e não um
+                    `genero === feminino` escrito de novo aqui: só 'masculino'
+                    esconde, e o resto mostra -- o comentário dela explica por
+                    quê. Duas regras para a mesma pergunta divergiriam no dia em
+                    que uma mudasse (armadilha 5). */}
+                {mostraOCiclo({ genero: ficha.genero, temRegistro: false }) && (
+                  <Item rotulo="Ciclo menstrual" valor="Abrir" onAbrir={() => setDossie('ciclo')} />
+                )}
                 <Item
                   rotulo="Evolução das medidas"
                   valor={ficha.medidas.length ? 'Abrir' : 'Sem avaliação'}
