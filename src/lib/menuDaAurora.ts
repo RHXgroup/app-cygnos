@@ -128,7 +128,9 @@ const semAcento = (texto: string): string =>
 
 /* Minúsculas, sem acento, sem pontuação, espaços colapsados. A pontuação vira
    ESPAÇO e não some: sem isso "menu-principal" viraria uma palavra só. */
-const achatar = (texto: string): string =>
+/* Exportado para `perguntaBasica`, que reconhece "quem é o meu próximo paciente"
+   pela mesma régua -- e não por uma segunda normalização que divergiria desta. */
+export const achatar = (texto: string): string =>
   semAcento(texto.toLowerCase())
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()

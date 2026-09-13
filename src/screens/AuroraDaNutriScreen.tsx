@@ -36,6 +36,8 @@ import { useDesvioDoTeclado } from '../lib/teclado'
 import { estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
 import { executarAcaoConfirmada } from '../lib/acoesNoAparelho'
+import { lerPerguntaBasica } from '../lib/perguntaBasica'
+import { medirRespostaSemIA, responderSemIA } from '../lib/respostaSemIA'
 import { apontarQueNaoEraIsso } from '../lib/naoEraIsso'
 import { Ditado } from '../components/Ditado'
 
@@ -245,6 +247,41 @@ export function AuroraDaNutriScreen({
     setTexto('')
     emVoo.current = true
     setPensando(true)
+
+    /* ──────────────── PERGUNTA BÁSICA NÃO VAI AO MODELO ────────────────
+     *
+     * "As perguntas básicas -- próximo paciente, agenda tal -- ela vai gastar
+     * também? Espero a IA pra fazer análises, não pra fazer comando simples."
+     *
+     * "Quem é o meu próximo paciente?" tem uma resposta só, e ela está no banco.
+     * Aqui ela é respondida com as mesmas leituras da agenda e do painel: na
+     * hora, sem custo, e sem a chance de o modelo errar o que uma linha de código
+     * acerta. Quem decide o que é básico é `perguntaBasica`, pela frase inteira
+     * -- "marca o próximo paciente amanhã" não entra.
+     *
+     * Dentro da ficha de um paciente NÃO: lá "qual a próxima consulta?" quer dizer
+     * a DELE, e só a Aurora sabe disso.
+     *
+     * A pergunta e a resposta viram falas LOCAIS as duas. Só a resposta local
+     * deixaria a pergunta dela no histórico sem resposta, e o modelo a
+     * responderia de novo na pergunta seguinte.
+     *
+     * Leitura que falhou devolve nulo, e a pergunta segue para a Aurora de
+     * sempre, logo abaixo. */
+    const basica = sobre ? null : lerPerguntaBasica(limpa)
+    if (basica) {
+      const pronta = await responderSemIA(basica)
+      if (pronta) {
+        emVoo.current = false
+        setPensando(false)
+        setFalas(atual => [
+          ...atual.map(f => (f.id === minha.id ? { ...f, local: true } : f)),
+          { ...novaFala('aurora', pronta), local: true },
+        ])
+        medirRespostaSemIA(basica)
+        return
+      }
+    }
 
     /* Na tela ela lê o que escreveu; o servidor recebe de quem se trata, por
        número. Sem isto a Aurora teria de adivinhar o paciente a cada pergunta
