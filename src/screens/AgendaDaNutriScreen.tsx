@@ -286,6 +286,7 @@ export function AgendaDaNutriScreen({
         setAgindoEm(null)
         void buscar()
       }}
+      onAbrirFicha={setFichaAberta}
     />
   ) : null
 
@@ -856,10 +857,16 @@ export function PainelDaConsulta({
   consulta,
   onFechar,
   onMudou,
+  onAbrirFicha,
 }: {
   consulta: ConsultaDoDia
   onFechar: () => void
   onMudou: () => void
+  /* A ficha da pessoa -- e dentro dela o histórico de consultas. Pedido dele:
+     "se eu quiser ver histórico de consulta aqui pra fazer uma análise, não
+     consigo". O histórico existia, na ficha, e a ficha não tinha porta a
+     partir da consulta em que ela estava. */
+  onAbrirFicha?: (pacienteId: number) => void
 }) {
   const styles = estilos()
   const { bottom } = useSafeAreaInsets()
@@ -1021,6 +1028,24 @@ export function PainelDaConsulta({
 
         {modo === 'menu' && (
           <>
+            {/* A ficha primeiro: é a pergunta de antes de qualquer ação ("quem
+                é, como está, o que conversamos da última vez"). Só com ficha --
+                o encaixe avulso não tem para onde abrir. */}
+            {!!onAbrirFicha && !!consulta.pacienteId && (
+              <Pressable
+                onPress={() => {
+                  onFechar()
+                  onAbrirFicha(consulta.pacienteId!)
+                }}
+                style={({ pressed }) => [styles.opcaoDaFolha, pressed && styles.pressionado]}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir a ficha e o histórico de consultas"
+              >
+                <Ionicons name="person-outline" size={18} color={paleta().cores.ink} />
+                <Text style={styles.textoDaOpcao}>Ficha e histórico de consultas</Text>
+              </Pressable>
+            )}
+
             {/* Só o que cabe NESTE estado. Confirmar uma consulta já confirmada
                 ou dar por atendida uma cancelada são opções que existiriam para
                 a pessoa descobrir, tocando, que não fazem nada. */}

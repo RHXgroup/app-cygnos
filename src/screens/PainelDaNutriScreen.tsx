@@ -307,6 +307,7 @@ export function PainelDaNutriScreen({
         setAgindoEm(null)
         void buscar()
       }}
+      onAbrirFicha={setFichaAberta}
     />
   ) : null
 
