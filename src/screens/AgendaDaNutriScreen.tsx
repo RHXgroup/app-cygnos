@@ -18,7 +18,7 @@ import { useVoltarDoAparelho } from '../lib/voltarDoAparelho'
 import { NovaConsultaScreen } from './NovaConsultaScreen'
 import {
   confirmarConsulta,
-  geraFinanceiroSozinho,
+  lancarFinanceiroDaConsulta,
   marcarComoAtendida,
   salvarNotaDoAtendimento,
 } from '../lib/acoesDaConsulta'
@@ -884,7 +884,7 @@ export function PainelDaConsulta({
    * tentativas na tela de conversa. */
   const [alturaDaTela, setAlturaDaTela] = useState(0)
   const respiro = useDesvioDoTeclado(bottom, alturaDaTela || undefined)
-  const [modo, setModo] = useState<'menu' | 'remarcar' | 'cancelar' | 'nota'>('menu')
+  const [modo, setModo] = useState<'menu' | 'remarcar' | 'cancelar' | 'nota' | 'mensalidade'>('menu')
   /* A nota do atendimento, escrita logo depois de dar por atendida. É a mesma
      coluna que a ficha mostra no topo como "onde a gente parou" -- escrita no
      corredor ela existe; deixada para a noite, é o que mais se perde. */
@@ -897,19 +897,10 @@ export function PainelDaConsulta({
      confirmar duas vezes é pedir ao banco duas vezes a mesma coisa. */
   const salvandoAgora = useRef(false)
   const [recado, setRecado] = useState('')
-  /* Ligado quando o consultório gera título sozinho ao dar por atendida. Serve
-     só para a frase: é o que diz a ela que o lançamento NÃO nasceu aqui. */
-  const [financeiroAuto, setFinanceiroAuto] = useState(false)
-
-  useEffect(() => {
-    let vivo = true
-    void geraFinanceiroSozinho().then(x => {
-      if (vivo) setFinanceiroAuto(x)
-    })
-    return () => {
-      vivo = false
-    }
-  }, [])
+  /* A pergunta da mensalidade, como o banco a escreveu ("ela tem mensalidade
+     de R$ 400 todo dia 10; lançar também R$ 180 por esta sessão?"). Nula fora
+     desse degrau. */
+  const [perguntaDaMensalidade, setPerguntaDaMensalidade] = useState('')
 
   /* Sem lista de dependências, pelo mesmo motivo da tela: assim este fica na
      frente do da agenda e do `AreaDaNutri`, e o voltar descasca um degrau por
@@ -917,6 +908,19 @@ export function PainelDaConsulta({
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (salvando) return true
+      /* Depois de dar por atendida o menu não tem mais para onde voltar: a
+         consulta mudou de estado. Da pergunta da mensalidade, voltar é "não
+         lançar" e segue para a nota; da nota, voltar é fechar e reler. */
+      if (modo === 'mensalidade') {
+        setPerguntaDaMensalidade('')
+        setModo('nota')
+        setRecado('Consulta dada por atendida. Nada lançado no financeiro.')
+        return true
+      }
+      if (modo === 'nota') {
+        onMudou()
+        return true
+      }
       if (modo !== 'menu') {
         setModo('menu')
         setRecado('')
@@ -956,11 +960,40 @@ export function PainelDaConsulta({
        fecha -- ela abre a nota, porque é o instante em que a nota existe na
        cabeça dela. Pular direto seria mandar escrever depois, e depois quer
        dizer nunca. */
-    if (qual === 'confirmar') onMudou()
-    else {
-      setModo('nota')
-      setRecado('Consulta dada por atendida.')
+    if (qual === 'confirmar') {
+      onMudou()
+      return
     }
+
+    /* ── E O FINANCEIRO, junto ──
+       "Confirmar que eu atendi, essas coisinhas têm que funcionar aqui." No
+       sistema, dar por atendida também lança a cobrança -- e agora aqui
+       também, pela MESMA função do banco. A consulta já está atendida neste
+       ponto: o que vier do financeiro vira frase, e nunca desfaz o atendimento. */
+    await financeiro(false)
+  }
+
+  async function financeiro(mesmoComMensalidade: boolean) {
+    salvandoAgora.current = true
+    setSalvando(true)
+    const f = await lancarFinanceiroDaConsulta(consulta.id, mesmoComMensalidade)
+    salvandoAgora.current = false
+    setSalvando(false)
+
+    if (f.tipo === 'confirmar') {
+      setPerguntaDaMensalidade(f.mensagem)
+      setModo('mensalidade')
+      setRecado('')
+      return
+    }
+
+    setPerguntaDaMensalidade('')
+    setModo('nota')
+    setRecado(
+      f.tipo === 'erro'
+        ? f.mensagem
+        : 'Consulta dada por atendida.' + (f.mensagem ? ' ' + f.mensagem : ''),
+    )
   }
 
   async function guardarNota() {
@@ -1075,18 +1108,6 @@ export function PainelDaConsulta({
               </Pressable>
             )}
 
-            {financeiroAuto &&
-              (consulta.status === 'pendente' || consulta.status === 'confirmada') && (
-                /* Dito ANTES, e não depois: no sistema, dar por atendida também
-                   gera o título quando o consultório tem geração automática, e
-                   essa regra (mensalidade, convênio, parcelas) mora lá. Marcar
-                   aqui e ela descobrir sozinha que a cobrança não nasceu é o
-                   defeito que já custou dez consultas sem título em agosto. */
-                <Text style={styles.dica}>
-                  O lançamento no financeiro continua sendo feito no computador.
-                </Text>
-              )}
-
             <Pressable
               onPress={() => {
                 setModo('remarcar')
@@ -1113,6 +1134,26 @@ export function PainelDaConsulta({
           </>
         )}
 
+        {modo === 'mensalidade' && (
+          <>
+            {/* A pergunta do sistema, com as mesmas palavras de lá: lançar a
+                sessão por fora de uma mensalidade pode ser cobrança em dobro --
+                e pode ser uma avaliação fora do pacote. Quem sabe é ela. */}
+            <Text style={styles.recado}>{perguntaDaMensalidade}</Text>
+            <BotoesDaFolha
+              rotulo="Lançar mesmo assim"
+              rotuloDeVoltar="Não lançar"
+              salvando={salvando}
+              onVoltar={() => {
+                setPerguntaDaMensalidade('')
+                setModo('nota')
+                setRecado('Consulta dada por atendida. Nada lançado no financeiro.')
+              }}
+              onConfirmar={() => void financeiro(true)}
+            />
+          </>
+        )}
+
         {modo === 'nota' && (
           <>
             <Text style={styles.dica}>
@@ -1131,6 +1172,7 @@ export function PainelDaConsulta({
             {!!recado && <Text style={styles.recado}>{recado}</Text>}
             <BotoesDaFolha
               rotulo="Guardar nota"
+              rotuloDeVoltar="Agora não"
               salvando={salvando}
               onVoltar={() => {
                 /* Sem nota também é uma resposta, e a consulta já está
@@ -1225,12 +1267,16 @@ export function PainelDaConsulta({
    ninguém. */
 function BotoesDaFolha({
   rotulo,
+  rotuloDeVoltar = 'Voltar',
   perigo,
   salvando,
   onVoltar,
   onConfirmar,
 }: {
   rotulo: string
+  /* "Voltar" na maioria dos degraus; "Não lançar" na pergunta da mensalidade,
+     onde voltar não é voltar -- é uma resposta. */
+  rotuloDeVoltar?: string
   perigo?: boolean
   salvando: boolean
   onVoltar: () => void
@@ -1249,7 +1295,7 @@ function BotoesDaFolha({
         ]}
         accessibilityRole="button"
       >
-        <Text style={styles.textoVoltar}>Voltar</Text>
+        <Text style={styles.textoVoltar}>{rotuloDeVoltar}</Text>
       </Pressable>
 
       <Pressable
