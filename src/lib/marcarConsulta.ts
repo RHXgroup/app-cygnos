@@ -35,27 +35,48 @@ export const TIPOS_DE_FABRICA: TipoDeConsulta[] = [
  * volta vazio: sem resposta, os de fábrica (item 11).
  */
 export async function tiposDeConsulta(): Promise<TipoDeConsulta[]> {
-  const { data, error } = await supabase
-    .from('tipos_consulta')
-    .select('slug, nome, duracao_min, ordem')
-    .eq('ativo', true)
-    .order('ordem')
-    .order('nome')
+  const [{ data, error }, { data: config }] = await Promise.all([
+    supabase
+      .from('tipos_consulta')
+      .select('slug, nome, duracao_min, ordem')
+      .eq('ativo', true)
+      .order('ordem')
+      .order('nome'),
+    supabase
+      .from('configuracoes')
+      .select('duracao_consulta, tipos_consulta_detalhado')
+      .limit(1).maybeSingle(),
+  ])
+
+  /* A duração segue a chave "Detalhado" de Parâmetros > Sistema, como no site
+     e na Aurora (`_shared/duracaoDaConsulta.ts` do Nutriviet): desligada -- o
+     padrão, e o que quase todo consultório tem --, TODA consulta usa o número
+     único; ligada, cada tipo usa a sua. Ler só a tabela de tipos, que nasce
+     com 60 nos dois, ignorava o número que ela escolheu. */
+  const cfg = config as { duracao_consulta?: number | null; tipos_consulta_detalhado?: boolean | null } | null
+  const valido = (n: unknown) => {
+    const v = Number(n)
+    return Number.isInteger(v) && v >= 5 && v <= 480 ? v : null
+  }
+  const unica = valido(cfg?.duracao_consulta) ?? 60
+  const detalhado = !!cfg?.tipos_consulta_detalhado
 
   if (error) {
     falha('Não consegui ler os seus tipos de consulta.', error)
-    return TIPOS_DE_FABRICA
+    return TIPOS_DE_FABRICA.map(t => ({ ...t, duracaoMin: detalhado ? t.duracaoMin : unica }))
   }
 
   const lidos = ((data ?? []) as Record<string, unknown>[])
     .map(t => ({
       slug: typeof t.slug === 'string' ? t.slug : '',
       nome: (typeof t.nome === 'string' && t.nome.trim()) || '',
-      duracaoMin: Number(t.duracao_min) > 0 ? Number(t.duracao_min) : 60,
+      duracaoMin: detalhado ? valido(t.duracao_min) ?? unica : unica,
     }))
     .filter(t => t.slug && t.nome)
 
-  return lidos.length > 0 ? lidos : TIPOS_DE_FABRICA
+  return lidos.length > 0
+    ? lidos
+    : TIPOS_DE_FABRICA.map(t => ({ ...t, duracaoMin: detalhado ? t.duracaoMin : unica }))
 }
 
 export type ResultadoDaMarcacao =

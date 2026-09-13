@@ -284,7 +284,12 @@ export function NovaConsultaScreen({
 
         <Text style={styles.rotulo}>DURAÇÃO</Text>
         <View style={styles.chips}>
-          {DURACOES.map(m => (
+          {/* A duração configurada por ela entra na fileira quando não é uma
+              das de sempre: com 50 minutos no sistema, nenhuma pílula aparecia
+              marcada e parecia que a tela não sabia a duração. */}
+          {[...new Set([...DURACOES, ...tipos.map(t => t.duracaoMin), duracao])]
+            .sort((x, y) => x - y)
+            .map(m => (
             <Chip
               key={m}
               rotulo={m + ' min'}
