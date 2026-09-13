@@ -118,6 +118,8 @@ caso('o lembrete que ela pediu à Aurora apita', () =>
 caso('o lembrete de refeição apita', () => assert.equal(deveApitar('refeicao'), true))
 caso('o lembrete de água apita', () => assert.equal(deveApitar('agua'), true))
 caso('o da sequência apita', () => assert.equal(deveApitar('sequencia'), true))
+caso('a mensagem de paciente apita -- faltava, e calava com o app aberto', () =>
+  assert.equal(deveApitar('conversa-nutri'), true))
 caso('a CONFIRMAÇÃO de água NÃO apita -- ela não tem tipo', () =>
   /* Avisa de uma coisa que a pessoa acabou de fazer. Apitar aqui era o defeito
      que o canal MIN dela existe para evitar, e é por isso que o tratador

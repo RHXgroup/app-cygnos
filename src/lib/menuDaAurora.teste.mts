@@ -1,4 +1,6 @@
 import {
+  FECHAMENTO,
+  atalhosCabem,
   ehPedidoDeMenu,
   fraseDeAberturaDaAurora,
   semRestos,
@@ -142,6 +144,19 @@ function ok(nome: string, condicao: boolean, detalhe = '') {
 
   /* "2 sem confirmar" sozinho não diz sem confirmar o quê. */
   ok('pendente sem consulta não vaza', r(0, 2, 0) === null, String(r(0, 2, 0)))
+}
+
+{
+  /* Os atalhos no meio da conversa. */
+  ok('conversa vazia mostra', atalhosCabem(undefined))
+  ok('a Aurora perguntando o motivo esconde',
+    !atalhosCabem({ papel: 'aurora', texto: 'Achei a consulta das 14:00. Qual o motivo do cancelamento?' }))
+  ok('a Aurora perguntando primeira ou retorno esconde',
+    !atalhosCabem({ papel: 'aurora', texto: 'É primeira consulta ou retorno, e que horas?' }))
+  ok('"precisa de mais alguma coisa?" é o fim do assunto, e mostra', atalhosCabem({ papel: 'aurora', texto: FECHAMENTO }))
+  ok('resposta que afirma mostra', atalhosCabem({ papel: 'aurora', texto: 'Seu próximo paciente é Maria Alves, hoje às 14:00.' }))
+  ok('fala dela por último mostra (a tela esconde enquanto a Aurora pensa)',
+    atalhosCabem({ papel: 'nutri', texto: 'cancela a da Suelen?' }))
 }
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')

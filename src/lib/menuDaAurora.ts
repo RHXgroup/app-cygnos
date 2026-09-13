@@ -90,6 +90,34 @@ export const RESPOSTA_DO_MENU = 'Voltamos ao começo. ' + O_QUE_ELA_FAZ
  * histórico para saber o que de fato aconteceu. */
 export const FECHAMENTO = 'Precisa de mais alguma coisa?'
 
+/* ──────────────────── OS ATALHOS NO MEIO DA CONVERSA ────────────────────
+ *
+ * Relatado testando: "eu falei pra ela cancelar e ela me perguntou o motivo do
+ * cancelamento -- e aí embaixo aparece 'quem é o próximo paciente?', 'quanto
+ * recebi hoje?'. Essas perguntas deveriam aparecer quando eu não estou
+ * conversando, quando concluí as minhas dúvidas. Toda hora aparecendo isso vai
+ * atrapalhar, e não ajudar."
+ *
+ * Ele está certo: com a Aurora esperando a resposta dela, um atalho embaixo
+ * convida a trocar de assunto no meio -- e tocar nele deixa a pergunta anterior
+ * sem resposta, com uma ação pela metade.
+ *
+ * Então os atalhos somem quando a ÚLTIMA fala é da Aurora e é uma pergunta. E
+ * voltam quando o assunto fecha: uma resposta, uma ação confirmada, uma
+ * resposta sem IA (que é justamente quando ela quer tocar no atalho seguinte),
+ * ou o próprio "Precisa de mais alguma coisa?" -- que é pergunta, mas é a
+ * pergunta de quem terminou.
+ *
+ * Recebe só o essencial da fala, e não o tipo da tela, para poder ser testado
+ * sem arrastar o aparelho. */
+export function atalhosCabem(ultima: { papel: string; texto: string } | undefined): boolean {
+  if (!ultima) return true
+  if (ultima.papel !== 'aurora') return true
+  const texto = (ultima.texto ?? '').trim()
+  if (texto === FECHAMENTO) return true
+  return !texto.endsWith('?')
+}
+
 /* O que oferecer antes de ela digitar qualquer coisa -- e depois também.
  *
  * Não é enfeite: uma caixa de texto vazia com "pergunte alguma coisa" não diz o

@@ -16,6 +16,7 @@ function ok(nome: string, condicao: boolean) {
 import {
   juntarFalas,
   desfechoDoErro,
+  semInterrogacaoInventada,
   temPortugues,
   PALAVRAS_DA_NUTRI,
 } from './escutaDoDitado.ts'
@@ -124,6 +125,22 @@ ok('tem Aurora', PALAVRAS_DA_NUTRI.includes('Aurora'))
 ok('tem os verbos do recado', PALAVRAS_DA_NUTRI.includes('avisa') && PALAVRAS_DA_NUTRI.includes('recado'))
 ok('nenhuma palavra vazia', PALAVRAS_DA_NUTRI.every(p => p.trim().length > 0))
 ok('sem repetição', new Set(PALAVRAS_DA_NUTRI).size === PALAVRAS_DA_NUTRI.length)
+
+// ──── o "?" que o reconhecedor inventa ────
+ok('parar sem ter falado nada é silêncio, e não "não consegui ouvir"', desfechoDoErro('no-match').tipo === 'silencio')
+ok('ordem com a voz subindo perde o "?"',
+  semInterrogacaoInventada('marca a Suelen amanhã às dez?') === 'marca a Suelen amanhã às dez')
+ok('recado para a paciente perde o "?"',
+  semInterrogacaoInventada('Pode trazer os exames na consulta?') === 'Pode trazer os exames na consulta')
+ok('pergunta com "quem" mantém', semInterrogacaoInventada('Quem é o meu próximo paciente?') === 'Quem é o meu próximo paciente?')
+ok('pergunta com "quanto" mantém', semInterrogacaoInventada('quanto eu recebi hoje?') === 'quanto eu recebi hoje?')
+ok('pergunta com acento na palavra de pergunta mantém', semInterrogacaoInventada('Cadê o exame dela?') === 'Cadê o exame dela?')
+ok('"o que" mantém', semInterrogacaoInventada('o que eu tenho amanhã?') === 'o que eu tenho amanhã?')
+ok('"por que" mantém', semInterrogacaoInventada('por que ela faltou?') === 'por que ela faltou?')
+ok('o vocativo não esconde a pergunta', semInterrogacaoInventada('Aurora, qual a agenda de hoje?') === 'Aurora, qual a agenda de hoje?')
+ok('sem "?" fica como estava, até o espaço', semInterrogacaoInventada('marca um lembrete ') === 'marca um lembrete ')
+ok('só o "?" do fim sai, a vírgula fica', semInterrogacaoInventada('marca, por favor, às dez?') === 'marca, por favor, às dez')
+ok('vazio não quebra', semInterrogacaoInventada('') === '')
 
 console.log(`${passou} passaram, ${falhas.length} falharam`)
 if (falhas.length) {

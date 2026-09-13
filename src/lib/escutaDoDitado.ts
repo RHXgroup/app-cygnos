@@ -66,6 +66,10 @@ export function desfechoDoErro(codigo: unknown): DesfechoDoErro {
   switch (String(codigo ?? '')) {
     case 'no-speech':
     case 'speech-timeout':
+    /* O Android manda `no-match` quando ela para sem ter falado nada que ele
+       reconheça. É silêncio, e não falha: sem esta linha caía no genérico e a
+       tela dizia "não consegui ouvir" para quem só apertou parar. */
+    case 'no-match':
       return { tipo: 'silencio' }
 
     /* Tudo o que quer dizer "este aparelho não ouve sozinho". Com
@@ -154,3 +158,55 @@ export const PALAVRAS_DA_NUTRI = [
   'a receber',
   'a pagar',
 ]
+
+/* ──────────────────── 5. O PONTO DE INTERROGAÇÃO QUE NINGUÉM DISSE ────────────────────
+ *
+ * Relatado: "quando estou enviando áudio, ele fica um ? no final da mensagem,
+ * está colocando sozinho".
+ *
+ * É a pontuação automática do reconhecedor (`addsPunctuation`): ele decide o
+ * sinal pela entonação, e no português falado a voz SOBE no fim de muita frase
+ * que não é pergunta. "Marca a Suelen amanhã às dez" sai com "?", e numa
+ * mensagem para a paciente isso muda o sentido -- vira uma pergunta que a
+ * nutricionista não fez.
+ *
+ * A pontuação continua ligada, porque vírgula e ponto ajudam a ler a mensagem.
+ * Só o "?" do FIM de cada trecho sai, e só quando o trecho não começa com
+ * palavra de pergunta. "Quem é o meu próximo paciente?" mantém.
+ *
+ * O custo, dito por inteiro: pergunta de sim-ou-não sem palavra de pergunta
+ * ("pode vir amanhã?") perde o sinal. É o erro mais barato dos dois -- ela lê o
+ * texto no campo antes de mandar, e uma interrogação que falta se percebe; uma
+ * que sobra muda o que a paciente entende. */
+const PALAVRAS_DE_PERGUNTA = new Set([
+  'quem', 'qual', 'quais', 'quando', 'onde', 'aonde', 'como',
+  'quanto', 'quanta', 'quantos', 'quantas', 'porque', 'cade', 'sera',
+])
+
+const semAcentoMinusculo = (texto: string): string =>
+  [...texto.normalize('NFD')]
+    .filter(c => {
+      const n = c.charCodeAt(0)
+      return n < 0x300 || n > 0x36f
+    })
+    .join('')
+    .toLowerCase()
+
+export function semInterrogacaoInventada(trecho: string): string {
+  const original = trecho ?? ''
+  const t = original.trimEnd()
+  if (!t.endsWith('?')) return original
+
+  const palavras = semAcentoMinusculo(t)
+    .split(' ')
+    .map(p => p.replace(/[^a-z]/g, ''))
+    .filter(Boolean)
+  /* O vocativo não conta: "Aurora, quem é o próximo?" é pergunta. */
+  if (palavras[0] === 'aurora') palavras.shift()
+
+  const [primeira = '', segunda = ''] = palavras
+  if (PALAVRAS_DE_PERGUNTA.has(primeira)) return t
+  if ((primeira === 'o' || primeira === 'por') && segunda === 'que') return t
+
+  return t.slice(0, -1).trimEnd()
+}

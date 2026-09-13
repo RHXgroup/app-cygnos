@@ -2,6 +2,7 @@ import { falha } from './erros'
 import {
   PALAVRAS_DA_NUTRI,
   desfechoDoErro,
+  semInterrogacaoInventada,
   juntarFalas,
   temPortugues,
 } from './escutaDoDitado'
@@ -215,7 +216,10 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
 
   inscricoes.push(
     m.addListener('result', ev => {
-      const texto = ev?.results?.[0]?.transcript ?? ''
+      /* Sem o "?" que o reconhecedor inventa pela entonação. Aqui, e não na
+         entrega, porque o parcial também aparece no campo -- e ver o "?" surgir
+         e sumir seria pior do que não vê-lo. Ver `semInterrogacaoInventada`. */
+      const texto = semInterrogacaoInventada(ev?.results?.[0]?.transcript ?? '')
       if (ev?.isFinal) {
         /* Trecho fechado: entra na lista e o parcial zera. Com o reconhecedor
            que repete tudo, `juntarFalas` impede a frase de dobrar. */
@@ -232,6 +236,25 @@ export async function ouvirNoAparelho(op: OpcoesDaEscuta): Promise<Escuta> {
 
   inscricoes.push(
     m.addListener('error', ev => {
+      /* O código cru no log. Faltava, e foi por isso que o "não consegui ouvir
+         agora" relatado não deixou rastro: o log dizia "ouvindo" e mais nada. */
+      console.log('[cygnos] ditado: erro da escuta', String(ev?.error ?? ''), pediuParar ? '(depois de ela mandar parar)' : '')
+
+      /* ──────────────── ERRO DEPOIS DE ELA MANDAR PARAR NÃO É ERRO ────────────────
+       *
+       * Relatado: "quando eu clico pra concluir ou cancelar o áudio, ele dá a
+       * mensagem 'não consegui ouvir agora, tente de novo' -- e eu nem enviei".
+       *
+       * Ao receber `stop` ou `abort`, o Android costuma mandar um código de erro
+       * ANTES do `end` -- e o código muda de aparelho para aparelho. Este
+       * tratador olhava só o código: um que não estava na lista caía no genérico,
+       * fechava a escuta, mostrava a mensagem e o `end` seguinte já não entregava
+       * o texto (sobrava só o parcial que estava no campo).
+       *
+       * Se foi ela que mandou parar, quem decide é o `end`: entrega o que foi
+       * ouvido (pronto) ou joga fora (cancelar). Nenhum código muda isso. */
+      if (pediuParar) return
+
       const d = desfechoDoErro(ev?.error)
       /* Silêncio e parada seguem para o `end`, que entrega o que houver (ou
          "não ouvi nada"). Todo o resto decide AQUI, e fecha a escuta. */

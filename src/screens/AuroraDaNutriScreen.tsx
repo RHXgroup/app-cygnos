@@ -24,6 +24,7 @@ import {
 } from '../lib/auroraDaNutri'
 import {
   FECHAMENTO,
+  atalhosCabem,
   O_QUE_ELA_FAZ,
   PERGUNTAS_DE_EXEMPLO,
   RESPOSTA_DO_MENU,
@@ -686,7 +687,9 @@ export function AuroraDaNutriScreen({
           Some enquanto ela digita (o teclado já ocupa a tela), enquanto a
           Aurora pensa, e enquanto houver cartão esperando decisão -- ali a
           única coisa a fazer é confirmar ou cancelar. */}
-      {!vazia && !pensando && !cartaoAberto && !texto.trim() && (
+      {/* E some também quando a Aurora está PERGUNTANDO algo a ela -- ver
+          `atalhosCabem`: um atalho ali convida a largar a ação pela metade. */}
+      {!vazia && !pensando && !cartaoAberto && !texto.trim() && atalhosCabem(falas[falas.length - 1]) && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

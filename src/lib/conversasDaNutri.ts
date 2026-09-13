@@ -66,6 +66,9 @@ type LinhaDeConversa = {
  * conversa, e é por isso que a função do banco parte de `app_vinculos` e não de
  * `app_mensagens`. Esses chegam com tudo nulo, e a tela mostra o convite.
  */
+/* Ver "Canal NOVO" em `avisarQueChegou`. */
+const CANAL_DAS_MENSAGENS = 'mensagens-nutri-2'
+
 export async function conversasDaNutri(): Promise<ResultadoDasConversas> {
   const { data, error } = await supabase.rpc('nutri_conversas')
 
@@ -284,12 +287,16 @@ export async function avisarQueChegou(nome: string, previa: string): Promise<voi
        sistema, e dividir o canal com "Meus avisos" faria desligar um calar o
        outro sem nada na nossa tela explicando. Mesma decisão de
        `avisosDaNutri.ts`. */
+    /* Canal NOVO, pelo mesmo motivo de `avisosDaNutri` (ver "CANAL NOVO" lá):
+       `sound: 'default'` é lido como arquivo que não existe, e o canal nascia
+       mudo. O antigo pode ser APAGADO aqui, ao contrário do dos avisos, porque
+       ele nunca foi usado -- ver o gatilho logo abaixo. */
     if (Platform.OS === 'android') {
-      await N.setNotificationChannelAsync('mensagens-nutri', {
+      await N.setNotificationChannelAsync(CANAL_DAS_MENSAGENS, {
         name: 'Mensagens de pacientes',
         importance: N.AndroidImportance.HIGH,
-        sound: 'default',
       })
+      await N.deleteNotificationChannelAsync('mensagens-nutri').catch(() => {})
     }
 
     await N.scheduleNotificationAsync({
@@ -300,8 +307,16 @@ export async function avisarQueChegou(nome: string, previa: string): Promise<voi
         body: previa || 'Mandou uma mensagem',
         data: { tipo: 'conversa-nutri' },
       },
-      /* Agora. `null` é o gatilho imediato. */
-      trigger: null,
+      /* Agora, E no canal criado logo acima.
+       *
+       * Era `trigger: null`, que também dispara na hora -- mas SEM canal, e sem
+       * canal a notificação cai no canal genérico do app. O canal "Mensagens de
+       * pacientes" era criado a cada mensagem e nunca recebia nenhuma: desligar
+       * ele nas configurações não desligava nada. É o mesmo defeito que a
+       * confirmação de água já teve, e a mesma saída de lá: `{ channelId }` é o
+       * gatilho que a biblioteca descreve como "delivered immediately". No iOS
+       * não há canal, e `null` continua certo. */
+      trigger: Platform.OS === 'android' ? { channelId: CANAL_DAS_MENSAGENS } : null,
     })
   } catch (e) {
     /* Engole. Função de apoio de UI não rejeita: uma rejeição sem dono aqui

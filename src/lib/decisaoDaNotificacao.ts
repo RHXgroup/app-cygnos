@@ -125,7 +125,13 @@ export function depoisDoPedido(
 /* Os tipos que PEDEM atenção. Lista explícita, e não "tudo menos a água":
    notificação nova entra calada e alguém percebe, o que é melhor do que entrar
    apitando sem ninguém ter decidido. Armadilha 10, pelo lado do padrão. */
-const APITAM = new Set(['nutri', 'refeicao', 'agua', 'sequencia'])
+/* `conversa-nutri` faltou na primeira versão desta lista, e calou as mensagens
+   de paciente com o app aberto. A regra do "entra calada e alguém percebe"
+   funcionou como alarme -- só que o tipo não era novo: quem escreveu a lista
+   não o conhecia. Levantado agora de TODOS os `scheduleNotificationAsync` do
+   app: são estes cinco, mais a confirmação de água, que não tem tipo e fica
+   muda de propósito. */
+const APITAM = new Set(['nutri', 'refeicao', 'agua', 'sequencia', 'conversa-nutri'])
 
 export function deveApitar(tipo: unknown): boolean {
   return typeof tipo === 'string' && APITAM.has(tipo)

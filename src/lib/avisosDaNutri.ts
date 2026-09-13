@@ -94,6 +94,10 @@ async function gravar(avisos: Aviso[]): Promise<void> {
  * cumpriu o papel dele não é histórico, é lixo -- e uma lista que só cresce
  * faz ela parar de olhar. Quem quiser histórico tem a agenda.
  */
+/* Ver "CANAL NOVO" em `criarAviso`: o `avisos-nutri` nasceu com um som que não
+   existe, e som de canal não se muda depois. */
+const CANAL_DOS_AVISOS = 'avisos-nutri-2'
+
 export async function avisosPendentes(agora: number = Date.now()): Promise<Aviso[]> {
   const todos = await guardados()
   const vivos = todos.filter(a => a.quando > agora).sort((a, b) => a.quando - b.quando)
@@ -152,12 +156,35 @@ export async function criarAviso(
        importância, e a pessoa desliga POR CANAL nas configurações do sistema --
        então dividir o canal com outro assunto faria desligar um calar o outro,
        sem nada na nossa tela explicando. */
+    /* ──────────────── CANAL NOVO, porque o antigo nascia MUDO ────────────────
+     *
+     * Relatado: "a Aurora me notificou às sete da manhã, mas não apitou, só pôs
+     * um lembrete na tela". Achado no log do próprio celular dele:
+     *
+     *   expo-notifications: Custom sound 'default' not found in native app.
+     *
+     * `sound: 'default'` NÃO quer dizer "o som padrão do telefone": a biblioteca
+     * lê como o nome de um ARQUIVO de som chamado "default", que não existe -- e
+     * o canal fica sem som nenhum. O som padrão é deixar `sound` de fora.
+     *
+     * E não bastava tirar a linha: no Android o som de um canal é fixado quando
+     * ele nasce, e nenhum `setNotificationChannelAsync` posterior o muda. Por
+     * isso o canal é outro. O antigo NÃO é apagado: lembretes que já estavam
+     * agendados apontam para ele, e um canal apagado faz o Android descartar a
+     * notificação na hora de tocar. Ele só ganha "(antigos)" no nome, para não
+     * aparecerem dois "Meus avisos" nas configurações.
+     *
+     * O que foi consertado antes (o tratador que calava tudo com o app aberto)
+     * era real, mas só valia com o app aberto. Com o app fechado, era isto. */
     if (Platform.OS === 'android') {
-      await N.setNotificationChannelAsync('avisos-nutri', {
+      await N.setNotificationChannelAsync(CANAL_DOS_AVISOS, {
         name: 'Meus avisos',
         importance: N.AndroidImportance.HIGH,
-        sound: 'default',
       })
+      await N.setNotificationChannelAsync('avisos-nutri', {
+        name: 'Meus avisos (antigos)',
+        importance: N.AndroidImportance.HIGH,
+      }).catch(() => {})
     }
 
     const idDaNotificacao = await N.scheduleNotificationAsync({
@@ -172,7 +199,7 @@ export async function criarAviso(
       trigger: {
         type: N.SchedulableTriggerInputTypes.DATE,
         date: new Date(instante),
-        ...(Platform.OS === 'android' ? { channelId: 'avisos-nutri' } : {}),
+        ...(Platform.OS === 'android' ? { channelId: CANAL_DOS_AVISOS } : {}),
       },
     })
 
