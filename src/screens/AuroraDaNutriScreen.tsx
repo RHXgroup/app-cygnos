@@ -625,7 +625,15 @@ export function AuroraDaNutriScreen({
                   problema é o sinal, não a resposta) e só uma vez por fala.
                   Discreto de propósito: quem está satisfeita não deve tropeçar
                   nele. */}
-              {f.papel === 'aurora' && !f.local && !f.falhou ? (
+              {/* ──── SÓ NO APP DE TESTE, até ele decidir ────
+                  O "não era isso" guarda a PERGUNTA que ela escreveu, e a
+                  pergunta pode ter nome de paciente dentro. Pelo contrato isso é
+                  finalidade nova sobre dado de paciente e pede ACEITE das
+                  nutricionistas -- decisão do Helton, ainda não tomada. Até lá o
+                  botão não vai para o build da loja: `__DEV__` é falso no pacote
+                  de produção, e o botão some dele por inteiro.
+                  Quando ele decidir, é tirar `__DEV__ &&` desta linha. */}
+              {__DEV__ && f.papel === 'aurora' && !f.local && !f.falhou ? (
                 f.apontada ? (
                   <Text style={styles.anotado}>Anotado. Vou usar para melhorar a Aurora.</Text>
                 ) : (
