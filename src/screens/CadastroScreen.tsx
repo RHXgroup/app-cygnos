@@ -144,8 +144,23 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
 
     if (error) {
       const m = error.message.toLowerCase()
-      if (m.includes('already registered') || m.includes('already been registered')) {
+      const codigo = (error as { code?: string }).code ?? ''
+      const status = (error as { status?: number }).status
+      console.warn('[cadastro] signUp recusou:', status, codigo, error.message)
+      if (m.includes('already registered') || m.includes('already been registered') || codigo === 'email_exists' || codigo === 'user_already_exists') {
         setErros({ email: 'Já existe uma conta com esse e-mail.' })
+      } else if (codigo === 'over_email_send_rate_limit' || status === 429 || m.includes('rate limit')) {
+        /* O servidor tem um teto de e-mails por hora. Quando várias pessoas se
+           cadastram juntas (numa consulta, num evento), a conta NÃO é criada --
+           o Supabase desfaz o cadastro quando não consegue mandar a confirmação.
+           "Tente de novo em instantes" fazia a pessoa tentar dez vezes seguidas. */
+        setErroGeral('Muitos cadastros ao mesmo tempo agora. Sua conta ainda não foi criada: espere alguns minutos e toque em "Criar conta" de novo.')
+      } else if (codigo === 'weak_password' || m.includes('password should')) {
+        setErros({ senha: 'O servidor recusou essa senha. Escolha outra, mais longa e que você não use em outro lugar.' })
+      } else if (codigo === 'email_address_invalid' || (m.includes('email address') && m.includes('invalid'))) {
+        setErros({ email: 'Esse e-mail não foi aceito. Confira se está escrito certo.' })
+      } else if (m.includes('sending confirmation') || m.includes('confirmation email')) {
+        setErroGeral('Não consegui enviar o e-mail de confirmação, e por isso a conta ainda não foi criada. Confira o e-mail digitado e tente de novo em alguns minutos.')
       } else if (m.includes('database error')) {
         /* CPF ou telefone repetido — o caminho NORMAL desde que a checagem
            prévia parou de perguntar por eles. Cobre também a corrida de alguém
@@ -170,9 +185,19 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
     return (
       <View style={styles.centro}>
         <Text style={styles.tituloConfirmacao}>Falta só confirmar</Text>
+        {/* O relato que trouxe este texto: "todo mundo criou usuário e senha, foi
+            entrar e deu senha errada". Quem não tocava no link não conseguia
+            entrar, e nada nesta tela dizia que o link era obrigatório, onde
+            procurar a mensagem, nem com que nome entrar depois. */}
         <Text style={styles.textoConfirmacao}>
           Enviamos um e-mail para {email.trim().toLowerCase()}. Abra a mensagem e toque no link
-          para ativar sua conta.
+          para ativar sua conta. Sem tocar no link, o app não deixa entrar.
+        </Text>
+        <Text style={styles.textoConfirmacao}>
+          Não chegou? Olhe o spam e a aba Promoções. O link pode abrir uma página no navegador:
+          depois dele, volte aqui e entre com{' '}
+          <Text style={styles.destaqueConfirmacao}>{normalizarUsername(username)}</Text> ou com o
+          seu e-mail.
         </Text>
         <Botao rotulo="Voltar para o login" onPress={onVoltar} />
       </View>
@@ -437,5 +462,6 @@ const estilos = estilosDe(t =>
     textAlign: 'center',
     marginBottom: 8,
   },
+  destaqueConfirmacao: { fontWeight: '700', color: t.cores.deep },
   }),
 )

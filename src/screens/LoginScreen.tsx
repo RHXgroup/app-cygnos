@@ -45,11 +45,11 @@ function frasaDaEspera(segundos: number): string {
 
 /* A tradutora de mensagem do supabase-js saiu daqui junto com o
    `signInWithPassword`: quem responde agora é a `app-login`, e ela responde
-   IGUAL para usuário inexistente, senha errada e e-mail não confirmado —
-   separar os três devolveria o verificador de contas que a mudança fechou.
-   O caso que valia a pena dizer, "confirme seu e-mail", virou parte da
-   mensagem única: serve para quem precisa e não afirma nada sobre a conta de
-   ninguém. */
+   IGUAL para usuário inexistente e senha errada — separar os dois devolveria o
+   verificador de contas que a mudança fechou.
+   O e-mail não confirmado ganhou resposta própria em 14/09/2026, e isso NÃO
+   reabre o verificador: o Supabase só chega a olhar a confirmação depois de a
+   senha conferir (ver o comentário na `app-login`). */
 
 export function LoginScreen({
   aviso,
@@ -306,11 +306,16 @@ export function LoginScreen({
      * numa recusa -- e toda senha errada virava "não consegui entrar agora",
      * como se fosse a internet. É o mesmo desenho que `confirmarAcao` já lê. */
     let motivo: string | undefined = data?.error
+    /* `false` só quando a função disse que o reenvio foi recusado. A função
+       antiga não mandava o campo, e aí vale a frase de sempre. */
+    let reenviado: boolean | undefined = data?.reenviado
     if (erroFn && !motivo) {
       const ctx = (erroFn as { context?: Response }).context
       if (ctx && typeof ctx.json === 'function') {
         try {
-          motivo = (await ctx.json())?.error
+          const corpo = await ctx.json()
+          motivo = corpo?.error
+          reenviado = corpo?.reenviado
         } catch {
           motivo = undefined
         }
@@ -328,8 +333,12 @@ export function LoginScreen({
      * A função agora diz que é isso, e já reenvia o e-mail. */
     if (motivo === 'email_nao_confirmado') {
       setErro(
-        'Sua conta ainda não foi confirmada. Enviamos de novo o e-mail de confirmação: ' +
-          'abra a mensagem, toque no link e depois entre aqui. Olhe também o spam.',
+        reenviado === false
+          ? 'Sua conta ainda não foi confirmada. Procure o e-mail de confirmação que mandamos no ' +
+              'cadastro (olhe o spam e a aba Promoções) e toque no link. Se não achar, espere ' +
+              'alguns minutos e tente entrar de novo: aí mandamos outro.'
+          : 'Sua conta ainda não foi confirmada. Enviamos de novo o e-mail de confirmação: ' +
+              'abra a mensagem, toque no link e depois entre aqui. Olhe também o spam.',
       )
       setCarregando(false)
       return

@@ -17,7 +17,7 @@ import { CampoTexto } from '../components/CampoTexto'
 import { ForcaSenha } from '../components/ForcaSenha'
 import { AVISO_CONTA_SEM_CADASTRO } from '../lib/conta'
 import { quemEntrou } from '../lib/souNutri'
-import { validarSenha } from '../lib/formulario'
+import { normalizarUsername, validarSenha } from '../lib/formulario'
 import { supabase } from '../lib/supabase'
 import { estilosDe, paleta } from '../lib/tema'
 import { useDesvioDoTeclado } from '../lib/teclado'
@@ -119,7 +119,12 @@ export function RecuperarSenhaScreen({
   }, [esperaReenvio])
 
   async function pedirCodigo() {
-    const login = identificador.trim().toLowerCase()
+    /* A MESMA regra do cadastro e do login. Com só `toLowerCase`, quem se
+       cadastrou digitando "João" (salvo "joao") pedia o código para "joão", a
+       função não achava a conta, e o código nunca chegava -- calado, porque a
+       tela responde igual exista a conta ou não. */
+    const bruto = identificador.trim()
+    const login = bruto.includes('@') ? bruto.toLowerCase() : normalizarUsername(bruto)
     if (login.length === 0 || carregando) return
 
     setErro('')
