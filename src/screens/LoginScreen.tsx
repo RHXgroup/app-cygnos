@@ -344,6 +344,22 @@ export function LoginScreen({
       return
     }
 
+    /* ──── O USUÁRIO E A SENHA QUE A NUTRICIONISTA CRIOU NO SISTEMA ────
+     *
+     * A causa real de "todo mundo criou usuário e senha, foi entrar e deu senha
+     * errada": o formulário de paciente do site ainda cria o acesso do
+     * aplicativo ANTERIOR, e essa conta não tem cadastro no Cygnos. A senha
+     * estava certa. A função só responde isto depois de conferi-la. */
+    if (motivo === 'conta_do_app_antigo') {
+      setErro(
+        'Esse usuário e senha foram criados no sistema da sua nutricionista para o aplicativo ' +
+          'antigo, e não servem no Cygnos. Toque em "Criar conta" logo abaixo (leva um minuto). ' +
+          'Depois, sua nutricionista liga a conta nova à sua ficha.',
+      )
+      setCarregando(false)
+      return
+    }
+
     if (erroFn && !motivo) {
       /* Sem afirmar que é a internet da pessoa: o pedido pode ter falhado do
          nosso lado, e aí a mensagem antiga a mandava procurar defeito no
