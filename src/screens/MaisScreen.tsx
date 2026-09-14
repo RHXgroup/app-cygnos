@@ -54,6 +54,7 @@ import { Confirmacao } from '../components/Confirmacao'
 import { EXPLICACAO_DA_NOTIFICACAO, SEM_NOTIFICACAO } from '../lib/permissoes'
 import { ASuaNutri, Minha, SuaNutri, elaPronome, uma } from '../lib/tratamentoDaNutri'
 import { sairDaConta } from '../lib/sairDaConta'
+import { versaoDoApp } from '../lib/versaoDoApp'
 
 const OPCOES_DE_TEMA: { chave: Tema; rotulo: string; icone: 'moon-outline' | 'sunny-outline' }[] = [
   { chave: 'escuro', rotulo: 'Escuro', icone: 'moon-outline' },
@@ -920,6 +921,9 @@ export function MaisScreen({
       {/* A explicação da notificação, com a cara do app.
           `explicandoAviso` guarda QUAL interruptor pediu — são três, e depois
           do "pode pedir" é preciso continuar naquele, e não em outro. */}
+      {/* A versão instalada, pequena e apagada no fim da aba. Ver `versaoDoApp`. */}
+      {!!versaoDoApp() && <Text style={styles.versao}>{versaoDoApp()}</Text>}
+
       <Confirmacao
         visivel={explicandoAviso !== null}
         titulo="Lembretes no seu aparelho"
@@ -1219,6 +1223,7 @@ const estilos = estilosDe(t =>
   StyleSheet.create({
   tela: { flex: 1, backgroundColor: t.cores.fundo },
   conteudo: { paddingHorizontal: MARGEM, paddingBottom: 28, gap: 14 },
+  versao: { fontSize: 11, color: t.inkFraco, opacity: 0.6, textAlign: 'center', paddingTop: 4 },
 
   /* Cartão de uma linha, e não um item dentro de "Conta": é o primeiro assunto
      da aba, e o único que fala da PESSOA e não de configuração. */

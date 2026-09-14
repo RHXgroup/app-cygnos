@@ -16,6 +16,7 @@ import { dinheiroDoDia, reais, type DinheiroDoDia } from '../lib/financeiroDoDia
 import { carregarPerfilDaNutri, type PerfilDaNutri } from '../lib/souNutri'
 import { RAIO_CARTAO, estilosDe, paleta } from '../lib/tema'
 import { FONTE } from '../lib/fontes'
+import { versaoDoApp } from '../lib/versaoDoApp'
 import { apagarAviso, avisosPendentes, criarAviso, type Aviso } from '../lib/avisosDaNutri'
 import { quandoDoAviso, quandoPorExtenso } from '../lib/quandoDoAviso'
 import {
@@ -195,6 +196,10 @@ export function MaisDaNutriScreen({
           O que não tem tela aqui, a Aurora faz · e o que ela ainda não faz,
           continua no sistema, no computador.
         </Text>
+
+        {/* A versão instalada, pequena e apagada: só serve para quem procura --
+            "subi uma versão e não sei se atualizou". Ver `versaoDoApp`. */}
+        {!!versaoDoApp() && <Text style={styles.versao}>{versaoDoApp()}</Text>}
       </ScrollView>
     </View>
   )
@@ -618,6 +623,7 @@ const estilos = estilosDe(t =>
     textoDaOpcao: { fontSize: 12.5, color: t.inkFraco, marginTop: 1 },
     nomeDaConta: { fontSize: 14, color: t.inkSuave, paddingBottom: 4 },
 
+    versao: { fontSize: 11, color: t.inkFraco, opacity: 0.6, textAlign: 'center', paddingTop: 6 },
     rodape: { fontSize: 12, color: t.inkFraco, lineHeight: 18, paddingHorizontal: 4, paddingTop: 4 },
     pressionado: { opacity: 0.7 },
   }),
