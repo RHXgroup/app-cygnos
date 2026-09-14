@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { normalizarUsername } from '../lib/formulario'
 import { estilosDe, paleta } from '../lib/tema'
 import { useDesvioDoTeclado } from '../lib/teclado'
 import { Botao } from '../components/Botao'
@@ -277,7 +278,12 @@ export function LoginScreen({
       return
     }
 
-    const login = identificador.trim().toLowerCase()
+    /* E-mail vai como está (só minúscula). Usuário passa pela MESMA regra do
+       cadastro: "Maria.Silva" ou "João" digitados aqui têm de casar com
+       "maria.silva" e "joao" salvos lá. Sem isto, quem se cadastrou com acento
+       ouvia que a senha estava errada. */
+    const bruto = identificador.trim()
+    const login = bruto.includes('@') ? bruto.toLowerCase() : normalizarUsername(bruto)
 
     /* Identificador e senha na MESMA chamada, e é esse o ponto.
        Antes o app perguntava primeiro "qual o e-mail do fulano?" — uma RPC que
@@ -293,7 +299,43 @@ export function LoginScreen({
       body: { login, senha },
     })
 
-    if (erroFn && !data?.error) {
+    /* ──── A RESPOSTA DA RECUSA mora no corpo do erro ────
+     *
+     * Quando a função responde 401, o `invoke` devolve `data` NULO e o corpo
+     * fica em `error.context`. Este trecho lia `data?.error`, que nunca existia
+     * numa recusa -- e toda senha errada virava "não consegui entrar agora",
+     * como se fosse a internet. É o mesmo desenho que `confirmarAcao` já lê. */
+    let motivo: string | undefined = data?.error
+    if (erroFn && !motivo) {
+      const ctx = (erroFn as { context?: Response }).context
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          motivo = (await ctx.json())?.error
+        } catch {
+          motivo = undefined
+        }
+      }
+    }
+
+    /* ──── A CONTA QUE AINDA NÃO FOI CONFIRMADA ────
+     *
+     * Relatado: "todo mundo tinha criado usuário e senha, e quando foi entrar deu
+     * que a senha estava errada, e teve que criar outra". O cadastro manda um
+     * e-mail de confirmação; quem tentava entrar antes de tocar no link recebia a
+     * mesma resposta de senha errada -- pedia senha nova, e o link de nova senha
+     * confirmava o e-mail de quebra, então "funcionava".
+     *
+     * A função agora diz que é isso, e já reenvia o e-mail. */
+    if (motivo === 'email_nao_confirmado') {
+      setErro(
+        'Sua conta ainda não foi confirmada. Enviamos de novo o e-mail de confirmação: ' +
+          'abra a mensagem, toque no link e depois entre aqui. Olhe também o spam.',
+      )
+      setCarregando(false)
+      return
+    }
+
+    if (erroFn && !motivo) {
       /* Sem afirmar que é a internet da pessoa: o pedido pode ter falhado do
          nosso lado, e aí a mensagem antiga a mandava procurar defeito no
          aparelho dela. */

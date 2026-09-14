@@ -1,4 +1,4 @@
-import { mascaraQuantidade, numeroDigitado } from './formulario.ts'
+import { mascaraQuantidade, normalizarUsername, numeroDigitado, validarUsername } from './formulario.ts'
 
 let passou = 0
 let falhou = 0
@@ -23,6 +23,17 @@ ok('letra some', mascaraQuantidade('1a5') === '15')
 ok('uma casa decimal só', mascaraQuantidade('1,55') === '1,5', mascaraQuantidade('1,55'))
 ok('dois separadores viram um', mascaraQuantidade('1.5.3') === '1,5', mascaraQuantidade('1.5.3'))
 ok('quatro dígitos no inteiro', mascaraQuantidade('12345') === '1234')
+
+// ── O nome de usuário: "Mm" e o acento que sumia ─────────────────────────────
+ok('maiúscula vira minúscula, uma vez só', normalizarUsername('Maria') === 'maria', normalizarUsername('Maria'))
+ok('acento vira letra, e não some', normalizarUsername('joão') === 'joao', normalizarUsername('joão'))
+ok('ç vira c', normalizarUsername('Conceição') === 'conceicao', normalizarUsername('Conceição'))
+ok('espaço sai', normalizarUsername('maria silva') === 'mariasilva', normalizarUsername('maria silva'))
+ok('ponto e underline ficam', normalizarUsername('Maria.Silva_2') === 'maria.silva_2', normalizarUsername('Maria.Silva_2'))
+ok('símbolo sai', normalizarUsername('maria@silva!') === 'mariasilva', normalizarUsername('maria@silva!'))
+ok('limite de 20', normalizarUsername('abcdefghijklmnopqrstuvwxyz').length === 20)
+ok('vazio não quebra', normalizarUsername('') === '')
+ok('o normalizado passa na validação', validarUsername(normalizarUsername('João.Silva')) === null)
 
 console.log('\n' + passou + ' passaram, ' + falhou + ' falharam')
 process.exit(falhou > 0 ? 1 : 0)

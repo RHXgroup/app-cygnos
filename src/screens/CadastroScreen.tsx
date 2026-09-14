@@ -15,6 +15,7 @@ import {
   mascaraCPF,
   mascaraData,
   mascaraTelefone,
+  normalizarUsername,
   soDigitos,
   validarCPF,
   validarEmail,
@@ -71,7 +72,7 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
     const locais: Erros = {
       nome: validarNome(nome) ?? undefined,
       email: validarEmail(email) ?? undefined,
-      username: validarUsername(username) ?? undefined,
+      username: validarUsername(normalizarUsername(username)) ?? undefined,
       cpf: validarCPF(cpf) ?? undefined,
       telefone: validarTelefone(telefone) ?? undefined,
       senha: validarSenha(senha) ?? undefined,
@@ -102,7 +103,7 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
        e aparece ao enviar, no bloco de erro mais abaixo. */
     const { data: disp, error: erroDisp } = await supabase.rpc('app_cadastro_disponibilidade', {
       p_email: email.trim().toLowerCase(),
-      p_username: username.trim().toLowerCase(),
+      p_username: normalizarUsername(username),
       p_cpf: soDigitos(cpf),
       p_telefone: soDigitos(telefone),
     })
@@ -132,7 +133,7 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
       options: {
         data: {
           app_nome_completo: nome.trim().replace(/\s+/g, ' '),
-          app_username: username.trim().toLowerCase(),
+          app_username: normalizarUsername(username),
           app_cpf: soDigitos(cpf),
           app_telefone: soDigitos(telefone),
           app_genero: genero,
@@ -227,13 +228,22 @@ export function CadastroScreen({ onVoltar }: { onVoltar: () => void }) {
             rotulo="Nome de usuário"
             value={username}
             onChangeText={v => {
-              /* Filtra na digitação em vez de reclamar depois: o teclado do
-                 celular não tem como o usuário adivinhar a regra. */
-              setUsername(v.toLowerCase().replace(/[^a-z0-9._]/g, ''))
+              /* SEM transformar enquanto ela digita. Passar para minúscula a cada
+                 letra brigava com o teclado do Android e duplicava a maiúscula
+                 ("Mm"). A regra roda ao sair do campo e ao enviar -- ver
+                 `normalizarUsername`. */
+              setUsername(v)
               limparErro('username')
             }}
+            onBlur={() => setUsername(u => normalizarUsername(u))}
             erro={erros.username}
-            ajuda="Letras, números, ponto e underline."
+            /* Mostra COMO vai ficar, quando for diferente do que ela digitou:
+               ela entra depois com este nome, e precisa vê-lo antes. */
+            ajuda={
+              username && normalizarUsername(username) !== username
+                ? `Você vai entrar com: ${normalizarUsername(username) || '(vazio)'}`
+                : 'Letras, números, ponto e underline.'
+            }
             placeholder="maria.silva"
             autoCapitalize="none"
             autoCorrect={false}

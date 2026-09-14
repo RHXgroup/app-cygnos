@@ -81,6 +81,33 @@ export function validarEmail(v: string): string | null {
   return null
 }
 
+/* ──────────────────── O NOME DE USUÁRIO, do jeito que ele fica salvo ────────────────────
+ *
+ * Relatado por um usuário: "ao se cadastrar, não aceita letra maiúscula -- ela
+ * duplica a maiúscula e joga a mesma letra minúscula". O campo passava o texto
+ * para minúscula A CADA LETRA, e no Android isso briga com o teclado: ele ainda
+ * está compondo a palavra quando o app troca "M" por "m", reenvia a composição, e
+ * sai "Mm". A conta nascia "mmaria" -- e quem digitava "maria" para entrar ouvia
+ * que a senha estava errada.
+ *
+ * Agora a transformação sai da digitação: o campo aceita o que ela digitar, e
+ * esta função normaliza quando ela sai do campo e na hora de enviar -- e também
+ * no LOGIN, para "Maria.Silva" digitado lá casar com "maria.silva" salvo aqui.
+ *
+ * E o acento vira letra, em vez de sumir: a versão antiga apagava tudo fora de
+ * a-z, e "joão" virava "joo" sem ninguém ver. Espaço sai. O limite é o do banco. */
+export function normalizarUsername(v: string): string {
+  return [...(v ?? '').normalize('NFD')]
+    .filter(c => {
+      const n = c.charCodeAt(0)
+      return n < 0x300 || n > 0x36f
+    })
+    .join('')
+    .toLowerCase()
+    .replace(/[^a-z0-9._]/g, '')
+    .slice(0, 20)
+}
+
 export function validarUsername(v: string): string | null {
   const limpo = v.trim().toLowerCase()
   if (limpo.length < 3) return 'O usuário precisa de pelo menos 3 caracteres.'
